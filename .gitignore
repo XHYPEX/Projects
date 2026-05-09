@@ -21,6 +21,8 @@ build/
 Thumbs.db
 
 # Logs & temp files
+CLAUDE.md
+*.csv
 *.log
 *.tmp
 .cache/

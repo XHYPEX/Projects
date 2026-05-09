@@ -1,0 +1,26 @@
+# Secrets & credentials
+.env
+*.pem
+*.key
+secrets.json
+
+# Dependencies
+node_modules/
+vendor/
+__pycache__/
+*.pyc
+
+# Build output
+dist/
+build/
+*.o
+*.exe
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs & temp files
+*.log
+*.tmp
+.cache/

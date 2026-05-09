@@ -1,0 +1,376 @@
+2026-05-03 15:37:47.0597 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=1, delay=2.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:37:51.0658 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=2, delay=4.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:37:57.0811 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=3, delay=8.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:38:06.0785 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=4, delay=16.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:38:24.0147 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=5, delay=32.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:38:57.0226 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=6, delay=64.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:40:02.0739 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=7, delay=128.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+2026-05-03 15:42:12.0178 - ERROR - graphrag.language_model.providers.litellm.services.retry.exponential_retry - ExponentialRetry: Request failed, retrying, retries=8, delay=256.0, max_retries=10, exception=litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 461, in make_openai_chat_completion_request
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 2700, in create
+    return await self._post(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 622, in acompletion
+    response = await init_response
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/llms/openai/openai.py", line 990, in acompletion
+    raise OpenAIError(
+litellm.llms.openai.common_utils.OpenAIError: Error code: 404 - {'error': {'message': 'The model `gpt-4-turbo-preview` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/services/retry/exponential_retry.py", line 71, in aretry
+    return await func(**kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/graphrag/language_model/providers/litellm/chat_model.py", line 109, in _base_acompletion
+    return await acompletion(**new_args)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 2097, in wrapper_async
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/utils.py", line 1896, in wrapper_async
+    result = await original_function(*args, **kwargs)
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/main.py", line 641, in acompletion
+    raise exception_type(
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2456, in exception_type
+    raise e
+  File "/Users/0xd0kk/anaconda3/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 412, in exception_type
+    raise NotFoundError(
+litellm.exceptions.NotFoundError: litellm.NotFoundError: OpenAIException - The model `gpt-4-turbo-preview` does not exist or you do not have access to it.

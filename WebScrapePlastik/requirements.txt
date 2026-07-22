@@ -1,5 +1,7 @@
 playwright
 folium
 pandas
-streamlit
-streamlit-folium
+fastapi[standard]
+uvicorn[standard]
+rapidfuzz
+bcrypt

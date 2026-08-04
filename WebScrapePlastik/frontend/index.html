@@ -86,16 +86,17 @@
       box-shadow: inset 2px 0 0 0 #D97757;
     }
 
-    .dash-preset-btn.is-active {
+    .history-status-btn.is-active {
       background: #D97757;
       border-color: #D97757;
       color: #FAF9F5;
     }
 
-    /* Same visual treatment as .dash-preset-btn.is-active, kept as its own class so
-       toggling the Riwayat Invoice status filter can't be affected by
-       updateDashboardPresetButtons()'s document-wide `.dash-preset-btn` query. */
-    .history-status-btn.is-active {
+    /* Faktur Pembelian has two independent filter strips (document status and
+       payment status), so each gets its own class — one shared class would let
+       a click in one strip clear the highlight in the other. */
+    .pi-status-btn.is-active,
+    .pi-payment-btn.is-active {
       background: #D97757;
       border-color: #D97757;
       color: #FAF9F5;
@@ -112,13 +113,6 @@
       color: #141413;
       box-shadow: inset 0 -2px 0 0 #D97757;
     }
-
-    /* Cashier: Pending/Done/Void segmented status control — reuses the exact three
-       hex values already used by .status-dot.is-pending/.is-done/.is-void. */
-    .status-seg-btn { background: #FAF9F5; color: #6B6B66; }
-    .status-seg-btn[data-status="pending"].is-active { background: #AD7A1E; color: #FAF9F5; }
-    .status-seg-btn[data-status="done"].is-active    { background: #5B7A5B; color: #FAF9F5; }
-    .status-seg-btn[data-status="void"].is-active    { background: #A83B3B; color: #FAF9F5; }
 
     /* Header sprite: dachshund walks right-to-left across the top bar on every page. */
     .header-sprite-track {
@@ -184,18 +178,40 @@
 
     .is-staff .admin-only { display: none !important; }
 
+    /* Purchase invoice: A4 document, screen-hidden and only laid out for print. */
+    #pi-print-area { display: none; }
+
     @media print {
       body * { visibility: hidden; }
-      #barcode-print-area, #barcode-print-area * { visibility: visible; }
-      #barcode-print-area {
+
+      /* Two print targets share one stylesheet — the body class picks which one
+         becomes visible. @page can't be class-scoped, so the paper size lives in
+         the #print-page-rule <style> element that each print helper rewrites. */
+      body:not(.print-invoice) #barcode-print-area,
+      body:not(.print-invoice) #barcode-print-area * { visibility: visible; }
+      body:not(.print-invoice) #barcode-print-area {
         display: block;
         position: absolute;
         top: 0;
         left: 0;
       }
-      @page { size: 58mm 40mm; margin: 0; }
+
+      body.print-invoice #pi-print-area,
+      body.print-invoice #pi-print-area * { visibility: visible; }
+      body.print-invoice #pi-print-area {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        color: #141413;
+        font-family: 'Inter', system-ui, sans-serif;
+      }
+      body.print-invoice #pi-print-area table { page-break-inside: auto; }
+      body.print-invoice #pi-print-area tr { page-break-inside: avoid; }
     }
   </style>
+  <style id="print-page-rule">@page { size: 58mm 40mm; margin: 0; }</style>
 </head>
 <body class="bg-bg text-ink font-sans h-screen flex flex-col overflow-hidden">
 
@@ -232,6 +248,13 @@
         </svg>
         Riwayat Invoice
       </a>
+      <a href="#/purchase-invoices" data-route="/purchase-invoices" class="nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
+          <path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/>
+          <path d="M8 8h8M8 12h8M8 16h4"/>
+        </svg>
+        Faktur Pembelian
+      </a>
       <div>
         <button type="button" onclick="toggleInventoryNavGroup()" data-route="/inventory"
           class="nav-link w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
@@ -246,8 +269,6 @@
           </svg>
         </button>
         <div id="nav-inventory-submenu" class="hidden ml-8 pl-3 mt-0.5 py-0.5 border-l border-line space-y-0.5">
-          <a href="#/inventory" data-inv-tab="overview" onclick="navigateInventoryTab(event, 'overview')"
-            class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Ringkasan</a>
           <a href="#/inventory" data-inv-tab="inbound" onclick="navigateInventoryTab(event, 'inbound')"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Barang Masuk</a>
           <a href="#/inventory" data-inv-tab="master" onclick="navigateInventoryTab(event, 'master')"
@@ -256,9 +277,11 @@
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Brand</a>
           <a href="#/inventory" data-inv-tab="supplier" onclick="navigateInventoryTab(event, 'supplier')"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Supplier</a>
+          <a href="#/inventory" data-inv-tab="unit" onclick="navigateInventoryTab(event, 'unit')"
+            class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Satuan</a>
         </div>
       </div>
-      <a href="#/dashboard" data-route="/dashboard" class="admin-only nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
+      <a href="#/dashboard" data-route="/dashboard" class="nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
           <path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>
         </svg>
@@ -294,10 +317,14 @@
 
   <!-- TOAST -->
   <div id="toast" class="hidden fixed top-16 right-4 z-50 max-w-sm w-[calc(100%-2rem)] sm:w-96 opacity-0 -translate-y-1 transition-all duration-200 ease-out">
-    <div class="flex items-start gap-2.5 bg-bg border border-failed border-l-4 border-l-failed rounded-lg px-4 py-3">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-failed shrink-0 mt-0.5">
+    <div id="toast-card" class="flex items-start gap-2.5 bg-bg border border-failed border-l-4 border-l-failed rounded-lg px-4 py-3">
+      <svg id="toast-icon-error" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-failed shrink-0 mt-0.5">
         <circle cx="12" cy="12" r="9"/>
         <path d="M12 8v5M12 16h.01"/>
+      </svg>
+      <svg id="toast-icon-success" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="hidden text-done shrink-0 mt-0.5">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M8.5 12.5l2.5 2.5 5-5"/>
       </svg>
       <p id="toast-message" class="flex-1 text-sm text-ink"></p>
       <button onclick="hideToast()" aria-label="Dismiss notification" class="p-1 -m-1 rounded-lg hover:bg-bg2 text-muted transition-colors shrink-0">
@@ -471,27 +498,52 @@
         <div class="max-w-2xl">
           <div class="flex items-center justify-between mb-4">
             <h2 id="cashier-form-title" class="font-serif text-lg font-semibold text-ink">New receipt</h2>
-            <button id="cashier-delete-btn" onclick="confirmDeleteActiveReceipt()"
-              class="hidden admin-only px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
+            <div class="flex items-center gap-2">
+              <button id="cashier-void-btn" onclick="confirmVoidActiveReceipt()"
+                class="hidden px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Void</button>
+              <button id="cashier-delete-btn" onclick="confirmDeleteActiveReceipt()"
+                class="hidden admin-only px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
+            </div>
           </div>
+
+          <!-- Voided banner: same read-only-explanation treatment as the Barang Masuk
+               inbound-document void/posted banner (#inbound-readonly-banner) — void has
+               no unvoid path, so the whole form locks once this shows. -->
+          <div id="cashier-void-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted">This receipt has been voided and can no longer be edited.</div>
 
           <!-- Plate number -->
           <div class="mb-5">
             <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Vehicle plate number</label>
             <div class="flex items-start gap-2">
               <input id="plate-region" type="text" maxlength="2" placeholder="B"
-                class="w-16 text-center uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                class="w-16 text-center uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,''); validatePlateRegion();" />
               <span class="text-muted pt-2">·</span>
               <input id="plate-number" type="text" maxlength="4" inputmode="numeric" placeholder="1234"
-                class="w-20 text-center border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                class="w-20 text-center border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
               <span class="text-muted pt-2">·</span>
               <input id="plate-suffix" type="text" maxlength="3" placeholder="XYZ"
-                class="w-16 text-center uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                class="w-16 text-center uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'');" />
             </div>
             <p id="plate-region-feedback" class="text-xs text-muted mt-1.5"></p>
+          </div>
+
+          <!-- Customer contact: phone required, name optional -->
+          <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="customer-phone" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="text-failed">*</span></label>
+              <input id="customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                oninput="this.value=this.value.replace(/[^0-9+\s\-.()]/g,''); markActiveTabDirty();" />
+            </div>
+            <div>
+              <label for="customer-name" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama <span class="text-muted/60 normal-case">(opsional)</span></label>
+              <input id="customer-name" type="text" placeholder="Nama pelanggan" autocomplete="off"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                oninput="markActiveTabDirty();" />
+            </div>
           </div>
 
           <!-- Barcode scan -->
@@ -500,7 +552,7 @@
             <div class="flex items-center gap-2">
               <input id="scan-barcode-input" type="text" placeholder="Scan or type SKU, then Enter…" autocomplete="off"
                 onkeydown="handleScanInputKeydown(event)"
-                class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono placeholder:font-sans placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+                class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono placeholder:font-sans placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
             </div>
             <p id="scan-barcode-feedback" class="text-xs text-muted mt-1.5 min-h-[1rem]"></p>
           </div>
@@ -509,22 +561,23 @@
           <div class="mb-5">
             <div class="flex items-center justify-between mb-2">
               <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Products</label>
-              <button onclick="addItemRow(); markActiveTabDirty();" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors">+ Add item</button>
+              <button id="add-item-btn" onclick="addItemRow(); markActiveTabDirty();" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add item</button>
             </div>
             <div id="item-rows" class="space-y-2"></div>
           </div>
 
-          <!-- Status -->
+          <!-- Status: Pending/Done are computed from Jumlah Dibayar vs Total, never
+               chosen by hand, so this is a read-only badge — see statusLabel() and
+               the Void button/banner above for the one real user action here. -->
           <div class="mb-5">
             <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Status</label>
-            <div id="status-control" class="inline-flex rounded-lg border border-line overflow-hidden" data-value="pending">
-              <button type="button" data-status="pending" onclick="setCashierStatus('pending')" class="status-seg-btn is-active px-4 py-1.5 text-sm font-medium transition-colors">Pending</button>
-              <button type="button" data-status="done" onclick="setCashierStatus('done')" class="status-seg-btn px-4 py-1.5 text-sm font-medium border-l border-line transition-colors">Done</button>
-              <button type="button" data-status="void" onclick="setCashierStatus('void')" class="status-seg-btn px-4 py-1.5 text-sm font-medium border-l border-line transition-colors">Void</button>
-            </div>
+            <span id="cashier-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-bg2 text-sm font-medium text-ink">
+              <span id="cashier-status-dot" class="status-dot is-pending"></span>
+              <span id="cashier-status-label">Pending</span>
+            </span>
           </div>
 
-          <!-- Discount + totals -->
+          <!-- Discount + payment + totals -->
           <div class="border-t border-line pt-4 space-y-2 max-w-sm ml-auto">
             <div class="flex items-center justify-between text-sm">
               <span class="text-muted">Subtotal</span>
@@ -533,13 +586,23 @@
             <div class="flex items-center justify-between text-sm gap-3">
               <label for="discount-input" class="text-muted">Discount</label>
               <input id="discount-input" type="text" inputmode="numeric" value="0"
-                class="w-32 text-right border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                class="w-32 text-right border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 oninput="this.value=this.value.replace(/[^0-9]/g,''); recomputeTotals();" />
             </div>
             <p id="discount-error" class="hidden text-xs text-failed text-right"></p>
             <div class="flex items-center justify-between text-base border-t border-line pt-2">
               <span class="font-serif font-semibold text-ink">Total</span>
               <span id="total-display" class="font-serif font-semibold text-ink tabular-nums">Rp 0</span>
+            </div>
+            <div class="flex items-center justify-between text-sm gap-3 border-t border-line pt-2">
+              <label for="amount-paid-input" class="text-muted">Jumlah Dibayar</label>
+              <input id="amount-paid-input" type="text" inputmode="numeric" value="0"
+                class="w-32 text-right border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                oninput="this.value=this.value.replace(/[^0-9]/g,''); markAmountPaidTouched(); recomputeTotals();" />
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span id="remaining-balance-label" class="text-muted">Sisa Bayar</span>
+              <span id="remaining-balance-display" class="font-medium tabular-nums text-pending">Rp 0</span>
             </div>
           </div>
 
@@ -579,6 +642,7 @@
           <thead class="bg-bg2">
             <tr>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plate</th>
+              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Date</th>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
               <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Items</th>
@@ -595,70 +659,344 @@
     </div>
   </div>
 
-  <!-- PAGE: DASHBOARD -->
-  <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-5xl mx-auto">
+  <!-- PAGE: FAKTUR PEMBELIAN (purchase invoices / accounts payable — supplier bills we owe) -->
+  <div id="page-purchase-invoices" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
 
-      <!-- Range controls -->
-      <section class="mb-5">
-        <div class="flex flex-wrap items-center gap-2">
-          <button type="button" data-preset="today" onclick="applyDashboardPreset('today')"
-            class="dash-preset-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Today</button>
-          <button type="button" data-preset="7d" onclick="applyDashboardPreset('7d')"
-            class="dash-preset-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Last 7 days</button>
-          <button type="button" data-preset="30d" onclick="applyDashboardPreset('30d')"
-            class="dash-preset-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Last 30 days</button>
-          <button type="button" data-preset="month" onclick="applyDashboardPreset('month')"
-            class="dash-preset-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">This month</button>
-          <span class="w-px h-5 bg-line mx-1"></span>
-          <div class="flex items-center gap-2">
-            <input id="dash-date-from" type="date" onchange="onDashboardCustomDateChange()"
-              class="border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-            <span class="text-muted text-sm">to</span>
-            <input id="dash-date-to" type="date" onchange="onDashboardCustomDateChange()"
-              class="border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      <!-- LIST PANEL -->
+      <div id="pi-list-panel">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-serif text-lg font-semibold text-ink">Faktur Pembelian</h2>
+          <button onclick="newPurchaseInvoiceForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Faktur Baru</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Total Utang</div>
+            <div id="pi-sum-outstanding" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
+          </div>
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Faktur Belum Lunas</div>
+            <div id="pi-sum-unpaid" class="font-sans text-2xl font-semibold text-ink">0</div>
+          </div>
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Lewat Jatuh Tempo</div>
+            <div id="pi-sum-overdue-count" class="font-sans text-2xl font-semibold text-failed">0</div>
+            <div id="pi-sum-overdue-total" class="text-xs text-muted mt-0.5">Rp 0</div>
+          </div>
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Diposting</div>
+            <div id="pi-sum-posted" class="font-sans text-2xl font-semibold text-ink">0</div>
           </div>
         </div>
-      </section>
 
-      <!-- Stat tiles -->
-      <section class="grid grid-cols-2 gap-3 mb-6 max-w-md">
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Total revenue</div>
-          <div id="dash-total-revenue" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <input id="pi-search-input" type="text" placeholder="Cari no. faktur / no. supplier / nama supplier…" autocomplete="off"
+            oninput="onPurchaseInvoiceSearchInput()"
+            class="flex-1 min-w-[240px] border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" data-pi-status="" onclick="setPurchaseInvoiceStatusFilter('')"
+              class="pi-status-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Semua</button>
+            <button type="button" data-pi-status="draft" onclick="setPurchaseInvoiceStatusFilter('draft')"
+              class="pi-status-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Draft</button>
+            <button type="button" data-pi-status="posted" onclick="setPurchaseInvoiceStatusFilter('posted')"
+              class="pi-status-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Diposting</button>
+            <button type="button" data-pi-status="void" onclick="setPurchaseInvoiceStatusFilter('void')"
+              class="pi-status-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Void</button>
+          </div>
+          <span class="w-px h-5 bg-line mx-0.5"></span>
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" data-pi-payment="" onclick="setPurchaseInvoicePaymentFilter('')"
+              class="pi-payment-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Semua Bayar</button>
+            <button type="button" data-pi-payment="belum" onclick="setPurchaseInvoicePaymentFilter('belum')"
+              class="pi-payment-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Belum</button>
+            <button type="button" data-pi-payment="sebagian" onclick="setPurchaseInvoicePaymentFilter('sebagian')"
+              class="pi-payment-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Sebagian</button>
+            <button type="button" data-pi-payment="lunas" onclick="setPurchaseInvoicePaymentFilter('lunas')"
+              class="pi-payment-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Lunas</button>
+          </div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Receipts</div>
-          <div id="dash-receipt-count" class="font-sans text-2xl font-semibold text-ink">0</div>
-        </div>
-      </section>
 
-      <!-- Chart -->
-      <section class="mb-6">
-        <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Daily revenue</h2>
-        <div id="dash-chart" class="border border-line rounded-xl bg-bg2 p-4"></div>
-      </section>
-
-      <!-- Top 5 performing days -->
-      <section>
-        <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Top 5 performing days</h2>
-        <div class="border border-line rounded-xl bg-bg2 overflow-hidden">
+        <div class="border border-line rounded-xl overflow-x-auto">
           <table class="w-full text-sm">
-            <thead>
+            <thead class="bg-bg2">
               <tr>
-                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">#</th>
-                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Date</th>
-                <th class="text-right px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Revenue</th>
-                <th class="text-right px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Receipts</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Faktur</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jatuh Tempo</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
               </tr>
             </thead>
-            <tbody id="dash-top-days-tbody"></tbody>
+            <tbody id="pi-list-tbody"></tbody>
           </table>
-          <div id="dash-top-days-empty" class="hidden text-center py-10">
-            <p class="text-sm text-muted">No sales in this range.</p>
+          <div id="pi-list-empty" class="hidden text-center py-12">
+            <p class="font-serif text-base text-ink mb-1">Belum ada faktur pembelian.</p>
+            <p class="text-sm text-muted">Catat tagihan dari supplier lewat tombol “+ Faktur Baru”.</p>
           </div>
         </div>
-      </section>
+      </div>
+
+      <!-- FORM PANEL -->
+      <div id="pi-form-panel" class="hidden max-w-4xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 id="pi-form-title" class="font-serif text-lg font-semibold text-ink">Faktur Baru</h2>
+            <p id="pi-form-number" class="hidden font-mono text-xs text-muted mt-0.5"></p>
+          </div>
+          <button onclick="backToPurchaseInvoiceList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+        </div>
+
+        <div id="pi-readonly-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted"></div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Supplier</label>
+            <div class="flex gap-1.5">
+              <div class="relative flex-1">
+                <input id="pi-supplier-select" type="text" autocomplete="off" placeholder="Cari supplier…" data-entity-type="supplier" data-on-change="onPurchaseInvoiceSupplierChange"
+                  class="combobox-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  oninput="onComboboxInput(this)" onkeydown="onComboboxKeydown(event, this)" onfocus="onComboboxFocus(this)" onblur="onComboboxBlur(this)" />
+                <div class="combobox-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+              </div>
+              <button type="button" id="pi-supplier-add-btn" onclick="openQuickAddSupplier('pi-supplier-select')" class="px-3 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" title="Tambah supplier baru">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">No. Invoice Supplier</label>
+            <input id="pi-supplier-invoice-no" type="text" placeholder="nomor di faktur supplier"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
+        </div>
+
+        <!-- Contact block, mirrored from the supplier master so the printed invoice shows who was billed. -->
+        <div id="pi-supplier-contact" class="hidden mb-3 border border-line rounded-lg bg-bg2 px-3 py-2 text-xs text-muted space-y-0.5"></div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Tanggal Faktur</label>
+            <input id="pi-invoice-date" type="date" onchange="onPurchaseInvoiceTermsChange()"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Termin</label>
+            <select id="pi-payment-terms" onchange="onPurchaseInvoiceTermsChange()"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+              <option value="NET 0">Tunai (NET 0)</option>
+              <option value="NET 7">NET 7</option>
+              <option value="NET 14">NET 14</option>
+              <option value="NET 30" selected>NET 30</option>
+              <option value="NET 45">NET 45</option>
+              <option value="NET 60">NET 60</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jatuh Tempo</label>
+            <input id="pi-due-date" type="date"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan</label>
+          <input id="pi-notes" type="text" placeholder="opsional"
+            class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Barang</label>
+          <button type="button" id="pi-add-row-btn" onclick="addPurchaseInvoiceRow()" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors">+ Tambah Baris</button>
+        </div>
+        <div id="pi-item-rows" class="space-y-2 mb-4"></div>
+
+        <div class="border-t border-line pt-4 mb-4">
+          <div class="sm:ml-auto sm:max-w-sm space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-muted">Subtotal</span>
+              <span id="pi-subtotal-display" class="tabular-nums text-ink">Rp 0</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <label for="pi-discount" class="text-muted shrink-0">Diskon (Rp)</label>
+              <input id="pi-discount" type="number" min="0" step="1" value="0" oninput="updatePurchaseInvoiceTotals()"
+                class="w-36 border border-line rounded-lg px-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <label for="pi-tax-rate" class="text-muted shrink-0">PPN (%)</label>
+              <input id="pi-tax-rate" type="number" min="0" max="100" step="0.5" value="0" oninput="updatePurchaseInvoiceTotals()"
+                class="w-36 border border-line rounded-lg px-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-muted">Nilai PPN</span>
+              <span id="pi-tax-display" class="tabular-nums text-ink">Rp 0</span>
+            </div>
+            <div class="flex items-center justify-between border-t border-line pt-2">
+              <span class="font-serif font-semibold text-ink">Total</span>
+              <span id="pi-total-display" class="font-serif text-base font-semibold text-ink tabular-nums">Rp 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment block: posted invoices only — a draft isn't a payable yet. -->
+        <div id="pi-payment-section" class="hidden border border-line rounded-xl bg-bg2 px-4 py-3 mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Pembayaran</div>
+              <div class="text-sm text-ink">
+                Dibayar <span id="pi-paid-display" class="tabular-nums font-medium">Rp 0</span>
+                · Sisa <span id="pi-outstanding-display" class="tabular-nums font-medium text-failed">Rp 0</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="pi-payment-amount" type="number" min="1" step="1" placeholder="Jumlah bayar"
+                class="w-40 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <button type="button" onclick="submitPurchaseInvoicePayment()"
+                class="px-4 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 transition-colors">Catat Bayar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+          <button id="pi-print-btn" onclick="printPurchaseInvoice()"
+            class="hidden px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Cetak</button>
+          <button id="pi-delete-btn" data-armed="false" onclick="handleDeletePurchaseInvoiceClick(this)"
+            class="hidden admin-only px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
+          <button id="pi-void-btn" data-armed="false" onclick="handleVoidPurchaseInvoiceClick(this)"
+            class="hidden admin-only px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Void</button>
+          <button id="pi-save-btn" onclick="savePurchaseInvoiceDraft()"
+            class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Draft</button>
+          <button id="pi-post-btn" data-armed="false" onclick="handlePostPurchaseInvoiceClick(this)"
+            class="hidden px-5 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 transition-colors">Posting</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PAGE: DASHBOARD (Ringkasan — moved here from the Inventori tab bar) -->
+  <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
+
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">SKU Aktif</div>
+          <div id="ov-active-sku-count" class="font-sans text-2xl font-semibold text-ink">0</div>
+        </div>
+        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Persediaan</div>
+          <div id="ov-total-value" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
+        </div>
+        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Penjualan Bulan Ini</div>
+          <div id="ov-sales-month-revenue" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
+          <div id="ov-sales-month-count" class="text-xs text-muted mt-0.5">0 nota</div>
+        </div>
+        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Tagihan Tertunda</div>
+          <div id="ov-pending-count" class="font-sans text-2xl font-semibold text-ink">0</div>
+          <div id="ov-pending-outstanding" class="text-xs text-muted mt-0.5">Rp 0 belum dibayar</div>
+        </div>
+        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Dokumen Masuk (30 hari)</div>
+          <div id="ov-inbound-count" class="font-sans text-2xl font-semibold text-ink">0</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Produk Terlaris</h2>
+            <span class="text-xs text-muted">30 hari · unit terjual</span>
+          </div>
+          <div class="border border-line rounded-xl overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-bg2">
+                <tr>
+                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Produk</th>
+                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Terjual</th>
+                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Omzet</th>
+                </tr>
+              </thead>
+              <tbody id="ov-top-selling-tbody"></tbody>
+            </table>
+            <div id="ov-top-selling-empty" class="hidden text-center py-8">
+              <p class="text-sm text-muted">Belum ada penjualan 30 hari terakhir.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Barang Masuk Terbaru</h2>
+            <span class="text-xs text-muted">dari dokumen diposting</span>
+          </div>
+          <div class="border border-line rounded-xl overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-bg2">
+                <tr>
+                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Produk</th>
+                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
+                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty</th>
+                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+                </tr>
+              </thead>
+              <tbody id="ov-latest-incoming-tbody"></tbody>
+            </table>
+            <div id="ov-latest-incoming-empty" class="hidden text-center py-8">
+              <p class="text-sm text-muted">Belum ada barang masuk.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Stok Menipis</h2>
+          <span id="ov-low-stock-caption" class="text-xs text-muted"></span>
+        </div>
+        <div class="border border-line rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
+              </tr>
+            </thead>
+            <tbody id="ov-low-stock-tbody"></tbody>
+          </table>
+          <div id="ov-low-stock-empty" class="hidden text-center py-8">
+            <p class="text-sm text-muted">Tidak ada barang dengan stok menipis.</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Tagihan Tertunda Terbaru</h2>
+        </div>
+        <div class="border border-line rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dibayar</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+              </tr>
+            </thead>
+            <tbody id="ov-pending-tbody"></tbody>
+          </table>
+          <div id="ov-pending-empty" class="hidden text-center py-8">
+            <p class="text-sm text-muted">Tidak ada tagihan tertunda.</p>
+          </div>
+        </div>
+      </div>
 
     </div>
   </div>
@@ -696,59 +1034,17 @@
 
       <!-- Tab switcher -->
       <div class="flex flex-wrap gap-2 mb-5">
-        <button type="button" data-tab="overview" onclick="switchInventoryTab('overview')"
-          class="inv-tab-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Ringkasan</button>
         <button type="button" data-tab="inbound" onclick="switchInventoryTab('inbound')"
           class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Barang Masuk</button>
         <button type="button" data-tab="master" onclick="switchInventoryTab('master')"
-          class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Barang</button>
+          class="inv-tab-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Barang</button>
         <button type="button" data-tab="brand" onclick="switchInventoryTab('brand')"
           class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Brand</button>
         <button type="button" data-tab="supplier" onclick="switchInventoryTab('supplier')"
           class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Supplier</button>
+        <button type="button" data-tab="unit" onclick="switchInventoryTab('unit')"
+          class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Satuan</button>
       </div>
-
-      <!-- TAB: RINGKASAN -->
-      <section id="inv-tab-overview">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 max-w-2xl">
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">SKU Aktif</div>
-            <div id="ov-active-sku-count" class="font-sans text-2xl font-semibold text-ink">0</div>
-          </div>
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Persediaan</div>
-            <div id="ov-total-value" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
-          </div>
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Dokumen Masuk (30 hari)</div>
-            <div id="ov-inbound-count" class="font-sans text-2xl font-semibold text-ink">0</div>
-          </div>
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Stok Menipis</h2>
-            <span id="ov-low-stock-caption" class="text-xs text-muted"></span>
-          </div>
-          <div class="border border-line rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead class="bg-bg2">
-                <tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek</th>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
-                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
-                </tr>
-              </thead>
-              <tbody id="ov-low-stock-tbody"></tbody>
-            </table>
-            <div id="ov-low-stock-empty" class="hidden text-center py-8">
-              <p class="text-sm text-muted">Tidak ada barang dengan stok menipis.</p>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- TAB: BARANG MASUK (inbound documents) -->
       <section id="inv-tab-inbound" class="hidden">
@@ -837,7 +1133,7 @@
       </section>
 
       <!-- TAB: MASTER BARANG -->
-      <section id="inv-tab-master" class="hidden">
+      <section id="inv-tab-master">
 
         <div id="master-list-panel">
           <div class="flex flex-wrap items-end gap-3 mb-4">
@@ -924,6 +1220,7 @@
             <div class="flex items-center gap-2">
               <button id="detail-item-print-btn" onclick="printMasterItemBarcode()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Cetak Barcode</button>
               <button id="detail-item-edit-btn" onclick="enableMasterItemEdit()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Edit</button>
+              <button id="detail-item-delete-btn" onclick="handleDeleteMasterItem()" class="admin-only px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
             </div>
           </div>
 
@@ -950,11 +1247,16 @@
             <div class="flex gap-3">
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual</label>
-                <input id="edit-item-sell-price" type="text" inputmode="numeric" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                  <input id="edit-item-sell-price" type="text" inputmode="numeric" class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                </div>
               </div>
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Satuan</label>
-                <input id="edit-item-unit" type="text" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+                <select id="edit-item-unit" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                  <option value="">Pilih satuan…</option>
+                </select>
               </div>
             </div>
             <p class="text-xs text-muted">SKU (<span id="edit-item-sku-note" class="font-mono"></span>) tidak dapat diubah.</p>
@@ -1010,34 +1312,48 @@
             <div class="flex gap-3">
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Supplier</label>
-                <select id="new-item-supplier" onchange="updateNewItemSkuPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
-                  <option value="">Pilih supplier…</option>
-                </select>
+                <div class="relative">
+                  <input id="new-item-supplier" type="text" autocomplete="off" placeholder="Cari supplier…"
+                    class="combobox-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                    oninput="onNewItemComboInput(this, 'supplier')" onkeydown="onNewItemComboKeydown(event, this, 'supplier')" onfocus="onNewItemComboFocus(this, 'supplier')" onblur="onNewItemComboBlur(this)" />
+                  <div class="combobox-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+                </div>
               </div>
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Merek</label>
-                <select id="new-item-brand" onchange="updateNewItemSkuPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
-                  <option value="">Pilih merek…</option>
-                </select>
+                <div class="relative">
+                  <input id="new-item-brand" type="text" autocomplete="off" placeholder="Cari merek…"
+                    class="combobox-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                    oninput="onNewItemComboInput(this, 'brand')" onkeydown="onNewItemComboKeydown(event, this, 'brand')" onfocus="onNewItemComboFocus(this, 'brand')" onblur="onNewItemComboBlur(this)" />
+                  <div class="combobox-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+                </div>
               </div>
             </div>
             <div>
               <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Barang</label>
-              <input id="new-item-name" type="text" oninput="debouncedNewItemSkuPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <input id="new-item-name" type="text" oninput="forceUppercaseInput(this); debouncedNewItemSkuPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
             <div id="new-item-sku-badge" class="text-xs text-muted min-h-[1rem]"></div>
             <div class="flex gap-3">
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Satuan</label>
-                <input id="new-item-unit" type="text" placeholder="pcs" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+                <select id="new-item-unit" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                  <option value="">Pilih satuan…</option>
+                </select>
               </div>
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Modal</label>
-                <input id="new-item-cost-price" type="text" inputmode="numeric" placeholder="0" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                  <input id="new-item-cost-price" type="text" inputmode="numeric" placeholder="0" class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                </div>
               </div>
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual</label>
-                <input id="new-item-sell-price" type="text" inputmode="numeric" placeholder="0" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                  <input id="new-item-sell-price" type="text" inputmode="numeric" placeholder="0" class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                </div>
               </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
@@ -1099,6 +1415,7 @@
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Kode</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Telepon</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Kontak &amp; Alamat</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sumber</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
@@ -1108,6 +1425,35 @@
           </table>
           <div id="supplier-list-empty" class="hidden text-center py-10">
             <p class="text-sm text-muted">Tidak ada supplier yang cocok.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: MASTER SATUAN -->
+      <section id="inv-tab-unit" class="hidden">
+        <div class="flex flex-wrap items-end gap-3 mb-4">
+          <div class="flex-1 min-w-48">
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Cari</label>
+            <input id="unit-search-input" type="text" placeholder="Cari nama satuan…" oninput="onUnitSearchInput()"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
+          <button onclick="openAddUnitModal()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Tambah Satuan</button>
+          <button onclick="confirmDeleteAllUnits()" class="admin-only px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus Semua</button>
+        </div>
+
+        <div class="border border-line rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="unit-list-tbody"></tbody>
+          </table>
+          <div id="unit-list-empty" class="hidden text-center py-10">
+            <p class="text-sm text-muted">Tidak ada satuan yang cocok.</p>
           </div>
         </div>
       </section>
@@ -1256,12 +1602,25 @@ async function logout() {
 let toastAutoHideTimer = null;
 let toastFadeOutTimer = null;
 
-function showToast(message) {
+// type: "success" (green, good news) or "error" (red, default — anything
+// that isn't a successful completed action: validation blocks, failures).
+function showToast(message, type = "error") {
   const toast = document.getElementById("toast");
+  const card = document.getElementById("toast-card");
   const msgEl = document.getElementById("toast-message");
+  const iconError = document.getElementById("toast-icon-error");
+  const iconSuccess = document.getElementById("toast-icon-success");
 
   clearTimeout(toastAutoHideTimer);
   clearTimeout(toastFadeOutTimer);
+
+  const isSuccess = type === "success";
+  card.classList.toggle("border-failed", !isSuccess);
+  card.classList.toggle("border-l-failed", !isSuccess);
+  card.classList.toggle("border-done", isSuccess);
+  card.classList.toggle("border-l-done", isSuccess);
+  iconError.classList.toggle("hidden", isSuccess);
+  iconSuccess.classList.toggle("hidden", !isSuccess);
 
   msgEl.textContent = message;
   toast.classList.remove("hidden");
@@ -1294,12 +1653,13 @@ const ROUTES = {
   "/scraper": { title: "Maps Scraper", page: "page-scraper" },
   "/cashier": { title: "Cashier", page: "page-cashier" },
   "/invoices": { title: "Riwayat Invoice", page: "page-invoices" },
+  "/purchase-invoices": { title: "Faktur Pembelian", page: "page-purchase-invoices" },
   "/inventory": { title: "Inventori", page: "page-inventory" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
   "/users": { title: "Pengguna", page: "page-users" },
 };
 
-const ADMIN_ONLY_ROUTES = new Set(["/dashboard", "/users"]);
+const ADMIN_ONLY_ROUTES = new Set(["/users"]);
 
 function currentRoute() {
   const hash = location.hash.replace(/^#/, "");
@@ -1323,6 +1683,8 @@ function renderRoute() {
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
+  if (route === "/dashboard") loadDashboardOverview();
+  if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
   if (route === "/users") loadUsers();
   if (route === "/invoices") {
     document.getElementById("history-search-input").value = "";
@@ -1365,7 +1727,7 @@ async function init() {
   await loadPlateCodes();
   await loadReceiptHistory();
   openNewReceiptTab();
-  initDashboard();
+  loadDashboardOverview();
   initInventory();
 }
 
@@ -1634,22 +1996,41 @@ function addItemRow(prefill) {
   if (prefill && prefill.sku) row.dataset.sku = prefill.sku;
   row.innerHTML = `
     <input type="text" placeholder="Product name" value="${prefill ? esc(prefill.name || "") : ""}"
-      class="item-name flex-1 border border-line rounded-lg px-3 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      class="item-name flex-1 border border-line rounded-lg px-3 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
     <input type="text" inputmode="numeric" value="${prefill && prefill.qty != null && prefill.qty !== "" ? esc(String(prefill.qty)) : "1"}"
-      class="item-qty w-14 text-center border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+      class="item-qty w-14 text-center border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
     <input type="text" inputmode="numeric" placeholder="Price" value="${prefill && prefill.price != null && prefill.price !== "" ? esc(String(prefill.price)) : ""}"
-      class="item-price w-28 text-right border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+      class="item-price w-28 text-right border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
-    <input type="date" value="${prefill && prefill.warranty ? esc(prefill.warranty) : ""}"
-      class="item-warranty w-36 border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+    <div class="item-warranty-wrap w-36">
+      <button type="button" onclick="revealWarrantyDate(this)"
+        class="item-warranty-toggle w-full flex items-center justify-center gap-1.5 border border-line rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-bg2 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${prefill && prefill.warranty ? "hidden" : ""}"
+        title="Tambah tanggal garansi (opsional)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Tanggal
+      </button>
+      <input type="date" value="${prefill && prefill.warranty ? esc(prefill.warranty) : ""}"
+        class="item-warranty w-full border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${prefill && prefill.warranty ? "" : "hidden"}" />
+    </div>
     <button type="button" onclick="this.closest('.item-row').remove(); recomputeTotals(); markActiveTabDirty();"
-      class="p-1.5 rounded-lg hover:bg-bg2 text-muted transition-colors" aria-label="Remove item">
+      class="p-1.5 rounded-lg hover:bg-bg2 text-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors" aria-label="Remove item">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   `;
   container.appendChild(row);
   return row;
+}
+
+// Warranty date starts collapsed behind a "Tanggal" button (most items have
+// no warranty) — pressing it swaps in the actual date input, in place, same
+// width slot.
+function revealWarrantyDate(btnEl) {
+  const wrap = btnEl.closest(".item-warranty-wrap");
+  btnEl.classList.add("hidden");
+  const input = wrap.querySelector(".item-warranty");
+  input.classList.remove("hidden");
+  input.focus();
 }
 
 function findItemRowBySku(sku) {
@@ -1700,6 +2081,19 @@ function formatIDR(n) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
 
+// Status (Pending/Done) is never chosen by hand — it's derived from Jumlah
+// Dibayar vs Total, same rule the backend applies on save. Void overrides it
+// and is sticky (see applyCashierVoidLock).
+function updateCashierStatusBadge(total, amountPaid) {
+  const dot = document.getElementById("cashier-status-dot");
+  const label = document.getElementById("cashier-status-label");
+  if (!dot || !label) return;
+  const tab = getActiveTab();
+  const status = (tab && tab.status === "void") ? "void" : (amountPaid >= total ? "done" : "pending");
+  dot.className = `status-dot is-${status}`;
+  label.textContent = statusLabel(status);
+}
+
 function recomputeTotals() {
   const rows = document.querySelectorAll("#item-rows .item-row");
   let subtotal = 0;
@@ -1709,10 +2103,10 @@ function recomputeTotals() {
     subtotal += qty * price;
   });
   const discount = parseInt(document.getElementById("discount-input").value, 10) || 0;
-  const total = subtotal - discount;
+  const total = Math.max(subtotal - discount, 0);
 
   document.getElementById("subtotal-display").textContent = formatIDR(subtotal);
-  document.getElementById("total-display").textContent = formatIDR(Math.max(total, 0));
+  document.getElementById("total-display").textContent = formatIDR(total);
 
   const discountError = document.getElementById("discount-error");
   if (discount > subtotal) {
@@ -1721,6 +2115,47 @@ function recomputeTotals() {
   } else {
     discountError.classList.add("hidden");
   }
+
+  // Amount paid: until the cashier manually overrides it, keep it synced to
+  // Total so the common "customer pays in full on the spot" flow costs zero
+  // extra clicks, while still allowing an explicit lower number for a down
+  // payment (see markAmountPaidTouched / blankCashierTabState).
+  const amountPaidInput = document.getElementById("amount-paid-input");
+  const tab = getActiveTab();
+  if (tab && !tab.amountPaidTouched && tab.status !== "void") {
+    amountPaidInput.value = String(total);
+  }
+  const amountPaid = parseInt(amountPaidInput.value, 10) || 0;
+  const remaining = Math.max(total - amountPaid, 0);
+
+  const balanceLabel = document.getElementById("remaining-balance-label");
+  const balanceDisplay = document.getElementById("remaining-balance-display");
+  if (total <= 0) {
+    // Nothing payable yet -> "Lunas" (paid off) is meaningless. Show a neutral dash.
+    balanceLabel.textContent = "Status Bayar";
+    balanceDisplay.textContent = "—";
+    balanceDisplay.classList.remove("text-done", "text-pending");
+  } else if (remaining > 0) {
+    balanceLabel.textContent = "Sisa Bayar";
+    balanceDisplay.textContent = formatIDR(remaining);
+    balanceDisplay.classList.remove("text-done");
+    balanceDisplay.classList.add("text-pending");
+  } else {
+    balanceLabel.textContent = "Status Bayar";
+    balanceDisplay.textContent = "Lunas";
+    balanceDisplay.classList.remove("text-pending");
+    balanceDisplay.classList.add("text-done");
+  }
+
+  updateCashierStatusBadge(total, amountPaid);
+}
+
+// Called only from #amount-paid-input's own oninput (a real keystroke) —
+// programmatic `.value =` writes from recomputeTotals()'s auto-sync above
+// don't fire "input", so they never trip this.
+function markAmountPaidTouched() {
+  const tab = getActiveTab();
+  if (tab) tab.amountPaidTouched = true;
 }
 
 // ── Cashier: save / validate ──────────────────────────────────────────────────
@@ -1732,14 +2167,22 @@ function collectReceiptPayload() {
     unit_price: parseInt(row.querySelector(".item-price").value, 10) || 0,
     warranty_date: row.querySelector(".item-warranty").value || null,
   }));
-  return {
+  const customerName = document.getElementById("customer-name").value.trim();
+  const payload = {
     plate_region: document.getElementById("plate-region").value,
     plate_number: document.getElementById("plate-number").value,
     plate_suffix: document.getElementById("plate-suffix").value,
+    customer_phone: document.getElementById("customer-phone").value.trim(),
+    customer_name: customerName || null,
     items,
     discount: parseInt(document.getElementById("discount-input").value, 10) || 0,
-    status: document.getElementById("status-control").dataset.value || "pending",
+    amount_paid: parseInt(document.getElementById("amount-paid-input").value, 10) || 0,
   };
+  // status is write-restricted server-side to "void" or omitted — pending/done
+  // are always computed from amount_paid vs total, never sent by hand.
+  const tab = getActiveTab();
+  if (tab && tab.status === "void") payload.status = "void";
+  return payload;
 }
 
 function validateReceiptForm(payload) {
@@ -1755,6 +2198,16 @@ function validateReceiptForm(payload) {
     showToast("Plate suffix must be 1-3 letters.");
     return false;
   }
+  // phone is required; normalize the same way the backend does before checking format.
+  const phoneDigits = (payload.customer_phone || "").replace(/[\s\-.()]/g, "");
+  if (!phoneDigits) {
+    showToast("Nomor HP wajib diisi.");
+    return false;
+  }
+  if (!/^\+?\d{7,15}$/.test(phoneDigits)) {
+    showToast("Nomor HP harus 7-15 digit (boleh diawali +).");
+    return false;
+  }
   if (payload.items.length === 0) {
     showToast("Add at least one product.");
     return false;
@@ -1767,6 +2220,12 @@ function validateReceiptForm(payload) {
   const subtotal = payload.items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   if (payload.discount > subtotal) {
     showToast("Discount cannot exceed the subtotal.");
+    return false;
+  }
+  // Belt-and-suspenders: #amount-paid-input's own digit-only oninput sanitizer
+  // already makes a negative value untypeable, so this should never trip.
+  if (payload.amount_paid < 0) {
+    showToast("Amount paid cannot be negative.");
     return false;
   }
   return true;
@@ -1815,12 +2274,12 @@ async function saveReceipt() {
   renderCashierTabBar();
   renderCashierForm();
   btn.disabled = false;
-  showToast(isUpdate ? "Receipt updated." : "Receipt saved.");
+  showToast(isUpdate ? "Receipt updated." : "Receipt saved.", "success");
 }
 
 // ── Cashier: multi-tab workspace ──────────────────────────────────────────────
 // Per-tab form state lives here as plain JS objects; the DOM form (#item-rows,
-// #plate-region, #status-control, etc.) is a single shared panel re-rendered
+// #plate-region, #amount-paid-input, etc.) is a single shared panel re-rendered
 // from whichever tab is active on every switch (captureFormIntoActiveTab /
 // renderCashierForm), rather than cloning the form per tab.
 function nextCashierTabId() {
@@ -1834,8 +2293,15 @@ function blankCashierTabState(tabId) {
     plateRegion: "",
     plateNumber: "",
     plateSuffix: "",
+    customerPhone: "",
+    customerName: "",
     items: [{ sku: null, name: "", qty: "1", price: "", warranty: "" }],
     discount: "0",
+    // A brand-new receipt defaults to "paid in full on the spot" — amountPaid
+    // auto-syncs to Total (see recomputeTotals) until the cashier types into
+    // Jumlah Dibayar directly, which flips amountPaidTouched and freezes it.
+    amountPaid: "0",
+    amountPaidTouched: false,
     status: "pending",
     dirty: false,
   };
@@ -1848,6 +2314,8 @@ function tabStateFromReceipt(tabId, r) {
     plateRegion: r.plate_region,
     plateNumber: r.plate_number,
     plateSuffix: r.plate_suffix,
+    customerPhone: r.customer_phone || "",
+    customerName: r.customer_name || "",
     items: r.items.map(it => ({
       sku: null,
       name: it.product_name,
@@ -1856,6 +2324,11 @@ function tabStateFromReceipt(tabId, r) {
       warranty: it.warranty_date || "",
     })),
     discount: String(r.discount),
+    // A receipt loaded from the server already has an explicit, previously
+    // saved amount_paid — treat it as touched so editing line items later
+    // doesn't silently overwrite a recorded partial payment.
+    amountPaid: String(r.amount_paid),
+    amountPaidTouched: true,
     status: r.status || "pending",
     dirty: false,
   };
@@ -1906,8 +2379,12 @@ function captureFormIntoActiveTab() {
   tab.plateRegion = document.getElementById("plate-region").value;
   tab.plateNumber = document.getElementById("plate-number").value;
   tab.plateSuffix = document.getElementById("plate-suffix").value;
+  tab.customerPhone = document.getElementById("customer-phone").value;
+  tab.customerName = document.getElementById("customer-name").value;
   tab.discount = document.getElementById("discount-input").value;
-  tab.status = document.getElementById("status-control").dataset.value;
+  tab.amountPaid = document.getElementById("amount-paid-input").value;
+  // status isn't user-editable here anymore (see applyCashierVoidLock /
+  // confirmVoidActiveReceipt) — it only ever changes via a save response.
 }
 
 function markActiveTabDirty() {
@@ -1915,19 +2392,6 @@ function markActiveTabDirty() {
   if (!tab || tab.dirty) return;
   tab.dirty = true;
   renderCashierTabBar();
-}
-
-function setStatusControlValue(status, opts = {}) {
-  const control = document.getElementById("status-control");
-  control.dataset.value = status;
-  control.querySelectorAll(".status-seg-btn").forEach(btn => {
-    btn.classList.toggle("is-active", btn.dataset.status === status);
-  });
-  if (opts.markDirty !== false) markActiveTabDirty();
-}
-
-function setCashierStatus(status) {
-  setStatusControlValue(status);
 }
 
 function renderCashierTabBar() {
@@ -1962,6 +2426,8 @@ function renderCashierForm() {
   document.getElementById("plate-region").value = tab.plateRegion;
   document.getElementById("plate-number").value = tab.plateNumber;
   document.getElementById("plate-suffix").value = tab.plateSuffix;
+  document.getElementById("customer-phone").value = tab.customerPhone || "";
+  document.getElementById("customer-name").value = tab.customerName || "";
   validatePlateRegion();
 
   document.getElementById("scan-barcode-input").value = "";
@@ -1973,14 +2439,79 @@ function renderCashierForm() {
   for (const item of items) addItemRow(item);
 
   document.getElementById("discount-input").value = tab.discount || "0";
+  document.getElementById("amount-paid-input").value = tab.amountPaid ?? "0";
   recomputeTotals();
-
-  setStatusControlValue(tab.status, { markDirty: false });
 
   document.getElementById("cashier-form-title").textContent = tab.receiptId ? "Edit receipt" : "New receipt";
   document.getElementById("save-receipt-btn").textContent = tab.receiptId ? "Update receipt" : "Save receipt";
   document.getElementById("save-receipt-btn").disabled = false;
   document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId);
+
+  applyCashierVoidLock(tab);
+}
+
+// Void is sticky (no unvoid path) — once a receipt is voided the whole form
+// locks read-only, mirroring the Barang Masuk inbound-document void/posted
+// read-only treatment (#inbound-readonly-banner / setInboundRowDisabled).
+function applyCashierVoidLock(tab) {
+  const isVoid = tab.status === "void";
+
+  document.getElementById("cashier-void-banner").classList.toggle("hidden", !isVoid);
+
+  const lockIds = [
+    "plate-region", "plate-number", "plate-suffix", "customer-phone", "customer-name",
+    "scan-barcode-input", "add-item-btn", "discount-input", "amount-paid-input", "save-receipt-btn",
+  ];
+  lockIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = isVoid;
+  });
+
+  document.querySelectorAll("#item-rows .item-row").forEach(row => {
+    row.querySelectorAll("input, button").forEach(el => { el.disabled = isVoid; });
+  });
+
+  // Void itself can't be undone, and there's nothing left to void once a
+  // receipt has no persisted id yet — hide the button in both cases.
+  document.getElementById("cashier-void-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
+}
+
+function confirmVoidActiveReceipt() {
+  const tab = getActiveTab();
+  if (!tab || !tab.receiptId || tab.status === "void") return;
+  openModal("Void Receipt", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Voiding this receipt cannot be undone — there is no way to un-void it afterward, and the form will lock for editing. Are you sure?</p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Cancel</button>
+        <button type="button" onclick="voidActiveReceiptConfirmed()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Confirm Void</button>
+      </div>
+    </div>
+  `);
+}
+
+async function voidActiveReceiptConfirmed() {
+  const tab = getActiveTab();
+  if (!tab || !tab.receiptId) { closeModal(); return; }
+  const resp = await fetch(`/api/receipts/${tab.receiptId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "void" }),
+  });
+  if (!resp.ok) {
+    let message = "Could not void this receipt.";
+    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+    closeModal();
+    showToast(message);
+    return;
+  }
+  const saved = await resp.json();
+  closeModal();
+  Object.assign(tab, tabStateFromReceipt(tab.tabId, saved));
+  await loadReceiptHistory();
+  renderCashierTabBar();
+  renderCashierForm();
+  showToast("Receipt voided.", "success");
 }
 
 // Closes a tab, confirming via the shared modal (never native confirm()) if it
@@ -2039,14 +2570,27 @@ async function loadReceiptHistory() {
 
   for (const r of receipts) {
     const li = document.createElement("li");
+    // Surface remaining balance at a glance for partially-paid receipts only —
+    // for status=done or an untouched pending (nothing paid yet), the plain
+    // total already says everything the total-minus-nothing math would.
+    const remaining = Math.max(r.total - r.amount_paid, 0);
+    const amountLine = (r.status === "pending" && r.amount_paid > 0 && remaining > 0)
+      ? `${formatIDR(r.total)} &middot; Sisa ${formatIDR(remaining)}`
+      : formatIDR(r.total);
+    const customerBits = [r.customer_name, r.customer_phone].filter(Boolean).map(esc).join(" &middot; ");
+    const customerLine = customerBits
+      ? `<div class="text-[11px] text-muted/70 truncate pl-3">${customerBits}</div>`
+      : "";
     li.innerHTML = `
       <button onclick="viewReceipt('${r.id}')"
         class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg transition-colors">
-        <div class="flex items-center gap-1.5 text-xs font-medium text-ink truncate">
-          <span class="status-dot is-${r.status}"></span>
+        <div class="flex items-center gap-1.5 text-xs font-medium text-ink">
+          <span class="status-dot is-${r.status} shrink-0"></span>
           <span class="truncate">${esc(r.plate_full)}</span>
+          <span class="ml-auto shrink-0 text-[11px] font-normal text-muted">${esc(statusLabel(r.status))}</span>
         </div>
-        <div class="text-xs text-muted truncate pl-3">${formatIDR(r.total)}</div>
+        <div class="text-xs text-muted truncate pl-3">${amountLine}</div>
+        ${customerLine}
         <div class="text-[11px] text-muted/70 pl-3">${r.created_at.slice(0, 10)}</div>
       </button>
     `;
@@ -2110,7 +2654,7 @@ async function deleteActiveReceiptConfirmed() {
   tab.dirty = false; // already deleted server-side — close without a redundant confirm
   discardAndCloseCashierTab(tab.tabId);
   await loadReceiptHistory();
-  showToast("Receipt dihapus.");
+  showToast("Receipt dihapus.", "success");
 }
 
 // ── Invoices: history search + status filter ──────────────────────────────────
@@ -2172,8 +2716,10 @@ function renderHistoryTable(receipts, query) {
   for (const r of receipts) {
     const tr = document.createElement("tr");
     tr.className = "border-b border-line hover:bg-bg2 cursor-pointer transition-colors";
+    const customerCell = [r.customer_name, r.customer_phone].filter(Boolean).map(esc).join(" &middot; ") || "—";
     tr.innerHTML = `
       <td class="px-3 py-2 font-serif font-medium text-ink">${esc(r.plate_full)}</td>
+      <td class="px-3 py-2 text-muted">${customerCell}</td>
       <td class="px-3 py-2 text-muted">${esc((r.created_at || "").slice(0, 10))}</td>
       <td class="px-3 py-2">
         <span class="inline-flex items-center gap-1.5 text-xs text-muted">
@@ -2362,170 +2908,27 @@ function esc(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-let dashActivePreset = null;
+// Forces an input's value to uppercase in place, preserving caret position
+// (same-length transform, so selectionStart/End stay valid after reassignment).
+function forceUppercaseInput(inputEl) {
+  const start = inputEl.selectionStart;
+  const end = inputEl.selectionEnd;
+  inputEl.value = inputEl.value.toUpperCase();
+  inputEl.setSelectionRange(start, end);
+}
 
+// ── Date helpers ───────────────────────────────────────────────────────────
 function pad2(n) { return String(n).padStart(2, "0"); }
 
 function toDateInputValue(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+// Parsed as local midnight — `new Date("YYYY-MM-DD")` would be UTC and can land
+// on the previous day for east-of-UTC users, shifting due-date arithmetic.
 function parseDateInputValue(s) {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
-}
-
-function initDashboard() {
-  applyDashboardPreset("7d");
-}
-
-function applyDashboardPreset(preset) {
-  const today = new Date();
-  let from, to;
-  switch (preset) {
-    case "today":
-      from = new Date(today);
-      to = new Date(today);
-      break;
-    case "7d":
-      to = new Date(today);
-      from = new Date(today);
-      from.setDate(from.getDate() - 6);
-      break;
-    case "30d":
-      to = new Date(today);
-      from = new Date(today);
-      from.setDate(from.getDate() - 29);
-      break;
-    case "month":
-      from = new Date(today.getFullYear(), today.getMonth(), 1);
-      to = new Date(today);
-      break;
-    default:
-      return;
-  }
-  document.getElementById("dash-date-from").value = toDateInputValue(from);
-  document.getElementById("dash-date-to").value = toDateInputValue(to);
-  dashActivePreset = preset;
-  updateDashboardPresetButtons();
-  loadDashboardData();
-}
-
-function onDashboardCustomDateChange() {
-  const fromVal = document.getElementById("dash-date-from").value;
-  const toVal = document.getElementById("dash-date-to").value;
-  if (!fromVal || !toVal) return;
-  if (fromVal > toVal) {
-    showToast("The start date must be before the end date.");
-    return;
-  }
-  dashActivePreset = null;
-  updateDashboardPresetButtons();
-  loadDashboardData();
-}
-
-function updateDashboardPresetButtons() {
-  document.querySelectorAll(".dash-preset-btn").forEach(btn => {
-    btn.classList.toggle("is-active", btn.dataset.preset === dashActivePreset);
-  });
-}
-
-async function loadDashboardData() {
-  const from = document.getElementById("dash-date-from").value;
-  const to = document.getElementById("dash-date-to").value;
-  if (!from || !to) return;
-
-  const resp = await fetch(`/api/sales/summary?date_from=${from}&date_to=${to}`);
-  if (!resp.ok) {
-    showToast("Could not load dashboard data.");
-    return;
-  }
-  const data = await resp.json();
-
-  document.getElementById("dash-total-revenue").textContent = formatIDR(data.total_revenue);
-  document.getElementById("dash-receipt-count").textContent = data.receipt_count;
-
-  renderDashboardChart(data.daily || []);
-  renderDashboardTopDays(data.top_days || []);
-}
-
-// Show at most `maxLabels` date labels along the x-axis, evenly spaced, always
-// including the last day — avoids overlapping text on long ranges.
-function sparseLabelIndices(n, maxLabels) {
-  const indices = new Set();
-  if (n <= maxLabels) {
-    for (let i = 0; i < n; i++) indices.add(i);
-    return indices;
-  }
-  const step = Math.ceil(n / (maxLabels - 1));
-  for (let i = 0; i < n; i += step) indices.add(i);
-  indices.add(n - 1);
-  return indices;
-}
-
-function formatDashDateShort(dateStr) {
-  const d = parseDateInputValue(dateStr);
-  return String(d.getDate());
-}
-
-function renderDashboardChart(daily) {
-  const container = document.getElementById("dash-chart");
-
-  if (daily.length === 0) {
-    container.innerHTML = `<p class="text-sm text-muted text-center py-10">No data for this range.</p>`;
-    return;
-  }
-
-  const maxRevenue = Math.max(0, ...daily.map(d => d.revenue));
-  const labelIdx = sparseLabelIndices(daily.length, 7);
-
-  const bars = daily.map((d, i) => {
-    const pct = maxRevenue > 0 ? Math.round((d.revenue / maxRevenue) * 100) : 0;
-    // date/revenue/receipt_count are server-formatted date strings and numbers
-    // (never free-text), so they're safe to interpolate into the title attribute
-    // as-is — esc() only escapes & < > and is not attribute-safe.
-    const title = `${d.date}: ${formatIDR(d.revenue)} (${d.receipt_count} receipt${d.receipt_count === 1 ? "" : "s"})`;
-    return `
-      <div class="flex-1 max-w-[24px] h-full flex flex-col justify-end" title="${title}">
-        <div class="w-full bg-accent rounded-t-[4px]" style="height:${pct}%; min-height:${pct > 0 ? "2px" : "0"};"></div>
-      </div>
-    `;
-  }).join("");
-
-  const labels = daily.map((d, i) => {
-    const label = labelIdx.has(i) ? esc(formatDashDateShort(d.date)) : "";
-    return `<div class="flex-1 max-w-[24px] text-center text-[10px] text-muted truncate">${label}</div>`;
-  }).join("");
-
-  container.innerHTML = `
-    <div class="flex items-end justify-center gap-0.5 h-36 border-b border-line">${bars}</div>
-    <div class="flex justify-center gap-0.5 mt-1">${labels}</div>
-  `;
-}
-
-function renderDashboardTopDays(topDays) {
-  const tbody = document.getElementById("dash-top-days-tbody");
-  const emptyEl = document.getElementById("dash-top-days-empty");
-  tbody.innerHTML = "";
-
-  if (topDays.length === 0) {
-    emptyEl.classList.remove("hidden");
-    return;
-  }
-  emptyEl.classList.add("hidden");
-
-  topDays.forEach((d, i) => {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 hover:bg-bg transition-colors";
-    tr.innerHTML = `
-      <td class="px-4 py-2 text-muted tabular-nums">${i + 1}</td>
-      <td class="px-4 py-2 font-serif font-medium text-ink">${esc(d.date)}</td>
-      <td class="px-4 py-2 text-right text-ink tabular-nums">${formatIDR(d.revenue)}</td>
-      <td class="px-4 py-2 text-right text-muted tabular-nums">${d.receipt_count}</td>
-    `;
-    tbody.appendChild(tr);
-  });
 }
 
 // ── Modal (generic — first modal component in this app) ─────────────────────
@@ -2549,21 +2952,22 @@ let inboundRowSeq = 0;
 let inboundAutocompleteCache = {};
 let inboundDuplicateCache = {};
 let quickAddContext = null; // { type: 'supplier'|'brand', rowEl, targetInputEl } — set while the quick-add modal is open
-let quickAddCodeManuallyEdited = false;
 let currentInboundDocId = null;
 let currentInboundStatus = null;
 let currentMasterItemId = null;
 let currentMasterItem = null;
 let masterListState = { page: 1, pageSize: 20, total: 0 };
 let lastMasterItemsResponse = { items: [], total: 0, page: 1, page_size: 20 };
-let currentInventoryTab = "overview";
+let currentInventoryTab = "master";
 let brandListState = { editingId: null };
 let supplierListState = { editingId: null };
+let unitListState = { editingId: null };
+let unitsCache = [];
 
 async function initInventory() {
   await loadSuppliers();
   await loadBrands();
-  await loadInventoryOverview();
+  await loadUnits();
   await loadInboundDocuments();
   await loadMasterItems();
   showInboundListPanel();
@@ -2573,12 +2977,25 @@ async function initInventory() {
 function switchInventoryTab(tab) {
   currentInventoryTab = tab;
   document.querySelectorAll(".inv-tab-btn").forEach(btn => btn.classList.toggle("is-active", btn.dataset.tab === tab));
-  document.getElementById("inv-tab-overview").classList.toggle("hidden", tab !== "overview");
   document.getElementById("inv-tab-inbound").classList.toggle("hidden", tab !== "inbound");
   document.getElementById("inv-tab-master").classList.toggle("hidden", tab !== "master");
   document.getElementById("inv-tab-brand").classList.toggle("hidden", tab !== "brand");
   document.getElementById("inv-tab-supplier").classList.toggle("hidden", tab !== "supplier");
+  document.getElementById("inv-tab-unit").classList.toggle("hidden", tab !== "unit");
   updateInventoryNavHighlight();
+  refreshInventoryTab(tab);
+}
+
+// Re-fetch the activated tab's data so it never shows stale bootstrap-time
+// state (e.g. a supplier just added elsewhere missing from a dropdown). Callers
+// that open a specific sub-panel after switching (jumpToInboundDocument,
+// goAddMasterItem) still win — their panel calls run after this returns.
+function refreshInventoryTab(tab) {
+  if (tab === "inbound") { showInboundListPanel(); loadInboundDocuments(); }
+  else if (tab === "master") { showMasterListPanel(); loadMasterItems(); }
+  else if (tab === "brand") loadBrands();
+  else if (tab === "supplier") loadSuppliers();
+  else if (tab === "unit") loadUnits();
 }
 
 // ── Inventory: suppliers / brands (full lists, active and inactive — feed the
@@ -2601,45 +3018,92 @@ async function loadBrands() {
   renderBrandTable();
 }
 
+async function loadUnits() {
+  const resp = await fetch("/api/units?active_only=false");
+  unitsCache = resp.ok ? await resp.json() : [];
+  refreshUnitDropdowns();
+  renderUnitTable();
+}
+
 function refreshSupplierDropdowns() {
-  const targets = ["master-filter-supplier", "new-item-supplier"];
-  for (const id of targets) {
-    const sel = document.getElementById(id);
-    if (!sel) continue;
-    const keepValue = sel.value;
-    const isFilter = id === "master-filter-supplier";
-    sel.innerHTML = isFilter ? '<option value="">Semua supplier</option>' : '<option value="">Pilih supplier…</option>';
-    for (const s of suppliersCache) {
-      if (!s.is_active) continue;
-      const opt = document.createElement("option");
-      opt.value = s.id;
-      opt.textContent = s.name;
-      sel.appendChild(opt);
-    }
-    sel.value = keepValue;
+  // new-item-supplier reads suppliersCache directly at render time (see
+  // onNewItemComboInput/renderNewItemComboDropdown below) — only the plain
+  // <select> filter needs repopulating here.
+  const sel = document.getElementById("master-filter-supplier");
+  if (!sel) return;
+  const keepValue = sel.value;
+  sel.innerHTML = '<option value="">Semua supplier</option>';
+  for (const s of suppliersCache) {
+    if (!s.is_active) continue;
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    sel.appendChild(opt);
   }
+  sel.value = keepValue;
 }
 
 function refreshBrandDropdowns() {
-  const targets = ["master-filter-brand", "new-item-brand"];
-  for (const id of targets) {
-    const sel = document.getElementById(id);
-    if (!sel) continue;
-    const keepValue = sel.value;
-    const isFilter = id === "master-filter-brand";
-    sel.innerHTML = isFilter ? '<option value="">Semua merek</option>' : '<option value="">Pilih merek…</option>';
-    for (const b of brandsCache) {
-      if (!b.is_active) continue;
-      const opt = document.createElement("option");
-      opt.value = b.id;
-      opt.textContent = b.name;
-      sel.appendChild(opt);
-    }
-    sel.value = keepValue;
+  // new-item-brand reads brandsCache directly at render time (see
+  // onNewItemComboInput/renderNewItemComboDropdown below) — only the plain
+  // <select> filter needs repopulating here.
+  const sel = document.getElementById("master-filter-brand");
+  if (!sel) return;
+  const keepValue = sel.value;
+  sel.innerHTML = '<option value="">Semua merek</option>';
+  for (const b of brandsCache) {
+    if (!b.is_active) continue;
+    const opt = document.createElement("option");
+    opt.value = b.id;
+    opt.textContent = b.name;
+    sel.appendChild(opt);
+  }
+  sel.value = keepValue;
+}
+
+// Assigns a <select>'s value, injecting a synthetic option first if the value
+// doesn't match any current option — covers historic unit strings (existing
+// master items / inbound rows) that no longer match an active Master Satuan
+// entry (renamed or deactivated after the item was created).
+function setUnitSelectValue(selectEl, value) {
+  if (!selectEl) return;
+  selectEl.value = value || "";
+  if (value && selectEl.value !== value) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = value;
+    selectEl.appendChild(opt);
+    selectEl.value = value;
   }
 }
 
-// ── Inventory: Master Brand / Master Supplier — list, inline edit, status ───
+function populateUnitSelect(selectEl, placeholder) {
+  const keepValue = selectEl.value;
+  selectEl.innerHTML = "";
+  const placeholderOpt = document.createElement("option");
+  placeholderOpt.value = "";
+  placeholderOpt.textContent = placeholder;
+  selectEl.appendChild(placeholderOpt);
+  for (const u of unitsCache) {
+    if (!u.is_active) continue;
+    const opt = document.createElement("option");
+    opt.value = u.name;
+    opt.textContent = u.name;
+    selectEl.appendChild(opt);
+  }
+  setUnitSelectValue(selectEl, keepValue);
+}
+
+// new-item-unit and edit-item-unit are single fixed <select>s in the Master
+// Barang forms.
+function refreshUnitDropdowns() {
+  const newItemSel = document.getElementById("new-item-unit");
+  if (newItemSel) populateUnitSelect(newItemSel, "Pilih satuan…");
+  const editSel = document.getElementById("edit-item-unit");
+  if (editSel) populateUnitSelect(editSel, "Pilih satuan…");
+}
+
+// ── Inventory: Master Brand / Master Supplier / Master Satuan — list, inline edit, status ───
 function onBrandSearchInput() { renderBrandTable(); }
 function onSupplierSearchInput() { renderSupplierTable(); }
 
@@ -2687,6 +3151,25 @@ function renderEntityRowHtml(type, item, isEditing) {
     ? `<input id="${type}-edit-phone-${item.id}" type="text" placeholder="opsional" class="w-full border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />`
     : `<span class="text-ink">${item.phone ? esc(item.phone) : '<span class="text-muted">–</span>'}</span>`;
 
+  // Contact person / address / NPWP feed the printed Faktur Pembelian header,
+  // so they live on the supplier master rather than being retyped per invoice.
+  const contactInput = (field, placeholder) =>
+    `<input id="supplier-edit-${field}-${item.id}" type="text" placeholder="${placeholder}"
+       class="w-full border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />`;
+  const contactCell = isEditing
+    ? `<div class="space-y-1 min-w-[200px]">
+         ${contactInput("contact", "Nama kontak (opsional)")}
+         ${contactInput("address", "Alamat (opsional)")}
+         ${contactInput("npwp", "NPWP (opsional)")}
+       </div>`
+    : (item.contact_person || item.address || item.npwp
+        ? `<div class="text-[11px] text-muted leading-relaxed">
+             ${item.contact_person ? `<div class="text-ink">${esc(item.contact_person)}</div>` : ""}
+             ${item.address ? `<div>${esc(item.address)}</div>` : ""}
+             ${item.npwp ? `<div>NPWP ${esc(item.npwp)}</div>` : ""}
+           </div>`
+        : `<span class="text-muted">–</span>`);
+
   let actionsCell;
   if (item.is_system) {
     actionsCell = `<span class="text-[11px] text-muted italic" title="${esc(systemNote)}">${esc(systemNote)}</span>`;
@@ -2709,7 +3192,7 @@ function renderEntityRowHtml(type, item, isEditing) {
     <tr id="${type}-row-${item.id}" class="border-b border-line last:border-b-0 hover:bg-bg2 transition-colors">
       <td class="px-3 py-2 font-mono text-xs text-ink">${esc(item.code)}</td>
       <td class="px-3 py-2">${nameCell}</td>
-      ${type === "supplier" ? `<td class="px-3 py-2">${phoneCell}</td>` : ""}
+      ${type === "supplier" ? `<td class="px-3 py-2">${phoneCell}</td><td class="px-3 py-2 align-top">${contactCell}</td>` : ""}
       <td class="px-3 py-2">${statusBadge}</td>
       <td class="px-3 py-2">${sourceBadge}</td>
       <td class="px-3 py-2 text-right">${actionsCell}</td>
@@ -2731,8 +3214,11 @@ function startEntityEdit(type, id) {
     input.select();
   }
   if (type === "supplier") {
-    const phoneInput = document.getElementById(`supplier-edit-phone-${id}`);
-    if (phoneInput) phoneInput.value = item?.phone || "";
+    const fields = { phone: "phone", contact: "contact_person", address: "address", npwp: "npwp" };
+    for (const [suffix, key] of Object.entries(fields)) {
+      const el = document.getElementById(`supplier-edit-${suffix}-${id}`);
+      if (el) el.value = item?.[key] || "";
+    }
   }
 }
 
@@ -2749,8 +3235,14 @@ async function saveEntityEdit(type, id) {
 
   const body = { name };
   if (type === "supplier") {
-    const phoneInput = document.getElementById(`supplier-edit-phone-${id}`);
-    body.phone = phoneInput ? phoneInput.value.trim() : "";
+    const readField = (suffix) => {
+      const el = document.getElementById(`supplier-edit-${suffix}-${id}`);
+      return el ? el.value.trim() : "";
+    };
+    body.phone = readField("phone");
+    body.contact_person = readField("contact");
+    body.address = readField("address");
+    body.npwp = readField("npwp");
   }
 
   const endpoint = type === "brand" ? `/api/brands/${id}` : `/api/suppliers/${id}`;
@@ -2767,7 +3259,7 @@ async function saveEntityEdit(type, id) {
   }
   entityListState(type).editingId = null;
   if (type === "brand") await loadBrands(); else await loadSuppliers();
-  showToast(`${type === "brand" ? "Merek" : "Supplier"} diperbarui.`);
+  showToast(`${type === "brand" ? "Merek" : "Supplier"} diperbarui.`, "success");
 }
 
 async function toggleEntityActive(type, id, nextActive) {
@@ -2787,7 +3279,7 @@ async function toggleEntityActive(type, id, nextActive) {
   if (type === "brand") await loadBrands(); else await loadSuppliers();
   showToast(nextActive
     ? `${type === "brand" ? "Merek" : "Supplier"} diaktifkan.`
-    : `${type === "brand" ? "Merek" : "Supplier"} dinonaktifkan.`);
+    : `${type === "brand" ? "Merek" : "Supplier"} dinonaktifkan.`, "success");
 }
 
 function confirmDeleteEntity(type, id) {
@@ -2817,7 +3309,7 @@ async function deleteEntity(type, id) {
   }
   closeModal();
   if (type === "brand") await loadBrands(); else await loadSuppliers();
-  showToast(`${type === "brand" ? "Merek" : "Supplier"} dihapus.`);
+  showToast(`${type === "brand" ? "Merek" : "Supplier"} dihapus.`, "success");
 }
 
 function confirmDeleteAllEntities(type) {
@@ -2848,7 +3340,202 @@ async function deleteAllEntities(type) {
   const result = await resp.json();
   closeModal();
   if (type === "brand") await loadBrands(); else await loadSuppliers();
-  showToast(`${result.deleted_count} ${label} dihapus${result.skipped_count > 0 ? `, ${result.skipped_count} dilewati (sistem/masih dipakai)` : ""}.`);
+  showToast(`${result.deleted_count} ${label} dihapus${result.skipped_count > 0 ? `, ${result.skipped_count} dilewati (sistem/masih dipakai)` : ""}.`, "success");
+}
+
+// ── Inventory: Master Satuan — list, inline edit, status ─────────────────────
+// Kept separate from the brand/supplier entity helpers above rather than
+// folded in: units have no code/source/is_system columns, so the shared row
+// markup and branching wouldn't actually simplify anything here.
+function onUnitSearchInput() { renderUnitTable(); }
+
+function renderUnitTable() {
+  const tbody = document.getElementById("unit-list-tbody");
+  const emptyEl = document.getElementById("unit-list-empty");
+  if (!tbody) return;
+  const query = document.getElementById("unit-search-input").value.trim().toLowerCase();
+  const items = unitsCache.filter(u => !query || u.name.toLowerCase().includes(query));
+  tbody.innerHTML = "";
+  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  emptyEl.classList.add("hidden");
+  tbody.innerHTML = items.map(item => renderUnitRowHtml(item, unitListState.editingId === item.id)).join("");
+}
+
+function renderUnitRowHtml(item, isEditing) {
+  const statusBadge = item.is_active
+    ? `<span class="inline-flex items-center gap-1.5 text-xs text-ink"><span class="status-dot is-done"></span>Aktif</span>`
+    : `<span class="inline-flex items-center gap-1.5 text-xs text-muted"><span class="status-dot is-failed"></span>Tidak Aktif</span>`;
+
+  const nameCell = isEditing
+    ? `<input id="unit-edit-name-${item.id}" type="text" class="w-full border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />`
+    : `<span class="font-serif font-medium text-ink">${esc(item.name)}</span>`;
+
+  const actionsCell = isEditing
+    ? `
+      <div class="flex items-center justify-end gap-1.5">
+        <button type="button" onclick="cancelUnitEdit()" class="px-2.5 py-1 border border-line rounded-md text-[11px] text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="saveUnitEdit(${item.id})" class="px-2.5 py-1 bg-accent text-bg rounded-md text-[11px] font-medium hover:bg-accentDark transition-colors">Simpan</button>
+      </div>`
+    : `
+      <div class="flex items-center justify-end gap-1.5">
+        <button type="button" onclick="startUnitEdit(${item.id})" class="px-2.5 py-1 border border-line rounded-md text-[11px] text-ink hover:bg-bg2 transition-colors">Edit</button>
+        <button type="button" onclick="toggleUnitActive(${item.id}, ${!item.is_active})" class="px-2.5 py-1 border border-line rounded-md text-[11px] text-ink hover:bg-bg2 transition-colors">${item.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
+        ${isAdmin() ? `<button type="button" onclick="confirmDeleteUnitEntity(${item.id})" class="px-2.5 py-1 border border-failed text-failed rounded-md text-[11px] hover:bg-failed/10 transition-colors">Hapus</button>` : ""}
+      </div>`;
+
+  return `
+    <tr id="unit-row-${item.id}" class="border-b border-line last:border-b-0 hover:bg-bg2 transition-colors">
+      <td class="px-3 py-2">${nameCell}</td>
+      <td class="px-3 py-2">${statusBadge}</td>
+      <td class="px-3 py-2 text-right">${actionsCell}</td>
+    </tr>`;
+}
+
+function startUnitEdit(id) {
+  unitListState.editingId = id;
+  renderUnitTable();
+  const item = unitsCache.find(u => u.id === id);
+  const input = document.getElementById(`unit-edit-name-${id}`);
+  if (input) {
+    input.value = item ? item.name : "";
+    input.focus();
+    input.select();
+  }
+}
+
+function cancelUnitEdit() {
+  unitListState.editingId = null;
+  renderUnitTable();
+}
+
+async function saveUnitEdit(id) {
+  const input = document.getElementById(`unit-edit-name-${id}`);
+  const name = input.value.trim();
+  if (!name) { showToast("Nama satuan tidak boleh kosong."); return; }
+  const resp = await fetch(`/api/units/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!resp.ok) {
+    let message = "Gagal memperbarui satuan.";
+    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+    showToast(message);
+    return;
+  }
+  unitListState.editingId = null;
+  await loadUnits();
+  showToast("Satuan diperbarui.", "success");
+}
+
+async function toggleUnitActive(id, nextActive) {
+  const resp = await fetch(`/api/units/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_active: nextActive }),
+  });
+  if (!resp.ok) {
+    let message = "Gagal memperbarui status satuan.";
+    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+    showToast(message);
+    return;
+  }
+  await loadUnits();
+  showToast(nextActive ? "Satuan diaktifkan." : "Satuan dinonaktifkan.", "success");
+}
+
+function confirmDeleteUnitEntity(id) {
+  const item = unitsCache.find(u => u.id === id);
+  const name = item ? esc(item.name) : "";
+  openModal("Hapus Satuan", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Yakin ingin menghapus satuan <strong class="text-ink">${name}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="deleteUnitEntity(${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus</button>
+      </div>
+    </div>
+  `);
+}
+
+async function deleteUnitEntity(id) {
+  const resp = await fetch(`/api/units/${id}`, { method: "DELETE" });
+  if (!resp.ok) {
+    let message = "Gagal menghapus satuan.";
+    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+    showToast(message);
+    return;
+  }
+  closeModal();
+  await loadUnits();
+  showToast("Satuan dihapus.", "success");
+}
+
+function confirmDeleteAllUnits() {
+  openModal("Hapus Semua Satuan", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">
+        Yakin ingin menghapus semua satuan? Satuan yang masih dipakai oleh barang atau dokumen akan dilewati secara otomatis. Tindakan ini tidak dapat dibatalkan.
+      </p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="deleteAllUnitsAction()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus Semua</button>
+      </div>
+    </div>
+  `);
+}
+
+async function deleteAllUnitsAction() {
+  const resp = await fetch("/api/units", { method: "DELETE" });
+  if (!resp.ok) {
+    let message = "Gagal menghapus satuan.";
+    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+    showToast(message);
+    return;
+  }
+  const result = await resp.json();
+  closeModal();
+  await loadUnits();
+  showToast(`${result.deleted_count} satuan dihapus${result.skipped_count > 0 ? `, ${result.skipped_count} dilewati (masih dipakai)` : ""}.`, "success");
+}
+
+function openAddUnitModal() {
+  openModal("Tambah Satuan Baru", `
+    <div class="space-y-3">
+      <div>
+        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Satuan</label>
+        <input id="add-unit-name" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAddUnit();}" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" id="add-unit-submit-btn" onclick="submitAddUnit()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Simpan</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => { document.getElementById("add-unit-name")?.focus(); }, 0);
+}
+
+async function submitAddUnit() {
+  const name = document.getElementById("add-unit-name").value.trim();
+  if (!name) { showToast("Nama satuan tidak boleh kosong."); return; }
+  const submitBtn = document.getElementById("add-unit-submit-btn");
+  if (submitBtn) submitBtn.disabled = true;
+  const resp = await fetch("/api/units", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!resp.ok) {
+    let message = "Gagal menambahkan satuan.";
+    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+    showToast(message);
+    if (submitBtn) submitBtn.disabled = false;
+    return;
+  }
+  const created = await resp.json();
+  await loadUnits();
+  closeModal();
+  showToast(`Satuan "${created.name}" ditambahkan.`, "success");
 }
 
 // ── Inventory: entity combobox (typeahead search input) ──────────────────────
@@ -2888,6 +3575,13 @@ function comboboxCloseDropdown(inputEl) {
 }
 
 function comboboxNotifyChange(inputEl, type) {
+  // A combobox can name its own commit handler via data-on-change; without one
+  // it falls back to the Barang Masuk hooks this widget was first built for.
+  const handlerName = inputEl.dataset.onChange;
+  if (handlerName && typeof window[handlerName] === "function") {
+    window[handlerName](inputEl);
+    return;
+  }
   if (type === "supplier") onInboundSupplierChange();
   else onInboundRowBrandChange(inputEl);
 }
@@ -2949,6 +3643,87 @@ function onComboboxKeydown(event, inputEl) {
 
 function comboboxHighlight(options, idx) {
   options.forEach((opt, i) => opt.classList.toggle("bg-bg2", i === idx));
+}
+
+// ── Inventory: Tambah Barang Baru — local-cache search combobox ──────────────
+// Supplier/Merek here only need to pick among already-active suppliers/brands
+// (no inline quick-add, unlike the Barang Masuk combobox above), and
+// suppliersCache/brandsCache are already loaded in full for this page, so this
+// filters that cache directly instead of round-tripping to the server.
+function newItemEntityCache(type) { return type === "supplier" ? suppliersCache : brandsCache; }
+
+function renderNewItemComboDropdown(inputEl, type, query) {
+  const q = query.toLowerCase();
+  const items = newItemEntityCache(type).filter(e => e.is_active && (!q || e.name.toLowerCase().includes(q)));
+  const dd = comboboxDropdown(inputEl);
+  if (items.length === 0) {
+    dd.innerHTML = `<div class="px-3 py-2 text-sm text-muted">Tidak ditemukan.</div>`;
+  } else {
+    dd.innerHTML = items.map((item, idx) => `
+      <button type="button" data-idx="${idx}" onmousedown="event.preventDefault()" onclick="newItemComboOptionClick(this, '${type}')"
+        class="combobox-option w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors border-b border-line last:border-b-0">
+        <span class="text-ink">${esc(item.name)}</span>
+        <span class="text-[11px] text-muted font-mono ml-1">${esc(item.code)}</span>
+      </button>
+    `).join("");
+  }
+  dd.classList.remove("hidden");
+  comboboxState.set(inputEl, { results: items, activeIndex: -1, query });
+}
+
+function onNewItemComboInput(inputEl, type) {
+  inputEl.dataset.selectedId = ""; // typing invalidates any prior selection
+  const query = inputEl.value.trim();
+  if (!query) { comboboxCloseDropdown(inputEl); updateNewItemSkuPreview(); return; }
+  renderNewItemComboDropdown(inputEl, type, query);
+  updateNewItemSkuPreview();
+}
+
+function onNewItemComboFocus(inputEl, type) {
+  if (comboboxValue(inputEl)) return; // already has a confirmed selection, don't reopen
+  renderNewItemComboDropdown(inputEl, type, inputEl.value.trim());
+}
+
+function onNewItemComboBlur(inputEl) {
+  setTimeout(() => comboboxCloseDropdown(inputEl), 150);
+}
+
+function onNewItemComboKeydown(event, inputEl, type) {
+  const dd = comboboxDropdown(inputEl);
+  if (dd.classList.contains("hidden")) {
+    if (event.key === "ArrowDown") renderNewItemComboDropdown(inputEl, type, inputEl.value.trim());
+    return;
+  }
+  const options = [...dd.querySelectorAll(".combobox-option")];
+  const state = comboboxState.get(inputEl) || { activeIndex: -1 };
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    state.activeIndex = Math.min(state.activeIndex + 1, options.length - 1);
+    comboboxHighlight(options, state.activeIndex);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    state.activeIndex = Math.max(state.activeIndex - 1, 0);
+    comboboxHighlight(options, state.activeIndex);
+  } else if (event.key === "Enter") {
+    if (state.activeIndex >= 0 && options[state.activeIndex]) {
+      event.preventDefault();
+      options[state.activeIndex].click();
+    }
+  } else if (event.key === "Escape") {
+    comboboxCloseDropdown(inputEl);
+  }
+  comboboxState.set(inputEl, state);
+}
+
+function newItemComboOptionClick(btnEl, type) {
+  const dd = btnEl.closest(".combobox-dropdown");
+  const inputEl = dd.parentElement.querySelector(".combobox-input");
+  const state = comboboxState.get(inputEl);
+  const item = state?.results?.[parseInt(btnEl.dataset.idx, 10)];
+  if (!item) return;
+  comboboxSetValue(inputEl, item.id, item.name);
+  comboboxCloseDropdown(inputEl);
+  updateNewItemSkuPreview();
 }
 
 async function comboboxSearch(inputEl, type, query) {
@@ -3015,15 +3790,10 @@ function comboboxTriggerAdd(inputEl, type) {
 // (comboboxTriggerAdd, above — already has a top match from the search that's
 // already running) and the standalone "+" button next to each field, which
 // hasn't searched yet and does one lookup here purely for the similarity check.
-function openQuickAddSupplier() {
-  const inputEl = document.getElementById("inbound-supplier-select");
+// Defaults to the Barang Masuk picker; Faktur Pembelian passes its own field id.
+function openQuickAddSupplier(inputId = "inbound-supplier-select") {
+  const inputEl = document.getElementById(inputId);
   openQuickAddFromButton("supplier", inputEl, null);
-}
-
-function openQuickAddBrand(btnEl) {
-  const rowEl = btnEl.closest(".inbound-item-row");
-  const inputEl = rowEl.querySelector(".row-brand-select");
-  openQuickAddFromButton("brand", inputEl, rowEl);
 }
 
 async function openQuickAddFromButton(type, inputEl, rowEl) {
@@ -3067,19 +3837,19 @@ async function renderQuickAddModal(type, query, topMatch) {
       </div>
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">${nameLabel}</label>
-        <input id="quick-add-name" type="text" oninput="onQuickAddNameInput()"
+        <input id="quick-add-name" type="text" oninput="onQuickAddNameInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();submitQuickAdd();}"
           class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
       </div>
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">${codeLabel}</label>
-        <input id="quick-add-code" type="text" maxlength="12" oninput="onQuickAddCodeInput()"
-          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-        <p class="text-[11px] text-muted mt-1.5">Kode ini akan menjadi bagian permanen dari kode produk (SKU) dan tidak bisa diubah setelah dipakai.</p>
+        <input id="quick-add-code" type="text" readonly tabindex="-1"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-muted uppercase cursor-not-allowed focus:outline-none" />
+        <p class="text-[11px] text-muted mt-1.5">Kode dibuat otomatis dan unik, menjadi bagian permanen dari kode produk (SKU).</p>
       </div>
       ${type === "supplier" ? `
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nomor Telepon <span class="normal-case text-muted/70">(opsional)</span></label>
-        <input id="quick-add-phone" type="text" placeholder="opsional"
+        <input id="quick-add-phone" type="text" placeholder="opsional" onkeydown="if(event.key==='Enter'){event.preventDefault();submitQuickAdd();}"
           class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
       </div>` : ""}
       <div class="flex justify-end gap-2 pt-2">
@@ -3094,13 +3864,12 @@ async function renderQuickAddModal(type, query, topMatch) {
   if (showSimilarity) {
     document.getElementById("quick-add-similarity-text").textContent = `Mirip dengan "${topMatch.name}" yang sudah ada. Yakin buat baru?`;
   }
-  quickAddCodeManuallyEdited = false;
   const nameInput = document.getElementById("quick-add-name");
   setTimeout(() => { nameInput.focus(); nameInput.select(); }, 0);
 }
 
 const debouncedQuickAddCodePreview = debounce(async () => {
-  if (quickAddCodeManuallyEdited || !quickAddContext) return;
+  if (!quickAddContext) return;
   const name = document.getElementById("quick-add-name")?.value.trim();
   if (!name) return;
   const cfg = COMBOBOX_CONFIG[quickAddContext.type];
@@ -3115,10 +3884,6 @@ const debouncedQuickAddCodePreview = debounce(async () => {
 
 function onQuickAddNameInput() {
   debouncedQuickAddCodePreview();
-}
-
-function onQuickAddCodeInput() {
-  quickAddCodeManuallyEdited = true;
 }
 
 function dismissQuickAddSimilarityBanner() {
@@ -3140,14 +3905,12 @@ async function submitQuickAdd() {
   if (!ctx) { closeModal(); return; }
   const cfg = COMBOBOX_CONFIG[ctx.type];
   const name = document.getElementById("quick-add-name").value.trim();
-  const code = document.getElementById("quick-add-code").value.trim();
   if (!name) { showToast(`Nama ${cfg.label} tidak boleh kosong.`); return; }
 
   const submitBtn = document.getElementById("quick-add-submit-btn");
   if (submitBtn) submitBtn.disabled = true;
 
   const body = { name };
-  if (code) body.code = code;
   if (ctx.type === "supplier") {
     const phoneInput = document.getElementById("quick-add-phone");
     if (phoneInput && phoneInput.value.trim()) body.phone = phoneInput.value.trim();
@@ -3173,23 +3936,91 @@ async function submitQuickAdd() {
 
   quickAddContext = null;
   closeModal();
-  showToast(`${ctx.type === "supplier" ? "Supplier" : "Merek"} "${created.name}" ditambahkan.`);
+  showToast(`${ctx.type === "supplier" ? "Supplier" : "Merek"} "${created.name}" ditambahkan.`, "success");
 }
 
-// ── Inventory: Ringkasan (overview) ──────────────────────────────────────────
-async function loadInventoryOverview() {
+// ── Dashboard: Ringkasan (overview) ──────────────────────────────────────────
+async function loadDashboardOverview() {
   const resp = await fetch("/api/inventory/overview");
   if (!resp.ok) { showToast("Gagal memuat ringkasan persediaan."); return; }
   const data = await resp.json();
-  renderInventoryOverview(data);
+  renderDashboardOverview(data);
 }
 
-function renderInventoryOverview(data) {
+function renderDashboardOverview(data) {
   document.getElementById("ov-active-sku-count").textContent = data.active_sku_count;
   document.getElementById("ov-total-value").textContent = formatIDR(data.total_inventory_value);
   document.getElementById("ov-inbound-count").textContent = data.inbound_doc_count_30d;
+  document.getElementById("ov-sales-month-revenue").textContent = formatIDR(data.sales_month_revenue);
+  document.getElementById("ov-sales-month-count").textContent = `${data.sales_month_count} nota`;
+  document.getElementById("ov-pending-count").textContent = data.pending_invoice_count;
+  document.getElementById("ov-pending-outstanding").textContent = `${formatIDR(data.pending_invoice_outstanding)} belum dibayar`;
   document.getElementById("ov-low-stock-caption").textContent = `Ambang batas: stok ≤ ${data.low_stock_threshold}`;
   renderLowStockTable(data.low_stock_items || []);
+  renderTopSellingTable(data.top_selling || []);
+  renderLatestIncomingTable(data.latest_incoming || []);
+  renderPendingInvoicesTable(data.pending_invoices || []);
+}
+
+function renderTopSellingTable(items) {
+  const tbody = document.getElementById("ov-top-selling-tbody");
+  const emptyEl = document.getElementById("ov-top-selling-empty");
+  tbody.innerHTML = "";
+  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  emptyEl.classList.add("hidden");
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 transition-colors";
+    tr.innerHTML = `
+      <td class="px-3 py-2 font-serif font-medium text-ink">${esc(item.product_name)}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-ink font-medium">${item.units_sold}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-muted">${formatIDR(item.revenue)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderLatestIncomingTable(items) {
+  const tbody = document.getElementById("ov-latest-incoming-tbody");
+  const emptyEl = document.getElementById("ov-latest-incoming-empty");
+  tbody.innerHTML = "";
+  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  emptyEl.classList.add("hidden");
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 transition-colors";
+    tr.innerHTML = `
+      <td class="px-3 py-2">
+        <div class="font-serif font-medium text-ink">${esc(item.product_name)}</div>
+        <div class="font-mono text-[11px] text-muted">${esc(item.sku)}</div>
+      </td>
+      <td class="px-3 py-2 text-muted">${esc(item.supplier_name)}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-done font-medium">+${item.qty_in}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(item.received_date || "-")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderPendingInvoicesTable(items) {
+  const tbody = document.getElementById("ov-pending-tbody");
+  const emptyEl = document.getElementById("ov-pending-empty");
+  tbody.innerHTML = "";
+  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  emptyEl.classList.add("hidden");
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 transition-colors";
+    tr.innerHTML = `
+      <td class="px-3 py-2 font-mono text-xs text-ink">${esc(item.plate_full)}</td>
+      <td class="px-3 py-2 text-muted">${esc(item.customer_name || "-")}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatIDR(item.total)}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-muted">${formatIDR(item.amount_paid)}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-failed font-medium">${formatIDR(item.outstanding)}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc((item.created_at || "").slice(0, 10))}</td>
+    `;
+    tbody.appendChild(tr);
+  }
 }
 
 function renderLowStockTable(items) {
@@ -3208,7 +4039,9 @@ function renderLowStockTable(items) {
       <td class="px-3 py-2 text-muted">${esc(item.supplier_name || "")}</td>
       <td class="px-3 py-2 text-right tabular-nums text-failed font-medium">${item.stock_qty}</td>
     `;
-    tr.onclick = () => { switchInventoryTab("master"); viewMasterItem(item.id); };
+    // Low-stock rows now live on the Dashboard, so jump to the Inventori route
+    // before switching tabs — otherwise the master panel opens on a hidden page.
+    tr.onclick = () => { location.hash = "/inventory"; switchInventoryTab("master"); viewMasterItem(item.id); };
     tbody.appendChild(tr);
   }
 }
@@ -3315,8 +4148,8 @@ function downloadMasterItemsCsv() {
 
 // ── Inventory: Master Barang — standalone create ─────────────────────────────
 function newMasterItemForm() {
-  document.getElementById("new-item-supplier").value = "";
-  document.getElementById("new-item-brand").value = "";
+  comboboxSetValue(document.getElementById("new-item-supplier"), "", "");
+  comboboxSetValue(document.getElementById("new-item-brand"), "", "");
   document.getElementById("new-item-name").value = "";
   document.getElementById("new-item-unit").value = "";
   document.getElementById("new-item-cost-price").value = "";
@@ -3326,8 +4159,8 @@ function newMasterItemForm() {
 }
 
 async function updateNewItemSkuPreview() {
-  const supplierId = document.getElementById("new-item-supplier").value;
-  const brandId = document.getElementById("new-item-brand").value;
+  const supplierId = comboboxValue(document.getElementById("new-item-supplier"));
+  const brandId = comboboxValue(document.getElementById("new-item-brand"));
   const name = document.getElementById("new-item-name").value.trim();
   const badge = document.getElementById("new-item-sku-badge");
   if (!supplierId || !brandId || name.length < 2) { badge.textContent = ""; return; }
@@ -3342,8 +4175,8 @@ async function updateNewItemSkuPreview() {
 const debouncedNewItemSkuPreview = debounce(updateNewItemSkuPreview, 280);
 
 async function submitNewMasterItem() {
-  const supplierId = parseInt(document.getElementById("new-item-supplier").value, 10);
-  const brandId = parseInt(document.getElementById("new-item-brand").value, 10);
+  const supplierId = parseInt(comboboxValue(document.getElementById("new-item-supplier")), 10);
+  const brandId = parseInt(comboboxValue(document.getElementById("new-item-brand")), 10);
   const name = document.getElementById("new-item-name").value.trim();
   const unit = document.getElementById("new-item-unit").value.trim();
   const sellPrice = parseInt(document.getElementById("new-item-sell-price").value, 10) || 0;
@@ -3361,7 +4194,7 @@ async function submitNewMasterItem() {
   });
   if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
   const item = await resp.json();
-  showToast(`Barang "${item.name}" (${item.sku}) ditambahkan.`);
+  showToast(`Barang "${item.name}" (${item.sku}) ditambahkan.`, "success");
   backToMasterList();
 }
 
@@ -3420,7 +4253,7 @@ function jumpToInboundDocument(documentId) {
 function enableMasterItemEdit() {
   document.getElementById("edit-item-name").value = currentMasterItem.name;
   document.getElementById("edit-item-sell-price").value = currentMasterItem.sell_price;
-  document.getElementById("edit-item-unit").value = currentMasterItem.unit;
+  setUnitSelectValue(document.getElementById("edit-item-unit"), currentMasterItem.unit);
   document.getElementById("edit-item-sku-note").textContent = currentMasterItem.sku;
   document.getElementById("detail-item-view").classList.add("hidden");
   document.getElementById("detail-item-edit-form").classList.remove("hidden");
@@ -3446,8 +4279,36 @@ async function saveMasterItemEdit() {
     body: JSON.stringify({ name, sell_price: parseInt(sellPriceRaw, 10) || 0, unit }),
   });
   if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
-  showToast("Barang diperbarui.");
-  await viewMasterItem(currentMasterItemId);
+  showToast("Barang diperbarui.", "success");
+  backToMasterList();
+}
+
+function handleDeleteMasterItem() {
+  if (!currentMasterItemId || !currentMasterItem) return;
+  const item = currentMasterItem;
+  openModal("Hapus Barang", `
+    <div class="space-y-4">
+      <p class="text-sm text-ink">Hapus <span class="font-medium">${esc(item.name)}</span> (<span class="font-mono">${esc(item.sku)}</span>) dari Master Barang?</p>
+      <p class="text-xs text-muted">Hanya bisa dihapus jika belum ada riwayat barang masuk atau pergerakan stok. Tindakan ini tidak dapat dibatalkan.</p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="confirmDeleteMasterItem(${currentMasterItemId})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Hapus</button>
+      </div>
+    </div>
+  `);
+}
+
+async function confirmDeleteMasterItem(id) {
+  const resp = await fetch(`/api/inventory/master-items/${id}`, { method: "DELETE" });
+  if (!resp.ok) {
+    let detail = "Gagal menghapus barang.";
+    try { detail = (await resp.json()).detail || detail; } catch (_) {}
+    showToast(`Error: ${detail}`);
+    return;
+  }
+  closeModal();
+  showToast("Barang dihapus.", "success");
+  backToMasterList();
 }
 
 async function submitStockAdjustment() {
@@ -3466,8 +4327,8 @@ async function submitStockAdjustment() {
   const result = await resp.json();
   document.getElementById("adjust-qty-delta").value = "";
   document.getElementById("adjust-reason").value = "";
-  showToast(`Stok diperbarui menjadi ${result.stock_qty}.`);
-  await viewMasterItem(currentMasterItemId);
+  showToast(`Stok diperbarui menjadi ${result.stock_qty}.`, "success");
+  backToMasterList();
 }
 
 // ── Inventory: Master Barang — panel switching ───────────────────────────────
@@ -3490,6 +4351,7 @@ function showMasterNewItemPanel() {
 }
 
 function backToMasterList() {
+  masterListState.page = 1;
   showMasterListPanel();
   loadMasterItems();
 }
@@ -3541,6 +4403,13 @@ function showInboundFormPanel() {
 function backToInboundList() {
   showInboundListPanel();
   loadInboundDocuments();
+}
+
+// After any save/post/void, drop the form state and return to the list.
+function goToInboundList() {
+  currentInboundDocId = null;
+  currentInboundStatus = null;
+  showInboundListPanel();
 }
 
 // ── Inventory: Barang Masuk — form (new / view / edit) ───────────────────────
@@ -3639,36 +4508,21 @@ function setInboundRowDisabled(rowEl, disabled) {
 }
 
 // ── Inventory: Barang Masuk — line item rows ─────────────────────────────────
+function rowPickButtonHtml() {
+  return `
+    <button type="button" onclick="openBarangPicker(this)"
+      class="row-pick-btn w-full flex items-center justify-center gap-2 border border-dashed border-line rounded-lg px-3 py-2 text-sm text-muted hover:border-accent hover:text-accent hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Pilih Barang dari Master
+    </button>`;
+}
+
 function inboundItemRowTemplate(rowId) {
   return `
     <div class="flex flex-wrap gap-2 items-start">
-      <div class="w-40">
-        <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Merek</label>
-        <div class="flex gap-1">
-          <div class="relative flex-1">
-            <input type="text" autocomplete="off" placeholder="Cari merek…" data-entity-type="brand"
-              class="row-brand-select combobox-input w-full border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              oninput="onComboboxInput(this)" onkeydown="onComboboxKeydown(event, this)" onfocus="onComboboxFocus(this)" onblur="onComboboxBlur(this)" />
-            <div class="combobox-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
-          </div>
-          <button type="button" onclick="openQuickAddBrand(this)" class="px-2 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors" title="Tambah merek baru">+</button>
-        </div>
-      </div>
-      <div class="flex-1 min-w-48 relative">
-        <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Nama Produk</label>
-        <input type="text" placeholder="Nama produk" autocomplete="off"
-          class="row-product-name w-full border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-          oninput="onInboundRowNameInput(this)" onblur="hideAutocompleteDropdownSoon(this)" />
-        <div class="row-autocomplete-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-48 overflow-y-auto"></div>
-        <div class="row-sku-badge mt-1 text-[11px] text-muted"></div>
-      </div>
-      <div class="w-24">
-        <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Satuan</label>
-        <input type="text" placeholder="pcs" class="row-unit w-full border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-      </div>
-      <div class="w-28">
-        <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Harga Jual (opsional)</label>
-        <input type="text" inputmode="numeric" placeholder="0" class="row-sell-price w-full text-right border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+      <div class="flex-1 min-w-64">
+        <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Barang</label>
+        <div class="row-product-slot">${rowPickButtonHtml()}</div>
       </div>
       <div class="w-20">
         <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Qty Masuk</label>
@@ -3676,14 +4530,16 @@ function inboundItemRowTemplate(rowId) {
       </div>
       <div class="w-28">
         <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Harga Modal</label>
-        <input type="text" inputmode="numeric" placeholder="0" class="row-cost w-full text-right border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'');" onkeydown="onInboundRowCostKeydown(event, this)" />
+        <div class="relative">
+          <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
+          <input type="text" inputmode="numeric" placeholder="0" class="row-cost w-full text-right border border-line rounded-lg pl-6 pr-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'');" onkeydown="onInboundRowCostKeydown(event, this)" />
+        </div>
       </div>
       <button type="button" onclick="removeInboundItemRow(this)" class="mt-5 p-1.5 rounded-lg hover:bg-bg2 text-muted transition-colors" aria-label="Hapus baris">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="row-duplicate-banner hidden"></div>
   `;
 }
 
@@ -3708,23 +4564,14 @@ function removeInboundItemRow(btnEl) {
 }
 
 function applyPrefillToRow(rowEl, item) {
-  if (item.master_item_id) {
-    rowEl.dataset.masterItemId = item.master_item_id;
-    rowEl.querySelector(".row-product-name").value = item.resolved_name || "";
-    rowEl.querySelector(".row-sku-badge").innerHTML = item.resolved_sku
-      ? `<span class="text-done font-medium">SKU: ${esc(item.resolved_sku)}</span>` : "";
-    if (item.resolved_brand_id) comboboxSetValue(rowEl.querySelector(".row-brand-select"), item.resolved_brand_id, item.resolved_brand_name || "");
-    rowEl.querySelector(".row-unit").value = item.resolved_unit || "";
-    if (item.resolved_sell_price != null) rowEl.querySelector(".row-sell-price").value = item.resolved_sell_price;
-    rowEl.querySelector(".row-brand-select").disabled = true;
-    rowEl.querySelector(".row-unit").disabled = true;
-    rowEl.querySelector(".row-sell-price").disabled = true;
-  } else {
-    if (item.pending_brand_id) comboboxSetValue(rowEl.querySelector(".row-brand-select"), item.pending_brand_id, item.pending_brand_name || "");
-    rowEl.querySelector(".row-product-name").value = item.pending_product_name || "";
-    rowEl.querySelector(".row-unit").value = item.pending_unit || "";
-    if (item.pending_sell_price != null) rowEl.querySelector(".row-sell-price").value = item.pending_sell_price;
-  }
+  renderRowProduct(rowEl, {
+    master_item_id: item.master_item_id,
+    name: item.resolved_name || item.pending_product_name || "",
+    sku: item.resolved_sku || "",
+    brand_name: item.resolved_brand_name || item.pending_brand_name || "",
+    unit: item.resolved_unit || item.pending_unit || "",
+    sell_price: item.resolved_sell_price != null ? item.resolved_sell_price : item.pending_sell_price,
+  });
   rowEl.querySelector(".row-qty").value = item.qty_in;
   rowEl.querySelector(".row-cost").value = item.cost_price;
 }
@@ -3733,7 +4580,7 @@ function onInboundRowCostKeydown(event, inputEl) {
   if (event.key !== "Enter") return;
   event.preventDefault();
   const newRow = addInboundItemRow();
-  newRow.querySelector(".row-product-name").focus();
+  newRow.querySelector(".row-pick-btn")?.focus();
 }
 
 function updateInboundTotalDisplay() {
@@ -3747,186 +4594,147 @@ function updateInboundTotalDisplay() {
   document.getElementById("inbound-total-display").textContent = `Total: ${formatIDR(total)}`;
 }
 
-// ── Inventory: Barang Masuk — row autocomplete / SKU preview / duplicate check
-function onInboundRowNameInput(inputEl) {
-  const rowEl = inputEl.closest(".inbound-item-row");
-  if (rowEl.dataset.masterItemId) {
-    delete rowEl.dataset.masterItemId;
-    rowEl.querySelector(".row-unit").disabled = false;
-    rowEl.querySelector(".row-sell-price").disabled = false;
-    rowEl.querySelector(".row-sku-badge").innerHTML = "";
-  }
-  debouncedRowLookup(rowEl);
+// ── Inventory: Barang Masuk — product selection (Master Barang only) ─────────
+// A line item can only reference a product that already exists in Master Barang.
+// The row shows a "Pilih Barang" button that opens a searchable picker; new
+// products must be created in Master Barang first.
+
+function renderRowProduct(rowEl, p) {
+  rowEl.dataset.masterItemId = (p.master_item_id != null && p.master_item_id !== "") ? String(p.master_item_id) : "";
+  const slot = rowEl.querySelector(".row-product-slot");
+  const sell = p.sell_price != null ? formatIDR(p.sell_price) : "-";
+  slot.innerHTML = `
+    <div class="flex items-start gap-2 border border-line rounded-lg px-3 py-2 bg-bg2">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-ink truncate">${esc(p.name || "")}</div>
+        <div class="text-[11px] text-muted flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+          ${p.sku ? `<span class="font-mono text-done">${esc(p.sku)}</span>` : ""}
+          ${p.brand_name ? `<span>· ${esc(p.brand_name)}</span>` : ""}
+          ${p.unit ? `<span>· ${esc(p.unit)}</span>` : ""}
+          <span>· Jual ${sell}</span>
+        </div>
+      </div>
+      <button type="button" onclick="openBarangPicker(this)" class="row-change-btn shrink-0 text-[11px] text-accent hover:text-accentDark font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Ganti</button>
+    </div>`;
 }
 
-const debouncedRowLookup = debounce((rowEl) => performRowLookup(rowEl), 280);
-
-function onInboundRowBrandChange(selectEl) {
-  const rowEl = selectEl.closest(".inbound-item-row");
-  if (rowEl.dataset.masterItemId) {
-    delete rowEl.dataset.masterItemId;
-    rowEl.querySelector(".row-unit").disabled = false;
-    rowEl.querySelector(".row-sell-price").disabled = false;
-    rowEl.querySelector(".row-sku-badge").innerHTML = "";
-  }
-  performRowLookup(rowEl);
+function clearRowProduct(rowEl) {
+  delete rowEl.dataset.masterItemId;
+  rowEl.querySelector(".row-product-slot").innerHTML = rowPickButtonHtml();
 }
 
+// Master items are supplier-scoped, so changing the document's supplier
+// invalidates any product already picked — clear them and re-pick.
 function onInboundSupplierChange() {
   document.querySelectorAll("#inbound-item-rows .inbound-item-row").forEach(rowEl => {
-    if (!rowEl.dataset.masterItemId) performRowLookup(rowEl);
+    if (rowEl.dataset.masterItemId) clearRowProduct(rowEl);
   });
 }
 
-async function performRowLookup(rowEl) {
+// No brand combobox in inbound rows anymore; kept as a no-op because the shared
+// combobox commit path (comboboxNotifyChange) still references it by name.
+function onInboundRowBrandChange() {}
+
+let barangPickerRow = null;
+let barangPickerCache = [];
+
+function openBarangPicker(btnEl) {
+  const rowEl = btnEl.closest(".inbound-item-row");
   const supplierId = comboboxValue(document.getElementById("inbound-supplier-select"));
-  const brandId = comboboxValue(rowEl.querySelector(".row-brand-select"));
-  const name = rowEl.querySelector(".row-product-name").value.trim();
-  const badge = rowEl.querySelector(".row-sku-badge");
-
-  if (rowEl.dataset.masterItemId) return;
-
-  if (!supplierId || !brandId || name.length < 2) {
-    badge.innerHTML = "";
-    hideAutocompleteDropdown(rowEl);
-    clearDuplicateBanner(rowEl);
-    return;
-  }
-
-  try {
-    const acResp = await fetch(`/api/inventory/master-items/autocomplete?query=${encodeURIComponent(name)}&supplier_id=${supplierId}&brand_id=${brandId}&limit=8`);
-    renderAutocompleteDropdown(rowEl, acResp.ok ? await acResp.json() : []);
-  } catch (_) {}
-
-  try {
-    const dupResp = await fetch(`/api/inventory/duplicate-check?supplier_id=${supplierId}&brand_id=${brandId}&product_name=${encodeURIComponent(name)}`);
-    if (dupResp.ok) {
-      const dup = await dupResp.json();
-      if (dup.exact_match) {
-        applyMasterItemToRow(rowEl, dup.exact_match);
-        hideAutocompleteDropdown(rowEl);
-        clearDuplicateBanner(rowEl);
-        return;
-      }
-      renderDuplicateBanner(rowEl, dup.cross_supplier_matches || []);
-    }
-  } catch (_) {}
-
-  try {
-    const skuResp = await fetch(`/api/inventory/sku-preview?supplier_id=${supplierId}&brand_id=${brandId}&product_name=${encodeURIComponent(name)}`);
-    if (skuResp.ok) {
-      const preview = await skuResp.json();
-      badge.innerHTML = `<span class="text-muted">SKU akan menjadi: <span class="font-mono">${esc(preview.sku)}</span></span>`;
-    }
-  } catch (_) {}
-}
-
-function renderAutocompleteDropdown(rowEl, items) {
-  const dd = rowEl.querySelector(".row-autocomplete-dropdown");
-  const rowId = rowEl.dataset.rowId;
-  inboundAutocompleteCache[rowId] = items;
-  if (!items.length) { dd.classList.add("hidden"); dd.innerHTML = ""; return; }
-  dd.innerHTML = items.map((item, idx) => `
-    <button type="button" onmousedown="event.preventDefault()" onclick="selectAutocompleteItem('${rowId}', ${idx})"
-      class="w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors border-b border-line last:border-b-0">
-      <div class="text-ink font-medium">${esc(item.name)}</div>
-      <div class="text-[11px] text-muted font-mono">${esc(item.sku)} · Stok ${item.stock_qty}</div>
-    </button>
-  `).join("");
-  dd.classList.remove("hidden");
-}
-
-function hideAutocompleteDropdown(rowEl) {
-  const dd = rowEl.querySelector(".row-autocomplete-dropdown");
-  dd.classList.add("hidden");
-}
-
-function hideAutocompleteDropdownSoon(inputEl) {
-  // Delay so a click on a dropdown item registers before blur hides it.
-  setTimeout(() => hideAutocompleteDropdown(inputEl.closest(".inbound-item-row")), 150);
-}
-
-function selectAutocompleteItem(rowId, idx) {
-  const rowEl = document.querySelector(`.inbound-item-row[data-row-id="${rowId}"]`);
-  const item = (inboundAutocompleteCache[rowId] || [])[idx];
-  if (!rowEl || !item) return;
-  applyMasterItemToRow(rowEl, item);
-  hideAutocompleteDropdown(rowEl);
-  clearDuplicateBanner(rowEl);
-}
-
-function applyMasterItemToRow(rowEl, item) {
-  rowEl.dataset.masterItemId = item.id;
-  rowEl.querySelector(".row-product-name").value = item.name;
-  if (item.brand_id) comboboxSetValue(rowEl.querySelector(".row-brand-select"), item.brand_id, item.brand_name || "");
-  const unitEl = rowEl.querySelector(".row-unit");
-  unitEl.value = item.unit;
-  unitEl.disabled = true;
-  const sellEl = rowEl.querySelector(".row-sell-price");
-  sellEl.value = item.sell_price;
-  sellEl.disabled = true;
-  rowEl.querySelector(".row-sku-badge").innerHTML = `<span class="text-done font-medium">SKU: ${esc(item.sku)}</span>`;
-}
-
-function renderDuplicateBanner(rowEl, matches) {
-  const el = rowEl.querySelector(".row-duplicate-banner");
-  const rowId = rowEl.dataset.rowId;
-  inboundDuplicateCache[rowId] = matches;
-  if (!matches.length) { el.classList.add("hidden"); el.innerHTML = ""; return; }
-  const m = matches[0];
-  el.innerHTML = `
-    <div class="bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-xs text-ink flex items-center gap-2 flex-wrap">
-      <span>Produk ini sudah ada dengan SKU <span class="font-mono font-medium">${esc(m.sku)}</span> dari supplier lain (${esc(m.supplier_name || "-")}).</span>
-      <div class="flex gap-1.5 ml-auto">
-        <button type="button" onclick="useDuplicateSku('${rowId}', 0)" class="px-2 py-1 bg-accent text-bg rounded-md text-[11px] font-medium hover:bg-accentDark transition-colors">Gunakan SKU Ini</button>
-        <button type="button" onclick="dismissDuplicateBanner('${rowId}')" class="px-2 py-1 border border-line rounded-md text-[11px] text-ink hover:bg-bg2 transition-colors">Tetap Buat Baru</button>
+  if (!supplierId) { showToast("Pilih supplier terlebih dahulu."); return; }
+  barangPickerRow = rowEl;
+  barangPickerCache = [];
+  openModal("Pilih Barang", `
+    <div class="space-y-3">
+      <input id="barang-picker-search" type="text" autocomplete="off" placeholder="Cari nama atau SKU barang…"
+        class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+        oninput="debouncedBarangPickerSearch()" />
+      <div id="barang-picker-results" class="max-h-72 overflow-y-auto border border-line rounded-lg divide-y divide-line"></div>
+      <div id="barang-picker-empty" class="hidden text-center py-6 space-y-2">
+        <p class="text-sm text-muted">Barang belum ada di Master Barang untuk supplier ini.</p>
+        <p class="text-[11px] text-muted">Tambahkan dulu di Master Barang, lalu pilih di sini.</p>
+        <button type="button" onclick="goAddMasterItem()" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">+ Tambah di Master Barang</button>
       </div>
     </div>
-  `;
-  el.classList.remove("hidden");
+  `);
+  loadBarangPicker("");
+  setTimeout(() => document.getElementById("barang-picker-search")?.focus(), 0);
 }
 
-function useDuplicateSku(rowId, idx) {
-  const rowEl = document.querySelector(`.inbound-item-row[data-row-id="${rowId}"]`);
-  const item = (inboundDuplicateCache[rowId] || [])[idx];
-  if (!rowEl || !item) return;
-  applyMasterItemToRow(rowEl, item);
-  dismissDuplicateBanner(rowId);
+const debouncedBarangPickerSearch = debounce(() => {
+  loadBarangPicker(document.getElementById("barang-picker-search")?.value.trim() || "");
+}, 250);
+
+async function loadBarangPicker(query) {
+  const supplierId = comboboxValue(document.getElementById("inbound-supplier-select"));
+  if (!supplierId) return;
+  const params = new URLSearchParams({ page_size: "50", is_active: "true", supplier_id: supplierId });
+  if (query) params.set("search", query);
+  let items = [];
+  try {
+    const resp = await fetch(`/api/inventory/master-items?${params.toString()}`);
+    if (resp.ok) items = (await resp.json()).items || [];
+  } catch (_) {}
+  barangPickerCache = items;
+  renderBarangPickerResults(items);
 }
 
-function dismissDuplicateBanner(rowId) {
-  const rowEl = document.querySelector(`.inbound-item-row[data-row-id="${rowId}"]`);
-  if (!rowEl) return;
-  clearDuplicateBanner(rowEl);
+function renderBarangPickerResults(items) {
+  const box = document.getElementById("barang-picker-results");
+  const empty = document.getElementById("barang-picker-empty");
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = "";
+    box.classList.add("hidden");
+    empty?.classList.remove("hidden");
+    return;
+  }
+  empty?.classList.add("hidden");
+  box.classList.remove("hidden");
+  box.innerHTML = items.map((item, idx) => `
+    <button type="button" onclick="chooseBarang(${idx})" class="w-full text-left px-3 py-2 hover:bg-bg2 transition-colors">
+      <div class="text-sm font-medium text-ink">${esc(item.name)}</div>
+      <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
+        <span class="font-mono">${esc(item.sku)}</span>
+        ${item.brand_name ? `<span>· ${esc(item.brand_name)}</span>` : ""}
+        <span>· ${esc(item.unit)}</span>
+        <span>· Stok ${item.stock_qty}</span>
+        <span>· Jual ${formatIDR(item.sell_price)}</span>
+      </div>
+    </button>
+  `).join("");
 }
 
-function clearDuplicateBanner(rowEl) {
-  const el = rowEl.querySelector(".row-duplicate-banner");
-  el.classList.add("hidden");
-  el.innerHTML = "";
+function chooseBarang(idx) {
+  const item = barangPickerCache[idx];
+  if (!item || !barangPickerRow) return;
+  renderRowProduct(barangPickerRow, {
+    master_item_id: item.id,
+    name: item.name,
+    sku: item.sku,
+    brand_name: item.brand_name,
+    unit: item.unit,
+    sell_price: item.sell_price,
+  });
+  closeModal();
+  barangPickerRow = null;
+}
+
+function goAddMasterItem() {
+  closeModal();
+  barangPickerRow = null;
+  switchInventoryTab("master");
+  newMasterItemForm();
 }
 
 // ── Inventory: Barang Masuk — save / validate / post / void ──────────────────
 function collectInboundPayload() {
   const rows = [...document.querySelectorAll("#inbound-item-rows .inbound-item-row")];
-  const items = rows.map(row => {
-    const masterItemId = row.dataset.masterItemId ? parseInt(row.dataset.masterItemId, 10) : null;
-    const base = {
-      qty_in: parseInt(row.querySelector(".row-qty").value, 10) || 0,
-      cost_price: parseInt(row.querySelector(".row-cost").value, 10) || 0,
-    };
-    if (masterItemId) {
-      return { ...base, master_item_id: masterItemId };
-    }
-    const sellRaw = row.querySelector(".row-sell-price").value;
-    return {
-      ...base,
-      pending_brand_id: parseInt(comboboxValue(row.querySelector(".row-brand-select")), 10) || null,
-      pending_product_name: row.querySelector(".row-product-name").value.trim(),
-      pending_unit: row.querySelector(".row-unit").value.trim(),
-      pending_sell_price: sellRaw ? parseInt(sellRaw, 10) : null,
-    };
-  });
+  const items = rows.map(row => ({
+    master_item_id: row.dataset.masterItemId ? parseInt(row.dataset.masterItemId, 10) : null,
+    qty_in: parseInt(row.querySelector(".row-qty").value, 10) || 0,
+    cost_price: parseInt(row.querySelector(".row-cost").value, 10) || 0,
+  }));
   return {
     supplier_id: parseInt(comboboxValue(document.getElementById("inbound-supplier-select")), 10) || null,
     received_date: document.getElementById("inbound-received-date").value,
@@ -3941,13 +4749,9 @@ function validateInboundForm(payload) {
   if (!payload.received_date) { showToast("Tanggal terima wajib diisi."); return false; }
   if (payload.items.length === 0) { showToast("Tambahkan minimal satu baris barang."); return false; }
   for (const item of payload.items) {
+    if (!item.master_item_id) { showToast("Setiap baris harus memilih barang dari Master Barang."); return false; }
     if (item.qty_in <= 0) { showToast("Qty masuk harus lebih dari 0 di setiap baris."); return false; }
     if (item.cost_price < 0) { showToast("Harga modal tidak boleh negatif."); return false; }
-    if (!item.master_item_id) {
-      if (!item.pending_brand_id) { showToast("Pilih merek untuk setiap baris barang baru."); return false; }
-      if (!item.pending_product_name) { showToast("Nama produk tidak boleh kosong."); return false; }
-      if (!item.pending_unit) { showToast("Satuan tidak boleh kosong untuk barang baru."); return false; }
-    }
   }
   return true;
 }
@@ -3970,10 +4774,9 @@ async function saveInboundDraft() {
     btn.disabled = false;
     return;
   }
-  const doc = await resp.json();
-  showToast(isUpdate ? "Draft diperbarui." : "Draft disimpan.");
+  showToast(isUpdate ? "Draft diperbarui." : "Draft disimpan.", "success");
   await loadInboundDocuments();
-  renderInboundFormFromDocument(doc);
+  goToInboundList();
   btn.disabled = false;
 }
 
@@ -4014,9 +4817,9 @@ async function postInboundDocument(docId) {
   const resp = await fetch(`/api/inventory/inbound-documents/${docId}/post`, { method: "POST" });
   if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
   const doc = await resp.json();
-  showToast(`Dokumen ${doc.doc_number} berhasil diposting.`);
+  showToast(`Dokumen ${doc.doc_number} berhasil diposting.`, "success");
   await loadInboundDocuments();
-  renderInboundFormFromDocument(doc);
+  goToInboundList();
 }
 
 function handleVoidDocClick(btnEl) {
@@ -4063,9 +4866,9 @@ async function submitVoidDocument(docId) {
   if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
   const doc = await resp.json();
   closeModal();
-  showToast(`Dokumen ${doc.doc_number} dibatalkan (void).`);
+  showToast(`Dokumen ${doc.doc_number} dibatalkan (void).`, "success");
   await loadInboundDocuments();
-  renderInboundFormFromDocument(doc);
+  goToInboundList();
 }
 
 function printMasterItemBarcode() {
@@ -4080,7 +4883,734 @@ function printMasterItemBarcode() {
     width: 1.5,
     height: 42,
   });
-  window.print();
+  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", null);
+}
+
+// Two print targets, one stylesheet: `bodyClass` selects which block becomes
+// visible and `pageRule` swaps the paper size, since @page can't be scoped to a
+// selector. Both are restored after the print dialog closes.
+function printWithPageRule(pageRule, bodyClass) {
+  const styleEl = document.getElementById("print-page-rule");
+  const previousRule = styleEl.textContent;
+  styleEl.textContent = pageRule;
+  if (bodyClass) document.body.classList.add(bodyClass);
+  try {
+    window.print();
+  } finally {
+    if (bodyClass) document.body.classList.remove(bodyClass);
+    styleEl.textContent = previousRule;
+  }
+}
+
+// ── Faktur Pembelian (purchase invoices / utang ke supplier) ─────────────────
+// A supplier's bill recorded as-is. Deliberately independent of Barang Masuk:
+// posting an invoice never moves stock, so it can be entered before, after, or
+// without a matching delivery document.
+
+// Printed on the invoice as the billed party. Edit to match the real shop.
+const SHOP_PROFILE = {
+  name: "TOKO PLASTIK",
+  address: "",
+  phone: "",
+};
+
+const PI_STATUS_LABELS = { draft: "Draft", posted: "Diposting", void: "Void" };
+const PI_PAYMENT_LABELS = { belum: "Belum dibayar", sebagian: "Dibayar sebagian", lunas: "Lunas" };
+
+let purchaseInvoiceCache = [];
+let currentPurchaseInvoice = null; // full detail of the open invoice; null while composing a new one
+let piRowSeq = 0;
+let piStatusFilter = "";
+let piPaymentFilter = "";
+let piSearchQuery = "";
+let piProductSearchState = new WeakMap(); // row product input -> { results, timer }
+
+// --- list ------------------------------------------------------------------
+
+const debouncedPurchaseInvoiceSearch = debounce(() => {
+  piSearchQuery = document.getElementById("pi-search-input").value.trim();
+  loadPurchaseInvoices();
+}, 250);
+
+function onPurchaseInvoiceSearchInput() {
+  debouncedPurchaseInvoiceSearch();
+}
+
+function setPurchaseInvoiceStatusFilter(status) {
+  piStatusFilter = status;
+  document.querySelectorAll(".pi-status-btn").forEach(btn => {
+    btn.classList.toggle("is-active", btn.dataset.piStatus === status);
+  });
+  loadPurchaseInvoices();
+}
+
+function setPurchaseInvoicePaymentFilter(payment) {
+  piPaymentFilter = payment;
+  document.querySelectorAll(".pi-payment-btn").forEach(btn => {
+    btn.classList.toggle("is-active", btn.dataset.piPayment === payment);
+  });
+  loadPurchaseInvoices();
+}
+
+async function loadPurchaseInvoices() {
+  const params = new URLSearchParams();
+  if (piStatusFilter) params.set("status", piStatusFilter);
+  if (piPaymentFilter) params.set("payment_status", piPaymentFilter);
+  if (piSearchQuery) params.set("search", piSearchQuery);
+  const resp = await fetch(`/api/purchase-invoices?${params.toString()}`);
+  if (!resp.ok) { showToast("Gagal memuat faktur pembelian."); return; }
+  purchaseInvoiceCache = await resp.json();
+  renderPurchaseInvoiceList(purchaseInvoiceCache);
+  loadPayableSummary();
+}
+
+async function loadPayableSummary() {
+  const resp = await fetch("/api/purchase-invoices/summary");
+  if (!resp.ok) return;
+  const s = await resp.json();
+  document.getElementById("pi-sum-outstanding").textContent = formatIDR(s.outstanding_total);
+  document.getElementById("pi-sum-unpaid").textContent = s.unpaid_count;
+  document.getElementById("pi-sum-overdue-count").textContent = s.overdue_count;
+  document.getElementById("pi-sum-overdue-total").textContent = formatIDR(s.overdue_total);
+  document.getElementById("pi-sum-posted").textContent = s.posted_count;
+}
+
+function purchaseInvoiceStatusBadge(inv) {
+  const dot = `<span class="status-dot is-${esc(inv.status)}"></span>`;
+  const label = PI_STATUS_LABELS[inv.status] || inv.status;
+  if (inv.status !== "posted") {
+    return `<span class="inline-flex items-center gap-1.5 text-xs text-muted">${dot}${esc(label)}</span>`;
+  }
+  const payment = PI_PAYMENT_LABELS[inv.payment_status] || inv.payment_status;
+  const overdue = inv.is_overdue ? `<span class="text-failed font-medium"> · telat</span>` : "";
+  return `<span class="inline-flex items-center gap-1.5 text-xs text-muted">${dot}${esc(label)} · ${esc(payment)}${overdue}</span>`;
+}
+
+function renderPurchaseInvoiceList(rows) {
+  const tbody = document.getElementById("pi-list-tbody");
+  const emptyEl = document.getElementById("pi-list-empty");
+  tbody.innerHTML = "";
+  if (rows.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  emptyEl.classList.add("hidden");
+  for (const inv of rows) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
+    tr.innerHTML = `
+      <td class="px-3 py-2">
+        <div class="font-mono text-xs text-ink">${esc(inv.invoice_number)}</div>
+        ${inv.supplier_invoice_no ? `<div class="text-[11px] text-muted">${esc(inv.supplier_invoice_no)}</div>` : ""}
+      </td>
+      <td class="px-3 py-2 font-serif font-medium text-ink">${esc(inv.supplier_name || inv.supplier_name_snapshot)}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(inv.invoice_date)}</td>
+      <td class="px-3 py-2 whitespace-nowrap ${inv.is_overdue ? "text-failed font-medium" : "text-muted"}">${esc(inv.due_date)}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatIDR(inv.total)}</td>
+      <td class="px-3 py-2 text-right tabular-nums ${inv.outstanding > 0 ? "text-failed font-medium" : "text-muted"}">${formatIDR(inv.outstanding)}</td>
+      <td class="px-3 py-2">${purchaseInvoiceStatusBadge(inv)}</td>
+    `;
+    tr.onclick = () => openPurchaseInvoice(inv.id);
+    tbody.appendChild(tr);
+  }
+}
+
+// --- panels ----------------------------------------------------------------
+
+function backToPurchaseInvoiceList() {
+  currentPurchaseInvoice = null;
+  document.getElementById("pi-form-panel").classList.add("hidden");
+  document.getElementById("pi-list-panel").classList.remove("hidden");
+  loadPurchaseInvoices();
+}
+
+function showPurchaseInvoiceForm() {
+  document.getElementById("pi-list-panel").classList.add("hidden");
+  document.getElementById("pi-form-panel").classList.remove("hidden");
+}
+
+function newPurchaseInvoiceForm() {
+  currentPurchaseInvoice = null;
+  document.getElementById("pi-form-title").textContent = "Faktur Baru";
+  document.getElementById("pi-form-number").classList.add("hidden");
+  comboboxSetValue(document.getElementById("pi-supplier-select"), "", "");
+  document.getElementById("pi-supplier-contact").classList.add("hidden");
+  document.getElementById("pi-supplier-invoice-no").value = "";
+  document.getElementById("pi-invoice-date").value = toDateInputValue(new Date());
+  document.getElementById("pi-payment-terms").value = "NET 30";
+  document.getElementById("pi-notes").value = "";
+  document.getElementById("pi-discount").value = "0";
+  document.getElementById("pi-tax-rate").value = "0";
+  document.getElementById("pi-item-rows").innerHTML = "";
+  onPurchaseInvoiceTermsChange();
+  addPurchaseInvoiceRow();
+  applyPurchaseInvoiceMode(null);
+  showPurchaseInvoiceForm();
+}
+
+async function openPurchaseInvoice(invoiceId) {
+  const resp = await fetch(`/api/purchase-invoices/${invoiceId}`);
+  if (!resp.ok) { showToast("Faktur tidak ditemukan."); return; }
+  const inv = await resp.json();
+  currentPurchaseInvoice = inv;
+
+  document.getElementById("pi-form-title").textContent = inv.supplier_name_snapshot;
+  const numberEl = document.getElementById("pi-form-number");
+  numberEl.textContent = inv.supplier_invoice_no
+    ? `${inv.invoice_number} · faktur supplier ${inv.supplier_invoice_no}`
+    : inv.invoice_number;
+  numberEl.classList.remove("hidden");
+
+  comboboxSetValue(document.getElementById("pi-supplier-select"), inv.supplier_id, inv.supplier_name || inv.supplier_name_snapshot);
+  renderPurchaseInvoiceContact({
+    phone: inv.supplier_phone_snapshot,
+    address: inv.supplier_address_snapshot,
+    contact_person: inv.supplier_contact_snapshot,
+    npwp: inv.supplier_npwp,
+  });
+  document.getElementById("pi-supplier-invoice-no").value = inv.supplier_invoice_no || "";
+  document.getElementById("pi-invoice-date").value = inv.invoice_date;
+  ensureTermOption(inv.payment_terms);
+  document.getElementById("pi-payment-terms").value = inv.payment_terms;
+  document.getElementById("pi-due-date").value = inv.due_date;
+  document.getElementById("pi-notes").value = inv.notes || "";
+  document.getElementById("pi-discount").value = inv.discount;
+  document.getElementById("pi-tax-rate").value = inv.tax_rate;
+
+  document.getElementById("pi-item-rows").innerHTML = "";
+  for (const item of inv.items) addPurchaseInvoiceRow(item);
+  if (inv.items.length === 0) addPurchaseInvoiceRow();
+
+  applyPurchaseInvoiceMode(inv);
+  updatePurchaseInvoiceTotals();
+  showPurchaseInvoiceForm();
+}
+
+// A stored invoice may carry terms that predate the current option list (or a
+// hand-entered one), so make sure the <select> can actually show its value.
+function ensureTermOption(terms) {
+  const sel = document.getElementById("pi-payment-terms");
+  if ([...sel.options].some(o => o.value === terms)) return;
+  const opt = document.createElement("option");
+  opt.value = terms;
+  opt.textContent = terms;
+  sel.appendChild(opt);
+}
+
+// Only drafts are editable; posted/void invoices become a read-only record.
+function applyPurchaseInvoiceMode(inv) {
+  const editable = inv === null || inv.status === "draft";
+  const posted = inv !== null && inv.status === "posted";
+
+  const inputs = [
+    "pi-supplier-select", "pi-supplier-invoice-no", "pi-invoice-date",
+    "pi-payment-terms", "pi-due-date", "pi-notes", "pi-discount", "pi-tax-rate",
+  ];
+  inputs.forEach(id => { document.getElementById(id).disabled = !editable; });
+  document.getElementById("pi-supplier-add-btn").disabled = !editable;
+  document.getElementById("pi-add-row-btn").classList.toggle("hidden", !editable);
+  document.querySelectorAll("#pi-item-rows input").forEach(el => { el.disabled = !editable; });
+  document.querySelectorAll("#pi-item-rows .pi-row-remove").forEach(el => { el.classList.toggle("hidden", !editable); });
+
+  const banner = document.getElementById("pi-readonly-banner");
+  if (editable) {
+    banner.classList.add("hidden");
+  } else {
+    banner.classList.remove("hidden");
+    banner.textContent = inv.status === "void"
+      ? `Faktur ini sudah di-void${inv.void_reason ? ` — ${inv.void_reason}` : ""}. Hanya bisa dilihat.`
+      : "Faktur sudah diposting dan terkunci. Catat pembayaran di bawah, atau void bila salah.";
+  }
+
+  document.getElementById("pi-save-btn").classList.toggle("hidden", !editable);
+  document.getElementById("pi-post-btn").classList.toggle("hidden", !(inv !== null && inv.status === "draft"));
+  document.getElementById("pi-void-btn").classList.toggle("hidden", !(inv !== null && inv.status !== "void"));
+  document.getElementById("pi-delete-btn").classList.toggle("hidden", !(inv !== null && inv.status === "draft"));
+  document.getElementById("pi-print-btn").classList.toggle("hidden", inv === null);
+  resetPiArmButtons();
+
+  const paymentSection = document.getElementById("pi-payment-section");
+  paymentSection.classList.toggle("hidden", !posted);
+  if (posted) {
+    document.getElementById("pi-paid-display").textContent = formatIDR(inv.amount_paid);
+    document.getElementById("pi-outstanding-display").textContent = formatIDR(inv.outstanding);
+    document.getElementById("pi-payment-amount").value = "";
+  }
+}
+
+function renderPurchaseInvoiceContact(supplier) {
+  const box = document.getElementById("pi-supplier-contact");
+  const lines = [];
+  if (supplier?.contact_person) lines.push(`<div>UP: ${esc(supplier.contact_person)}</div>`);
+  if (supplier?.phone) lines.push(`<div>Telp: ${esc(supplier.phone)}</div>`);
+  if (supplier?.address) lines.push(`<div>${esc(supplier.address)}</div>`);
+  if (supplier?.npwp) lines.push(`<div>NPWP: ${esc(supplier.npwp)}</div>`);
+  if (lines.length === 0) {
+    box.innerHTML = `<div>Supplier ini belum punya telepon/alamat. Lengkapi di Inventori → Master Supplier agar tercetak di faktur.</div>`;
+  } else {
+    box.innerHTML = lines.join("");
+  }
+  box.classList.remove("hidden");
+}
+
+async function onPurchaseInvoiceSupplierChange(inputEl) {
+  const supplierId = comboboxValue(inputEl);
+  if (!supplierId) { document.getElementById("pi-supplier-contact").classList.add("hidden"); return; }
+  let supplier = suppliersCache.find(s => String(s.id) === String(supplierId));
+  if (!supplier) {
+    // suppliersCache is filled by the Inventori bootstrap; refetch when this
+    // page is used before that ran, or after a quick-add.
+    try {
+      const resp = await fetch("/api/suppliers");
+      if (resp.ok) {
+        suppliersCache = await resp.json();
+        supplier = suppliersCache.find(s => String(s.id) === String(supplierId));
+      }
+    } catch (_) {}
+  }
+  renderPurchaseInvoiceContact(supplier);
+}
+
+function onPurchaseInvoiceTermsChange() {
+  const invoiceDate = document.getElementById("pi-invoice-date").value;
+  const terms = document.getElementById("pi-payment-terms").value;
+  const match = /^NET\s*(\d{1,3})$/i.exec(terms);
+  if (!invoiceDate || !match) return;
+  const due = parseDateInputValue(invoiceDate);
+  due.setDate(due.getDate() + parseInt(match[1], 10));
+  document.getElementById("pi-due-date").value = toDateInputValue(due);
+}
+
+// --- line items ------------------------------------------------------------
+
+function purchaseInvoiceRowTemplate(rowId) {
+  return `
+    <div class="flex flex-wrap items-start gap-2">
+      <div class="relative flex-1 min-w-[180px]">
+        <input type="text" autocomplete="off" placeholder="Nama barang (cari master / ketik bebas)"
+          class="pi-row-product w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors"
+          oninput="onPiProductInput(this)" onfocus="onPiProductInput(this)" onblur="onPiProductBlur(this)" />
+        <div class="pi-row-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+      </div>
+      <input type="text" placeholder="Satuan"
+        class="pi-row-unit w-24 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+      <input type="number" min="1" step="1" placeholder="Qty" value="1"
+        class="pi-row-qty w-20 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors"
+        oninput="updatePurchaseInvoiceTotals()" />
+      <input type="number" min="0" step="1" placeholder="Harga" value="0"
+        class="pi-row-price w-32 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors"
+        oninput="updatePurchaseInvoiceTotals()" />
+      <div class="pi-row-total w-28 px-2 py-2 text-sm text-right tabular-nums text-muted">Rp 0</div>
+      <button type="button" onclick="removePurchaseInvoiceRow(this)" title="Hapus baris"
+        class="pi-row-remove px-2.5 py-2 border border-line rounded-lg text-sm text-muted hover:text-failed hover:border-failed transition-colors">&times;</button>
+    </div>
+    <div class="pi-row-meta hidden text-[11px] text-muted mt-1"></div>
+  `;
+}
+
+function addPurchaseInvoiceRow(prefill) {
+  const rowId = ++piRowSeq;
+  const div = document.createElement("div");
+  div.className = "pi-item-row border border-line rounded-lg p-3";
+  div.dataset.rowId = rowId;
+  div.dataset.masterItemId = "";
+  div.innerHTML = purchaseInvoiceRowTemplate(rowId);
+  document.getElementById("pi-item-rows").appendChild(div);
+  if (prefill) {
+    div.dataset.masterItemId = prefill.master_item_id != null ? String(prefill.master_item_id) : "";
+    div.querySelector(".pi-row-product").value = prefill.product_name || "";
+    div.querySelector(".pi-row-unit").value = prefill.unit || "";
+    div.querySelector(".pi-row-qty").value = prefill.qty;
+    div.querySelector(".pi-row-price").value = prefill.unit_price;
+    setPiRowMeta(div, prefill.sku);
+  }
+  updatePurchaseInvoiceTotals();
+  return div;
+}
+
+function removePurchaseInvoiceRow(btnEl) {
+  btnEl.closest(".pi-item-row").remove();
+  updatePurchaseInvoiceTotals();
+}
+
+function setPiRowMeta(rowEl, sku) {
+  const meta = rowEl.querySelector(".pi-row-meta");
+  if (sku) {
+    meta.innerHTML = `<span class="font-mono text-done">${esc(sku)}</span> · tertaut ke Master Barang`;
+    meta.classList.remove("hidden");
+  } else {
+    meta.textContent = "";
+    meta.classList.add("hidden");
+  }
+}
+
+function piRowDropdown(inputEl) {
+  return inputEl.parentElement.querySelector(".pi-row-dropdown");
+}
+
+function onPiProductInput(inputEl) {
+  const rowEl = inputEl.closest(".pi-item-row");
+  rowEl.dataset.masterItemId = ""; // typing detaches any previous master link
+  setPiRowMeta(rowEl, null);
+  const query = inputEl.value.trim();
+  const state = piProductSearchState.get(inputEl) || {};
+  clearTimeout(state.timer);
+  if (!query) {
+    piRowDropdown(inputEl).classList.add("hidden");
+    piProductSearchState.set(inputEl, state);
+    return;
+  }
+  state.timer = setTimeout(() => searchPiProducts(inputEl, query), 200);
+  piProductSearchState.set(inputEl, state);
+}
+
+function onPiProductBlur(inputEl) {
+  // Same delay trick as the entity combobox: let an option's click land first.
+  setTimeout(() => piRowDropdown(inputEl).classList.add("hidden"), 150);
+}
+
+async function searchPiProducts(inputEl, query) {
+  let results = [];
+  try {
+    const resp = await fetch(`/api/inventory/master-items/autocomplete?query=${encodeURIComponent(query)}&limit=8`);
+    if (resp.ok) results = await resp.json();
+  } catch (_) {}
+  if (inputEl.value.trim() !== query) return; // stale response, user kept typing
+  piProductSearchState.set(inputEl, { results });
+  const dd = piRowDropdown(inputEl);
+  if (results.length === 0) {
+    dd.innerHTML = `<div class="px-3 py-2 text-xs text-muted">Tidak ada di Master Barang — teks bebas tetap bisa dipakai.</div>`;
+  } else {
+    dd.innerHTML = results.map((item, idx) => `
+      <button type="button" data-idx="${idx}" onmousedown="event.preventDefault()" onclick="choosePiProduct(this)"
+        class="w-full text-left px-3 py-2 hover:bg-bg2 transition-colors border-b border-line last:border-b-0">
+        <div class="text-sm text-ink">${esc(item.name)}</div>
+        <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
+          <span class="font-mono">${esc(item.sku)}</span>
+          <span>· ${esc(item.unit)}</span>
+          <span>· Modal ${formatIDR(item.last_cost_price)}</span>
+        </div>
+      </button>
+    `).join("");
+  }
+  dd.classList.remove("hidden");
+}
+
+function choosePiProduct(btnEl) {
+  const dd = btnEl.closest(".pi-row-dropdown");
+  const inputEl = dd.parentElement.querySelector(".pi-row-product");
+  const rowEl = inputEl.closest(".pi-item-row");
+  const item = piProductSearchState.get(inputEl)?.results?.[parseInt(btnEl.dataset.idx, 10)];
+  if (!item) return;
+  rowEl.dataset.masterItemId = String(item.id);
+  inputEl.value = item.name;
+  rowEl.querySelector(".pi-row-unit").value = item.unit || "";
+  const priceEl = rowEl.querySelector(".pi-row-price");
+  // Last purchase cost is the best guess for what this supplier will bill again.
+  if (!parseInt(priceEl.value, 10) && item.last_cost_price) priceEl.value = item.last_cost_price;
+  setPiRowMeta(rowEl, item.sku);
+  dd.classList.add("hidden");
+  updatePurchaseInvoiceTotals();
+}
+
+function purchaseInvoiceRowValues() {
+  return [...document.querySelectorAll("#pi-item-rows .pi-item-row")].map(rowEl => ({
+    rowEl,
+    master_item_id: rowEl.dataset.masterItemId ? parseInt(rowEl.dataset.masterItemId, 10) : null,
+    product_name: rowEl.querySelector(".pi-row-product").value.trim(),
+    unit: rowEl.querySelector(".pi-row-unit").value.trim(),
+    qty: parseInt(rowEl.querySelector(".pi-row-qty").value, 10) || 0,
+    unit_price: parseInt(rowEl.querySelector(".pi-row-price").value, 10) || 0,
+  }));
+}
+
+// Mirrors compute_purchase_invoice_totals() on the server — this copy is only
+// for live display; the stored figures are always the server's.
+function updatePurchaseInvoiceTotals() {
+  const rows = purchaseInvoiceRowValues();
+  let subtotal = 0;
+  for (const row of rows) {
+    const lineTotal = row.qty * row.unit_price;
+    subtotal += lineTotal;
+    row.rowEl.querySelector(".pi-row-total").textContent = formatIDR(lineTotal);
+  }
+  const discountInput = Math.max(0, parseInt(document.getElementById("pi-discount").value, 10) || 0);
+  const discount = Math.min(discountInput, subtotal);
+  const taxRate = parseFloat(document.getElementById("pi-tax-rate").value) || 0;
+  const taxAmount = Math.round((subtotal - discount) * taxRate / 100);
+  document.getElementById("pi-subtotal-display").textContent = formatIDR(subtotal);
+  document.getElementById("pi-tax-display").textContent = formatIDR(taxAmount);
+  document.getElementById("pi-total-display").textContent = formatIDR(subtotal - discount + taxAmount);
+}
+
+// --- save / post / void / delete -------------------------------------------
+
+function collectPurchaseInvoicePayload() {
+  const supplierId = comboboxValue(document.getElementById("pi-supplier-select"));
+  if (!supplierId) { showToast("Pilih supplier terlebih dahulu."); return null; }
+  const invoiceDate = document.getElementById("pi-invoice-date").value;
+  if (!invoiceDate) { showToast("Tanggal faktur wajib diisi."); return null; }
+  const dueDate = document.getElementById("pi-due-date").value;
+  if (dueDate && dueDate < invoiceDate) { showToast("Jatuh tempo tidak boleh sebelum tanggal faktur."); return null; }
+
+  const rows = purchaseInvoiceRowValues();
+  const items = [];
+  for (const [idx, row] of rows.entries()) {
+    const blank = !row.product_name && row.qty <= 0 && row.unit_price <= 0;
+    if (blank) continue; // an untouched trailing row is not an error
+    if (!row.product_name) { showToast(`Baris ${idx + 1}: nama barang wajib diisi.`); return null; }
+    if (row.qty <= 0) { showToast(`Baris ${idx + 1}: qty harus lebih dari 0.`); return null; }
+    items.push({
+      master_item_id: row.master_item_id,
+      product_name: row.product_name,
+      unit: row.unit,
+      qty: row.qty,
+      unit_price: row.unit_price,
+    });
+  }
+  if (items.length === 0) { showToast("Minimal satu baris barang."); return null; }
+
+  return {
+    supplier_id: parseInt(supplierId, 10),
+    invoice_date: invoiceDate,
+    due_date: dueDate || null,
+    payment_terms: document.getElementById("pi-payment-terms").value,
+    supplier_invoice_no: document.getElementById("pi-supplier-invoice-no").value.trim() || null,
+    notes: document.getElementById("pi-notes").value.trim() || null,
+    discount: Math.max(0, parseInt(document.getElementById("pi-discount").value, 10) || 0),
+    tax_rate: parseFloat(document.getElementById("pi-tax-rate").value) || 0,
+    items,
+  };
+}
+
+async function savePurchaseInvoiceDraft() {
+  const payload = collectPurchaseInvoicePayload();
+  if (!payload) return;
+  const editing = currentPurchaseInvoice !== null;
+  const btn = document.getElementById("pi-save-btn");
+  btn.disabled = true;
+  try {
+    const resp = await fetch(
+      editing ? `/api/purchase-invoices/${currentPurchaseInvoice.id}` : "/api/purchase-invoices",
+      {
+        method: editing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+    const inv = await resp.json();
+    showToast(`Faktur ${inv.invoice_number} tersimpan.`, "success");
+    await openPurchaseInvoice(inv.id);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Two-click confirm, same idea as the Barang Masuk post/void buttons.
+function armPiButton(btnEl, activeClasses, idleClass, idleLabel, onConfirm) {
+  if (btnEl.dataset.armed !== "true") {
+    btnEl.dataset.armed = "true";
+    btnEl.classList.add(...activeClasses);
+    btnEl.classList.remove(idleClass);
+    btnEl.textContent = "Klik lagi untuk konfirmasi";
+    btnEl._armTimer = setTimeout(() => resetPiArmButton(btnEl, activeClasses, idleClass, idleLabel), 3000);
+    return;
+  }
+  resetPiArmButton(btnEl, activeClasses, idleClass, idleLabel);
+  onConfirm();
+}
+
+function resetPiArmButton(btnEl, activeClasses, idleClass, idleLabel) {
+  clearTimeout(btnEl._armTimer);
+  btnEl.dataset.armed = "false";
+  btnEl.classList.remove(...activeClasses);
+  btnEl.classList.add(idleClass);
+  btnEl.textContent = idleLabel;
+}
+
+function resetPiArmButtons() {
+  resetPiArmButton(document.getElementById("pi-post-btn"), ["bg-done", "text-bg"], "text-done", "Posting");
+  resetPiArmButton(document.getElementById("pi-void-btn"), ["bg-failed", "text-bg"], "text-failed", "Void");
+  resetPiArmButton(document.getElementById("pi-delete-btn"), ["bg-failed", "text-bg"], "text-failed", "Hapus");
+}
+
+function handlePostPurchaseInvoiceClick(btnEl) {
+  armPiButton(btnEl, ["bg-done", "text-bg"], "text-done", "Posting", postPurchaseInvoice);
+}
+
+function handleVoidPurchaseInvoiceClick(btnEl) {
+  armPiButton(btnEl, ["bg-failed", "text-bg"], "text-failed", "Void", openPurchaseInvoiceVoidModal);
+}
+
+function handleDeletePurchaseInvoiceClick(btnEl) {
+  armPiButton(btnEl, ["bg-failed", "text-bg"], "text-failed", "Hapus", deletePurchaseInvoice);
+}
+
+async function postPurchaseInvoice() {
+  if (!currentPurchaseInvoice) return;
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/post`, { method: "POST" });
+  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  const inv = await resp.json();
+  showToast(`Faktur ${inv.invoice_number} diposting.`, "success");
+  await openPurchaseInvoice(inv.id);
+}
+
+function openPurchaseInvoiceVoidModal() {
+  if (!currentPurchaseInvoice) return;
+  openModal("Batalkan Faktur (Void)", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Faktur tetap tersimpan dengan nomornya, tetapi tidak lagi dihitung sebagai utang.</p>
+      <div>
+        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan</label>
+        <input id="pi-void-reason" type="text" placeholder="misal: salah input, faktur ganda"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="submitPurchaseInvoiceVoid()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Void</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById("pi-void-reason")?.focus(), 0);
+}
+
+async function submitPurchaseInvoiceVoid() {
+  const reason = document.getElementById("pi-void-reason").value.trim();
+  if (!reason) { showToast("Alasan void wajib diisi."); return; }
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/void`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  const inv = await resp.json();
+  closeModal();
+  showToast(`Faktur ${inv.invoice_number} di-void.`, "success");
+  await openPurchaseInvoice(inv.id);
+}
+
+async function deletePurchaseInvoice() {
+  if (!currentPurchaseInvoice) return;
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}`, { method: "DELETE" });
+  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  showToast("Draft faktur dihapus.", "success");
+  backToPurchaseInvoiceList();
+}
+
+async function submitPurchaseInvoicePayment() {
+  if (!currentPurchaseInvoice) return;
+  const amount = parseInt(document.getElementById("pi-payment-amount").value, 10);
+  if (!amount || amount <= 0) { showToast("Jumlah bayar harus lebih dari 0."); return; }
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount }),
+  });
+  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  const inv = await resp.json();
+  showToast(inv.payment_status === "lunas" ? "Faktur lunas." : "Pembayaran dicatat.", "success");
+  await openPurchaseInvoice(inv.id);
+}
+
+// --- print -----------------------------------------------------------------
+
+function printPurchaseInvoice() {
+  if (!currentPurchaseInvoice) return;
+  document.getElementById("pi-print-area").innerHTML = purchaseInvoicePrintHtml(currentPurchaseInvoice);
+  printWithPageRule("@page { size: A4; margin: 14mm; }", "print-invoice");
+}
+
+function purchaseInvoicePrintHtml(inv) {
+  const supplierLines = [
+    inv.supplier_contact_snapshot ? `UP: ${esc(inv.supplier_contact_snapshot)}` : "",
+    inv.supplier_address_snapshot ? esc(inv.supplier_address_snapshot) : "",
+    inv.supplier_phone_snapshot ? `Telp: ${esc(inv.supplier_phone_snapshot)}` : "",
+    inv.supplier_npwp ? `NPWP: ${esc(inv.supplier_npwp)}` : "",
+  ].filter(Boolean).map(l => `<div>${l}</div>`).join("");
+
+  const shopLines = [SHOP_PROFILE.address, SHOP_PROFILE.phone]
+    .filter(Boolean).map(l => `<div>${esc(l)}</div>`).join("");
+
+  const rows = inv.items.map((item, idx) => `
+    <tr>
+      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;">${idx + 1}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;">
+        ${esc(item.product_name)}${item.sku ? `<div style="font-size:8pt;color:#6B6B66;">${esc(item.sku)}</div>` : ""}
+      </td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;">${esc(item.unit)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;text-align:right;">${item.qty}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;text-align:right;">${formatIDR(item.unit_price)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;text-align:right;">${formatIDR(item.line_total)}</td>
+    </tr>
+  `).join("");
+
+  const totalRow = (label, value, bold) => `
+    <tr>
+      <td style="padding:3px 6px;text-align:right;color:#6B6B66;${bold ? "font-weight:600;color:#141413;" : ""}">${label}</td>
+      <td style="padding:3px 6px;text-align:right;white-space:nowrap;${bold ? "font-weight:600;" : ""}">${value}</td>
+    </tr>`;
+
+  return `
+    <div style="font-size:10pt;line-height:1.45;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #141413;padding-bottom:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:16pt;font-weight:700;letter-spacing:0.5px;">FAKTUR PEMBELIAN</div>
+          <div style="font-size:9pt;color:#6B6B66;">${esc(inv.invoice_number)}</div>
+        </div>
+        <div style="text-align:right;font-size:9pt;color:#6B6B66;">
+          ${inv.status === "void" ? `<div style="color:#A83B3B;font-weight:700;font-size:11pt;">VOID</div>` : ""}
+          <div>Tanggal: ${esc(inv.invoice_date)}</div>
+          <div>Jatuh tempo: ${esc(inv.due_date)}</div>
+          <div>Termin: ${esc(inv.payment_terms)}</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:24px;margin-bottom:14px;font-size:9pt;">
+        <div style="flex:1;">
+          <div style="font-size:8pt;text-transform:uppercase;letter-spacing:1px;color:#6B6B66;margin-bottom:3px;">Dari (Supplier)</div>
+          <div style="font-weight:600;font-size:10pt;">${esc(inv.supplier_name_snapshot)}</div>
+          ${supplierLines}
+          ${inv.supplier_invoice_no ? `<div>No. faktur supplier: ${esc(inv.supplier_invoice_no)}</div>` : ""}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:8pt;text-transform:uppercase;letter-spacing:1px;color:#6B6B66;margin-bottom:3px;">Ditagihkan Kepada</div>
+          <div style="font-weight:600;font-size:10pt;">${esc(SHOP_PROFILE.name)}</div>
+          ${shopLines}
+        </div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:9pt;">
+        <thead>
+          <tr style="background:#F0EEE6;">
+            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #141413;width:24px;">#</th>
+            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #141413;">Barang</th>
+            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #141413;">Satuan</th>
+            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #141413;">Qty</th>
+            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #141413;">Harga</th>
+            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #141413;">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <table style="margin-left:auto;margin-top:10px;font-size:9pt;min-width:230px;">
+        ${totalRow("Subtotal", formatIDR(inv.subtotal))}
+        ${inv.discount ? totalRow("Diskon", `- ${formatIDR(inv.discount)}`) : ""}
+        ${inv.tax_amount ? totalRow(`PPN ${inv.tax_rate}%`, formatIDR(inv.tax_amount)) : ""}
+        ${totalRow("Total", formatIDR(inv.total), true)}
+        ${inv.amount_paid ? totalRow("Dibayar", `- ${formatIDR(inv.amount_paid)}`) : ""}
+        ${totalRow("Sisa tagihan", formatIDR(inv.outstanding), true)}
+      </table>
+
+      ${inv.notes ? `<div style="margin-top:14px;font-size:9pt;"><span style="color:#6B6B66;">Catatan:</span> ${esc(inv.notes)}</div>` : ""}
+      <div style="margin-top:6px;font-size:8pt;color:#6B6B66;">
+        Status: ${esc(PI_STATUS_LABELS[inv.status] || inv.status)} · ${esc(PI_PAYMENT_LABELS[inv.payment_status] || inv.payment_status)}
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:36px;font-size:9pt;text-align:center;">
+        <div style="width:40%;"><div style="border-top:1px solid #141413;padding-top:4px;">Penerima</div></div>
+        <div style="width:40%;"><div style="border-top:1px solid #141413;padding-top:4px;">Hormat kami</div></div>
+      </div>
+    </div>
+  `;
 }
 
 // ── Users (admin) ─────────────────────────────────────────────────────────────
@@ -4174,7 +5704,7 @@ async function submitNewUser() {
   }
   closeModal();
   await loadUsers();
-  showToast("Pengguna ditambahkan.");
+  showToast("Pengguna ditambahkan.", "success");
 }
 
 async function changeUserRole(userId, role) {
@@ -4204,7 +5734,7 @@ async function toggleUserActive(userId, nextActive) {
     return;
   }
   await loadUsers();
-  showToast(nextActive ? "Pengguna diaktifkan." : "Pengguna dinonaktifkan.");
+  showToast(nextActive ? "Pengguna diaktifkan." : "Pengguna dinonaktifkan.", "success");
 }
 
 function openResetPasswordModal(userId, username) {
@@ -4237,7 +5767,7 @@ async function submitResetPassword(userId) {
     return;
   }
   closeModal();
-  showToast("Password berhasil direset.");
+  showToast("Password berhasil direset.", "success");
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -4276,5 +5806,8 @@ checkAuth();
     <div id="barcode-print-price" class="barcode-label-price"></div>
   </div>
 </div>
+
+<!-- Purchase invoice print sheet — filled by renderPurchaseInvoicePrint() right before window.print(). -->
+<div id="pi-print-area"></div>
 </body>
 </html>

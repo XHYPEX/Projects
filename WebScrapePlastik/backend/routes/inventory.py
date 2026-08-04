@@ -7,21 +7,25 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.auth import require_admin
 from backend.database import (
-    _normalize_name,
     autocomplete_master_items,
     create_brand,
     create_inbound_document,
     create_master_item,
     create_stock_adjustment,
     create_supplier,
+    create_unit,
     delete_all_brands,
     delete_all_suppliers,
+    delete_all_units,
     delete_brand,
+    delete_master_item,
     delete_supplier,
+    delete_unit,
     find_cross_supplier_master_items,
     find_exact_duplicate_master_item,
     get_all_brands,
     get_all_suppliers,
+    get_all_units,
     get_brand,
     get_inbound_document,
     get_inbound_document_items,
@@ -32,6 +36,8 @@ from backend.database import (
     get_master_items_for_export,
     get_stock_ledger,
     get_supplier,
+    get_unit,
+    get_unit_by_name,
     list_inbound_documents,
     list_master_items,
     post_inbound_document,
@@ -44,6 +50,7 @@ from backend.database import (
     update_inbound_document,
     update_master_item,
     update_supplier,
+    update_unit,
     void_inbound_document,
 )
 from backend.schemas import (
@@ -57,6 +64,7 @@ from backend.schemas import (
     InboundDocumentDetail,
     InboundDocumentOut,
     InboundItemOut,
+    IncomingItemOut,
     InventoryOverviewOut,
     MasterItemBatchOut,
     MasterItemCreateRequest,
@@ -64,6 +72,7 @@ from backend.schemas import (
     MasterItemListOut,
     MasterItemOut,
     MasterItemUpdateRequest,
+    PendingInvoiceOut,
     SkuPreviewOut,
     StockAdjustmentRequest,
     StockAdjustmentResponse,
@@ -71,6 +80,10 @@ from backend.schemas import (
     SupplierOut,
     SupplierRequest,
     SupplierUpdateRequest,
+    TopSellingOut,
+    UnitOut,
+    UnitRequest,
+    UnitUpdateRequest,
     VoidRequest,
 )
 
@@ -104,42 +117,26 @@ def _validate_inbound_items(items: list) -> None:
         raise HTTPException(status_code=422, detail="At least one line item is required")
     seen: set = set()
     for item in items:
-        has_existing = item.master_item_id is not None
-        has_pending = bool(item.pending_brand_id) or bool(item.pending_product_name) or bool(item.pending_unit)
-        if has_existing and has_pending:
+        # Barang can only be received if it already exists in Master Barang.
+        # Inline new-product creation (pending_* fields) is no longer allowed.
+        if item.master_item_id is None:
             raise HTTPException(
                 status_code=422,
-                detail="A line item cannot have both master_item_id and pending product fields set",
+                detail="Setiap baris barang harus dipilih dari Master Barang — tambahkan barang baru di Master Barang terlebih dahulu",
             )
-        if not has_existing and not has_pending:
+        if item.pending_brand_id or item.pending_product_name or item.pending_unit or item.pending_sell_price is not None:
             raise HTTPException(
                 status_code=422,
-                detail="A line item must have either master_item_id, or pending_brand_id/pending_product_name/pending_unit, set",
-            )
-        if has_pending and not (item.pending_brand_id and item.pending_product_name and item.pending_unit):
-            raise HTTPException(
-                status_code=422,
-                detail="A pending (new-product) line item requires pending_brand_id, pending_product_name, and pending_unit all set",
+                detail="Barang baru tidak dapat dibuat langsung di Barang Masuk — tambahkan dulu di Master Barang",
             )
         if item.qty_in <= 0:
             raise HTTPException(status_code=422, detail="qty_in must be a positive integer")
         if item.cost_price < 0:
             raise HTTPException(status_code=422, detail="cost_price must be >= 0")
-        if item.pending_sell_price is not None and item.pending_sell_price < 0:
-            raise HTTPException(status_code=422, detail="pending_sell_price must be >= 0")
 
-        if has_existing:
-            if get_master_item(item.master_item_id) is None:
-                raise HTTPException(status_code=422, detail=f"master_item_id {item.master_item_id} not found")
-            key = ("existing", item.master_item_id)
-        else:
-            if get_brand(item.pending_brand_id) is None:
-                raise HTTPException(status_code=422, detail=f"pending_brand_id {item.pending_brand_id} not found")
-            if not item.pending_product_name.strip():
-                raise HTTPException(status_code=422, detail="pending_product_name must not be empty")
-            if not item.pending_unit.strip():
-                raise HTTPException(status_code=422, detail="pending_unit must not be empty")
-            key = ("pending", item.pending_brand_id, _normalize_name(item.pending_product_name))
+        if get_master_item(item.master_item_id) is None:
+            raise HTTPException(status_code=422, detail=f"master_item_id {item.master_item_id} not found")
+        key = ("existing", item.master_item_id)
 
         if key in seen:
             raise HTTPException(
@@ -159,6 +156,9 @@ def _row_to_supplier(row: dict) -> SupplierOut:
         is_system=bool(row["is_system"]),
         source=row["source"],
         phone=row["phone"],
+        address=row["address"],
+        contact_person=row["contact_person"],
+        npwp=row["npwp"],
         score=row.get("score"),
     )
 
@@ -173,6 +173,15 @@ def _row_to_brand(row: dict) -> BrandOut:
         is_system=bool(row["is_system"]),
         source=row["source"],
         score=row.get("score"),
+    )
+
+
+def _row_to_unit(row: dict) -> UnitOut:
+    return UnitOut(
+        id=row["id"],
+        name=row["name"],
+        is_active=bool(row["is_active"]),
+        created_at=row["created_at"],
     )
 
 
@@ -278,7 +287,17 @@ async def create_new_supplier(req: SupplierRequest):
         raise HTTPException(status_code=422, detail="name must not be empty")
     loop = asyncio.get_event_loop()
     try:
-        row = await loop.run_in_executor(None, create_supplier, req.name.strip(), req.code, "quick_add", req.phone)
+        row = await loop.run_in_executor(
+            None,
+            create_supplier,
+            req.name.strip(),
+            req.code,
+            "quick_add",
+            req.phone,
+            req.address,
+            req.contact_person,
+            req.npwp,
+        )
     except ValueError as e:
         _raise_from_value_error(e)
     return _row_to_supplier(row)
@@ -313,7 +332,17 @@ async def patch_supplier(supplier_id: int, req: SupplierUpdateRequest):
     if await loop.run_in_executor(None, get_supplier, supplier_id) is None:
         raise HTTPException(status_code=404, detail=f"Supplier {supplier_id} not found")
     try:
-        row = await loop.run_in_executor(None, update_supplier, supplier_id, req.name, req.is_active, req.phone)
+        row = await loop.run_in_executor(
+            None,
+            update_supplier,
+            supplier_id,
+            req.name,
+            req.is_active,
+            req.phone,
+            req.address,
+            req.contact_person,
+            req.npwp,
+        )
     except ValueError as e:
         _raise_from_value_error(e)
     return _row_to_supplier(row)
@@ -407,6 +436,61 @@ async def delete_brand_route(brand_id: int):
     return Response(status_code=204)
 
 
+# --- units (Satuan) ---------------------------------------------------------
+
+
+@router.post("/units", response_model=UnitOut, status_code=201)
+async def create_new_unit(req: UnitRequest):
+    if not req.name.strip():
+        raise HTTPException(status_code=422, detail="name must not be empty")
+    loop = asyncio.get_event_loop()
+    try:
+        row = await loop.run_in_executor(None, create_unit, req.name.strip())
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return _row_to_unit(row)
+
+
+@router.get("/units", response_model=list[UnitOut])
+async def list_units(active_only: bool = False):
+    loop = asyncio.get_event_loop()
+    rows = await loop.run_in_executor(None, get_all_units, active_only)
+    return [_row_to_unit(r) for r in rows]
+
+
+@router.patch("/units/{unit_id}", response_model=UnitOut)
+async def patch_unit(unit_id: int, req: UnitUpdateRequest):
+    if req.name is not None and not req.name.strip():
+        raise HTTPException(status_code=422, detail="name must not be empty")
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_unit, unit_id) is None:
+        raise HTTPException(status_code=404, detail=f"Unit {unit_id} not found")
+    try:
+        row = await loop.run_in_executor(None, update_unit, unit_id, req.name, req.is_active)
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return _row_to_unit(row)
+
+
+@router.delete("/units", response_model=BulkDeleteOut, dependencies=[Depends(require_admin)])
+async def delete_all_units_route():
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, delete_all_units)
+    return BulkDeleteOut(**result)
+
+
+@router.delete("/units/{unit_id}", status_code=204, response_class=Response, dependencies=[Depends(require_admin)])
+async def delete_unit_route(unit_id: int):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_unit, unit_id) is None:
+        raise HTTPException(status_code=404, detail=f"Unit {unit_id} not found")
+    try:
+        await loop.run_in_executor(None, delete_unit, unit_id)
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return Response(status_code=204)
+
+
 # --- sku preview / duplicate check / autocomplete --------------------------
 
 
@@ -474,6 +558,8 @@ async def create_new_master_item(req: MasterItemCreateRequest):
         raise HTTPException(status_code=422, detail=f"supplier_id {req.supplier_id} not found")
     if await loop.run_in_executor(None, get_brand, req.brand_id) is None:
         raise HTTPException(status_code=422, detail=f"brand_id {req.brand_id} not found")
+    if await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
+        raise HTTPException(status_code=422, detail=f"unit '{req.unit}' is not a valid satuan")
 
     try:
         row = await loop.run_in_executor(
@@ -556,6 +642,8 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
         raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+    if req.unit is not None and await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
+        raise HTTPException(status_code=422, detail=f"unit '{req.unit}' is not a valid satuan")
     try:
         row = await loop.run_in_executor(None, update_master_item, master_item_id, req.name, req.sell_price, req.unit)
     except ValueError as e:
@@ -570,6 +658,18 @@ async def master_item_ledger(master_item_id: int):
         raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
     rows = await loop.run_in_executor(None, get_stock_ledger, master_item_id)
     return [_row_to_ledger(r) for r in rows]
+
+
+@router.delete("/inventory/master-items/{master_item_id}", status_code=204, response_class=Response, dependencies=[Depends(require_admin)])
+async def delete_master_item_route(master_item_id: int):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+    try:
+        await loop.run_in_executor(None, delete_master_item, master_item_id)
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return Response(status_code=204)
 
 
 # --- inbound documents -----------------------------------------------------
@@ -700,4 +800,11 @@ async def inventory_overview():
         inbound_doc_count_30d=result["inbound_doc_count_30d"],
         low_stock_threshold=result["low_stock_threshold"],
         low_stock_items=[_row_to_master_item(r) for r in result["low_stock_items"]],
+        pending_invoice_count=result["pending_invoice_count"],
+        pending_invoice_outstanding=result["pending_invoice_outstanding"],
+        pending_invoices=[PendingInvoiceOut(**r) for r in result["pending_invoices"]],
+        latest_incoming=[IncomingItemOut(**r) for r in result["latest_incoming"]],
+        top_selling=[TopSellingOut(**r) for r in result["top_selling"]],
+        sales_month_revenue=result["sales_month_revenue"],
+        sales_month_count=result["sales_month_count"],
     )

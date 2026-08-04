@@ -63,6 +63,8 @@ def init_db() -> None:
                 plate_number TEXT NOT NULL,
                 plate_suffix TEXT NOT NULL,
                 plate_full TEXT NOT NULL,
+                customer_phone TEXT NOT NULL DEFAULT '',
+                customer_name TEXT,
                 subtotal INTEGER NOT NULL,
                 discount INTEGER NOT NULL DEFAULT 0,
                 total INTEGER NOT NULL,
@@ -94,6 +96,14 @@ def init_db() -> None:
                 is_active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS units (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                name_normalized TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_units_name_normalized ON units(name_normalized);
             CREATE TABLE IF NOT EXISTS master_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sku TEXT NOT NULL UNIQUE,
@@ -156,6 +166,47 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_stock_ledger_master_item_id ON stock_ledger(master_item_id);
 
+            CREATE TABLE IF NOT EXISTS purchase_invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_number TEXT NOT NULL UNIQUE,
+                supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+                supplier_invoice_no TEXT,
+                supplier_name_snapshot TEXT NOT NULL,
+                supplier_phone_snapshot TEXT,
+                supplier_address_snapshot TEXT,
+                supplier_contact_snapshot TEXT,
+                invoice_date TEXT NOT NULL,
+                payment_terms TEXT NOT NULL DEFAULT 'NET 30',
+                due_date TEXT NOT NULL,
+                subtotal INTEGER NOT NULL DEFAULT 0,
+                discount INTEGER NOT NULL DEFAULT 0,
+                tax_rate REAL NOT NULL DEFAULT 0,
+                tax_amount INTEGER NOT NULL DEFAULT 0,
+                total INTEGER NOT NULL DEFAULT 0,
+                amount_paid INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','posted','void')),
+                notes TEXT,
+                void_reason TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_purchase_invoices_status ON purchase_invoices(status);
+            CREATE INDEX IF NOT EXISTS idx_purchase_invoices_supplier_id ON purchase_invoices(supplier_id);
+            CREATE INDEX IF NOT EXISTS idx_purchase_invoices_due_date ON purchase_invoices(due_date);
+            CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL REFERENCES purchase_invoices(id),
+                master_item_id INTEGER REFERENCES master_items(id),
+                product_name TEXT NOT NULL,
+                sku TEXT,
+                unit TEXT NOT NULL DEFAULT '',
+                qty INTEGER NOT NULL,
+                unit_price INTEGER NOT NULL,
+                line_total INTEGER NOT NULL,
+                line_no INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_invoice_id ON purchase_invoice_items(invoice_id);
+
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
@@ -207,6 +258,14 @@ def init_db() -> None:
         if "phone" not in supplier_cols:
             con.execute("ALTER TABLE suppliers ADD COLUMN phone TEXT")
 
+        # --- Additive migration: supplier contact details (purchase invoice header) ---
+        # A purchase invoice prints the supplier's contact block, so those details
+        # live on the supplier master rather than being retyped per invoice. Live
+        # rows predate these columns and stay NULL until someone fills them in.
+        for supplier_col in ("address", "contact_person", "npwp"):
+            if supplier_col not in supplier_cols:
+                con.execute(f"ALTER TABLE suppliers ADD COLUMN {supplier_col} TEXT")
+
         # --- Additive migration: receipt payment status ---
         # data/scraper.db already has live receipt rows created before this
         # feature existed, so those are backfilled to 'done' (already-completed
@@ -218,6 +277,26 @@ def init_db() -> None:
             con.execute("ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
             con.execute("UPDATE receipts SET status='done' WHERE status='pending'")
 
+        # --- Additive migration: down payment (amount_paid) ---
+        # 'done' already meant "fully paid" by convention before this column
+        # existed, so those rows are backfilled to amount_paid=total to keep
+        # that invariant true; 'pending'/'void' rows have no payment history to
+        # infer from and default to 0 (nothing recorded as paid yet).
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "amount_paid" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN amount_paid INTEGER NOT NULL DEFAULT 0")
+            con.execute("UPDATE receipts SET amount_paid=total WHERE status='done'")
+
+        # --- Additive migration: customer contact (phone required going forward, name optional) ---
+        # Pre-existing receipts were created before contact capture existed, so they have no
+        # number to backfill — they stay at '' (empty) and are grandfathered in. New receipts
+        # are required to carry a phone at the routes/frontend layer, not by a DB constraint.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "customer_phone" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN customer_phone TEXT NOT NULL DEFAULT ''")
+        if "customer_name" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN customer_name TEXT")
+
         seed_normalized = _normalize_name("Tanpa Merk")
         existing_seed = con.execute("SELECT 1 FROM brands WHERE code=?", ("NOB",)).fetchone()
         if existing_seed is None:
@@ -226,6 +305,20 @@ def init_db() -> None:
                    VALUES (?, ?, 1, ?, ?, 1, 'master')""",
                 ("NOB", "Tanpa Merk", _now(), seed_normalized),
             )
+
+        # --- Seed: initial Satuan (unit) master list ---
+        # Only the starting values requested when this master was introduced;
+        # admins manage the list from here on via the Master Satuan tab.
+        for seed_unit_name in ("PCS", "SET"):
+            unit_seed_normalized = _normalize_name(seed_unit_name)
+            existing_unit_seed = con.execute(
+                "SELECT 1 FROM units WHERE name_normalized=?", (unit_seed_normalized,)
+            ).fetchone()
+            if existing_unit_seed is None:
+                con.execute(
+                    "INSERT INTO units (name, name_normalized, is_active, created_at) VALUES (?, ?, 1, ?)",
+                    (seed_unit_name, unit_seed_normalized, _now()),
+                )
 
 
 def _now() -> str:
@@ -335,6 +428,16 @@ def delete_job(job_id: str) -> None:
         con.execute("DELETE FROM jobs WHERE id=?", (job_id,))
 
 
+def _compute_receipt_status(total: int, amount_paid: int, requested_status: str | None) -> str:
+    """'void' is the only status a caller can force directly — pending/done are
+    always derived from whether amount_paid covers total. The routes layer
+    already rejects any client-sent status other than 'void'/None; this stays
+    defensive about it rather than trusting that."""
+    if requested_status == "void":
+        return "void"
+    return "done" if amount_paid >= total else "pending"
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -342,19 +445,27 @@ def create_receipt(
     plate_suffix: str,
     items: list[dict],
     discount: int,
-    status: str = "pending",
+    amount_paid: int = 0,
+    status: str | None = None,
+    customer_phone: str = "",
+    customer_name: str | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
     total = subtotal - discount
+    final_status = _compute_receipt_status(total, amount_paid, status)
     created_at = _now()
 
     with _conn() as con:
         con.execute(
             """INSERT INTO receipts
-               (id, plate_region, plate_number, plate_suffix, plate_full, subtotal, discount, total, created_at, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (receipt_id, plate_region, plate_number, plate_suffix, plate_full, subtotal, discount, total, created_at, status),
+               (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
+                subtotal, discount, total, created_at, status, amount_paid)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
+                subtotal, discount, total, created_at, final_status, amount_paid,
+            ),
         )
         con.executemany(
             """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date)
@@ -365,7 +476,10 @@ def create_receipt(
             ],
         )
 
-    return {"subtotal": subtotal, "discount": discount, "total": total, "status": status}
+    return {
+        "subtotal": subtotal, "discount": discount, "total": total, "status": final_status,
+        "amount_paid": amount_paid, "customer_phone": customer_phone, "customer_name": customer_name,
+    }
 
 
 def get_receipt(receipt_id: str) -> dict | None:
@@ -402,7 +516,11 @@ def update_receipt(
     plate_suffix: str | None = None,
     items: list[dict] | None = None,
     discount: int | None = None,
+    amount_paid: int | None = None,
     status: str | None = None,
+    customer_phone: str | None = None,
+    customer_name: str | None = None,
+    update_customer_name: bool = False,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -415,7 +533,12 @@ def update_receipt(
         new_plate_suffix = plate_suffix if plate_suffix is not None else existing["plate_suffix"]
         new_plate_full = f"{new_plate_region} {new_plate_number} {new_plate_suffix}"
 
-        new_status = status if status is not None else existing["status"]
+        new_customer_phone = customer_phone if customer_phone is not None else existing["customer_phone"]
+        # name is nullable, so "clear it" (None) is distinct from "leave unchanged" — the route
+        # sets update_customer_name only when the field was actually present in the request.
+        new_customer_name = customer_name if update_customer_name else existing["customer_name"]
+
+        new_amount_paid = amount_paid if amount_paid is not None else existing["amount_paid"]
 
         if items is not None:
             con.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
@@ -444,12 +567,22 @@ def update_receipt(
             new_discount = existing["discount"]
             new_total = existing["total"]
 
+        # Void is sticky and has no unvoid path — once a receipt is voided, only
+        # a fresh explicit status="void" request is honored (a no-op); editing
+        # amount_paid or items afterward must not accidentally revive it to a
+        # computed pending/done.
+        if existing["status"] == "void" and status != "void":
+            new_status = "void"
+        else:
+            new_status = _compute_receipt_status(new_total, new_amount_paid, status)
+
         con.execute(
             """UPDATE receipts SET plate_region=?, plate_number=?, plate_suffix=?, plate_full=?,
-               subtotal=?, discount=?, total=?, status=? WHERE id=?""",
+               customer_phone=?, customer_name=?, subtotal=?, discount=?, total=?, status=?, amount_paid=? WHERE id=?""",
             (
                 new_plate_region, new_plate_number, new_plate_suffix, new_plate_full,
-                new_subtotal, new_discount, new_total, new_status, receipt_id,
+                new_customer_phone, new_customer_name,
+                new_subtotal, new_discount, new_total, new_status, new_amount_paid, receipt_id,
             ),
         )
 
@@ -564,11 +697,19 @@ _FUZZY_SEARCH_MIN_SCORE = 60  # rapidfuzz WRatio cutoff — below this, treat as
 
 
 def _create_quick_add_entity(
-    table: str, name: str, code: str | None, source: str, phone: str | None = None
+    table: str,
+    name: str,
+    code: str | None,
+    source: str,
+    phone: str | None = None,
+    address: str | None = None,
+    contact_person: str | None = None,
+    npwp: str | None = None,
 ) -> dict:
     """Shared insert path for create_supplier/create_brand — same validation and
-    insert shape for both tables, only the table name differs. `phone` is a
-    suppliers-only column (brands have no such field) — ignored for brands."""
+    insert shape for both tables, only the table name differs. `phone`/`address`/
+    `contact_person`/`npwp` are suppliers-only columns (brands have no such
+    fields) — ignored for brands."""
     entity_label = "Supplier" if table == "suppliers" else "Brand"
     name_normalized = _normalize_name(name)
     created_at = _now()
@@ -591,9 +732,21 @@ def _create_quick_add_entity(
 
         if table == "suppliers":
             cur = con.execute(
-                """INSERT INTO suppliers (code, name, is_active, created_at, name_normalized, is_system, source, phone)
-                   VALUES (?, ?, 1, ?, ?, 0, ?, ?)""",
-                (code, name, created_at, name_normalized, source, (phone or "").strip() or None),
+                """INSERT INTO suppliers
+                   (code, name, is_active, created_at, name_normalized, is_system, source,
+                    phone, address, contact_person, npwp)
+                   VALUES (?, ?, 1, ?, ?, 0, ?, ?, ?, ?, ?)""",
+                (
+                    code,
+                    name,
+                    created_at,
+                    name_normalized,
+                    source,
+                    (phone or "").strip() or None,
+                    (address or "").strip() or None,
+                    (contact_person or "").strip() or None,
+                    (npwp or "").strip() or None,
+                ),
             )
         else:
             cur = con.execute(
@@ -606,14 +759,22 @@ def _create_quick_add_entity(
 
 
 def _update_quick_add_entity(
-    table: str, entity_id: int, name: str | None, is_active: bool | None, phone: str | None = None
+    table: str,
+    entity_id: int,
+    name: str | None,
+    is_active: bool | None,
+    phone: str | None = None,
+    address: str | None = None,
+    contact_person: str | None = None,
+    npwp: str | None = None,
 ) -> dict:
     entity_label = "Supplier" if table == "suppliers" else "Brand"
+    supplier_details = (phone, address, contact_person, npwp)
     with _conn() as con:
         row = con.execute(f"SELECT * FROM {table} WHERE id=?", (entity_id,)).fetchone()
         if row is None:
             raise ValueError(f"{entity_label} {entity_id} not found")
-        if row["is_system"] and (name is not None or is_active is not None or phone is not None):
+        if row["is_system"] and (name is not None or is_active is not None or any(d is not None for d in supplier_details)):
             raise ValueError(f"System {entity_label.lower()} cannot be modified")
         new_name = name if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
@@ -627,10 +788,23 @@ def _update_quick_add_entity(
         new_active = int(is_active) if is_active is not None else row["is_active"]
 
         if table == "suppliers":
-            new_phone = (phone.strip() or None) if phone is not None else row["phone"]
+            def _merged(value: str | None, column: str) -> str | None:
+                return (value.strip() or None) if value is not None else row[column]
+
             con.execute(
-                "UPDATE suppliers SET name=?, name_normalized=?, is_active=?, phone=? WHERE id=?",
-                (new_name, new_name_normalized, new_active, new_phone, entity_id),
+                """UPDATE suppliers
+                   SET name=?, name_normalized=?, is_active=?, phone=?, address=?, contact_person=?, npwp=?
+                   WHERE id=?""",
+                (
+                    new_name,
+                    new_name_normalized,
+                    new_active,
+                    _merged(phone, "phone"),
+                    _merged(address, "address"),
+                    _merged(contact_person, "contact_person"),
+                    _merged(npwp, "npwp"),
+                    entity_id,
+                ),
             )
         else:
             con.execute(
@@ -648,8 +822,9 @@ def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
     if table == "suppliers":
         row = con.execute(
             "SELECT 1 FROM master_items WHERE supplier_id=? "
-            "UNION SELECT 1 FROM inbound_documents WHERE supplier_id=? LIMIT 1",
-            (entity_id, entity_id),
+            "UNION SELECT 1 FROM inbound_documents WHERE supplier_id=? "
+            "UNION SELECT 1 FROM purchase_invoices WHERE supplier_id=? LIMIT 1",
+            (entity_id, entity_id, entity_id),
         ).fetchone()
     else:
         row = con.execute(
@@ -709,14 +884,30 @@ def _search_quick_add_entities(table: str, query: str, active_only: bool, limit:
 # --- Suppliers -------------------------------------------------------------
 
 
-def create_supplier(name: str, code: str | None = None, source: str = "quick_add", phone: str | None = None) -> dict:
-    return _create_quick_add_entity("suppliers", name, code, source, phone)
+def create_supplier(
+    name: str,
+    code: str | None = None,
+    source: str = "quick_add",
+    phone: str | None = None,
+    address: str | None = None,
+    contact_person: str | None = None,
+    npwp: str | None = None,
+) -> dict:
+    return _create_quick_add_entity("suppliers", name, code, source, phone, address, contact_person, npwp)
 
 
 def update_supplier(
-    supplier_id: int, name: str | None = None, is_active: bool | None = None, phone: str | None = None
+    supplier_id: int,
+    name: str | None = None,
+    is_active: bool | None = None,
+    phone: str | None = None,
+    address: str | None = None,
+    contact_person: str | None = None,
+    npwp: str | None = None,
 ) -> dict:
-    return _update_quick_add_entity("suppliers", supplier_id, name, is_active, phone)
+    return _update_quick_add_entity(
+        "suppliers", supplier_id, name, is_active, phone, address, contact_person, npwp
+    )
 
 
 def get_supplier(supplier_id: int) -> dict | None:
@@ -792,6 +983,113 @@ def delete_brand(brand_id: int) -> None:
 
 def delete_all_brands() -> dict:
     return _delete_all_quick_add_entities("brands")
+
+
+# --- Units (Satuan) ---------------------------------------------------------
+# Deliberately simpler than brands/suppliers: no code (units don't feed the
+# SKU), no source/is_system tracking (nothing here is a locked default) —
+# just a name and active flag. master_items.unit / inbound_items.pending_unit
+# store the unit's name as plain text rather than a foreign key (pre-existing
+# schema shape), so "in use" is checked by name match, not id.
+
+
+def create_unit(name: str) -> dict:
+    name_normalized = _normalize_name(name)
+    created_at = _now()
+    with _conn() as con:
+        dup = con.execute(
+            "SELECT 1 FROM units WHERE name_normalized=? AND is_active=1", (name_normalized,)
+        ).fetchone()
+        if dup is not None:
+            raise ValueError(f"Satuan '{name}' already exists")
+        cur = con.execute(
+            "INSERT INTO units (name, name_normalized, is_active, created_at) VALUES (?, ?, 1, ?)",
+            (name.strip(), name_normalized, created_at),
+        )
+        row = con.execute("SELECT * FROM units WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = None) -> dict:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Unit {unit_id} not found")
+        new_name = name.strip() if name is not None else row["name"]
+        new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
+        if name is not None:
+            dup = con.execute(
+                "SELECT 1 FROM units WHERE name_normalized=? AND is_active=1 AND id!=?",
+                (new_name_normalized, unit_id),
+            ).fetchone()
+            if dup is not None:
+                raise ValueError(f"Satuan '{name}' already exists")
+        new_active = int(is_active) if is_active is not None else row["is_active"]
+        con.execute(
+            "UPDATE units SET name=?, name_normalized=?, is_active=? WHERE id=?",
+            (new_name, new_name_normalized, new_active, unit_id),
+        )
+        updated = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
+        return dict(updated)
+
+
+def get_unit(unit_id: int) -> dict | None:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
+        return dict(row) if row is not None else None
+
+
+def get_unit_by_name(name: str) -> dict | None:
+    """Case-insensitive lookup against active units — used to validate a
+    submitted unit string (from Tambah Barang Baru, item edit, or a Barang
+    Masuk pending-product row) against the Satuan master before it's saved."""
+    with _conn() as con:
+        row = con.execute(
+            "SELECT * FROM units WHERE UPPER(name)=UPPER(?) AND is_active=1", (name.strip(),)
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+
+def get_all_units(active_only: bool = False) -> list[dict]:
+    with _conn() as con:
+        if active_only:
+            rows = con.execute("SELECT * FROM units WHERE is_active=1 ORDER BY name ASC").fetchall()
+        else:
+            rows = con.execute("SELECT * FROM units ORDER BY name ASC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def _unit_in_use(con: sqlite3.Connection, unit_name: str) -> bool:
+    row = con.execute(
+        "SELECT 1 FROM master_items WHERE UPPER(unit)=UPPER(?) "
+        "UNION SELECT 1 FROM inbound_items WHERE UPPER(pending_unit)=UPPER(?) LIMIT 1",
+        (unit_name, unit_name),
+    ).fetchone()
+    return row is not None
+
+
+def delete_unit(unit_id: int) -> None:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Unit {unit_id} not found")
+        if _unit_in_use(con, row["name"]):
+            raise ValueError("Satuan is still in use and cannot be deleted")
+        con.execute("DELETE FROM units WHERE id=?", (unit_id,))
+
+
+def delete_all_units() -> dict:
+    with _conn() as con:
+        rows = con.execute("SELECT id, name FROM units").fetchall()
+        deleted = 0
+        skipped = 0
+        for row in rows:
+            if _unit_in_use(con, row["name"]):
+                skipped += 1
+                continue
+            con.execute("DELETE FROM units WHERE id=?", (row["id"],))
+            deleted += 1
+    return {"deleted_count": deleted, "skipped_count": skipped}
 
 
 # --- Duplicate lookups / SKU preview ---------------------------------------
@@ -908,6 +1206,26 @@ def update_master_item(
         return dict(updated)
 
 
+def delete_master_item(master_item_id: int) -> None:
+    """Hard-deletes a master item. Only allowed when it has no receipt or stock
+    history — deleting a referenced product would orphan stock_ledger rows and
+    corrupt costing. Products that have ever been received should be kept."""
+    with _conn() as con:
+        row = con.execute("SELECT id FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Master item {master_item_id} not found")
+        in_use = con.execute(
+            "SELECT 1 FROM inbound_items WHERE master_item_id=? LIMIT 1", (master_item_id,)
+        ).fetchone() or con.execute(
+            "SELECT 1 FROM stock_ledger WHERE master_item_id=? LIMIT 1", (master_item_id,)
+        ).fetchone()
+        if in_use is not None:
+            raise ValueError(
+                "Barang memiliki riwayat barang masuk atau pergerakan stok dan tidak dapat dihapus"
+            )
+        con.execute("DELETE FROM master_items WHERE id=?", (master_item_id,))
+
+
 def get_master_item(master_item_id: int) -> dict | None:
     with _conn() as con:
         row = con.execute(
@@ -1017,12 +1335,66 @@ def get_inventory_overview() -> dict:
                WHERE mi.is_active=1 AND mi.stock_qty <= ? ORDER BY mi.stock_qty ASC""",
             (LOW_STOCK_THRESHOLD,),
         ).fetchall()
+
+        # Pending invoices: receipts not yet fully paid (amount_paid < total).
+        pending_totals = con.execute(
+            "SELECT COUNT(*) AS c, COALESCE(SUM(total - amount_paid), 0) AS outstanding "
+            "FROM receipts WHERE status='pending'"
+        ).fetchone()
+        pending_rows = con.execute(
+            """SELECT id, plate_full, customer_name, total, amount_paid,
+                      (total - amount_paid) AS outstanding, created_at
+               FROM receipts WHERE status='pending'
+               ORDER BY created_at DESC LIMIT 5"""
+        ).fetchall()
+
+        # Latest incoming products from posted Barang Masuk documents.
+        latest_incoming_rows = con.execute(
+            """SELECT ii.qty_in, ii.received_date, mi.name AS product_name, mi.sku,
+                      s.name AS supplier_name
+               FROM inbound_items ii
+               JOIN inbound_documents d ON d.id = ii.document_id
+               JOIN master_items mi ON mi.id = ii.master_item_id
+               JOIN suppliers s ON s.id = d.supplier_id
+               WHERE d.status='posted' AND ii.master_item_id IS NOT NULL
+               ORDER BY ii.received_date DESC, ii.id DESC LIMIT 5"""
+        ).fetchall()
+
+        # Top-selling products (last 30 days, by units sold) from paid receipts.
+        sales_cutoff = (date.today() - timedelta(days=30)).isoformat()
+        top_selling_rows = con.execute(
+            """SELECT ri.product_name,
+                      SUM(ri.quantity) AS units_sold,
+                      SUM(ri.quantity * ri.unit_price) AS revenue
+               FROM receipt_items ri
+               JOIN receipts r ON r.id = ri.receipt_id
+               WHERE r.status='done' AND date(r.created_at) >= ?
+               GROUP BY ri.product_name
+               ORDER BY units_sold DESC, revenue DESC LIMIT 5""",
+            (sales_cutoff,),
+        ).fetchall()
+
+        # Sales this calendar month (paid receipts).
+        month_start = date.today().replace(day=1).isoformat()
+        sales_month = con.execute(
+            "SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS c "
+            "FROM receipts WHERE status='done' AND date(created_at) >= ?",
+            (month_start,),
+        ).fetchone()
+
         return {
             "active_sku_count": active_sku_count,
             "total_inventory_value": total_inventory_value,
             "inbound_doc_count_30d": inbound_doc_count_30d,
             "low_stock_threshold": LOW_STOCK_THRESHOLD,
             "low_stock_items": [dict(r) for r in low_stock_rows],
+            "pending_invoice_count": pending_totals["c"],
+            "pending_invoice_outstanding": pending_totals["outstanding"],
+            "pending_invoices": [dict(r) for r in pending_rows],
+            "latest_incoming": [dict(r) for r in latest_incoming_rows],
+            "top_selling": [dict(r) for r in top_selling_rows],
+            "sales_month_revenue": sales_month["revenue"],
+            "sales_month_count": sales_month["c"],
         }
 
 
@@ -1391,6 +1763,352 @@ def get_stock_ledger(master_item_id: int) -> list[dict]:
             "SELECT * FROM stock_ledger WHERE master_item_id=? ORDER BY id ASC", (master_item_id,)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+# --- Purchase invoices (faktur pembelian / accounts payable) ----------------
+# A supplier's bill, recorded as-is. Deliberately does NOT touch stock or
+# costing — goods movement stays the inbound document's job (§ Barang Masuk),
+# so an invoice can be entered before, after, or without a matching delivery.
+
+
+def _next_purchase_invoice_number(con: sqlite3.Connection, today_str: str) -> str:
+    prefix = f"FP-{today_str}-"
+    row = con.execute(
+        "SELECT invoice_number FROM purchase_invoices WHERE invoice_number LIKE ? ORDER BY invoice_number DESC LIMIT 1",
+        (f"{prefix}%",),
+    ).fetchone()
+    seq = int(row["invoice_number"].rsplit("-", 1)[-1]) + 1 if row is not None else 1
+    return f"{prefix}{seq:04d}"
+
+
+def compute_purchase_invoice_totals(items: list[dict], discount: int, tax_rate: float) -> dict:
+    """Single source of truth for invoice money. Always recomputed server-side
+    from the line items — the client's totals are display-only and never stored."""
+    subtotal = sum(int(i["qty"]) * int(i["unit_price"]) for i in items)
+    discount = max(0, min(int(discount), subtotal))
+    taxable = subtotal - discount
+    tax_amount = int(round(taxable * float(tax_rate) / 100))
+    return {
+        "subtotal": subtotal,
+        "discount": discount,
+        "tax_rate": float(tax_rate),
+        "tax_amount": tax_amount,
+        "total": taxable + tax_amount,
+    }
+
+
+def compute_payment_status(total: int, amount_paid: int) -> str:
+    """'lunas' | 'sebagian' | 'belum' — derived, never stored, so it can't drift
+    away from amount_paid the way a written-down column would."""
+    if amount_paid <= 0:
+        return "belum"
+    if amount_paid >= total:
+        return "lunas"
+    return "sebagian"
+
+
+def _insert_purchase_invoice_items(con: sqlite3.Connection, invoice_id: int, items: list[dict]) -> None:
+    con.executemany(
+        """INSERT INTO purchase_invoice_items
+           (invoice_id, master_item_id, product_name, sku, unit, qty, unit_price, line_total, line_no)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                invoice_id,
+                item.get("master_item_id"),
+                item["product_name"],
+                item.get("sku"),
+                item.get("unit") or "",
+                int(item["qty"]),
+                int(item["unit_price"]),
+                int(item["qty"]) * int(item["unit_price"]),
+                line_no,
+            )
+            for line_no, item in enumerate(items, start=1)
+        ],
+    )
+
+
+def _supplier_snapshot(con: sqlite3.Connection, supplier_id: int) -> dict:
+    """Contact details are copied onto the invoice at save time so a later edit
+    to the supplier master can't silently rewrite an already-printed document."""
+    row = con.execute("SELECT * FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
+    if row is None:
+        raise ValueError(f"Supplier {supplier_id} not found")
+    return {
+        "supplier_name_snapshot": row["name"],
+        "supplier_phone_snapshot": row["phone"],
+        "supplier_address_snapshot": row["address"],
+        "supplier_contact_snapshot": row["contact_person"],
+    }
+
+
+def create_purchase_invoice(
+    supplier_id: int,
+    invoice_date: str,
+    due_date: str,
+    payment_terms: str,
+    supplier_invoice_no: str | None,
+    notes: str | None,
+    discount: int,
+    tax_rate: float,
+    items: list[dict],
+) -> dict:
+    now = _now()
+    totals = compute_purchase_invoice_totals(items, discount, tax_rate)
+    with _conn() as con:
+        snapshot = _supplier_snapshot(con, supplier_id)
+        invoice_number = _next_purchase_invoice_number(con, date.today().strftime("%Y%m%d"))
+        cur = con.execute(
+            """INSERT INTO purchase_invoices
+               (invoice_number, supplier_id, supplier_invoice_no, supplier_name_snapshot,
+                supplier_phone_snapshot, supplier_address_snapshot, supplier_contact_snapshot,
+                invoice_date, payment_terms, due_date, subtotal, discount, tax_rate, tax_amount,
+                total, amount_paid, status, notes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?, ?)""",
+            (
+                invoice_number,
+                supplier_id,
+                supplier_invoice_no,
+                snapshot["supplier_name_snapshot"],
+                snapshot["supplier_phone_snapshot"],
+                snapshot["supplier_address_snapshot"],
+                snapshot["supplier_contact_snapshot"],
+                invoice_date,
+                payment_terms,
+                due_date,
+                totals["subtotal"],
+                totals["discount"],
+                totals["tax_rate"],
+                totals["tax_amount"],
+                totals["total"],
+                notes,
+                now,
+                now,
+            ),
+        )
+        invoice_id = cur.lastrowid
+        _insert_purchase_invoice_items(con, invoice_id, items)
+        row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        return dict(row)
+
+
+def update_purchase_invoice(
+    invoice_id: int,
+    supplier_id: int,
+    invoice_date: str,
+    due_date: str,
+    payment_terms: str,
+    supplier_invoice_no: str | None,
+    notes: str | None,
+    discount: int,
+    tax_rate: float,
+    items: list[dict],
+) -> dict:
+    totals = compute_purchase_invoice_totals(items, discount, tax_rate)
+    with _conn() as con:
+        row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Purchase invoice {invoice_id} not found")
+        if row["status"] != "draft":
+            raise ValueError(
+                f"Cannot edit purchase invoice {invoice_id}: status is '{row['status']}', "
+                "only draft invoices can be edited"
+            )
+        snapshot = _supplier_snapshot(con, supplier_id)
+        con.execute(
+            """UPDATE purchase_invoices
+               SET supplier_id=?, supplier_invoice_no=?, supplier_name_snapshot=?,
+                   supplier_phone_snapshot=?, supplier_address_snapshot=?, supplier_contact_snapshot=?,
+                   invoice_date=?, payment_terms=?, due_date=?, subtotal=?, discount=?, tax_rate=?,
+                   tax_amount=?, total=?, notes=?, updated_at=?
+               WHERE id=?""",
+            (
+                supplier_id,
+                supplier_invoice_no,
+                snapshot["supplier_name_snapshot"],
+                snapshot["supplier_phone_snapshot"],
+                snapshot["supplier_address_snapshot"],
+                snapshot["supplier_contact_snapshot"],
+                invoice_date,
+                payment_terms,
+                due_date,
+                totals["subtotal"],
+                totals["discount"],
+                totals["tax_rate"],
+                totals["tax_amount"],
+                totals["total"],
+                notes,
+                _now(),
+                invoice_id,
+            ),
+        )
+        con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
+        _insert_purchase_invoice_items(con, invoice_id, items)
+        updated = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        return dict(updated)
+
+
+def get_purchase_invoice(invoice_id: int) -> dict | None:
+    with _conn() as con:
+        row = con.execute(
+            """SELECT pi.*, s.name AS supplier_name, s.code AS supplier_code, s.npwp AS supplier_npwp
+               FROM purchase_invoices pi
+               JOIN suppliers s ON s.id = pi.supplier_id
+               WHERE pi.id=?""",
+            (invoice_id,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+
+def get_purchase_invoice_items(invoice_id: int) -> list[dict]:
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT pii.*, mi.sku AS current_sku, mi.stock_qty AS current_stock_qty
+               FROM purchase_invoice_items pii
+               LEFT JOIN master_items mi ON mi.id = pii.master_item_id
+               WHERE pii.invoice_id=?
+               ORDER BY pii.line_no ASC, pii.id ASC""",
+            (invoice_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_purchase_invoices(
+    status: str | None = None,
+    supplier_id: int | None = None,
+    payment_status: str | None = None,
+    search: str | None = None,
+) -> list[dict]:
+    with _conn() as con:
+        query = """SELECT pi.*, s.name AS supplier_name FROM purchase_invoices pi
+                   JOIN suppliers s ON s.id = pi.supplier_id WHERE 1=1"""
+        params: list = []
+        if status:
+            query += " AND pi.status=?"
+            params.append(status)
+        if supplier_id is not None:
+            query += " AND pi.supplier_id=?"
+            params.append(supplier_id)
+        if search:
+            query += """ AND (pi.invoice_number LIKE ? OR IFNULL(pi.supplier_invoice_no,'') LIKE ?
+                              OR s.name LIKE ?)"""
+            params.extend([f"%{search}%"] * 3)
+        query += " ORDER BY pi.invoice_date DESC, pi.id DESC"
+        rows = [dict(r) for r in con.execute(query, params).fetchall()]
+
+    # payment_status is derived, so it can't be pushed into the SQL WHERE above.
+    if payment_status:
+        rows = [
+            r for r in rows if compute_payment_status(r["total"], r["amount_paid"]) == payment_status
+        ]
+    return rows
+
+
+def post_purchase_invoice(invoice_id: int) -> dict:
+    """draft -> posted. Locks the invoice against edits and makes it count as a
+    real payable. No stock or costing side effects by design."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Purchase invoice {invoice_id} not found")
+        if row["status"] != "draft":
+            raise ValueError(f"Purchase invoice {invoice_id} is already '{row['status']}'")
+        item_count = con.execute(
+            "SELECT COUNT(*) AS n FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,)
+        ).fetchone()["n"]
+        if item_count == 0:
+            raise ValueError(f"Cannot post purchase invoice {invoice_id}: it has no line items")
+        con.execute(
+            "UPDATE purchase_invoices SET status='posted', updated_at=? WHERE id=?", (_now(), invoice_id)
+        )
+        updated = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        return dict(updated)
+
+
+def void_purchase_invoice(invoice_id: int, reason: str) -> dict:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Purchase invoice {invoice_id} not found")
+        if row["status"] == "void":
+            raise ValueError(f"Purchase invoice {invoice_id} is already void")
+        if row["amount_paid"] > 0:
+            raise ValueError(
+                f"Cannot void purchase invoice {invoice_id}: {row['amount_paid']} already recorded as paid. "
+                "Reverse the payment first."
+            )
+        con.execute(
+            "UPDATE purchase_invoices SET status='void', void_reason=?, updated_at=? WHERE id=?",
+            (reason, _now(), invoice_id),
+        )
+        updated = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        return dict(updated)
+
+
+def delete_purchase_invoice(invoice_id: int) -> None:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Purchase invoice {invoice_id} not found")
+        if row["status"] != "draft":
+            raise ValueError(
+                f"Cannot delete purchase invoice {invoice_id}: status is '{row['status']}'. "
+                "Void it instead so the number stays on record."
+            )
+        con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
+        con.execute("DELETE FROM purchase_invoices WHERE id=?", (invoice_id,))
+
+
+def record_purchase_invoice_payment(invoice_id: int, amount: int) -> dict:
+    """Adds to amount_paid. A negative amount reverses an over-recorded payment;
+    the running total is clamped to [0, total] either way."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Purchase invoice {invoice_id} not found")
+        if row["status"] != "posted":
+            raise ValueError(
+                f"Cannot record payment on purchase invoice {invoice_id}: status is '{row['status']}', "
+                "only posted invoices accept payments"
+            )
+        if amount == 0:
+            raise ValueError("Payment amount must not be zero")
+        new_paid = row["amount_paid"] + amount
+        if new_paid < 0:
+            raise ValueError("Payment reversal is larger than the amount recorded as paid")
+        if new_paid > row["total"]:
+            raise ValueError(
+                f"Payment exceeds the outstanding balance ({row['total'] - row['amount_paid']})"
+            )
+        con.execute(
+            "UPDATE purchase_invoices SET amount_paid=?, updated_at=? WHERE id=?",
+            (new_paid, _now(), invoice_id),
+        )
+        updated = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        return dict(updated)
+
+
+def get_purchase_payable_summary() -> dict:
+    """Totals across posted, non-void invoices — what the shop still owes."""
+    today = date.today().isoformat()
+    with _conn() as con:
+        rows = [
+            dict(r)
+            for r in con.execute(
+                "SELECT total, amount_paid, due_date FROM purchase_invoices WHERE status='posted'"
+            ).fetchall()
+        ]
+    outstanding = sum(r["total"] - r["amount_paid"] for r in rows)
+    unpaid = [r for r in rows if r["total"] - r["amount_paid"] > 0]
+    overdue = [r for r in unpaid if r["due_date"] < today]
+    return {
+        "posted_count": len(rows),
+        "unpaid_count": len(unpaid),
+        "outstanding_total": outstanding,
+        "overdue_count": len(overdue),
+        "overdue_total": sum(r["total"] - r["amount_paid"] for r in overdue),
+    }
 
 
 # --- Users / sessions ---------------------------------------------------

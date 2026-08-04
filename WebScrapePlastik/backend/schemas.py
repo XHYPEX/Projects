@@ -46,18 +46,26 @@ class ReceiptRequest(BaseModel):
     plate_region: str
     plate_number: str
     plate_suffix: str
+    customer_phone: str
+    customer_name: str | None = None
     items: list[ReceiptItemRequest]
     discount: int = 0
-    status: str = "pending"
+    amount_paid: int = 0
+    status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
 
 
 class ReceiptUpdateRequest(BaseModel):
     plate_region: str | None = None
     plate_number: str | None = None
     plate_suffix: str | None = None
+    # customer_name uses a sentinel default so "omitted" (leave as-is) is distinguishable
+    # from "sent as null" (clear it); the route checks fields_set to tell them apart.
+    customer_phone: str | None = None
+    customer_name: str | None = None
     items: list[ReceiptItemRequest] | None = None
     discount: int | None = None
-    status: str | None = None
+    amount_paid: int | None = None
+    status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
 
 
 class ReceiptResponse(BaseModel):
@@ -65,7 +73,10 @@ class ReceiptResponse(BaseModel):
     subtotal: int
     discount: int
     total: int
+    amount_paid: int
     status: str
+    customer_phone: str
+    customer_name: str | None = None
 
 
 class ReceiptItemOut(BaseModel):
@@ -82,9 +93,12 @@ class ReceiptOut(BaseModel):
     plate_number: str
     plate_suffix: str
     plate_full: str
+    customer_phone: str
+    customer_name: str | None = None
     subtotal: int
     discount: int
     total: int
+    amount_paid: int
     status: str
     created_at: str
     item_count: int
@@ -116,12 +130,18 @@ class SupplierRequest(BaseModel):
     name: str
     code: str | None = None
     phone: str | None = None
+    address: str | None = None
+    contact_person: str | None = None
+    npwp: str | None = None
 
 
 class SupplierUpdateRequest(BaseModel):
     name: str | None = None
     is_active: bool | None = None
     phone: str | None = None
+    address: str | None = None
+    contact_person: str | None = None
+    npwp: str | None = None
 
 
 class SupplierOut(BaseModel):
@@ -133,6 +153,9 @@ class SupplierOut(BaseModel):
     is_system: bool
     source: str
     phone: str | None = None
+    address: str | None = None
+    contact_person: str | None = None
+    npwp: str | None = None
     score: float | None = None
 
 
@@ -155,6 +178,22 @@ class BrandOut(BaseModel):
     is_system: bool
     source: str
     score: float | None = None
+
+
+class UnitRequest(BaseModel):
+    name: str
+
+
+class UnitUpdateRequest(BaseModel):
+    name: str | None = None
+    is_active: bool | None = None
+
+
+class UnitOut(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+    created_at: str
 
 
 class CodePreviewOut(BaseModel):
@@ -296,6 +335,92 @@ class VoidRequest(BaseModel):
     reason: str
 
 
+VALID_PURCHASE_INVOICE_STATUSES = {"draft", "posted", "void"}
+VALID_PAYMENT_STATUSES = {"belum", "sebagian", "lunas"}
+
+
+class PurchaseInvoiceItemRequest(BaseModel):
+    master_item_id: int | None = None  # null when the line is free text (product not in Master Barang)
+    product_name: str
+    sku: str | None = None
+    unit: str | None = None
+    qty: int
+    unit_price: int
+
+
+class PurchaseInvoiceItemOut(BaseModel):
+    id: int
+    invoice_id: int
+    master_item_id: int | None
+    product_name: str
+    sku: str | None
+    unit: str
+    qty: int
+    unit_price: int
+    line_total: int
+    line_no: int
+    current_sku: str | None = None
+    current_stock_qty: int | None = None
+
+
+class PurchaseInvoiceRequest(BaseModel):
+    supplier_id: int
+    invoice_date: str
+    due_date: str | None = None  # derived from payment_terms when omitted
+    payment_terms: str = "NET 30"
+    supplier_invoice_no: str | None = None
+    notes: str | None = None
+    discount: int = 0
+    tax_rate: float = 0
+    items: list[PurchaseInvoiceItemRequest]
+
+
+class PurchaseInvoicePaymentRequest(BaseModel):
+    amount: int
+
+
+class PurchaseInvoiceOut(BaseModel):
+    id: int
+    invoice_number: str
+    supplier_id: int
+    supplier_name: str | None = None
+    supplier_invoice_no: str | None
+    supplier_name_snapshot: str
+    supplier_phone_snapshot: str | None
+    supplier_address_snapshot: str | None
+    supplier_contact_snapshot: str | None
+    supplier_npwp: str | None = None
+    invoice_date: str
+    payment_terms: str
+    due_date: str
+    subtotal: int
+    discount: int
+    tax_rate: float
+    tax_amount: int
+    total: int
+    amount_paid: int
+    outstanding: int
+    payment_status: str
+    is_overdue: bool
+    status: str
+    notes: str | None
+    void_reason: str | None
+    created_at: str
+    updated_at: str
+
+
+class PurchaseInvoiceDetail(PurchaseInvoiceOut):
+    items: list[PurchaseInvoiceItemOut]
+
+
+class PayableSummaryOut(BaseModel):
+    posted_count: int
+    unpaid_count: int
+    outstanding_total: int
+    overdue_count: int
+    overdue_total: int
+
+
 class StockAdjustmentRequest(BaseModel):
     master_item_id: int
     qty_delta: int
@@ -320,12 +445,43 @@ class StockLedgerOut(BaseModel):
     created_at: str
 
 
+class PendingInvoiceOut(BaseModel):
+    id: str
+    plate_full: str
+    customer_name: str | None
+    total: int
+    amount_paid: int
+    outstanding: int
+    created_at: str
+
+
+class IncomingItemOut(BaseModel):
+    product_name: str
+    sku: str
+    supplier_name: str
+    qty_in: int
+    received_date: str | None
+
+
+class TopSellingOut(BaseModel):
+    product_name: str
+    units_sold: int
+    revenue: int
+
+
 class InventoryOverviewOut(BaseModel):
     active_sku_count: int
     total_inventory_value: int
     inbound_doc_count_30d: int
     low_stock_threshold: int
     low_stock_items: list[MasterItemOut]
+    pending_invoice_count: int
+    pending_invoice_outstanding: int
+    pending_invoices: list[PendingInvoiceOut]
+    latest_incoming: list[IncomingItemOut]
+    top_selling: list[TopSellingOut]
+    sales_month_revenue: int
+    sales_month_count: int
 
 
 # ---------------------------------------------------------------------------

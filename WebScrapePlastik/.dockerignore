@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.env
+results.csv
+output_map.html

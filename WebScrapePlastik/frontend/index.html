@@ -1879,14 +1879,47 @@ async function loadResults(jobId) {
   renderTable(allPlaces);
 
   document.getElementById("results-count").textContent = `${allPlaces.length} places found`;
-  document.getElementById("csv-btn").onclick = () => {
-    window.location.href = `/api/results/${jobId}/csv`;
-  };
+  document.getElementById("csv-btn").onclick = () => saveResultsCsv(jobId);
 
   showPanel("results");
   await loadMap(jobId);
   document.getElementById("scrape-btn").disabled = false;
   loadJobHistory();
+}
+
+async function saveResultsCsv(jobId) {
+  const suggestedName = `results_${jobId.slice(0, 8)}.csv`;
+
+  try {
+    const resp = await fetch(`/api/results/${jobId}/csv`);
+    if (!resp.ok) throw new Error("Download failed");
+    const blob = await resp.blob();
+
+    if (window.showSaveFilePicker) {
+      // Chromium browsers: native "Save As" dialog lets the user pick the destination folder.
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: "CSV file", accept: { "text/csv": [".csv"] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      showToast("CSV saved.", "success");
+    } else {
+      // Fallback (Firefox/Safari): trigger the browser's normal download flow.
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = suggestedName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+  } catch (err) {
+    if (err.name === "AbortError") return; // user cancelled the save dialog
+    showToast(`Could not save CSV: ${err.message}`);
+  }
 }
 
 function renderTable(places) {

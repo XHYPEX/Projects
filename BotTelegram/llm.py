@@ -20,11 +20,11 @@ async def polish_signal(raw_text: str) -> str | None:
     response = await _client.messages.create(
         model=config.ANTHROPIC_MODEL,
         max_tokens=1024,
-        temperature=0,
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": raw_text}],
     )
-    result = response.content[0].text.strip()
+    text_blocks = [block.text for block in response.content if block.type == "text"]
+    result = "".join(text_blocks).strip()
 
     if result.upper() == "SKIP":
         return None

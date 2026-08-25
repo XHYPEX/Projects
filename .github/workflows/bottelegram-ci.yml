@@ -1,0 +1,76 @@
+name: BotTelegram CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "BotTelegram/**"
+      - ".github/workflows/bottelegram-ci.yml"
+  pull_request:
+    paths:
+      - "BotTelegram/**"
+      - ".github/workflows/bottelegram-ci.yml"
+
+concurrency:
+  group: bottelegram-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: BotTelegram
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Syntax check semua file Python
+        run: python -m py_compile $(find . -name "*.py")
+
+      - name: Siapkan fixture minimal buat import check
+        # session/ dan routes.json sengaja di-gitignore (isinya kredensial/ID asli),
+        # jadi checkout bersih gak punya keduanya -- TelegramClient(...) dan
+        # config.load_routes() bakal gagal tanpa ini.
+        run: |
+          mkdir -p session
+          cp routes.json.example routes.json
+
+      - name: Pastikan semua module bisa di-import (tanpa .env asli)
+        env:
+          TELEGRAM_API_ID: "12345"
+          TELEGRAM_API_HASH: "dummy"
+          TARGET_BOT_TOKEN: "dummy:token"
+          ANTHROPIC_API_KEY: "dummy"
+        run: |
+          python -c "import config, state, llm, userbot, list_chats, config_app; print('semua module OK')"
+
+      - name: Jalankan test suite
+        run: pytest -v
+
+  deploy:
+    name: Deploy ke VPS
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH & jalankan deploy/update.sh
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd ${{ secrets.VPS_PROJECT_DIR }}
+            sudo bash deploy/update.sh

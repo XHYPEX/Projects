@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BotTelegram — Config</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e0e2e7;
+    --text: #1a1c22;
+    --text-dim: #6b7078;
+    --accent: #4f6bed;
+    --accent-text: #ffffff;
+    --ok: #1a8a4a;
+    --err: #c0392b;
+    --chip-bg: #eef0f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b;
+      --panel: #1c1f26;
+      --border: #2b2f38;
+      --text: #eef0f4;
+      --text-dim: #9096a2;
+      --accent: #6f8bff;
+      --accent-text: #0c0e12;
+      --ok: #4fd685;
+      --err: #ff6b5f;
+      --chip-bg: #262a33;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  .sub { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 2rem; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .panel h2 { font-size: 1rem; margin: 0 0 0.25rem; }
+  .panel .hint { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 1rem; }
+  label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem; }
+  select, button {
+    font-family: inherit;
+    font-size: 0.95rem;
+  }
+  select {
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .sender-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+  .sender-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .sender-item input { width: 16px; height: 16px; }
+  .sender-name { flex: 1; font-size: 0.9rem; }
+  .sender-meta { font-size: 0.78rem; color: var(--text-dim); }
+  .empty-note { color: var(--text-dim); font-size: 0.85rem; font-style: italic; }
+  .actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+  button.primary {
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    padding: 0.65rem 1.4rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+  button.link {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+  }
+  #status { font-size: 0.85rem; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--err); }
+  .chip {
+    display: inline-block;
+    background: var(--chip-bg);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.75rem;
+    margin-left: 0.4rem;
+  }
+  .route-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+  }
+  .route-header h2 { margin: 0; }
+  .field { margin-top: 0.9rem; }
+  .field:first-of-type { margin-top: 0; }
+  .add-route-btn {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0.6rem;
+    width: 100%;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+  }
+  .add-route-btn:disabled { opacity: 0.5; cursor: default; }
+  textarea {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+  }
+  .history-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .history-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+  }
+  .history-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+  .history-time { font-size: 0.85rem; }
+  .history-actions { display: flex; gap: 0.9rem; flex-shrink: 0; }
+  .history-preview {
+    margin: 0.6rem 0 0;
+    padding: 0.6rem 0.7rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BotTelegram — Konfigurasi</h1>
+  <p class="sub">Atur sampai 5 pasangan grup sumber → channel tujuan, dan (opsional) filter pengirim per pasangan. Perubahan langsung ditulis ke <code>routes.json</code>.</p>
+
+  <div id="routes-container"></div>
+  <button type="button" class="add-route-btn" id="add-route-btn">+ Tambah pasangan channel</button>
+
+  <div class="actions">
+    <button class="primary" id="save-btn">Simpan & Restart Bot</button>
+    <span id="status"></span>
+  </div>
+
+  <div class="panel">
+    <h2>System Prompt</h2>
+    <p class="hint">Instruksi yang dikirim ke Claude untuk merapikan tiap sinyal masuk. Edit lalu simpan — bot otomatis di-restart supaya prompt baru langsung dipakai. Versi lama otomatis di-backup ke history di bawah.</p>
+    <textarea id="prompt-textarea" rows="16" spellcheck="false"></textarea>
+    <div class="actions">
+      <button class="primary" id="prompt-save-btn">Simpan & Restart Bot</button>
+      <button type="button" class="link" id="prompt-reset-btn">Buang perubahan</button>
+      <span id="prompt-status"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>History Prompt</h2>
+    <p class="hint">Sampai 20 versi terakhir disimpan otomatis. Klik "Lihat" buat intip isinya, atau "Pulihkan" buat pakai versi itu lagi (versi yang lagi aktif juga ikut di-backup dulu).</p>
+    <div id="prompt-history-list" class="history-list"></div>
+  </div>
+</div>
+
+<script>
+const MAX_ROUTES = 5;
+const routesContainer = document.getElementById('routes-container');
+const addRouteBtn = document.getElementById('add-route-btn');
+const saveBtn = document.getElementById('save-btn');
+const statusEl = document.getElementById('status');
+
+let dialogs = [];
+// Each entry: { source_chat, target_chat, sender_whitelist: [], _senders: [] }
+let routes = [];
+
+function dialogLabel(d) {
+  const handle = d.username ? ` (@${d.username})` : '';
+  return `${d.name}${handle} — ${d.id}`;
+}
+
+function buildSelectOptions(select, selectedId) {
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '-- pilih --';
+  select.appendChild(placeholder);
+  for (const d of dialogs) {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = dialogLabel(d);
+    if (selectedId !== null && selectedId !== undefined && String(d.id) === String(selectedId)) {
+      opt.selected = true;
+    }
+    select.appendChild(opt);
+  }
+}
+
+function addRoute() {
+  if (routes.length >= MAX_ROUTES) return;
+  routes.push({ source_chat: null, target_chat: null, sender_whitelist: [], _senders: [] });
+  renderRoutes();
+}
+
+function removeRoute(index) {
+  routes.splice(index, 1);
+  renderRoutes();
+}
+
+async function loadSendersForRoute(index) {
+  const route = routes[index];
+  const card = routesContainer.children[index];
+  const senderListEl = card.querySelector('.sender-list');
+  if (!route.source_chat) {
+    senderListEl.innerHTML = '<p class="empty-note">Pilih grup sumber dulu.</p>';
+    return;
+  }
+  senderListEl.innerHTML = '<p class="empty-note">Memuat daftar pengirim...</p>';
+  try {
+    const res = await fetch(`/api/senders?chat_id=${route.source_chat}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal ambil daftar pengirim');
+    route._senders = data;
+    renderSenderList(index);
+  } catch (e) {
+    senderListEl.innerHTML = `<p class="empty-note">Gagal ambil daftar pengirim: ${e.message}</p>`;
+  }
+}
+
+function renderSenderList(index) {
+  const route = routes[index];
+  const card = routesContainer.children[index];
+  const senderListEl = card.querySelector('.sender-list');
+  const chip = card.querySelector('.sender-mode-chip');
+  if (!route._senders.length) {
+    senderListEl.innerHTML = '<p class="empty-note">Belum ada history pesan di grup ini.</p>';
+    chip.textContent = 'semua pengirim';
+    return;
+  }
+  senderListEl.innerHTML = '';
+  for (const s of route._senders) {
+    const row = document.createElement('label');
+    row.className = 'sender-item';
+    const checked = route.sender_whitelist.includes(s.id) ? 'checked' : '';
+    row.innerHTML = `
+      <input type="checkbox" value="${s.id}" ${checked} />
+      <span class="sender-name">${s.name}${s.username ? ` (@${s.username})` : ''}</span>
+      <span class="sender-meta">${s.message_count}x pesan</span>
+    `;
+    row.querySelector('input').addEventListener('change', (e) => {
+      const id = parseInt(e.target.value, 10);
+      if (e.target.checked) {
+        if (!route.sender_whitelist.includes(id)) route.sender_whitelist.push(id);
+      } else {
+        route.sender_whitelist = route.sender_whitelist.filter((x) => x !== id);
+      }
+      updateSenderChip(index);
+    });
+    senderListEl.appendChild(row);
+  }
+  updateSenderChip(index);
+}
+
+function updateSenderChip(index) {
+  const route = routes[index];
+  const card = routesContainer.children[index];
+  const chip = card.querySelector('.sender-mode-chip');
+  chip.textContent = route.sender_whitelist.length === 0
+    ? 'semua pengirim'
+    : `${route.sender_whitelist.length} pengirim dipilih`;
+}
+
+function renderRoutes() {
+  routesContainer.innerHTML = '';
+  routes.forEach((route, index) => {
+    const card = document.createElement('div');
+    card.className = 'panel';
+    card.innerHTML = `
+      <div class="route-header">
+        <h2>Pasangan #${index + 1}</h2>
+        ${routes.length > 1 ? '<button type="button" class="link remove-route-btn">Hapus</button>' : ''}
+      </div>
+      <div class="field">
+        <label>Grup / Channel Sumber</label>
+        <select class="source-select"></select>
+      </div>
+      <div class="field">
+        <label>Channel / Grup Tujuan</label>
+        <select class="target-select"></select>
+      </div>
+      <div class="field">
+        <label>Filter Pengirim <span class="chip sender-mode-chip">semua pengirim</span></label>
+        <p class="hint">Kosongkan semua kalau mau ambil pesan dari SEMUA orang di grup ini. Centang satu/lebih buat batasi ke sender tertentu. Daftar diambil dari 300 pesan terakhir.</p>
+        <div class="sender-list"></div>
+      </div>
+    `;
+    routesContainer.appendChild(card);
+
+    const sourceSelect = card.querySelector('.source-select');
+    const targetSelect = card.querySelector('.target-select');
+    buildSelectOptions(sourceSelect, route.source_chat);
+    buildSelectOptions(targetSelect, route.target_chat);
+
+    sourceSelect.addEventListener('change', () => {
+      route.source_chat = sourceSelect.value || null;
+      route.sender_whitelist = [];
+      route._senders = [];
+      loadSendersForRoute(index);
+    });
+    targetSelect.addEventListener('change', () => {
+      route.target_chat = targetSelect.value || null;
+    });
+
+    const removeBtn = card.querySelector('.remove-route-btn');
+    if (removeBtn) removeBtn.addEventListener('click', () => removeRoute(index));
+
+    if (route.source_chat) {
+      loadSendersForRoute(index);
+    } else {
+      card.querySelector('.sender-list').innerHTML = '<p class="empty-note">Pilih grup sumber dulu di atas.</p>';
+    }
+  });
+
+  addRouteBtn.disabled = routes.length >= MAX_ROUTES;
+}
+
+addRouteBtn.addEventListener('click', addRoute);
+
+async function loadDialogs() {
+  const res = await fetch('/api/dialogs');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Gagal ambil daftar dialog');
+  dialogs = data;
+}
+
+async function loadCurrentConfig() {
+  const res = await fetch('/api/config');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Gagal ambil config');
+  return data.routes || [];
+}
+
+saveBtn.addEventListener('click', async () => {
+  if (!routes.length) {
+    statusEl.textContent = 'Tambahkan minimal 1 pasangan sumber/tujuan.';
+    statusEl.className = 'err';
+    return;
+  }
+  for (const [i, r] of routes.entries()) {
+    if (!r.source_chat || !r.target_chat) {
+      statusEl.textContent = `Pasangan #${i + 1}: pilih grup sumber dan channel tujuan dulu.`;
+      statusEl.className = 'err';
+      return;
+    }
+  }
+  saveBtn.disabled = true;
+  statusEl.textContent = 'Menyimpan...';
+  statusEl.className = '';
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        routes: routes.map((r) => ({
+          source_chat: parseInt(r.source_chat, 10),
+          target_chat: parseInt(r.target_chat, 10),
+          sender_whitelist: r.sender_whitelist,
+        })),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal simpan');
+    if (data.restarted) {
+      statusEl.textContent = 'Tersimpan & bot berhasil di-restart.';
+      statusEl.className = 'ok';
+    } else {
+      statusEl.textContent = `Tersimpan. ${data.restart_error || 'Restart bot secara manual.'}`;
+      statusEl.className = 'ok';
+    }
+  } catch (e) {
+    statusEl.textContent = `Gagal: ${e.message}`;
+    statusEl.className = 'err';
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+(async function init() {
+  try {
+    const savedRoutes = await loadCurrentConfig();
+    await loadDialogs();
+    routes = savedRoutes.length
+      ? savedRoutes.map((r) => ({
+          source_chat: r.source_chat != null ? String(r.source_chat) : null,
+          target_chat: r.target_chat != null ? String(r.target_chat) : null,
+          sender_whitelist: r.sender_whitelist || [],
+          _senders: [],
+        }))
+      : [{ source_chat: null, target_chat: null, sender_whitelist: [], _senders: [] }];
+    renderRoutes();
+  } catch (e) {
+    statusEl.textContent = `Gagal load data: ${e.message}`;
+    statusEl.className = 'err';
+  }
+})();
+
+// --- System Prompt (edit + history/backup) ---
+
+const promptTextarea = document.getElementById('prompt-textarea');
+const promptSaveBtn = document.getElementById('prompt-save-btn');
+const promptResetBtn = document.getElementById('prompt-reset-btn');
+const promptStatusEl = document.getElementById('prompt-status');
+const promptHistoryListEl = document.getElementById('prompt-history-list');
+
+let currentPrompt = '';
+
+function formatHistoryId(id) {
+  // id format: YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSS-n (collision suffix)
+  const m = id.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/);
+  if (!m) return id;
+  const [, y, mo, d, h, mi, s] = m;
+  const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
+  if (Number.isNaN(date.getTime())) return id;
+  return date.toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+async function loadPrompt() {
+  const res = await fetch('/api/prompt');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Gagal ambil system prompt');
+  currentPrompt = data.content || '';
+  promptTextarea.value = currentPrompt;
+}
+
+async function loadPromptHistory() {
+  promptHistoryListEl.innerHTML = '<p class="empty-note">Memuat history...</p>';
+  try {
+    const res = await fetch('/api/prompt/history');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal ambil history prompt');
+    renderPromptHistory(data);
+  } catch (e) {
+    promptHistoryListEl.innerHTML = `<p class="empty-note">Gagal ambil history: ${e.message}</p>`;
+  }
+}
+
+function renderPromptHistory(entries) {
+  if (!entries.length) {
+    promptHistoryListEl.innerHTML = '<p class="empty-note">Belum ada history. Backup otomatis dibuat tiap kali kamu simpan perubahan.</p>';
+    return;
+  }
+  promptHistoryListEl.innerHTML = '';
+  for (const entry of entries) {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <div class="history-row">
+        <span class="history-time">${formatHistoryId(entry.id)}</span>
+        <div class="history-actions">
+          <button type="button" class="link view-btn">Lihat</button>
+          <button type="button" class="link restore-btn">Pulihkan</button>
+        </div>
+      </div>
+      <pre class="history-preview" hidden></pre>
+    `;
+    const viewBtn = item.querySelector('.view-btn');
+    const restoreBtn = item.querySelector('.restore-btn');
+    const preview = item.querySelector('.history-preview');
+
+    viewBtn.addEventListener('click', async () => {
+      if (!preview.hidden) {
+        preview.hidden = true;
+        viewBtn.textContent = 'Lihat';
+        return;
+      }
+      viewBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/prompt/history/${entry.id}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Gagal ambil isi history');
+        preview.textContent = data.content;
+        preview.hidden = false;
+        viewBtn.textContent = 'Tutup';
+      } catch (e) {
+        preview.textContent = `Gagal load: ${e.message}`;
+        preview.hidden = false;
+      } finally {
+        viewBtn.disabled = false;
+      }
+    });
+
+    restoreBtn.addEventListener('click', async () => {
+      if (!confirm('Pulihkan system prompt ke versi ini? Versi yang lagi aktif akan ikut di-backup dulu, lalu bot di-restart.')) {
+        return;
+      }
+      restoreBtn.disabled = true;
+      promptStatusEl.textContent = 'Memulihkan...';
+      promptStatusEl.className = '';
+      try {
+        const res = await fetch(`/api/prompt/history/${entry.id}/restore`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Gagal pulihkan prompt');
+        await loadPrompt();
+        await loadPromptHistory();
+        promptStatusEl.textContent = data.restarted
+          ? 'Dipulihkan & bot berhasil di-restart.'
+          : `Dipulihkan. ${data.restart_error || 'Restart bot secara manual.'}`;
+        promptStatusEl.className = 'ok';
+      } catch (e) {
+        promptStatusEl.textContent = `Gagal: ${e.message}`;
+        promptStatusEl.className = 'err';
+      } finally {
+        restoreBtn.disabled = false;
+      }
+    });
+
+    promptHistoryListEl.appendChild(item);
+  }
+}
+
+promptResetBtn.addEventListener('click', () => {
+  promptTextarea.value = currentPrompt;
+  promptStatusEl.textContent = '';
+  promptStatusEl.className = '';
+});
+
+promptSaveBtn.addEventListener('click', async () => {
+  const content = promptTextarea.value;
+  if (!content.trim()) {
+    promptStatusEl.textContent = 'Prompt tidak boleh kosong.';
+    promptStatusEl.className = 'err';
+    return;
+  }
+  promptSaveBtn.disabled = true;
+  promptStatusEl.textContent = 'Menyimpan...';
+  promptStatusEl.className = '';
+  try {
+    const res = await fetch('/api/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal simpan prompt');
+    currentPrompt = content;
+    await loadPromptHistory();
+    promptStatusEl.textContent = data.restarted
+      ? 'Tersimpan & bot berhasil di-restart.'
+      : `Tersimpan. ${data.restart_error || 'Restart bot secara manual.'}`;
+    promptStatusEl.className = 'ok';
+  } catch (e) {
+    promptStatusEl.textContent = `Gagal: ${e.message}`;
+    promptStatusEl.className = 'err';
+  } finally {
+    promptSaveBtn.disabled = false;
+  }
+});
+
+(async function initPrompt() {
+  try {
+    await loadPrompt();
+    await loadPromptHistory();
+  } catch (e) {
+    promptStatusEl.textContent = `Gagal load system prompt: ${e.message}`;
+    promptStatusEl.className = 'err';
+  }
+})();
+</script>
+</body>
+</html>

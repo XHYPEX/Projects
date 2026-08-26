@@ -113,6 +113,8 @@
   #status.err { color: var(--err); }
   .ok { color: var(--ok); }
   .err { color: var(--err); }
+  #account-status { font-size: 0.85rem; margin: 0.75rem 0 0; min-height: 1.1em; }
+  #account-status:empty { margin-top: 0; }
   .chip {
     display: inline-block;
     background: var(--chip-bg);
@@ -197,7 +199,6 @@
       </div>
       <div class="actions">
         <button class="primary" id="phone-start-btn">Kirim Kode OTP</button>
-        <span id="account-status"></span>
       </div>
     </div>
 
@@ -222,6 +223,10 @@
         <button type="button" class="link" id="password-cancel-btn">Batal</button>
       </div>
     </div>
+
+    <!-- Di luar ketiga step di atas: kalau di dalam salah satunya, pesan status
+         ikut ke-hide begitu pindah step, jadi user gak lihat progress/error apa pun. -->
+    <p id="account-status"></p>
   </div>
 
   <div id="routes-container"></div>

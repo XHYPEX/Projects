@@ -1,0 +1,28 @@
+[Unit]
+Description=BotTelegram - Config Web UI (routes/prompt/account login)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ganti sesuai user/path di VPS kamu.
+User=bottelegram
+WorkingDirectory=/opt/bottelegram
+EnvironmentFile=/opt/bottelegram/.env
+ExecStart=/opt/bottelegram/.venv/bin/python3 /opt/bottelegram/config_app.py
+
+# Auto-restart kalau crash, tapi jangan restart-loop tanpa henti kalau memang rusak.
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Batasi resource biar aman di VPS kecil.
+MemoryMax=256M
+
+# Cuma dengerin di localhost -- HARUS diakses lewat reverse proxy (nginx) yang
+# nambahin HTTPS + (opsional) allowlist IP, jangan pernah expose port 8000 langsung
+# ke internet.
+
+[Install]
+WantedBy=multi-user.target

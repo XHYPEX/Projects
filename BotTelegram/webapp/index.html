@@ -52,11 +52,11 @@
   .panel h2 { font-size: 1rem; margin: 0 0 0.25rem; }
   .panel .hint { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 1rem; }
   label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem; }
-  select, button {
+  select, button, input[type="text"], input[type="password"] {
     font-family: inherit;
     font-size: 0.95rem;
   }
-  select {
+  select, input[type="text"], input[type="password"] {
     width: 100%;
     padding: 0.55rem 0.65rem;
     border-radius: 8px;
@@ -64,6 +64,10 @@
     background: var(--bg);
     color: var(--text);
   }
+  .header-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .status-badge { display: inline-block; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.78rem; margin-left: 0.5rem; }
+  .status-badge.connected { background: #1a8a4a22; color: var(--ok); }
+  .status-badge.disconnected { background: #c0392b22; color: var(--err); }
   .sender-list {
     display: flex;
     flex-direction: column;
@@ -107,6 +111,8 @@
   #status { font-size: 0.85rem; }
   #status.ok { color: var(--ok); }
   #status.err { color: var(--err); }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
   .chip {
     display: inline-block;
     background: var(--chip-bg);
@@ -174,8 +180,49 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>BotTelegram — Konfigurasi</h1>
+  <div class="header-row">
+    <h1>BotTelegram — Konfigurasi</h1>
+    <button type="button" class="link" id="logout-btn">Logout</button>
+  </div>
   <p class="sub">Atur sampai 5 pasangan grup sumber → channel tujuan, dan (opsional) filter pengirim per pasangan. Perubahan langsung ditulis ke <code>routes.json</code>.</p>
+
+  <div class="panel">
+    <h2>Akun Telegram (userbot)</h2>
+    <p class="hint">Bot mem-forward pesan pakai akun Telegram pribadi ini. Ganti nomor HP di sini kalau perlu pindah akun — bot berhenti sebentar selama proses login, lalu jalan lagi otomatis begitu selesai.</p>
+
+    <div id="account-step-phone">
+      <div class="field">
+        <label>Nomor HP (format internasional, mis. +6281234567890)</label>
+        <input type="text" id="phone-input" placeholder="+6281234567890" autocomplete="off" />
+      </div>
+      <div class="actions">
+        <button class="primary" id="phone-start-btn">Kirim Kode OTP</button>
+        <span id="account-status"></span>
+      </div>
+    </div>
+
+    <div id="account-step-code" hidden>
+      <div class="field">
+        <label>Kode OTP yang barusan dikirim ke Telegram kamu</label>
+        <input type="text" id="code-input" placeholder="12345" autocomplete="off" />
+      </div>
+      <div class="actions">
+        <button class="primary" id="code-submit-btn">Verifikasi Kode</button>
+        <button type="button" class="link" id="code-cancel-btn">Batal</button>
+      </div>
+    </div>
+
+    <div id="account-step-password" hidden>
+      <div class="field">
+        <label>Password 2FA (Two-Step Verification) akun ini</label>
+        <input type="password" id="password-input" autocomplete="off" />
+      </div>
+      <div class="actions">
+        <button class="primary" id="password-submit-btn">Verifikasi Password</button>
+        <button type="button" class="link" id="password-cancel-btn">Batal</button>
+      </div>
+    </div>
+  </div>
 
   <div id="routes-container"></div>
   <button type="button" class="add-route-btn" id="add-route-btn">+ Tambah pasangan channel</button>
@@ -204,6 +251,20 @@
 </div>
 
 <script>
+async function apiFetch(url, opts) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) {
+    window.location.href = '/login';
+    throw new Error('Sesi login habis, redirect ke halaman login...');
+  }
+  return res;
+}
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await apiFetch('/api/logout', { method: 'POST' });
+  window.location.href = '/login';
+});
+
 const MAX_ROUTES = 5;
 const routesContainer = document.getElementById('routes-container');
 const addRouteBtn = document.getElementById('add-route-btn');
@@ -257,7 +318,7 @@ async function loadSendersForRoute(index) {
   }
   senderListEl.innerHTML = '<p class="empty-note">Memuat daftar pengirim...</p>';
   try {
-    const res = await fetch(`/api/senders?chat_id=${route.source_chat}`);
+    const res = await apiFetch(`/api/senders?chat_id=${route.source_chat}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Gagal ambil daftar pengirim');
     route._senders = data;
@@ -367,14 +428,14 @@ function renderRoutes() {
 addRouteBtn.addEventListener('click', addRoute);
 
 async function loadDialogs() {
-  const res = await fetch('/api/dialogs');
+  const res = await apiFetch('/api/dialogs');
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || 'Gagal ambil daftar dialog');
   dialogs = data;
 }
 
 async function loadCurrentConfig() {
-  const res = await fetch('/api/config');
+  const res = await apiFetch('/api/config');
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || 'Gagal ambil config');
   return data.routes || [];
@@ -397,7 +458,7 @@ saveBtn.addEventListener('click', async () => {
   statusEl.textContent = 'Menyimpan...';
   statusEl.className = '';
   try {
-    const res = await fetch('/api/config', {
+    const res = await apiFetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -468,7 +529,7 @@ function formatHistoryId(id) {
 }
 
 async function loadPrompt() {
-  const res = await fetch('/api/prompt');
+  const res = await apiFetch('/api/prompt');
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || 'Gagal ambil system prompt');
   currentPrompt = data.content || '';
@@ -478,7 +539,7 @@ async function loadPrompt() {
 async function loadPromptHistory() {
   promptHistoryListEl.innerHTML = '<p class="empty-note">Memuat history...</p>';
   try {
-    const res = await fetch('/api/prompt/history');
+    const res = await apiFetch('/api/prompt/history');
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Gagal ambil history prompt');
     renderPromptHistory(data);
@@ -518,7 +579,7 @@ function renderPromptHistory(entries) {
       }
       viewBtn.disabled = true;
       try {
-        const res = await fetch(`/api/prompt/history/${entry.id}`);
+        const res = await apiFetch(`/api/prompt/history/${entry.id}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal ambil isi history');
         preview.textContent = data.content;
@@ -540,7 +601,7 @@ function renderPromptHistory(entries) {
       promptStatusEl.textContent = 'Memulihkan...';
       promptStatusEl.className = '';
       try {
-        const res = await fetch(`/api/prompt/history/${entry.id}/restore`, { method: 'POST' });
+        const res = await apiFetch(`/api/prompt/history/${entry.id}/restore`, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Gagal pulihkan prompt');
         await loadPrompt();
@@ -578,7 +639,7 @@ promptSaveBtn.addEventListener('click', async () => {
   promptStatusEl.textContent = 'Menyimpan...';
   promptStatusEl.className = '';
   try {
-    const res = await fetch('/api/prompt', {
+    const res = await apiFetch('/api/prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
@@ -608,6 +669,146 @@ promptSaveBtn.addEventListener('click', async () => {
     promptStatusEl.className = 'err';
   }
 })();
+
+// --- Akun Telegram (ganti nomor HP userbot.py lewat browser) ---
+
+const phoneInput = document.getElementById('phone-input');
+const phoneStartBtn = document.getElementById('phone-start-btn');
+const accountStatusEl = document.getElementById('account-status');
+const accountStepPhone = document.getElementById('account-step-phone');
+const accountStepCode = document.getElementById('account-step-code');
+const accountStepPassword = document.getElementById('account-step-password');
+const codeInput = document.getElementById('code-input');
+const codeSubmitBtn = document.getElementById('code-submit-btn');
+const codeCancelBtn = document.getElementById('code-cancel-btn');
+const passwordInput = document.getElementById('password-input');
+const passwordSubmitBtn = document.getElementById('password-submit-btn');
+const passwordCancelBtn = document.getElementById('password-cancel-btn');
+
+let currentLoginId = null;
+
+function showAccountStep(step) {
+  accountStepPhone.hidden = step !== 'phone';
+  accountStepCode.hidden = step !== 'code';
+  accountStepPassword.hidden = step !== 'password';
+}
+
+function setAccountStatus(text, cls) {
+  accountStatusEl.textContent = text;
+  accountStatusEl.className = cls || '';
+}
+
+phoneStartBtn.addEventListener('click', async () => {
+  const phone = phoneInput.value.trim();
+  if (!phone) {
+    setAccountStatus('Nomor HP wajib diisi.', 'err');
+    return;
+  }
+  phoneStartBtn.disabled = true;
+  setAccountStatus('Menghentikan bot & mengirim kode OTP...', '');
+  try {
+    const res = await apiFetch('/api/telegram-login/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal kirim kode OTP');
+    currentLoginId = data.login_id;
+    setAccountStatus('Kode terkirim, cek Telegram kamu.', '');
+    codeInput.value = '';
+    showAccountStep('code');
+  } catch (e) {
+    setAccountStatus(`Gagal: ${e.message}`, 'err');
+  } finally {
+    phoneStartBtn.disabled = false;
+  }
+});
+
+async function cancelAccountLogin() {
+  const loginId = currentLoginId;
+  currentLoginId = null;
+  showAccountStep('phone');
+  if (!loginId) return;
+  setAccountStatus('Membatalkan & menjalankan bot lagi dengan akun sebelumnya...', '');
+  try {
+    const res = await apiFetch('/api/telegram-login/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login_id: loginId }),
+    });
+    const data = await res.json();
+    setAccountStatus(
+      data.restarted ? 'Dibatalkan, bot jalan lagi.' : `Dibatalkan. ${data.restart_error || 'Restart bot manual.'}`,
+      'ok'
+    );
+  } catch (e) {
+    setAccountStatus(`Dibatalkan (tapi gagal restart bot: ${e.message}) -- restart manual.`, 'err');
+  }
+}
+
+codeCancelBtn.addEventListener('click', cancelAccountLogin);
+passwordCancelBtn.addEventListener('click', cancelAccountLogin);
+
+function finishAccountLogin(data) {
+  currentLoginId = null;
+  phoneInput.value = '';
+  showAccountStep('phone');
+  setAccountStatus(
+    data.restarted
+      ? 'Login berhasil, bot jalan lagi dengan akun baru.'
+      : `Login berhasil. ${data.restart_error || 'Restart bot manual.'}`,
+    'ok'
+  );
+}
+
+codeSubmitBtn.addEventListener('click', async () => {
+  const code = codeInput.value.trim();
+  if (!code) return;
+  codeSubmitBtn.disabled = true;
+  setAccountStatus('Memverifikasi kode...', '');
+  try {
+    const res = await apiFetch('/api/telegram-login/verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login_id: currentLoginId, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Kode salah');
+    if (data.awaiting === 'password') {
+      setAccountStatus('Akun ini pakai 2FA, masukkan password.', '');
+      passwordInput.value = '';
+      showAccountStep('password');
+      return;
+    }
+    finishAccountLogin(data);
+  } catch (e) {
+    setAccountStatus(`Gagal: ${e.message}`, 'err');
+  } finally {
+    codeSubmitBtn.disabled = false;
+  }
+});
+
+passwordSubmitBtn.addEventListener('click', async () => {
+  const password = passwordInput.value;
+  if (!password) return;
+  passwordSubmitBtn.disabled = true;
+  setAccountStatus('Memverifikasi password 2FA...', '');
+  try {
+    const res = await apiFetch('/api/telegram-login/verify-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login_id: currentLoginId, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Password salah');
+    finishAccountLogin(data);
+  } catch (e) {
+    setAccountStatus(`Gagal: ${e.message}`, 'err');
+  } finally {
+    passwordSubmitBtn.disabled = false;
+  }
+});
 </script>
 </body>
 </html>

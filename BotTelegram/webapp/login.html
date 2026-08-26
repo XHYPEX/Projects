@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BotTelegram — Login</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e0e2e7;
+    --text: #1a1c22;
+    --text-dim: #6b7078;
+    --accent: #4f6bed;
+    --accent-text: #ffffff;
+    --err: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b;
+      --panel: #1c1f26;
+      --border: #2b2f38;
+      --text: #eef0f4;
+      --text-dim: #9096a2;
+      --accent: #6f8bff;
+      --accent-text: #0c0e12;
+      --err: #ff6b5f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  form {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 340px;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 1.25rem; }
+  label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem; }
+  input {
+    width: 100%;
+    padding: 0.55rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  button {
+    width: 100%;
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    padding: 0.65rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #status { display: block; margin-top: 0.75rem; font-size: 0.85rem; min-height: 1.1em; color: var(--err); }
+</style>
+</head>
+<body>
+<form id="login-form">
+  <h1>BotTelegram — Login</h1>
+  <label for="username">Username</label>
+  <input type="text" id="username" name="username" autocomplete="username" required />
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password" autocomplete="current-password" required />
+  <button type="submit" id="submit-btn">Masuk</button>
+  <span id="status"></span>
+</form>
+
+<script>
+const form = document.getElementById('login-form');
+const submitBtn = document.getElementById('submit-btn');
+const statusEl = document.getElementById('status');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  submitBtn.disabled = true;
+  statusEl.textContent = '';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Login gagal');
+    window.location.href = '/';
+  } catch (err) {
+    statusEl.textContent = err.message;
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

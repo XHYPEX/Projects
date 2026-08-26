@@ -78,16 +78,22 @@ def config_app_module(monkeypatch, tmp_path):
     monkeypatch.setenv("TELEGRAM_API_HASH", "test-hash")
     monkeypatch.setenv("TARGET_BOT_TOKEN", "123456:ABC-test-token")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("CONFIG_APP_USERNAME", "test-admin")
+    monkeypatch.setenv("CONFIG_APP_PASSWORD", "test-password")
+    monkeypatch.setenv("CONFIG_APP_SECRET_KEY", "test-secret-key-not-for-production")
 
     routes_path = tmp_path / "routes.json"
     prompt_path = tmp_path / "system_prompt.txt"
     prompt_path.write_text("Original prompt v1", encoding="utf-8")
     history_dir = tmp_path / "history"
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
 
     config = importlib.import_module("config")
     monkeypatch.setattr(config, "ROUTES_PATH", str(routes_path))
     monkeypatch.setattr(config, "SYSTEM_PROMPT_PATH", str(prompt_path))
     monkeypatch.setattr(config, "PROMPT_HISTORY_DIR", str(history_dir))
+    monkeypatch.setattr(config, "SESSION_PATH", str(session_dir / "userbot"))
 
     config_app = importlib.import_module("config_app")
 
@@ -104,8 +110,24 @@ def config_app_module(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def api_client(config_app_module):
+def api_client_anon(config_app_module):
+    """An unauthenticated client -- for testing the login/auth gate itself."""
     from fastapi.testclient import TestClient
 
     with TestClient(config_app_module.app) as client:
         yield client
+
+
+@pytest.fixture
+def api_client(api_client_anon, config_app_module):
+    """A client already logged in with the fixture's CONFIG_APP_USERNAME/PASSWORD --
+    what nearly every test wants, since it's exercising routes/prompt behavior, not auth."""
+    res = api_client_anon.post(
+        "/api/login",
+        json={
+            "username": config_app_module.config.CONFIG_APP_USERNAME,
+            "password": config_app_module.config.CONFIG_APP_PASSWORD,
+        },
+    )
+    assert res.status_code == 200, res.text
+    return api_client_anon

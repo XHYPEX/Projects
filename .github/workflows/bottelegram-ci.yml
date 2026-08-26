@@ -50,6 +50,9 @@ jobs:
           TELEGRAM_API_HASH: "dummy"
           TARGET_BOT_TOKEN: "dummy:token"
           ANTHROPIC_API_KEY: "dummy"
+          CONFIG_APP_USERNAME: "dummy"
+          CONFIG_APP_PASSWORD: "dummy"
+          CONFIG_APP_SECRET_KEY: "dummy-not-for-production"
         run: |
           python -c "import config, state, llm, userbot, list_chats, config_app; print('semua module OK')"
 

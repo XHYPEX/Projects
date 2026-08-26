@@ -48,6 +48,17 @@ PROMPT_HISTORY_MAX_ENTRIES = 20
 # (SQLite locking) sama session userbot.py kalau dua-duanya jalan bersamaan.
 CONFIGAPP_SESSION_PATH = "session/configapp"
 
+# Login (username/password) buat config_app.py -- WAJIB diisi kalau app ini di-expose
+# ke internet (lewat nginx+domain), bukan cuma diakses via SSH tunnel. Kosong = config_app.py
+# nolak start (lihat pengecekan di config_app.py).
+CONFIG_APP_USERNAME = os.getenv("CONFIG_APP_USERNAME", "")
+CONFIG_APP_PASSWORD = os.getenv("CONFIG_APP_PASSWORD", "")
+# Random secret buat nanda-tangani session cookie login. Generate sekali pakai:
+#   python3 -c "import secrets; print(secrets.token_hex(32))"
+CONFIG_APP_SECRET_KEY = os.getenv("CONFIG_APP_SECRET_KEY", "")
+
+BOT_SERVICE_NAME = "bottelegram"
+
 # Daftar pasangan grup/channel sumber -> channel/grup tujuan (lihat routes.json.example).
 # Diatur paling gampang lewat config_app.py, atau edit routes.json manual.
 ROUTES_PATH = "routes.json"

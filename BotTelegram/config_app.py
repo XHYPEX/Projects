@@ -113,8 +113,13 @@ async def api_login(payload: LoginPayload, request: Request):
             status_code=429, detail="Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi."
         )
 
-    valid = hmac.compare_digest(payload.username, config.CONFIG_APP_USERNAME) and hmac.compare_digest(
-        payload.password, config.CONFIG_APP_PASSWORD
+    # Bandingkan sebagai bytes, bukan str: hmac.compare_digest nolak str yang
+    # mengandung karakter non-ASCII (TypeError -> 500), padahal password orang
+    # bisa aja pakai karakter beraksen/non-ASCII.
+    valid = hmac.compare_digest(
+        payload.username.encode("utf-8"), config.CONFIG_APP_USERNAME.encode("utf-8")
+    ) and hmac.compare_digest(
+        payload.password.encode("utf-8"), config.CONFIG_APP_PASSWORD.encode("utf-8")
     )
     if not valid:
         _record_failed_login(ip)

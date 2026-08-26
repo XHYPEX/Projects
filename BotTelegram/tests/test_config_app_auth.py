@@ -66,6 +66,25 @@ def test_repeated_failed_logins_are_rate_limited(api_client_anon):
     assert res.status_code == 429
 
 
+def test_non_ascii_credentials_work(api_client_anon, config_app_module, monkeypatch):
+    # hmac.compare_digest raises TypeError on non-ASCII *str* args, which surfaced
+    # as a 500 on login for anyone whose password had an accented character.
+    monkeypatch.setattr(config_app_module.config, "CONFIG_APP_USERNAME", "üser")
+    monkeypatch.setattr(config_app_module.config, "CONFIG_APP_PASSWORD", "pässwörd")
+
+    res = api_client_anon.post("/api/login", json={"username": "üser", "password": "pässwörd"})
+    assert res.status_code == 200
+    assert api_client_anon.get("/api/prompt").status_code == 200
+
+
+def test_non_ascii_credentials_still_reject_wrong_password(api_client_anon, config_app_module, monkeypatch):
+    monkeypatch.setattr(config_app_module.config, "CONFIG_APP_USERNAME", "üser")
+    monkeypatch.setattr(config_app_module.config, "CONFIG_APP_PASSWORD", "pässwörd")
+
+    res = api_client_anon.post("/api/login", json={"username": "üser", "password": "pässword"})
+    assert res.status_code == 401
+
+
 def test_logout_revokes_access(api_client):
     # api_client fixture starts out logged in.
     assert api_client.get("/api/prompt").status_code == 200

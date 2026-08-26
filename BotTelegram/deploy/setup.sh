@@ -23,6 +23,18 @@ fi
 echo "==> Bikin user sistem '$SERVICE_USER' (kalau belum ada)..."
 id -u "$SERVICE_USER" &>/dev/null || useradd --system --home "$PROJECT_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
 
+echo "==> Daftarkan repo sebagai safe.directory buat root..."
+# Isi project di-chown ke $SERVICE_USER di bawah, sementara deploy/update.sh jalan
+# sebagai root -- tanpa ini git nolak jalan ("detected dubious ownership") pas deploy.
+# Repo root bisa PROJECT_DIR sendiri atau folder di atasnya (kalau project ini cuma
+# salah satu subfolder di dalam repo), jadi daftarkan dua-duanya.
+add_safe_dir() {
+  git config --global --get-all safe.directory 2>/dev/null | grep -qx "$1" || \
+    git config --global --add safe.directory "$1"
+}
+add_safe_dir "$PROJECT_DIR"
+add_safe_dir "$(dirname "$PROJECT_DIR")"
+
 echo "==> Bikin folder session/ (kalau belum ada)..."
 mkdir -p "$PROJECT_DIR/session"
 

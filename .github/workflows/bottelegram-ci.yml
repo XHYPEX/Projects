@@ -37,12 +37,14 @@ jobs:
         run: python -m py_compile $(find . -name "*.py")
 
       - name: Siapkan fixture minimal buat import check
-        # session/ dan routes.json sengaja di-gitignore (isinya kredensial/ID asli),
-        # jadi checkout bersih gak punya keduanya -- TelegramClient(...) dan
-        # config.load_routes() bakal gagal tanpa ini.
+        # session/, routes.json, dan prompts/system_prompt.txt sengaja di-gitignore
+        # (kredensial/ID asli, dan prompt yang bisa diedit user lewat config_app.py),
+        # jadi checkout bersih gak punya ketiganya -- TelegramClient(...),
+        # config.load_routes(), dan llm.py bakal gagal tanpa ini.
         run: |
           mkdir -p session
           cp routes.json.example routes.json
+          cp prompts/system_prompt.txt.example prompts/system_prompt.txt
 
       - name: Pastikan semua module bisa di-import (tanpa .env asli)
         env:

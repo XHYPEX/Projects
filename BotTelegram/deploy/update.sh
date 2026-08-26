@@ -19,6 +19,15 @@ git pull
 echo "==> Install ulang dependency (kalau ada perubahan)..."
 "$PROJECT_DIR/.venv/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
 
+# prompts/system_prompt.txt gak di-track git (biar editan user lewat config_app.py
+# gak ketimpa tiap deploy), jadi kalau belum ada -- mis. install baru, atau file-nya
+# kehapus waktu pindah dari versi lama yang masih nge-track file ini -- bikin lagi
+# dari template. Yang sudah ada TIDAK ditimpa.
+if [ ! -f "$PROJECT_DIR/prompts/system_prompt.txt" ]; then
+  echo "==> prompts/system_prompt.txt belum ada, copy dari .example..."
+  cp "$PROJECT_DIR/prompts/system_prompt.txt.example" "$PROJECT_DIR/prompts/system_prompt.txt"
+fi
+
 # git pull di atas jalan sebagai root, jadi tiap file tracked yang berubah jadi
 # milik root -- dan config_app.py (jalan sebagai $SERVICE_USER) langsung gak bisa
 # nulis prompts/system_prompt.txt lagi (PermissionError pas save prompt).

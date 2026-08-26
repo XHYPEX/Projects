@@ -38,6 +38,13 @@ add_safe_dir "$(dirname "$PROJECT_DIR")"
 echo "==> Bikin folder session/ (kalau belum ada)..."
 mkdir -p "$PROJECT_DIR/session"
 
+echo "==> Siapkan prompts/system_prompt.txt (kalau belum ada)..."
+# File ini sengaja gak di-track git (user bisa edit lewat config_app.py), jadi
+# checkout bersih cuma punya .example-nya.
+if [ ! -f "$PROJECT_DIR/prompts/system_prompt.txt" ]; then
+  cp "$PROJECT_DIR/prompts/system_prompt.txt.example" "$PROJECT_DIR/prompts/system_prompt.txt"
+fi
+
 echo "==> Setup virtualenv & install dependencies..."
 # --clear: kalau .venv ini pindahan/copy-an dari lokasi lain, shebang/symlink internalnya
 # nunjuk ke path lama dan bakal rusak (bad interpreter) -- --clear paksa dibikin ulang bersih.

@@ -1,4 +1,5 @@
 import logging
+import os
 
 import anthropic
 
@@ -7,6 +8,13 @@ import config
 logger = logging.getLogger(__name__)
 
 _client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+
+if not os.path.exists(config.SYSTEM_PROMPT_PATH):
+    raise RuntimeError(
+        f"{config.SYSTEM_PROMPT_PATH} belum ada. Copy dari "
+        f"{config.SYSTEM_PROMPT_PATH}.example dulu (deploy/setup.sh dan deploy/update.sh "
+        "sebenarnya ngelakuin ini otomatis), atau atur lewat config_app.py."
+    )
 
 with open(config.SYSTEM_PROMPT_PATH, "r", encoding="utf-8") as f:
     _SYSTEM_PROMPT = f.read()

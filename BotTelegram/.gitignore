@@ -1,6 +1,9 @@
 .env
 routes.json
 session/
+# Prompt yang lagi aktif -- bisa diedit user lewat config_app.py, jadi jangan
+# di-track biar gak ketimpa tiap deploy. Template awalnya: system_prompt.txt.example
+prompts/system_prompt.txt
 prompts/history/
 __pycache__/
 *.pyc

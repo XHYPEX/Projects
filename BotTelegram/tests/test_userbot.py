@@ -62,6 +62,51 @@ def test_handler_is_registered_on_the_client(userbot_module):
     assert userbot_module.on_new_message in handlers
 
 
+def test_debug_all_chats_handler_is_off_by_default(userbot_module):
+    assert not hasattr(userbot_module, "on_any_message_debug")
+    assert len(userbot_module.client.list_event_handlers()) == 1
+
+
+def test_debug_all_chats_handler_registers_when_enabled(monkeypatch, tmp_path):
+    # The catch-all debug handler is the tool for diagnosing "the bot never sees this
+    # channel", so it silently failing to register would send someone down the wrong path.
+    import importlib
+    import json
+    import sys
+
+    for name in ("userbot", "llm", "state", "config"):
+        sys.modules.pop(name, None)
+
+    monkeypatch.setenv("TELEGRAM_API_ID", "12345")
+    monkeypatch.setenv("TELEGRAM_API_HASH", "test-hash")
+    monkeypatch.setenv("TARGET_BOT_TOKEN", "123456:ABC-test-token")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("DEBUG_LOG_ALL_CHATS", "1")
+
+    routes_path = tmp_path / "routes.json"
+    routes_path.write_text(json.dumps([{"source_chat": -100111, "target_chat": -100222}]))
+    prompt_path = tmp_path / "system_prompt.txt"
+    prompt_path.write_text("Test prompt.")
+    (tmp_path / "session").mkdir()
+
+    config = importlib.import_module("config")
+    assert config.DEBUG_LOG_ALL_CHATS is True
+    monkeypatch.setattr(config, "ROUTES_PATH", str(routes_path))
+    monkeypatch.setattr(config, "SYSTEM_PROMPT_PATH", str(prompt_path))
+    monkeypatch.setattr(config, "SESSION_PATH", str(tmp_path / "session" / "userbot"))
+    monkeypatch.setattr(config, "MESSAGE_MAP_PATH", str(tmp_path / "map.json"))
+    monkeypatch.setattr(config, "LOG_PATH", str(tmp_path / "logs" / "bot.log"))
+
+    userbot = importlib.import_module("userbot")
+    try:
+        handlers = [cb for cb, _ in userbot.client.list_event_handlers()]
+        assert userbot.on_any_message_debug in handlers
+        assert userbot.on_new_message in handlers
+    finally:
+        for name in ("userbot", "llm", "state", "config"):
+            sys.modules.pop(name, None)
+
+
 async def test_every_message_is_logged_before_filtering(userbot_module, bot, route, caplog):
     # The point of the [MASUK] line is that it lands even for messages that get
     # dropped, so the log explains why something never arrived downstream.

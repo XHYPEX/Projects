@@ -42,6 +42,12 @@ SYSTEM_PROMPT_PATH = "prompts/system_prompt.txt"
 LOG_PATH = os.getenv("LOG_PATH", "logs/bot.log")
 LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", str(5 * 1024 * 1024)))
 LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "5"))
+
+# Diagnostik: catat SEMUA pesan masuk dari chat mana pun (bukan cuma yang ada di
+# routes.json), lengkap sama chat_id-nya. Berguna buat nyari tau kenapa sebuah channel
+# gak keteruskan -- bandingin chat_id yang muncul di log sama yang ada di [ROUTE].
+# Ini ikut nge-log DM pribadi juga, jadi nyalain sementara aja pas lagi debug.
+DEBUG_LOG_ALL_CHATS = os.getenv("DEBUG_LOG_ALL_CHATS", "").strip().lower() in ("1", "true", "yes")
 MESSAGE_MAP_PATH = "session/sent_message_map.json"
 MESSAGE_MAP_MAX_ENTRIES = 5000
 

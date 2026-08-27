@@ -193,8 +193,38 @@ async def on_new_message(event):
         )
 
 
+if config.DEBUG_LOG_ALL_CHATS:
+
+    @client.on(events.NewMessage())
+    async def on_any_message_debug(event):
+        """Cuma aktif kalau DEBUG_LOG_ALL_CHATS=1. Handler ini gak nge-filter chat sama
+        sekali, jadi kalau sebuah channel muncul di sini tapi gak pernah muncul sebagai
+        [MASUK], berarti masalahnya di routes.json (chat_id salah). Kalau di sini pun
+        gak muncul, berarti akun-nya emang gak nerima update dari channel itu."""
+        try:
+            chat = await event.get_chat()
+            title = getattr(chat, "title", None) or getattr(chat, "username", None) or "(DM/privat)"
+        except Exception:
+            title = "(gagal ambil info chat)"
+        logger.info(
+            "[DEBUG-ALL] chat_id=%s title=%r sender=%s teks=%r",
+            event.chat_id,
+            title,
+            event.sender_id,
+            (event.raw_text or "")[:200],
+        )
+
+
 async def main():
     await client.start()
+
+    me = await client.get_me()
+    logger.info(
+        "Login sebagai: id=%s username=%s nama=%r",
+        me.id,
+        getattr(me, "username", None),
+        (getattr(me, "first_name", "") or "") + " " + (getattr(me, "last_name", "") or ""),
+    )
 
     for route in ROUTES:
         entity = await client.get_entity(route.source_chat)
@@ -205,6 +235,18 @@ async def main():
                 "-- tiap pasangan harus punya sumber unik."
             )
         routes_by_chat_id[chat_id] = route
+
+        # Dicetak biar gampang dicocokin sama chat_id yang muncul di log [MASUK]:
+        # kalau pesan masuk tapi chat_id-nya beda dari yang di sini, berarti routes.json
+        # nunjuk ke chat yang salah.
+        logger.info(
+            "[ROUTE] sumber=%r -> resolved chat_id=%s (%r) | tujuan=%r | whitelist=%s",
+            route.source_chat,
+            chat_id,
+            getattr(entity, "title", None) or getattr(entity, "username", None),
+            route.target_chat,
+            sorted(route.sender_whitelist) or "semua sender",
+        )
 
     logger.info("Userbot aktif, listening %d pasangan source -> target ...", len(ROUTES))
     await alert_admin(f"Bot aktif, listening {len(ROUTES)} pasangan channel.")

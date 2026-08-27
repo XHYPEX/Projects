@@ -49,6 +49,8 @@ def userbot_module(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "SYSTEM_PROMPT_PATH", str(prompt_path))
     monkeypatch.setattr(config, "MESSAGE_MAP_PATH", str(message_map_path))
     monkeypatch.setattr(config, "SESSION_PATH", str(session_dir / "userbot"))
+    # Kalau enggak, tiap run pytest bikin logs/bot.log beneran di folder repo.
+    monkeypatch.setattr(config, "LOG_PATH", str(tmp_path / "logs" / "bot.log"))
 
     userbot = importlib.import_module("userbot")
 

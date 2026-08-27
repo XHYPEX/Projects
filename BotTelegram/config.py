@@ -36,6 +36,12 @@ if _alert_chat_raw:
 
 SESSION_PATH = "session/userbot"
 SYSTEM_PROMPT_PATH = "prompts/system_prompt.txt"
+
+# Log ditulis ke file DAN tetap ke stdout (jadi `journalctl -u bottelegram` tetap jalan).
+# Di-rotate biar gak makan disk VPS tanpa batas.
+LOG_PATH = os.getenv("LOG_PATH", "logs/bot.log")
+LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", str(5 * 1024 * 1024)))
+LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "5"))
 MESSAGE_MAP_PATH = "session/sent_message_map.json"
 MESSAGE_MAP_MAX_ENTRIES = 5000
 

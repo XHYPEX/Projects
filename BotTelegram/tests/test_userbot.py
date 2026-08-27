@@ -62,6 +62,42 @@ def test_handler_is_registered_on_the_client(userbot_module):
     assert userbot_module.on_new_message in handlers
 
 
+async def test_every_message_is_logged_before_filtering(userbot_module, bot, route, caplog):
+    # The point of the [MASUK] line is that it lands even for messages that get
+    # dropped, so the log explains why something never arrived downstream.
+    route.sender_whitelist = {111}
+    with caplog.at_level("INFO", logger="signal-forwarder"):
+        await userbot_module.on_new_message(
+            make_event(sender_id=999, raw_text="pesan dari sender asing", msg_id=3)
+        )
+
+    assert "[MASUK]" in caplog.text
+    assert "pesan dari sender asing" in caplog.text
+    assert "[SKIP]" in caplog.text
+    bot.send_message.assert_not_called()
+
+
+async def test_short_message_is_logged_with_its_text(userbot_module, bot, route, caplog):
+    with caplog.at_level("INFO", logger="signal-forwarder"):
+        await userbot_module.on_new_message(make_event(raw_text="short"))
+
+    assert "[MASUK]" in caplog.text
+    assert "short" in caplog.text
+
+
+async def test_polished_result_is_logged(userbot_module, bot, route, monkeypatch, caplog):
+    monkeypatch.setattr(
+        userbot_module, "polish_signal", AsyncMock(return_value="Polished output here")
+    )
+    bot.send_message.return_value = SimpleNamespace(message_id=1)
+
+    with caplog.at_level("INFO", logger="signal-forwarder"):
+        await userbot_module.on_new_message(make_event())
+
+    assert "[HASIL]" in caplog.text
+    assert "Polished output here" in caplog.text
+
+
 async def test_unknown_route_is_ignored(userbot_module, bot):
     # No route registered for this chat_id.
     await userbot_module.on_new_message(make_event(chat_id=-999))

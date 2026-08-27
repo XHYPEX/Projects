@@ -1,6 +1,8 @@
 import asyncio
 import io
 import logging
+import logging.handlers
+import os
 
 from telegram import Bot
 from telegram.error import BadRequest, RetryAfter
@@ -11,10 +13,38 @@ import config
 import state
 from llm import polish_signal
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+
+def _setup_logging() -> None:
+    """Log ke stdout (buat journalctl) sekaligus ke file yang di-rotate."""
+    root = logging.getLogger()
+    if root.handlers:
+        # Sudah pernah di-setup -- mis. di test yang re-import module ini berkali-kali.
+        # Tanpa ini tiap import bikin RotatingFileHandler baru yang gak pernah kepakai
+        # (basicConfig no-op kalau root udah punya handler) alias bocor file descriptor.
+        return
+
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    handlers: list[logging.Handler] = [stream_handler]
+
+    log_dir = os.path.dirname(config.LOG_PATH)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    file_handler = logging.handlers.RotatingFileHandler(
+        config.LOG_PATH,
+        maxBytes=config.LOG_MAX_BYTES,
+        backupCount=config.LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(formatter)
+    handlers.append(file_handler)
+
+    logging.basicConfig(level=logging.INFO, handlers=handlers)
+
+
+_setup_logging()
 logger = logging.getLogger("signal-forwarder")
 
 client = TelegramClient(config.SESSION_PATH, config.TELEGRAM_API_ID, config.TELEGRAM_API_HASH)
@@ -54,18 +84,37 @@ async def on_new_message(event):
     if route is None:
         return
 
-    if route.sender_whitelist and event.sender_id not in route.sender_whitelist:
-        return
-
     raw_text = (event.raw_text or "").strip()
+
+    # Dicatat SEBELUM semua filter, biar tiap pesan yang kebaca bot selalu kelihatan
+    # di log -- termasuk yang nantinya di-skip, supaya gampang nyari tau kenapa
+    # sebuah pesan gak diteruskan.
+    logger.info(
+        "[MASUK] chat=%s sender=%s msg_id=%s media=%s teks=%r",
+        event.chat_id,
+        event.sender_id,
+        event.id,
+        bool(event.media),
+        raw_text,
+    )
+
+    if route.sender_whitelist and event.sender_id not in route.sender_whitelist:
+        logger.info("[SKIP] sender %s gak ada di whitelist route ini.", event.sender_id)
+        return
 
     if not raw_text:
         if event.media:
-            logger.info("Pesan media tanpa teks/caption di-skip (belum didukung).")
+            logger.info("[SKIP] pesan media tanpa teks/caption (belum didukung).")
+        else:
+            logger.info("[SKIP] pesan kosong.")
         return
 
     if len(raw_text) < config.MIN_MESSAGE_LENGTH:
-        logger.info("Pesan terlalu pendek, di-skip: %r", raw_text)
+        logger.info(
+            "[SKIP] pesan lebih pendek dari MIN_MESSAGE_LENGTH (%d): %r",
+            config.MIN_MESSAGE_LENGTH,
+            raw_text,
+        )
         return
 
     llm_input = raw_text
@@ -81,7 +130,7 @@ async def on_new_message(event):
         if reply_msg:
             target_reply_id = sent_message_map.get((event.chat_id, reply_msg.id))
 
-    logger.info("Pesan baru diterima, memproses ke LLM...")
+    logger.info("Memproses ke LLM...")
 
     try:
         polished = await polish_signal(llm_input)
@@ -90,8 +139,10 @@ async def on_new_message(event):
         return
 
     if polished is None:
-        logger.info("LLM menandai pesan sebagai bukan sinyal, di-skip.")
+        logger.info("[SKIP] LLM menandai pesan sebagai bukan sinyal.")
         return
+
+    logger.info("[HASIL] %r", polished)
 
     photo_bytes = await event.download_media(file=bytes) if event.photo else None
 

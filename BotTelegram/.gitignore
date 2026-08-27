@@ -5,6 +5,7 @@ session/
 # di-track biar gak ketimpa tiap deploy. Template awalnya: system_prompt.txt.example
 prompts/system_prompt.txt
 prompts/history/
+logs/
 __pycache__/
 *.pyc
 .venv/

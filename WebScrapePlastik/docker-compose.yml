@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
@@ -8,3 +9,8 @@ services:
       - ./results:/app/results
     environment:
       - PYTHONUNBUFFERED=1
+      # Maps scraper: needs Chromium in the image (see Dockerfile) before
+      # flipping this to "true".
+      - SCRAPER_ENABLED=false
+      # Set to "true" once the app is served over HTTPS.
+      - SESSION_COOKIE_SECURE=false

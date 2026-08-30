@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.auth import get_current_user, require_admin
+from backend.config import SCRAPER_ENABLED
 from backend.database import fail_orphaned_jobs, init_db, purge_expired_sessions
 from backend.routes.auth import router as auth_router
 from backend.routes.inventory import router as inventory_router
@@ -35,6 +36,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/config")
+async def get_app_config():
+    """Feature flags the frontend needs before it renders its nav. Unauthenticated:
+    it exposes nothing beyond which pages exist."""
+    return {"scraper_enabled": SCRAPER_ENABLED}
+
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(users_router, prefix="/api", dependencies=[Depends(require_admin)])

@@ -7,6 +7,8 @@ secrets.json
 # Dependencies
 node_modules/
 vendor/
+.venv/
+venv/
 __pycache__/
 *.pyc
 
@@ -15,6 +17,9 @@ dist/
 build/
 *.o
 *.exe
+
+# Marker file that disables Start.bat's auto-update on a developer machine.
+.no-auto-update
 
 # OS noise
 .DS_Store

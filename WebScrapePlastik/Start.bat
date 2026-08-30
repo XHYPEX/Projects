@@ -17,6 +17,7 @@ set "VENV=%~dp0.venv"
 set "HOST=127.0.0.1"
 set "PORT=8000"
 set "URL=http://127.0.0.1:8000"
+set "UPDATE_BRANCH=main"
 
 echo.
 echo   ============================================
@@ -64,25 +65,7 @@ if exist "data\scraper.db" (
 )
 
 REM --- 3. Cek update ----------------------------------------------------------
-REM Gagal update bukan alasan untuk tidak bisa jualan: kalau internet mati atau
-REM ada perubahan lokal, lewati saja dan tetap jalankan versi yang sekarang ada.
-git --version >nul 2>&1
-if errorlevel 1 (
-  echo   - Git tidak ada, lewati cek update.
-) else (
-  git rev-parse --is-inside-work-tree >nul 2>&1
-  if errorlevel 1 (
-    echo   - Bukan folder git, lewati cek update.
-  ) else (
-    echo   - Mengecek pembaruan aplikasi...
-    git pull --ff-only >nul 2>&1
-    if errorlevel 1 (
-      echo     ^(tidak bisa update sekarang - lanjut pakai versi saat ini^)
-    ) else (
-      echo     Aplikasi sudah versi terbaru.
-    )
-  )
-)
+call :update_app
 
 REM --- 4. Siapkan lingkungan Python -------------------------------------------
 if not exist "%VENV%\Scripts\python.exe" (
@@ -128,6 +111,56 @@ start "" powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Second
 if errorlevel 1 goto :fail_run
 
 endlocal
+exit /b 0
+
+:update_app
+REM Di komputer klien isi folder aplikasi harus SAMA PERSIS dengan repo, jadi
+REM update memakai "git reset --hard", bukan "git pull". Alasannya: "git pull"
+REM langsung GAGAL begitu ada perubahan lokal sekecil apa pun (file tidak sengaja
+REM tersimpan, folder kepencet) dan komputer itu diam-diam berhenti dapat update.
+REM "reset --hard" membuang perubahan lokal, jadi update tidak pernah macet.
+REM
+REM Ini AMAN di sini karena:
+REM   - Database ada di %LOCALAPPDATA%\TokoPlastik, DI LUAR folder repo
+REM     ^(lihat langkah 2^), jadi tidak mungkin ikut terhapus.
+REM   - "reset --hard" tidak menyentuh file untracked, jadi .venv dan results/ aman.
+REM
+REM JANGAN pernah menambahkan "git clean" di sini: .venv untracked, dan menghapusnya
+REM memaksa pemasangan ulang dari nol setiap kali aplikasi dibuka.
+REM
+REM Untuk mematikan update otomatis ^(mis. di komputer developer, supaya pekerjaan
+REM yang belum selesai tidak terbuang^): buat file kosong bernama .no-auto-update
+REM di folder ini.
+if exist "%~dp0.no-auto-update" (
+  echo   - Update otomatis dimatikan, lewati.
+  exit /b 0
+)
+
+git --version >nul 2>&1
+if errorlevel 1 (
+  echo   - Git tidak ada, lewati cek update.
+  exit /b 0
+)
+
+git rev-parse --is-inside-work-tree >nul 2>&1
+if errorlevel 1 (
+  echo   - Bukan folder git, lewati cek update.
+  exit /b 0
+)
+
+echo   - Mengecek pembaruan aplikasi...
+git fetch --quiet origin
+if errorlevel 1 (
+  echo     ^(tidak ada koneksi - lanjut pakai versi saat ini^)
+  exit /b 0
+)
+
+git reset --hard --quiet "origin/%UPDATE_BRANCH%"
+if errorlevel 1 (
+  echo     ^(gagal update - lanjut pakai versi saat ini^)
+  exit /b 0
+)
+echo     Aplikasi sudah versi terbaru.
 exit /b 0
 
 REM --- Penanganan error -------------------------------------------------------

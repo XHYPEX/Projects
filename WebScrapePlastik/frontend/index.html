@@ -177,6 +177,8 @@
     }
 
     .is-staff .admin-only { display: none !important; }
+    /* Set on <body> when /api/config reports scraper_enabled=false. */
+    .scraper-off .scraper-only { display: none !important; }
 
     /* Purchase invoice: A4 document, screen-hidden and only laid out for print. */
     #pi-print-area { display: none; }
@@ -228,7 +230,7 @@
       </button>
     </div>
     <div class="flex-1 overflow-y-auto p-2 space-y-0.5">
-      <a href="#/scraper" data-route="/scraper" class="nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
+      <a href="#/scraper" data-route="/scraper" class="scraper-only nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" class="text-accent shrink-0">
           <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z"/>
           <circle cx="12" cy="9.5" r="2.5"/>
@@ -1464,6 +1466,9 @@
 <script>
 const API = "";
 let currentUser = null;
+// Populated from /api/config before the first render; the optimistic default
+// only matters if that fetch fails.
+let appConfig = { scraper_enabled: false };
 
 // Catches session expiry/revocation from any of the ~40 existing fetch() call
 // sites without editing them individually. Excludes /api/auth/* so a failed
@@ -1493,6 +1498,10 @@ let plateCodes = {};
 // ── Auth: setup / login / logout ─────────────────────────────────────────────
 function isAdmin() {
   return currentUser?.role === "admin";
+}
+
+function applyFeatureGating() {
+  document.body.classList.toggle("scraper-off", !appConfig.scraper_enabled);
 }
 
 function applyRoleGating() {
@@ -1661,10 +1670,17 @@ const ROUTES = {
 
 const ADMIN_ONLY_ROUTES = new Set(["/users"]);
 
+// /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
+// #page-scraper; it just stops being reachable.
+function defaultRoute() {
+  return appConfig.scraper_enabled ? "/scraper" : "/cashier";
+}
+
 function currentRoute() {
   const hash = location.hash.replace(/^#/, "");
-  if (!ROUTES[hash]) return "/scraper";
-  if (ADMIN_ONLY_ROUTES.has(hash) && !isAdmin()) return "/scraper";
+  if (!ROUTES[hash]) return defaultRoute();
+  if (hash === "/scraper" && !appConfig.scraper_enabled) return defaultRoute();
+  if (ADMIN_ONLY_ROUTES.has(hash) && !isAdmin()) return defaultRoute();
   return hash;
 }
 
@@ -1722,8 +1738,10 @@ window.addEventListener("hashchange", renderRoute);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  await loadCities();
-  await loadJobHistory();
+  if (appConfig.scraper_enabled) {
+    await loadCities();
+    await loadJobHistory();
+  }
   await loadPlateCodes();
   await loadReceiptHistory();
   openNewReceiptTab();
@@ -1784,6 +1802,10 @@ function getSelectedKecamatan() {
 
 // ── Scrape ────────────────────────────────────────────────────────────────────
 async function startScrape() {
+  if (!appConfig.scraper_enabled) {
+    showToast("Fitur Maps Scraper sedang dinonaktifkan.");
+    return;
+  }
   const keyword = document.getElementById("keyword").value.trim();
   const city = document.getElementById("city-select").value;
   const kecamatan = getSelectedKecamatan();
@@ -5806,7 +5828,8 @@ async function submitResetPassword(userId) {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 function bootApp() {
   applyRoleGating();
-  if (!location.hash) location.hash = "/scraper";
+  applyFeatureGating();
+  if (!location.hash) location.hash = defaultRoute();
   renderRoute();
   init();
 }
@@ -5818,6 +5841,9 @@ async function checkAuth() {
     showAuthOverlay("setup");
     return;
   }
+  const configResp = await _origFetch("/api/config");
+  if (configResp.ok) appConfig = await configResp.json();
+
   const meResp = await _origFetch("/api/auth/me");
   if (meResp.status !== 200) {
     showAuthOverlay("login");

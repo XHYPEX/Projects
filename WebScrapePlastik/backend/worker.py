@@ -5,7 +5,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scraper import scrape
 from backend.database import create_job, get_places, insert_log, insert_place, update_job_status
 
 executor = ThreadPoolExecutor(max_workers=2)
@@ -22,6 +21,11 @@ def _make_log_fn(job_id: str):
 
 
 def run_scrape_job(job_id: str, keyword: str, city: str, kecamatan_list: list[str]) -> None:
+    # Imported here, not at module scope: scraper.py pulls in Playwright, which the
+    # runtime image only installs when SCRAPER_ENABLED=true. A top-level import would
+    # crash the whole app at startup on a build without it.
+    from scraper import scrape
+
     try:
         update_job_status(job_id, "running", progress=0)
         total = len(kecamatan_list)

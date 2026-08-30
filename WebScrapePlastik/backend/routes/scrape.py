@@ -5,6 +5,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from backend.config import SCRAPER_ENABLED
 from backend.database import (
     create_job,
     delete_job,
@@ -35,6 +36,13 @@ def _job_to_status(row: dict) -> JobStatus:
 
 @router.post("/scrape", response_model=ScrapeResponse, status_code=202)
 async def start_scrape(req: ScrapeRequest):
+    # Read-only job/results endpoints below stay available so existing scrape data
+    # remains viewable and exportable; only starting new jobs is switched off.
+    if not SCRAPER_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="The Maps scraper is currently disabled.",
+        )
     if req.city not in CITY_KECAMATAN:
         raise HTTPException(status_code=422, detail=f"Unknown city: {req.city}")
     valid = set(CITY_KECAMATAN[req.city])

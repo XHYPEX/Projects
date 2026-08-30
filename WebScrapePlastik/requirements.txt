@@ -1,6 +1,5 @@
-playwright
-folium
-pandas
+# Runtime dependencies for the web app (backend/). Deliberately small so a fresh
+# `pip install` on a user's machine is fast and can't fail on a heavy build.
 fastapi[standard]
 uvicorn[standard]
 rapidfuzz

@@ -1,0 +1,11 @@
+# Extras for the Google Maps scraper and the standalone CLI (main.py, mapper.py,
+# scraper.py). NOT needed to run the web app -- backend/ never imports these.
+#
+#   pip install -r requirements-scraper.txt
+#   playwright install chromium
+#
+# See backend/config.py for the SCRAPER_ENABLED flag.
+-r requirements.txt
+playwright
+folium
+pandas

@@ -193,6 +193,19 @@
         left: 0;
       }
 
+      /* Batch printing needs each label on its own 58x40mm page. Page breaks
+         inside an absolutely-positioned box are unreliable, so batch mode drops
+         the print area back into normal flow and removes the app shell from the
+         layout entirely (visibility:hidden alone still reserves its space, which
+         would push the first label off the page). */
+      body.print-barcode-batch > *:not(#barcode-print-area) { display: none !important; }
+      body.print-barcode-batch #barcode-print-area {
+        position: static;
+        display: block;
+      }
+      body.print-barcode-batch .barcode-label { break-after: page; page-break-after: always; }
+      body.print-barcode-batch .barcode-label:last-child { break-after: auto; page-break-after: auto; }
+
       body.print-invoice #pi-print-area,
       body.print-invoice #pi-print-area * { visibility: visible; }
       body.print-invoice #pi-print-area {
@@ -1132,7 +1145,11 @@
         <div id="inbound-form-panel" class="hidden max-w-4xl">
           <div class="flex items-center justify-between mb-4">
             <h2 id="inbound-form-title" class="font-serif text-lg font-semibold text-ink">Dokumen Baru</h2>
-            <button onclick="backToInboundList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+            <div class="flex items-center gap-3">
+              <button id="inbound-barcode-btn" onclick="printInboundBarcodes()"
+                class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Cetak Barcode</button>
+              <button onclick="backToInboundList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+            </div>
           </div>
 
           <div id="inbound-readonly-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted"></div>
@@ -4770,6 +4787,7 @@ function updateInboundTotalDisplay() {
     total += qty * cost;
   });
   document.getElementById("inbound-total-display").textContent = `Total: ${formatIDR(total)}`;
+  updateInboundBarcodeButton();
 }
 
 // ── Inventory: Barang Masuk — product selection (Master Barang only) ─────────
@@ -4779,6 +4797,11 @@ function updateInboundTotalDisplay() {
 
 function renderRowProduct(rowEl, p) {
   rowEl.dataset.masterItemId = (p.master_item_id != null && p.master_item_id !== "") ? String(p.master_item_id) : "";
+  // Stashed for barcode printing, which needs the raw values -- the rendered
+  // slot below only holds them formatted for display.
+  rowEl.dataset.sku = p.sku || "";
+  rowEl.dataset.productName = p.name || "";
+  rowEl.dataset.sellPrice = p.sell_price != null ? String(p.sell_price) : "";
   const slot = rowEl.querySelector(".row-product-slot");
   const sell = p.sell_price != null ? formatIDR(p.sell_price) : "-";
   slot.innerHTML = `
@@ -4794,11 +4817,16 @@ function renderRowProduct(rowEl, p) {
       </div>
       <button type="button" onclick="changeRowProduct(this)" class="row-change-btn shrink-0 text-[11px] text-accent hover:text-accentDark font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Ganti</button>
     </div>`;
+  updateInboundBarcodeButton();
 }
 
 function clearRowProduct(rowEl) {
   delete rowEl.dataset.masterItemId;
+  delete rowEl.dataset.sku;
+  delete rowEl.dataset.productName;
+  delete rowEl.dataset.sellPrice;
   rowEl.querySelector(".row-product-slot").innerHTML = rowPickButtonHtml();
+  updateInboundBarcodeButton();
 }
 
 // Master items are supplier-scoped, so changing the document's supplier
@@ -5104,8 +5132,105 @@ async function submitVoidDocument(docId) {
   goToInboundList();
 }
 
+
+// ── Barang Masuk: barcode labels for received stock ──────────────────────────
+// Prints one label per received unit for every line that resolves to a master
+// item, so incoming stock can be stickered straight off the document. Master
+// Barang keeps its own single-label print for reprints.
+const BARCODE_CONFIRM_THRESHOLD = 100;
+
+function collectInboundBarcodeLabels() {
+  const labels = [];
+  let skipped = 0;
+  document.querySelectorAll("#inbound-item-rows .inbound-item-row").forEach(row => {
+    const sku = row.dataset.sku;
+    const qty = parseInt(row.querySelector(".row-qty")?.value, 10) || 0;
+    if (!sku) {
+      // A row with a quantity but no chosen product cannot produce a barcode.
+      if (qty > 0) skipped++;
+      return;
+    }
+    if (qty <= 0) return;
+    for (let i = 0; i < qty; i++) {
+      labels.push({
+        sku,
+        name: row.dataset.productName || "",
+        sellPrice: row.dataset.sellPrice ? parseInt(row.dataset.sellPrice, 10) : null,
+      });
+    }
+  });
+  return { labels, skipped };
+}
+
+function updateInboundBarcodeButton() {
+  const btn = document.getElementById("inbound-barcode-btn");
+  if (!btn) return;
+  const { labels } = collectInboundBarcodeLabels();
+  btn.disabled = labels.length === 0;
+  btn.textContent = labels.length ? `Cetak Barcode (${labels.length})` : "Cetak Barcode";
+}
+
+function printInboundBarcodes() {
+  const { labels, skipped } = collectInboundBarcodeLabels();
+  if (!labels.length) {
+    showToast("Belum ada barang dengan SKU dan jumlah untuk dicetak.");
+    return;
+  }
+  if (labels.length > BARCODE_CONFIRM_THRESHOLD) {
+    // A mis-typed quantity could otherwise send hundreds of labels to a thermal
+    // printer before anyone can stop it.
+    openModal("Cetak Barcode", `
+      <p class="text-sm text-ink mb-1.5">Akan mencetak <span class="font-semibold">${labels.length} label</span>${skipped ? ` (${skipped} baris tanpa SKU dilewati)` : ""}.</p>
+      <p class="text-sm text-muted mb-4">Pastikan kertas label mencukupi sebelum melanjutkan.</p>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button onclick="closeModal(); runInboundBarcodePrint();" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Cetak</button>
+      </div>
+    `);
+    return;
+  }
+  if (skipped) showToast(`${skipped} baris tanpa SKU dilewati.`);
+  runInboundBarcodePrint();
+}
+
+function runInboundBarcodePrint() {
+  const { labels } = collectInboundBarcodeLabels();
+  if (!labels.length) return;
+
+  const batch = document.getElementById("barcode-batch");
+  document.getElementById("barcode-single").style.display = "none";
+  batch.innerHTML = labels.map((l, i) => `
+    <div class="barcode-label">
+      <div class="barcode-label-name">${esc(l.name)}</div>
+      <svg class="barcode-batch-svg" data-idx="${i}"></svg>
+      <div class="barcode-label-sku">${esc(l.sku)}</div>
+      <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
+    </div>
+  `).join("");
+
+  batch.querySelectorAll(".barcode-batch-svg").forEach(svg => {
+    JsBarcode(svg, labels[parseInt(svg.dataset.idx, 10)].sku, {
+      format: "CODE128",
+      displayValue: false,
+      margin: 0,
+      width: 1.5,
+      height: 42,
+    });
+  });
+
+  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", "print-barcode-batch");
+
+  // Leave the sheet as the single-label path expects to find it.
+  batch.innerHTML = "";
+  document.getElementById("barcode-single").style.display = "";
+}
+
 function printMasterItemBarcode() {
   if (!currentMasterItem) return;
+  // Share one print sheet with the batch path: show the single label, drop any
+  // labels a previous batch print left behind.
+  document.getElementById("barcode-batch").innerHTML = "";
+  document.getElementById("barcode-single").style.display = "";
   document.getElementById("barcode-print-name").textContent = currentMasterItem.name;
   document.getElementById("barcode-print-price").textContent = formatIDR(currentMasterItem.sell_price);
   document.getElementById("barcode-print-sku-text").textContent = currentMasterItem.sku;
@@ -6169,12 +6294,15 @@ checkAuth();
 </script>
 
 <div id="barcode-print-area">
-  <div class="barcode-label">
+  <!-- Single label: Master Barang's "Cetak Barcode" fills these by id. -->
+  <div id="barcode-single" class="barcode-label">
     <div id="barcode-print-name" class="barcode-label-name"></div>
     <svg id="barcode-print-svg"></svg>
     <div id="barcode-print-sku-text" class="barcode-label-sku"></div>
     <div id="barcode-print-price" class="barcode-label-price"></div>
   </div>
+  <!-- Batch: Barang Masuk renders one .barcode-label per received unit here. -->
+  <div id="barcode-batch"></div>
 </div>
 
 <!-- Purchase invoice print sheet — filled by renderPurchaseInvoicePrint() right before window.print(). -->

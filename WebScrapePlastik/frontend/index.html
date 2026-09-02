@@ -292,6 +292,12 @@
         </svg>
         Pengguna
       </a>
+      <a href="#/activity" data-route="/activity" class="admin-only nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+        </svg>
+        Log Aktivitas
+      </a>
     </div>
   </nav>
 
@@ -1025,6 +1031,73 @@
     </div>
   </div>
 
+  <!-- PAGE: AKTIVITAS (admin-only audit trail) -->
+  <div id="page-activity" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-serif text-lg font-semibold text-ink">Log Aktivitas</h2>
+        <span id="activity-total" class="text-xs text-muted"></span>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mb-4">
+        <input id="activity-search" type="text" placeholder="Cari aksi, nama, atau alamat…" oninput="debouncedActivitySearch()"
+          class="flex-1 min-w-56 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <select id="activity-filter-user" onchange="reloadActivity()"
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+          <option value="">Semua pengguna</option>
+        </select>
+        <select id="activity-filter-entity" onchange="reloadActivity()"
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+          <option value="">Semua jenis</option>
+          <option value="receipt">Nota penjualan</option>
+          <option value="master_item">Barang</option>
+          <option value="inbound_document">Barang masuk</option>
+          <option value="purchase_invoice">Faktur pembelian</option>
+          <option value="supplier">Supplier</option>
+          <option value="brand">Merek</option>
+          <option value="unit">Satuan</option>
+          <option value="stock">Penyesuaian stok</option>
+          <option value="user">Pengguna</option>
+          <option value="auth">Login / logout</option>
+        </select>
+        <input id="activity-date-from" type="date" onchange="reloadActivity()" data-no-uppercase
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <input id="activity-date-to" type="date" onchange="reloadActivity()" data-no-uppercase
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <label class="flex items-center gap-2 px-3 py-2 border border-line rounded-lg text-sm text-ink cursor-pointer hover:bg-bg2 transition-colors">
+          <input id="activity-failures-only" type="checkbox" onchange="reloadActivity()" class="accent-accent" />
+          Gagal saja
+        </label>
+      </div>
+
+      <div class="border border-line rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap">Waktu</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pengguna</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aktivitas</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+              </tr>
+            </thead>
+            <tbody id="activity-tbody"></tbody>
+          </table>
+        </div>
+        <div id="activity-empty" class="hidden text-center py-10">
+          <p class="text-sm text-muted">Belum ada aktivitas tercatat.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-3">
+        <button id="activity-prev" onclick="activityPage(-1)" class="px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">&larr; Sebelumnya</button>
+        <span id="activity-page-label" class="text-xs text-muted"></span>
+        <button id="activity-next" onclick="activityPage(1)" class="px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Berikutnya &rarr;</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PAGE: BARANG MASUK / MASTER BARANG (inventory module — Bahasa Indonesia UI labels, intentionally, per module scope) -->
   <div id="page-inventory" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-6xl mx-auto">
@@ -1699,6 +1772,7 @@ const ROUTES = {
   "/master-satuan": { title: "Master Satuan", page: "page-inventory", section: "inv-tab-unit", data: "unit" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
   "/users": { title: "Pengguna", page: "page-users" },
+  "/activity": { title: "Log Aktivitas", page: "page-activity" },
 };
 
 const INVENTORY_ROUTES = new Set(
@@ -1710,7 +1784,7 @@ const INVENTORY_ROUTES = new Set(
 // being immediately undone by it.
 let pendingInventoryAction = null;
 
-const ADMIN_ONLY_ROUTES = new Set(["/users"]);
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
 // #page-scraper; it just stops being reachable.
@@ -1757,6 +1831,7 @@ function renderRoute() {
   if (route === "/dashboard") loadDashboardOverview();
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
   if (route === "/users") loadUsers();
+  if (route === "/activity") initActivityPage();
   if (route === "/invoices") {
     document.getElementById("history-search-input").value = "";
     historyStatusFilter = "";
@@ -5926,6 +6001,139 @@ async function submitResetPassword(userId) {
   }
   closeModal();
   showToast("Password berhasil direset.", "success");
+}
+
+// ── Activity log (admin) ─────────────────────────────────────────────────────
+const activityState = { page: 1, pageSize: 50, total: 0, actorsLoaded: false };
+
+const ENTITY_LABELS = {
+  receipt: "Nota penjualan", master_item: "Barang", inbound_document: "Barang masuk",
+  purchase_invoice: "Faktur pembelian", supplier: "Supplier", brand: "Merek",
+  unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Login / logout",
+  scrape: "Scraper", job: "Job scraper",
+};
+
+async function initActivityPage() {
+  if (!activityState.actorsLoaded) {
+    activityState.actorsLoaded = true;
+    try {
+      const resp = await fetch("/api/activity/actors");
+      if (resp.ok) {
+        const actors = await resp.json();
+        const sel = document.getElementById("activity-filter-user");
+        const keep = sel.value;
+        sel.innerHTML = `<option value="">Semua pengguna</option>` +
+          actors.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join("");
+        sel.value = keep;
+      }
+    } catch (_) {}
+  }
+  reloadActivity();
+}
+
+function reloadActivity() {
+  activityState.page = 1;
+  loadActivity();
+}
+
+const debouncedActivitySearch = debounce(reloadActivity, 300);
+
+function activityPage(delta) {
+  const maxPage = Math.max(1, Math.ceil(activityState.total / activityState.pageSize));
+  activityState.page = Math.min(maxPage, Math.max(1, activityState.page + delta));
+  loadActivity();
+}
+
+async function loadActivity() {
+  const params = new URLSearchParams({
+    page: activityState.page,
+    page_size: activityState.pageSize,
+  });
+  const search = document.getElementById("activity-search").value.trim();
+  if (search) params.set("search", search);
+  const user = document.getElementById("activity-filter-user").value;
+  if (user) params.set("username", user);
+  const entity = document.getElementById("activity-filter-entity").value;
+  if (entity) params.set("entity", entity);
+  const from = document.getElementById("activity-date-from").value;
+  if (from) params.set("date_from", from);
+  const to = document.getElementById("activity-date-to").value;
+  if (to) params.set("date_to", to);
+  if (document.getElementById("activity-failures-only").checked) params.set("failures_only", "true");
+
+  const resp = await fetch(`/api/activity?${params.toString()}`);
+  if (!resp.ok) { showToast("Gagal memuat log aktivitas."); return; }
+  const data = await resp.json();
+  activityState.total = data.total;
+  renderActivity(data.items);
+
+  const maxPage = Math.max(1, Math.ceil(data.total / activityState.pageSize));
+  document.getElementById("activity-total").textContent = `${data.total} aktivitas tercatat`;
+  document.getElementById("activity-page-label").textContent = `Halaman ${data.page} dari ${maxPage}`;
+  document.getElementById("activity-prev").disabled = data.page <= 1;
+  document.getElementById("activity-next").disabled = data.page >= maxPage;
+}
+
+function formatActivityTime(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function renderActivity(items) {
+  const tbody = document.getElementById("activity-tbody");
+  const empty = document.getElementById("activity-empty");
+  tbody.innerHTML = "";
+  empty.classList.toggle("hidden", items.length > 0);
+
+  for (const row of items) {
+    const ok = row.status_code < 400;
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 transition-colors align-top";
+    tr.innerHTML = `
+      <td class="px-3 py-2 whitespace-nowrap text-muted tabular-nums">${formatActivityTime(row.created_at)}</td>
+      <td class="px-3 py-2 text-ink">${esc(row.username || "-")}</td>
+      <td class="px-3 py-2 text-ink font-medium">${esc(row.action)}</td>
+      <td class="px-3 py-2 text-muted">
+        ${row.summary ? esc(row.summary) : "-"}
+        ${row.entity ? `<span class="ml-1 text-[11px] text-muted/80">· ${esc(ENTITY_LABELS[row.entity] || row.entity)}</span>` : ""}
+      </td>
+      <td class="px-3 py-2">
+        <span class="px-2 py-0.5 rounded-md text-[11px] font-medium ${ok ? "bg-done/10 text-done" : "bg-failed/10 text-failed"}">
+          ${ok ? "Berhasil" : "Gagal " + row.status_code}
+        </span>
+      </td>`;
+    // Row detail: the redacted request body, revealed on click rather than
+    // shown inline so the table stays scannable.
+    if (row.payload) {
+      tr.classList.add("cursor-pointer");
+      tr.onclick = () => showActivityDetail(row);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+function showActivityDetail(row) {
+  let pretty = row.payload;
+  try { pretty = JSON.stringify(JSON.parse(row.payload), null, 2); } catch (_) {}
+  openModal("Detail Aktivitas", `
+    <div class="space-y-3 text-sm">
+      <div class="grid grid-cols-3 gap-2">
+        <span class="text-muted">Waktu</span><span class="col-span-2 text-ink">${formatActivityTime(row.created_at)}</span>
+        <span class="text-muted">Pengguna</span><span class="col-span-2 text-ink">${esc(row.username || "-")}</span>
+        <span class="text-muted">Aktivitas</span><span class="col-span-2 text-ink">${esc(row.action)}</span>
+        <span class="text-muted">Alamat</span><span class="col-span-2 text-ink font-mono text-[12px] break-all">${esc(row.method)} ${esc(row.path)}</span>
+        <span class="text-muted">Status</span><span class="col-span-2 text-ink">${row.status_code}</span>
+        <span class="text-muted">IP</span><span class="col-span-2 text-ink font-mono text-[12px]">${esc(row.ip || "-")}</span>
+      </div>
+      <div>
+        <p class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Data yang dikirim</p>
+        <pre class="bg-bg2 border border-line rounded-lg p-3 text-[12px] text-ink overflow-x-auto whitespace-pre-wrap break-all">${esc(pretty)}</pre>
+        <p class="text-[11px] text-muted mt-1.5">Password dan token tidak pernah disimpan di log.</p>
+      </div>
+    </div>
+  `);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

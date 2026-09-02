@@ -251,6 +251,16 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON activity_log(entity, entity_id);
         """)
 
+        # --- Additive migration: receipt start time ---
+        # created_at is when the sale was saved; started_at is when the cashier
+        # opened the tab and began entering it. Live databases already hold
+        # receipts, so this is an ALTER guarded by a PRAGMA check rather than an
+        # edit to the CREATE TABLE above. Existing rows keep NULL and fall back
+        # to created_at when displayed.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "started_at" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN started_at TEXT")
+
         # --- Additive migration: quick-add brand/supplier support (§7.2) ---
         # data/scraper.db already has live supplier/brand rows, so this uses
         # ALTER TABLE ADD COLUMN guarded by PRAGMA table_info checks (SQLite has
@@ -461,6 +471,29 @@ def _compute_receipt_status(total: int, amount_paid: int, requested_status: str 
     return "done" if amount_paid >= total else "pending"
 
 
+def _sanitize_started_at(value: str | None, created_at: str) -> str:
+    """started_at is the one timestamp the browser supplies, so it cannot be
+    trusted the way created_at can. A value that is unparseable, in the future,
+    or implausibly old (a machine with a wrong clock, or a tab left open
+    overnight) falls back to the server's own created_at rather than recording a
+    time the sale did not happen at. It is never editable after this point."""
+    if not value:
+        return created_at
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return created_at
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    # A little slack for clock skew between the browser and the server.
+    if parsed > now + timedelta(minutes=5):
+        return created_at
+    if parsed < now - timedelta(hours=24):
+        return created_at
+    return parsed.isoformat()
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -472,22 +505,24 @@ def create_receipt(
     status: str | None = None,
     customer_phone: str = "",
     customer_name: str | None = None,
+    started_at: str | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
     total = subtotal - discount
     final_status = _compute_receipt_status(total, amount_paid, status)
     created_at = _now()
+    started_at = _sanitize_started_at(started_at, created_at)
 
     with _conn() as con:
         con.execute(
             """INSERT INTO receipts
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, status, amount_paid)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                subtotal, discount, total, created_at, started_at, status, amount_paid)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, final_status, amount_paid,
+                subtotal, discount, total, created_at, started_at, final_status, amount_paid,
             ),
         )
         con.executemany(

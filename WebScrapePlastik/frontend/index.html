@@ -527,6 +527,35 @@
                no unvoid path, so the whole form locks once this shows. -->
           <div id="cashier-void-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted">This receipt has been voided and can no longer be edited.</div>
 
+          <!-- Waktu transaksi: recorded automatically, never editable. Both fields
+               are readonly AND disabled, and are excluded from the payload the form
+               collects -- the server sets created_at and sanitises started_at. -->
+          <div class="mb-5">
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Waktu Transaksi</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <div class="relative">
+                  <input id="receipt-started-at" type="text" readonly disabled tabindex="-1" data-no-uppercase
+                    class="w-full border border-line rounded-lg pl-3 pr-9 py-2 text-sm bg-bg2 text-muted tabular-nums cursor-not-allowed focus:outline-none" />
+                  <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-muted/70 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                  </svg>
+                </div>
+                <p class="text-[10px] text-muted mt-1">Mulai transaksi</p>
+              </div>
+              <div>
+                <div class="relative">
+                  <input id="receipt-created-at" type="text" readonly disabled tabindex="-1" data-no-uppercase
+                    class="w-full border border-line rounded-lg pl-3 pr-9 py-2 text-sm bg-bg2 text-muted tabular-nums cursor-not-allowed focus:outline-none" />
+                  <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-muted/70 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                  </svg>
+                </div>
+                <p id="receipt-created-at-label" class="text-[10px] text-muted mt-1">Waktu simpan</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Plate number -->
           <div class="mb-5">
             <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Vehicle plate number</label>
@@ -2386,6 +2415,9 @@ function collectReceiptPayload() {
   // are always computed from amount_paid vs total, never sent by hand.
   const tab = getActiveTab();
   if (tab && tab.status === "void") payload.status = "void";
+  // Only on create. The update schema has no started_at, and the server
+  // re-checks this value anyway rather than trusting the browser's clock.
+  if (tab && !tab.receiptId && tab.startedAt) payload.started_at = tab.startedAt;
   return payload;
 }
 
@@ -2500,6 +2532,9 @@ function blankCashierTabState(tabId) {
     customerPhone: "",
     customerName: "",
     items: [{ sku: null, name: "", qty: "1", price: "", warranty: "" }],
+    // Stamped when the tab is opened; sent once on create and never again.
+    startedAt: new Date().toISOString(),
+    createdAt: null,
     discount: "0",
     // A brand-new receipt defaults to "paid in full on the spot" — amountPaid
     // auto-syncs to Total (see recomputeTotals) until the cashier types into
@@ -2527,6 +2562,8 @@ function tabStateFromReceipt(tabId, r) {
       price: String(it.unit_price),
       warranty: it.warranty_date || "",
     })),
+    startedAt: r.started_at || r.created_at,
+    createdAt: r.created_at,
     discount: String(r.discount),
     // A receipt loaded from the server already has an explicit, previously
     // saved amount_paid — treat it as touched so editing line items later
@@ -2623,6 +2660,59 @@ function renderCashierTabBar() {
   `;
 }
 
+// ── Cashier: transaction time (recorded, never editable) ─────────────────────
+// Two timestamps. "Mulai" is stamped when the tab opens and travels with the
+// receipt once. "Waktu simpan" runs as a live clock until the receipt is saved,
+// then freezes to the server's own created_at -- the browser's value is only
+// ever a preview, the recorded one always comes from the server.
+let cashierClockTimer = null;
+
+function formatDateTimeSeconds(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} `
+       + `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+function stopCashierClock() {
+  if (cashierClockTimer) {
+    clearInterval(cashierClockTimer);
+    cashierClockTimer = null;
+  }
+}
+
+function renderCashierTimeFields() {
+  const tab = getActiveTab();
+  const startedEl = document.getElementById("receipt-started-at");
+  const createdEl = document.getElementById("receipt-created-at");
+  const createdLabel = document.getElementById("receipt-created-at-label");
+  if (!tab || !startedEl || !createdEl) return;
+
+  stopCashierClock();
+  startedEl.value = formatDateTimeSeconds(tab.startedAt);
+
+  if (tab.createdAt) {
+    createdEl.value = formatDateTimeSeconds(tab.createdAt);
+    createdLabel.textContent = "Waktu simpan";
+    return;
+  }
+
+  // Not saved yet: tick, so the cashier always sees a real time rather than an
+  // empty box. This is display only and is never what gets stored.
+  createdLabel.textContent = "Waktu simpan (belum disimpan)";
+  const tick = () => {
+    const current = getActiveTab();
+    if (!current || current.tabId !== tab.tabId || current.createdAt) {
+      stopCashierClock();
+      return;
+    }
+    createdEl.value = formatDateTimeSeconds(new Date().toISOString());
+  };
+  tick();
+  cashierClockTimer = setInterval(tick, 1000);
+}
+
 function renderCashierForm() {
   const tab = getActiveTab();
   if (!tab) return;
@@ -2633,6 +2723,8 @@ function renderCashierForm() {
   document.getElementById("customer-phone").value = tab.customerPhone || "";
   document.getElementById("customer-name").value = tab.customerName || "";
   validatePlateRegion();
+
+  renderCashierTimeFields();
 
   document.getElementById("scan-barcode-input").value = "";
   document.getElementById("scan-barcode-feedback").textContent = "";
@@ -2795,7 +2887,7 @@ async function loadReceiptHistory() {
         </div>
         <div class="text-xs text-muted truncate pl-3">${amountLine}</div>
         ${customerLine}
-        <div class="text-[11px] text-muted/70 pl-3">${r.created_at.slice(0, 10)}</div>
+        <div class="text-[11px] text-muted/70 pl-3 tabular-nums">${esc(formatDateTimeSeconds(r.created_at))}</div>
       </button>
     `;
     ul.appendChild(li);
@@ -2924,7 +3016,7 @@ function renderHistoryTable(receipts, query) {
     tr.innerHTML = `
       <td class="px-3 py-2 font-serif font-medium text-ink">${esc(r.plate_full)}</td>
       <td class="px-3 py-2 text-muted">${customerCell}</td>
-      <td class="px-3 py-2 text-muted">${esc((r.created_at || "").slice(0, 10))}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatDateTimeSeconds(r.created_at))}</td>
       <td class="px-3 py-2">
         <span class="inline-flex items-center gap-1.5 text-xs text-muted">
           <span class="status-dot is-${r.status}"></span>${esc(statusLabel(r.status))}

@@ -72,6 +72,7 @@ from backend.schemas import (
     MasterItemListOut,
     MasterItemOut,
     MasterItemUpdateRequest,
+    OpenPreorderOut,
     PendingInvoiceOut,
     SkuPreviewOut,
     StockAdjustmentRequest,
@@ -807,4 +808,8 @@ async def inventory_overview():
         top_selling=[TopSellingOut(**r) for r in result["top_selling"]],
         sales_month_revenue=result["sales_month_revenue"],
         sales_month_count=result["sales_month_count"],
+        preorder_open_count=result["preorder_open_count"],
+        preorder_outstanding=result["preorder_outstanding"],
+        preorder_ready_count=result["preorder_ready_count"],
+        preorders=[OpenPreorderOut(**r) for r in result["preorders"]],
     )

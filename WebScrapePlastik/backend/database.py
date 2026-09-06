@@ -82,6 +82,48 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt_id);
 
+            -- Preorder (pesanan barang yang belum ada di toko). Deliberately
+            -- separate from receipts and the stock ledger: nothing here moves
+            -- inventory or revenue. The order is only a promise until the goods
+            -- arrive, at which point Barang Masuk / Kasir take over as usual.
+            CREATE TABLE IF NOT EXISTS preorders (
+                id TEXT PRIMARY KEY,
+                customer_name TEXT NOT NULL,
+                customer_phone TEXT NOT NULL,
+                deposit INTEGER NOT NULL DEFAULT 0,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_preorders_created_at ON preorders(created_at);
+            CREATE TABLE IF NOT EXISTS preorder_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                preorder_id TEXT NOT NULL REFERENCES preorders(id),
+                master_item_id INTEGER,
+                product_name TEXT NOT NULL,
+                unit TEXT,
+                quantity INTEGER NOT NULL,
+                unit_price INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pesanan_dibuat',
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_preorder_items_preorder_id ON preorder_items(preorder_id);
+            -- One row per status change. product_name is snapshotted rather than
+            -- joined so the timeline still reads correctly after the line item is
+            -- renamed or deleted.
+            CREATE TABLE IF NOT EXISTS preorder_status_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                preorder_id TEXT NOT NULL,
+                preorder_item_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                changed_by TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_preorder_status_history_preorder_id
+                ON preorder_status_history(preorder_id);
+
             CREATE TABLE IF NOT EXISTS suppliers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 code TEXT NOT NULL UNIQUE,
@@ -1432,6 +1474,21 @@ def get_inventory_overview() -> dict:
             (sales_cutoff,),
         ).fetchall()
 
+        # Open preorders. The order-level stage is derived from its line items
+        # (see _preorder_overall_status), so this is assembled in Python rather
+        # than filtered in SQL -- the same approach get_all_preorders takes.
+        preorder_items_by_order: dict[str, list[dict]] = {}
+        for preorder_item in con.execute(
+            "SELECT * FROM preorder_items ORDER BY position ASC, id ASC"
+        ).fetchall():
+            preorder_items_by_order.setdefault(preorder_item["preorder_id"], []).append(dict(preorder_item))
+        preorders_open = [
+            _preorder_row(dict(r), preorder_items_by_order.get(r["id"], []))
+            for r in con.execute("SELECT * FROM preorders ORDER BY created_at DESC").fetchall()
+        ]
+        # Fully installed orders are finished business and drop off the dashboard.
+        preorders_open = [r for r in preorders_open if r["status"] != PREORDER_STATUSES[-1]]
+
         # Sales this calendar month (paid receipts).
         month_start = date.today().replace(day=1).isoformat()
         sales_month = con.execute(
@@ -1453,6 +1510,15 @@ def get_inventory_overview() -> dict:
             "top_selling": [dict(r) for r in top_selling_rows],
             "sales_month_revenue": sales_month["revenue"],
             "sales_month_count": sales_month["c"],
+            "preorder_open_count": len(preorders_open),
+            "preorder_outstanding": sum(r["remaining"] for r in preorders_open),
+            # Goods already sitting in the shop waiting to be installed -- the
+            # stage that actually needs someone to act.
+            "preorder_ready_count": sum(
+                1 for r in preorders_open
+                if any(i["status"] == "sampai_di_toko" for i in preorder_items_by_order.get(r["id"], []))
+            ),
+            "preorders": preorders_open[:5],
         }
 
 
@@ -2387,3 +2453,263 @@ def purge_activity_before(cutoff_iso: str) -> int:
     with _conn() as con:
         cur = con.execute("DELETE FROM activity_log WHERE created_at < ?", (cutoff_iso,))
         return cur.rowcount
+
+
+# --- Preorders -------------------------------------------------------------
+# A preorder is a customer promise, not a transaction: it never touches
+# stock_ledger, master_items.stock_qty or the sales summary. Each line item
+# carries its own stage, because a single order routinely has one item already
+# sitting in the shop while another is still with the supplier.
+
+PREORDER_STATUSES = (
+    "pesanan_dibuat",
+    "sudah_dipesankan",
+    "dalam_pengiriman",
+    "sampai_di_toko",
+    "terpasang",
+)
+
+PREORDER_STATUS_LABELS = {
+    "pesanan_dibuat": "Pesanan dibuat",
+    "sudah_dipesankan": "Sudah dipesankan",
+    "dalam_pengiriman": "Dalam pengiriman",
+    "sampai_di_toko": "Sampai di toko",
+    "terpasang": "Terpasang",
+}
+
+
+def _preorder_overall_status(item_statuses: list[str]) -> str:
+    """The order as a whole is only as far along as its *least* advanced line —
+    an order with a pipe still in transit is not 'sampai di toko' just because
+    the fittings arrived. An order with no items falls back to the first stage."""
+    if not item_statuses:
+        return PREORDER_STATUSES[0]
+    return min(item_statuses, key=lambda s: PREORDER_STATUSES.index(s) if s in PREORDER_STATUSES else 0)
+
+
+def _preorder_row(row: dict, items: list[dict]) -> dict:
+    total = sum(i["quantity"] * i["unit_price"] for i in items)
+    deposit = row["deposit"]
+    return {
+        **row,
+        "total": total,
+        # Overpayment would otherwise show as a negative balance owing.
+        "remaining": max(total - deposit, 0),
+        "item_count": len(items),
+        "status": _preorder_overall_status([i["status"] for i in items]),
+    }
+
+
+def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict, position: int, now: str) -> int:
+    cur = con.execute(
+        """INSERT INTO preorder_items
+           (preorder_id, master_item_id, product_name, unit, quantity, unit_price, status, position, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            preorder_id, item.get("master_item_id"), item["product_name"], item.get("unit"),
+            item["quantity"], item["unit_price"], item.get("status") or PREORDER_STATUSES[0],
+            position, now,
+        ),
+    )
+    item_id = cur.lastrowid
+    _log_preorder_status(con, preorder_id, item_id, item["product_name"],
+                         item.get("status") or PREORDER_STATUSES[0], now, item.get("changed_by"))
+    return item_id
+
+
+def _log_preorder_status(
+    con: sqlite3.Connection, preorder_id: str, item_id: int, product_name: str,
+    status: str, changed_at: str, changed_by: str | None,
+) -> None:
+    con.execute(
+        """INSERT INTO preorder_status_history
+           (preorder_id, preorder_item_id, product_name, status, changed_at, changed_by)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (preorder_id, item_id, product_name, status, changed_at, changed_by),
+    )
+
+
+def create_preorder(
+    preorder_id: str,
+    customer_name: str,
+    customer_phone: str,
+    items: list[dict],
+    deposit: int = 0,
+    notes: str | None = None,
+    changed_by: str | None = None,
+) -> dict:
+    now = _now()
+    with _conn() as con:
+        con.execute(
+            """INSERT INTO preorders
+               (id, customer_name, customer_phone, deposit, notes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (preorder_id, customer_name, customer_phone, deposit, notes, now, now),
+        )
+        for position, item in enumerate(items):
+            _insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now)
+        row = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
+        stored = [dict(r) for r in con.execute(
+            "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
+        ).fetchall()]
+    return _preorder_row(row, stored)
+
+
+def get_preorder(preorder_id: str) -> dict | None:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if row is None:
+            return None
+        items = [dict(r) for r in con.execute(
+            "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
+        ).fetchall()]
+    return _preorder_row(dict(row), items)
+
+
+def get_preorder_items(preorder_id: str) -> list[dict]:
+    """Carries the linked SKU along so the detail view can show which lines are
+    tied to Master Barang; it is null for a free-text line."""
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT preorder_items.*, master_items.sku AS sku
+               FROM preorder_items
+               LEFT JOIN master_items ON master_items.id = preorder_items.master_item_id
+               WHERE preorder_id=? ORDER BY position ASC, preorder_items.id ASC""",
+            (preorder_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_preorder_history(preorder_id: str) -> list[dict]:
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT * FROM preorder_status_history WHERE preorder_id=?
+               ORDER BY changed_at DESC, id DESC""",
+            (preorder_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_all_preorders(query: str | None = None, status: str | None = None) -> list[dict]:
+    """`status` filters on the computed order-level stage, so it is applied in
+    Python rather than SQL — the value does not exist as a column."""
+    where_sql = ""
+    params: list = []
+    if query:
+        where_sql = "WHERE customer_name LIKE ? OR customer_phone LIKE ? OR id IN (SELECT preorder_id FROM preorder_items WHERE product_name LIKE ?)"
+        like = f"%{query}%"
+        params = [like, like, like]
+
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            f"SELECT * FROM preorders {where_sql} ORDER BY created_at DESC", params
+        ).fetchall()]
+        items_by_order: dict[str, list[dict]] = {}
+        for item in con.execute(
+            "SELECT * FROM preorder_items ORDER BY position ASC, id ASC"
+        ).fetchall():
+            items_by_order.setdefault(item["preorder_id"], []).append(dict(item))
+
+    result = [_preorder_row(row, items_by_order.get(row["id"], [])) for row in rows]
+    if status:
+        result = [r for r in result if r["status"] == status]
+    return result
+
+
+def update_preorder(
+    preorder_id: str,
+    customer_name: str | None = None,
+    customer_phone: str | None = None,
+    items: list[dict] | None = None,
+    deposit: int | None = None,
+    notes: str | None = None,
+    update_notes: bool = False,
+    changed_by: str | None = None,
+) -> dict:
+    """Items are matched by id rather than deleted and re-inserted (the pattern
+    receipts use), because a line item owns its stage and its status history —
+    re-creating the row on every edit would silently reset both."""
+    now = _now()
+    with _conn() as con:
+        row = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Preorder {preorder_id} not found")
+        existing = dict(row)
+
+        con.execute(
+            "UPDATE preorders SET customer_name=?, customer_phone=?, deposit=?, notes=?, updated_at=? WHERE id=?",
+            (
+                customer_name if customer_name is not None else existing["customer_name"],
+                customer_phone if customer_phone is not None else existing["customer_phone"],
+                deposit if deposit is not None else existing["deposit"],
+                notes if update_notes else existing["notes"],
+                now,
+                preorder_id,
+            ),
+        )
+
+        if items is not None:
+            current = {
+                r["id"]: dict(r) for r in con.execute(
+                    "SELECT * FROM preorder_items WHERE preorder_id=?", (preorder_id,)
+                ).fetchall()
+            }
+            kept: set[int] = set()
+            for position, item in enumerate(items):
+                item_id = item.get("id")
+                if item_id is not None and item_id in current:
+                    kept.add(item_id)
+                    prev = current[item_id]
+                    new_status = item.get("status") or prev["status"]
+                    con.execute(
+                        """UPDATE preorder_items SET master_item_id=?, product_name=?, unit=?,
+                           quantity=?, unit_price=?, status=?, position=? WHERE id=?""",
+                        (
+                            item.get("master_item_id"), item["product_name"], item.get("unit"),
+                            item["quantity"], item["unit_price"], new_status, position, item_id,
+                        ),
+                    )
+                    if new_status != prev["status"]:
+                        _log_preorder_status(con, preorder_id, item_id, item["product_name"],
+                                             new_status, now, changed_by)
+                else:
+                    kept.add(_insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now))
+
+            for stale_id in set(current) - kept:
+                con.execute("DELETE FROM preorder_status_history WHERE preorder_item_id=?", (stale_id,))
+                con.execute("DELETE FROM preorder_items WHERE id=?", (stale_id,))
+
+        updated = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
+        stored = [dict(r) for r in con.execute(
+            "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
+        ).fetchall()]
+    return _preorder_row(updated, stored)
+
+
+def set_preorder_item_status(
+    preorder_id: str, item_id: int, status: str, changed_by: str | None = None
+) -> dict:
+    now = _now()
+    with _conn() as con:
+        row = con.execute(
+            "SELECT * FROM preorder_items WHERE id=? AND preorder_id=?", (item_id, preorder_id)
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Preorder item {item_id} not found")
+        item = dict(row)
+        if item["status"] != status:
+            con.execute("UPDATE preorder_items SET status=? WHERE id=?", (status, item_id))
+            con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
+            _log_preorder_status(con, preorder_id, item_id, item["product_name"], status, now, changed_by)
+        updated = dict(con.execute("SELECT * FROM preorder_items WHERE id=?", (item_id,)).fetchone())
+    return updated
+
+
+def delete_preorder(preorder_id: str) -> None:
+    with _conn() as con:
+        row = con.execute("SELECT 1 FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Preorder {preorder_id} not found")
+        con.execute("DELETE FROM preorder_status_history WHERE preorder_id=?", (preorder_id,))
+        con.execute("DELETE FROM preorder_items WHERE preorder_id=?", (preorder_id,))
+        con.execute("DELETE FROM preorders WHERE id=?", (preorder_id,))

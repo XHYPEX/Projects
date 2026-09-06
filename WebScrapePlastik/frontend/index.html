@@ -65,6 +65,12 @@
     .status-dot.is-draft   { background: #AD7A1E; }
     .status-dot.is-posted  { background: #5B7A5B; }
     .status-dot.is-void    { background: #A83B3B; }
+    /* Preorder stages, in order: noted down -> ordered -> shipping -> at the shop -> installed. */
+    .status-dot.is-pesanan_dibuat    { background: #9A938A; }
+    .status-dot.is-sudah_dipesankan  { background: #AD7A1E; }
+    .status-dot.is-dalam_pengiriman  { background: #4B6C6F; }
+    .status-dot.is-sampai_di_toko    { background: #D97757; }
+    .status-dot.is-terpasang         { background: #5B7A5B; }
 
 
     ::selection { background: #D97757; color: #FAF9F5; }
@@ -91,7 +97,8 @@
        payment status), so each gets its own class — one shared class would let
        a click in one strip clear the highlight in the other. */
     .pi-status-btn.is-active,
-    .pi-payment-btn.is-active {
+    .pi-payment-btn.is-active,
+    .po-status-btn.is-active {
       background: #D97757;
       border-color: #D97757;
       color: #FAF9F5;
@@ -250,6 +257,14 @@
           <path d="M3 7h18M6 7l1.5 10.5A2 2 0 0 0 9.48 19h5.04a2 2 0 0 0 1.98-1.5L18 7M9 11h6"/>
         </svg>
         Cashier
+      </a>
+      <a href="#/preorder" data-route="/preorder" class="nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
+          <path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/>
+          <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+          <path d="m9 13 2 2 4-4"/>
+        </svg>
+        Preorder
       </a>
       <a href="#/invoices" data-route="/invoices" class="nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
@@ -919,31 +934,167 @@
     </div>
   </div>
 
+  <!-- PAGE: PREORDER (pesanan barang yang belum ada di toko — bukan transaksi, tidak menyentuh stok) -->
+  <div id="page-preorder" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
+
+      <!-- LIST PANEL -->
+      <div id="po-list-panel">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-serif text-lg font-semibold text-ink">Preorder</h2>
+          <button onclick="newPreorderForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Preorder Baru</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Pesanan Berjalan</div>
+            <div id="po-sum-open" class="font-sans text-2xl font-semibold text-ink">0</div>
+            <div id="po-sum-total-count" class="text-xs text-muted mt-0.5">dari 0 pesanan</div>
+          </div>
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Pesanan</div>
+            <div id="po-sum-value" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
+          </div>
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Total DP Masuk</div>
+            <div id="po-sum-deposit" class="font-sans text-2xl font-semibold text-done">Rp 0</div>
+          </div>
+          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Sisa Tagihan</div>
+            <div id="po-sum-remaining" class="font-sans text-2xl font-semibold text-failed">Rp 0</div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <input id="po-search-input" type="text" placeholder="Cari nama pelanggan / no. HP / nama barang…" autocomplete="off"
+            oninput="onPreorderSearchInput()"
+            class="flex-1 min-w-[240px] border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          <div id="po-status-filters" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div class="border border-line rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. HP</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">DP</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+              </tr>
+            </thead>
+            <tbody id="po-list-tbody"></tbody>
+          </table>
+          <div id="po-list-empty" class="hidden text-center py-12">
+            <p id="po-list-empty-title" class="font-serif text-base text-ink mb-1">Belum ada preorder.</p>
+            <p id="po-list-empty-msg" class="text-sm text-muted">Catat pesanan pelanggan lewat tombol “+ Preorder Baru”.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORM PANEL -->
+      <div id="po-form-panel" class="hidden max-w-4xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 id="po-form-title" class="font-serif text-lg font-semibold text-ink">Preorder Baru</h2>
+            <p id="po-form-meta" class="hidden text-xs text-muted mt-0.5"></p>
+          </div>
+          <button onclick="backToPreorderList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label for="po-customer-name" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Pelanggan <span class="text-failed">*</span></label>
+            <input id="po-customer-name" type="text" placeholder="Nama pemesan" autocomplete="off"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
+          <div>
+            <label for="po-customer-phone" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="text-failed">*</span></label>
+            <input id="po-customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="po-notes" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan</label>
+          <input id="po-notes" type="text" placeholder="opsional — mis. warna, ukuran, janji pemasangan"
+            class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Barang Dipesan</label>
+          <button type="button" onclick="addPreorderRow()" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors">+ Tambah Baris</button>
+        </div>
+        <div id="po-item-rows" class="space-y-2 mb-4"></div>
+
+        <div class="border-t border-line pt-4 mb-4">
+          <div class="sm:ml-auto sm:max-w-sm space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-muted">Total Pesanan</span>
+              <span id="po-total-display" class="font-serif text-base font-semibold text-ink tabular-nums">Rp 0</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <label for="po-deposit" class="text-muted shrink-0">DP Dibayar (Rp)</label>
+              <input id="po-deposit" type="number" min="0" step="1" value="0" oninput="updatePreorderTotals()"
+                class="w-40 border border-line rounded-lg px-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+            </div>
+            <div class="flex items-center justify-between border-t border-line pt-2">
+              <span class="text-muted">Sisa</span>
+              <span id="po-remaining-display" class="font-serif text-base font-semibold text-failed tabular-nums">Rp 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status timeline: every stage change on every line, newest first. -->
+        <div id="po-history-section" class="hidden border border-line rounded-xl bg-bg2 px-4 py-3 mb-4">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-2">Riwayat Status</div>
+          <div id="po-history-list" class="space-y-1.5 max-h-64 overflow-y-auto"></div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+          <button id="po-delete-btn" data-armed="false" onclick="handleDeletePreorderClick(this)"
+            class="hidden admin-only px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
+          <button id="po-save-btn" onclick="savePreorder()"
+            class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- PAGE: DASHBOARD (Ringkasan — moved here from the Inventori tab bar) -->
   <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-6xl mx-auto">
 
-      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">SKU Aktif</div>
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">SKU Aktif</div>
           <div id="ov-active-sku-count" class="font-sans text-2xl font-semibold text-ink">0</div>
         </div>
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Persediaan</div>
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Nilai Persediaan</div>
           <div id="ov-total-value" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
         </div>
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Penjualan Bulan Ini</div>
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Penjualan Bulan Ini</div>
           <div id="ov-sales-month-revenue" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
           <div id="ov-sales-month-count" class="text-xs text-muted mt-0.5">0 nota</div>
         </div>
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Tagihan Tertunda</div>
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Tagihan Tertunda</div>
           <div id="ov-pending-count" class="font-sans text-2xl font-semibold text-ink">0</div>
           <div id="ov-pending-outstanding" class="text-xs text-muted mt-0.5">Rp 0 belum dibayar</div>
         </div>
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Dokumen Masuk (30 hari)</div>
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Preorder Berjalan</div>
+          <div id="ov-preorder-count" class="font-sans text-2xl font-semibold text-ink">0</div>
+          <div id="ov-preorder-outstanding" class="text-xs text-muted mt-0.5">Rp 0 sisa tagihan</div>
+        </div>
+        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Dokumen Masuk (30 hari)</div>
           <div id="ov-inbound-count" class="font-sans text-2xl font-semibold text-ink">0</div>
         </div>
       </div>
@@ -1015,6 +1166,31 @@
           </table>
           <div id="ov-low-stock-empty" class="hidden text-center py-8">
             <p class="text-sm text-muted">Tidak ada barang dengan stok menipis.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Preorder Berjalan</h2>
+          <span id="ov-preorder-caption" class="text-xs text-muted"></span>
+        </div>
+        <div class="border border-line rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. HP</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+              </tr>
+            </thead>
+            <tbody id="ov-preorder-tbody"></tbody>
+          </table>
+          <div id="ov-preorder-empty" class="hidden text-center py-8">
+            <p class="text-sm text-muted">Tidak ada preorder berjalan.</p>
           </div>
         </div>
       </div>
@@ -1812,6 +1988,7 @@ function closeDrawer() {
 const ROUTES = {
   "/scraper": { title: "Maps Scraper", page: "page-scraper" },
   "/cashier": { title: "Cashier", page: "page-cashier" },
+  "/preorder": { title: "Preorder", page: "page-preorder" },
   "/invoices": { title: "Riwayat Invoice", page: "page-invoices" },
   "/purchase-invoices": { title: "Faktur Pembelian", page: "page-purchase-invoices" },
   "/inventory": { title: "Barang Masuk", page: "page-inventory", section: "inv-tab-inbound", data: "inbound" },
@@ -1878,6 +2055,7 @@ function renderRoute() {
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
   if (route === "/dashboard") loadDashboardOverview();
+  if (route === "/preorder") { backToPreorderList(); }
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
   if (route === "/users") loadUsers();
   if (route === "/activity") initActivityPage();
@@ -1925,6 +2103,7 @@ async function init() {
   openNewReceiptTab();
   loadDashboardOverview();
   initInventory();
+  renderPreorderStatusFilters();
 }
 
 // ── Cities ────────────────────────────────────────────────────────────────────
@@ -4244,11 +4423,40 @@ function renderDashboardOverview(data) {
   document.getElementById("ov-sales-month-count").textContent = `${data.sales_month_count} nota`;
   document.getElementById("ov-pending-count").textContent = data.pending_invoice_count;
   document.getElementById("ov-pending-outstanding").textContent = `${formatIDR(data.pending_invoice_outstanding)} belum dibayar`;
+  document.getElementById("ov-preorder-count").textContent = data.preorder_open_count;
+  document.getElementById("ov-preorder-outstanding").textContent = `${formatIDR(data.preorder_outstanding)} sisa tagihan`;
+  // Orders with goods already in the shop are the ones someone has to act on today.
+  document.getElementById("ov-preorder-caption").textContent = data.preorder_ready_count > 0
+    ? `${data.preorder_ready_count} pesanan sudah sampai di toko`
+    : "belum termasuk pesanan yang sudah terpasang";
   document.getElementById("ov-low-stock-caption").textContent = `Ambang batas: stok ≤ ${data.low_stock_threshold}`;
   renderLowStockTable(data.low_stock_items || []);
   renderTopSellingTable(data.top_selling || []);
   renderLatestIncomingTable(data.latest_incoming || []);
+  renderOpenPreordersTable(data.preorders || []);
   renderPendingInvoicesTable(data.pending_invoices || []);
+}
+
+function renderOpenPreordersTable(items) {
+  const tbody = document.getElementById("ov-preorder-tbody");
+  const emptyEl = document.getElementById("ov-preorder-empty");
+  tbody.innerHTML = "";
+  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  emptyEl.classList.add("hidden");
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
+    tr.innerHTML = `
+      <td class="px-3 py-2 font-medium text-ink">${esc(item.customer_name)}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(item.customer_phone)}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-muted">${item.item_count}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatIDR(item.total)}</td>
+      <td class="px-3 py-2 text-right tabular-nums ${item.remaining > 0 ? "text-failed font-medium" : "text-muted"}">${formatIDR(item.remaining)}</td>
+      <td class="px-3 py-2">${preorderStatusBadgeHtml(item.status)}</td>
+    `;
+    tr.onclick = () => openPreorderFromDashboard(item.id);
+    tbody.appendChild(tr);
+  }
 }
 
 function renderTopSellingTable(items) {
@@ -6149,6 +6357,517 @@ function purchaseInvoicePrintHtml(inv) {
   `;
 }
 
+// ── Preorder ──────────────────────────────────────────────────────────────────
+// A preorder is a promise to a customer, not a sale: nothing here moves stock or
+// revenue. Each line carries its own stage, because one order routinely has the
+// fittings already in the shop while the pipe is still with the supplier.
+const PREORDER_STATUSES = [
+  { key: "pesanan_dibuat", label: "Pesanan dibuat" },
+  { key: "sudah_dipesankan", label: "Sudah dipesankan" },
+  { key: "dalam_pengiriman", label: "Dalam pengiriman" },
+  { key: "sampai_di_toko", label: "Sampai di toko" },
+  { key: "terpasang", label: "Terpasang" },
+];
+
+const PREORDER_STATUS_LABELS = Object.fromEntries(PREORDER_STATUSES.map(s => [s.key, s.label]));
+const PREORDER_DONE_STATUS = "terpasang";
+
+let preorderCache = [];
+let currentPreorder = null;   // full detail of the open order; null while composing a new one
+let poRowSeq = 0;
+let poStatusFilter = "";
+let poSearchQuery = "";
+let poProductSearchState = new WeakMap(); // row product input -> { results, timer }
+// Set when a dashboard row asks for a specific order; opened once the route's
+// list refresh has finished, so it is not immediately replaced by it.
+let pendingPreorderId = null;
+
+function preorderStatusLabel(status) {
+  return PREORDER_STATUS_LABELS[status] || status || "—";
+}
+
+function preorderStatusBadgeHtml(status) {
+  return `<span class="inline-flex items-center gap-1.5 text-xs text-muted whitespace-nowrap">
+    <span class="status-dot is-${esc(status)}"></span>${esc(preorderStatusLabel(status))}</span>`;
+}
+
+function renderPreorderStatusFilters() {
+  const wrap = document.getElementById("po-status-filters");
+  const chips = [{ key: "", label: "Semua" }, ...PREORDER_STATUSES];
+  wrap.innerHTML = chips.map(c => `
+    <button type="button" data-po-status="${esc(c.key)}" onclick="setPreorderStatusFilter('${esc(c.key)}')"
+      class="po-status-btn ${c.key === poStatusFilter ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">${esc(c.label)}</button>
+  `).join("");
+}
+
+function setPreorderStatusFilter(status) {
+  poStatusFilter = status;
+  document.querySelectorAll(".po-status-btn").forEach(btn => {
+    btn.classList.toggle("is-active", btn.dataset.poStatus === status);
+  });
+  loadPreorders();
+}
+
+const debouncedPreorderSearch = debounce(() => {
+  poSearchQuery = document.getElementById("po-search-input").value.trim();
+  loadPreorders();
+}, 280);
+
+function onPreorderSearchInput() {
+  debouncedPreorderSearch();
+}
+
+async function loadPreorders() {
+  const params = new URLSearchParams();
+  if (poSearchQuery) params.set("query", poSearchQuery);
+  if (poStatusFilter) params.set("status", poStatusFilter);
+  try {
+    const resp = await fetch(`/api/preorders?${params.toString()}`);
+    if (!resp.ok) throw new Error("gagal memuat");
+    preorderCache = await resp.json();
+  } catch (_) {
+    preorderCache = [];
+    showToast("Gagal memuat daftar preorder.");
+  }
+  renderPreorderSummary(preorderCache);
+  renderPreorderList(preorderCache);
+}
+
+// Summary is computed from the rows already on screen rather than a dedicated
+// endpoint — the list is small and this keeps the tiles honest about the filter.
+function renderPreorderSummary(rows) {
+  const open = rows.filter(r => r.status !== PREORDER_DONE_STATUS);
+  const sum = (arr, key) => arr.reduce((acc, r) => acc + r[key], 0);
+  document.getElementById("po-sum-open").textContent = open.length;
+  document.getElementById("po-sum-total-count").textContent = `dari ${rows.length} pesanan`;
+  document.getElementById("po-sum-value").textContent = formatIDR(sum(rows, "total"));
+  document.getElementById("po-sum-deposit").textContent = formatIDR(sum(rows, "deposit"));
+  document.getElementById("po-sum-remaining").textContent = formatIDR(sum(open, "remaining"));
+}
+
+function renderPreorderList(rows) {
+  const tbody = document.getElementById("po-list-tbody");
+  const emptyEl = document.getElementById("po-list-empty");
+  tbody.innerHTML = "";
+
+  if (rows.length === 0) {
+    const filtered = Boolean(poSearchQuery || poStatusFilter);
+    document.getElementById("po-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada preorder.";
+    document.getElementById("po-list-empty-msg").textContent = filtered
+      ? "Coba kata kunci lain atau pilih status “Semua”."
+      : "Catat pesanan pelanggan lewat tombol “+ Preorder Baru”.";
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
+
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
+    tr.innerHTML = `
+      <td class="px-3 py-2 font-medium text-ink">${esc(r.customer_name)}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(r.customer_phone)}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatDateTimeSeconds(r.created_at))}</td>
+      <td class="px-3 py-2 text-right text-muted tabular-nums">${r.item_count}</td>
+      <td class="px-3 py-2 text-right text-ink tabular-nums">${formatIDR(r.total)}</td>
+      <td class="px-3 py-2 text-right text-done tabular-nums">${formatIDR(r.deposit)}</td>
+      <td class="px-3 py-2 text-right tabular-nums ${r.remaining > 0 ? "text-failed" : "text-muted"}">${formatIDR(r.remaining)}</td>
+      <td class="px-3 py-2">${preorderStatusBadgeHtml(r.status)}</td>
+    `;
+    tr.onclick = () => openPreorder(r.id);
+    tbody.appendChild(tr);
+  }
+}
+
+function showPreorderList() {
+  document.getElementById("po-list-panel").classList.remove("hidden");
+  document.getElementById("po-form-panel").classList.add("hidden");
+}
+
+function showPreorderForm() {
+  document.getElementById("po-list-panel").classList.add("hidden");
+  document.getElementById("po-form-panel").classList.remove("hidden");
+}
+
+async function backToPreorderList() {
+  currentPreorder = null;
+  resetPreorderArmButtons();
+  showPreorderList();
+  await loadPreorders();
+  if (pendingPreorderId) {
+    const id = pendingPreorderId;
+    pendingPreorderId = null;
+    openPreorder(id);
+  }
+}
+
+// Jumps from the Dashboard straight into one order. The hash change drives
+// renderRoute -> backToPreorderList, which then honours pendingPreorderId.
+function openPreorderFromDashboard(preorderId) {
+  pendingPreorderId = preorderId;
+  if (currentRoute() === "/preorder") backToPreorderList();
+  else location.hash = "/preorder";
+}
+
+function newPreorderForm() {
+  currentPreorder = null;
+  resetPreorderArmButtons();
+  document.getElementById("po-form-title").textContent = "Preorder Baru";
+  document.getElementById("po-form-meta").classList.add("hidden");
+  document.getElementById("po-customer-name").value = "";
+  document.getElementById("po-customer-phone").value = "";
+  document.getElementById("po-notes").value = "";
+  document.getElementById("po-deposit").value = 0;
+  document.getElementById("po-item-rows").innerHTML = "";
+  document.getElementById("po-history-section").classList.add("hidden");
+  document.getElementById("po-delete-btn").classList.add("hidden");
+  addPreorderRow();
+  updatePreorderTotals();
+  showPreorderForm();
+  document.getElementById("po-customer-name").focus();
+}
+
+async function openPreorder(preorderId) {
+  let detail;
+  try {
+    const resp = await fetch(`/api/preorders/${preorderId}`);
+    if (!resp.ok) throw new Error("gagal memuat");
+    detail = await resp.json();
+  } catch (_) {
+    showToast("Gagal membuka preorder.");
+    return;
+  }
+  renderPreorderDetail(detail);
+}
+
+function renderPreorderDetail(detail) {
+  currentPreorder = detail;
+  resetPreorderArmButtons();
+  document.getElementById("po-form-title").textContent = detail.customer_name;
+  const meta = document.getElementById("po-form-meta");
+  meta.textContent = `Dibuat ${formatDateTimeSeconds(detail.created_at)} · terakhir diubah ${formatDateTimeSeconds(detail.updated_at)}`;
+  meta.classList.remove("hidden");
+  document.getElementById("po-customer-name").value = detail.customer_name;
+  document.getElementById("po-customer-phone").value = detail.customer_phone;
+  document.getElementById("po-notes").value = detail.notes || "";
+  document.getElementById("po-deposit").value = detail.deposit;
+  document.getElementById("po-item-rows").innerHTML = "";
+  for (const item of detail.items) addPreorderRow(item);
+  renderPreorderHistory(detail.history);
+  document.getElementById("po-delete-btn").classList.remove("hidden");
+  updatePreorderTotals();
+  showPreorderForm();
+}
+
+function renderPreorderHistory(history) {
+  const section = document.getElementById("po-history-section");
+  const list = document.getElementById("po-history-list");
+  if (!history || history.length === 0) {
+    section.classList.add("hidden");
+    list.innerHTML = "";
+    return;
+  }
+  list.innerHTML = history.map(h => `
+    <div class="flex flex-wrap items-baseline gap-x-2 text-xs">
+      <span class="status-dot is-${esc(h.status)}"></span>
+      <span class="text-ink">${esc(h.product_name)}</span>
+      <span class="text-muted">→ ${esc(preorderStatusLabel(h.status))}</span>
+      <span class="text-muted/80 tabular-nums ml-auto">${esc(formatDateTimeSeconds(h.changed_at))}${h.changed_by ? " · " + esc(h.changed_by) : ""}</span>
+    </div>
+  `).join("");
+  section.classList.remove("hidden");
+}
+
+// ── Preorder: line items ─────────────────────────────────────────────────────
+function preorderRowTemplate() {
+  const statusOptions = PREORDER_STATUSES
+    .map(s => `<option value="${esc(s.key)}">${esc(s.label)}</option>`).join("");
+  return `
+    <div class="flex flex-wrap items-start gap-2">
+      <div class="relative flex-1 min-w-[180px]">
+        <input type="text" autocomplete="off" placeholder="Nama barang (cari master / ketik bebas)"
+          class="po-row-product w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+          oninput="onPoProductInput(this)" onfocus="onPoProductInput(this)" onblur="onPoProductBlur(this)" />
+        <div class="po-row-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+      </div>
+      <input type="text" placeholder="Satuan"
+        class="po-row-unit w-24 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      <input type="number" min="1" step="1" placeholder="Unit" value="1"
+        class="po-row-qty w-20 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+        oninput="updatePreorderTotals()" />
+      <input type="number" min="0" step="1" placeholder="Harga" value="0"
+        class="po-row-price w-32 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+        oninput="updatePreorderTotals()" />
+      <select class="po-row-status w-44 border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+        onchange="onPoRowStatusChange(this)">${statusOptions}</select>
+      <div class="po-row-total w-28 px-2 py-2 text-sm text-right tabular-nums text-muted">Rp 0</div>
+      <button type="button" onclick="removePreorderRow(this)" title="Hapus baris"
+        class="po-row-remove px-2.5 py-2 border border-line rounded-lg text-sm text-muted hover:text-failed hover:border-failed transition-colors">&times;</button>
+    </div>
+    <div class="po-row-meta hidden text-[11px] text-muted mt-1"></div>
+  `;
+}
+
+function addPreorderRow(prefill) {
+  const rowId = ++poRowSeq;
+  const div = document.createElement("div");
+  div.className = "po-item-row border border-line rounded-lg p-3";
+  div.dataset.rowId = rowId;
+  div.dataset.masterItemId = "";
+  div.dataset.itemId = "";
+  div.innerHTML = preorderRowTemplate();
+  document.getElementById("po-item-rows").appendChild(div);
+  if (prefill) {
+    div.dataset.itemId = prefill.id != null ? String(prefill.id) : "";
+    div.dataset.masterItemId = prefill.master_item_id != null ? String(prefill.master_item_id) : "";
+    div.querySelector(".po-row-product").value = prefill.product_name || "";
+    div.querySelector(".po-row-unit").value = prefill.unit || "";
+    div.querySelector(".po-row-qty").value = prefill.quantity;
+    div.querySelector(".po-row-price").value = prefill.unit_price;
+    div.querySelector(".po-row-status").value = prefill.status;
+    setPoRowMeta(div, prefill.sku);
+  }
+  updatePreorderTotals();
+  return div;
+}
+
+function removePreorderRow(btnEl) {
+  btnEl.closest(".po-item-row").remove();
+  updatePreorderTotals();
+}
+
+function setPoRowMeta(rowEl, sku) {
+  const meta = rowEl.querySelector(".po-row-meta");
+  if (sku) {
+    meta.innerHTML = `<span class="font-mono text-done">${esc(sku)}</span> · tertaut ke Master Barang`;
+    meta.classList.remove("hidden");
+  } else {
+    meta.textContent = "";
+    meta.classList.add("hidden");
+  }
+}
+
+function poRowDropdown(inputEl) {
+  return inputEl.parentElement.querySelector(".po-row-dropdown");
+}
+
+function onPoProductInput(inputEl) {
+  const rowEl = inputEl.closest(".po-item-row");
+  rowEl.dataset.masterItemId = ""; // typing detaches any previous master link
+  setPoRowMeta(rowEl, null);
+  const query = inputEl.value.trim();
+  const state = poProductSearchState.get(inputEl) || {};
+  clearTimeout(state.timer);
+  if (!query) {
+    poRowDropdown(inputEl).classList.add("hidden");
+    poProductSearchState.set(inputEl, state);
+    return;
+  }
+  state.timer = setTimeout(() => searchPoProducts(inputEl, query), 200);
+  poProductSearchState.set(inputEl, state);
+}
+
+function onPoProductBlur(inputEl) {
+  // Delay so an option's click lands before the dropdown is torn down.
+  setTimeout(() => poRowDropdown(inputEl).classList.add("hidden"), 150);
+}
+
+async function searchPoProducts(inputEl, query) {
+  let results = [];
+  try {
+    const resp = await fetch(`/api/inventory/master-items/autocomplete?query=${encodeURIComponent(query)}&limit=8`);
+    if (resp.ok) results = await resp.json();
+  } catch (_) {}
+  if (inputEl.value.trim() !== query) return; // stale response, user kept typing
+  poProductSearchState.set(inputEl, { results });
+  const dd = poRowDropdown(inputEl);
+  if (results.length === 0) {
+    dd.innerHTML = `<div class="px-3 py-2 text-xs text-muted">Tidak ada di Master Barang — teks bebas tetap bisa dipakai.</div>`;
+  } else {
+    dd.innerHTML = results.map((item, idx) => `
+      <button type="button" data-idx="${idx}" onmousedown="event.preventDefault()" onclick="choosePoProduct(this)"
+        class="w-full text-left px-3 py-2 hover:bg-bg2 transition-colors border-b border-line last:border-b-0">
+        <div class="text-sm text-ink">${esc(item.name)}</div>
+        <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
+          <span class="font-mono">${esc(item.sku)}</span>
+          <span>· ${esc(item.unit)}</span>
+          <span>· Jual ${formatIDR(item.sell_price)}</span>
+        </div>
+      </button>
+    `).join("");
+  }
+  dd.classList.remove("hidden");
+}
+
+function choosePoProduct(btnEl) {
+  const dd = btnEl.closest(".po-row-dropdown");
+  const inputEl = dd.parentElement.querySelector(".po-row-product");
+  const rowEl = inputEl.closest(".po-item-row");
+  const item = poProductSearchState.get(inputEl)?.results?.[parseInt(btnEl.dataset.idx, 10)];
+  if (!item) return;
+  rowEl.dataset.masterItemId = String(item.id);
+  inputEl.value = item.name;
+  rowEl.querySelector(".po-row-unit").value = item.unit || "";
+  const priceEl = rowEl.querySelector(".po-row-price");
+  // The customer is quoted the selling price, not what the shop pays for it.
+  if (!parseInt(priceEl.value, 10) && item.sell_price) priceEl.value = item.sell_price;
+  setPoRowMeta(rowEl, item.sku);
+  dd.classList.add("hidden");
+  updatePreorderTotals();
+}
+
+// A stage change on a saved order posts on the spot rather than waiting for
+// Simpan: "barangnya sudah sampai" is the most frequent action on this page, and
+// it is what writes the timeline entry.
+async function onPoRowStatusChange(selectEl) {
+  const rowEl = selectEl.closest(".po-item-row");
+  const itemId = rowEl.dataset.itemId;
+  if (!currentPreorder || !itemId) return; // unsaved row — the value rides along with Simpan
+  const status = selectEl.value;
+  try {
+    const resp = await fetch(`/api/preorders/${currentPreorder.id}/items/${itemId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || "Gagal mengubah status");
+    }
+    const detail = await resp.json();
+    currentPreorder = detail;
+    renderPreorderHistory(detail.history);
+    document.getElementById("po-form-meta").textContent =
+      `Dibuat ${formatDateTimeSeconds(detail.created_at)} · terakhir diubah ${formatDateTimeSeconds(detail.updated_at)}`;
+    showToast(`Status “${rowEl.querySelector(".po-row-product").value}” → ${preorderStatusLabel(status)}`, "success");
+  } catch (e) {
+    showToast(e.message);
+    // Put the dropdown back to what the server still holds.
+    const stored = currentPreorder.items.find(i => String(i.id) === itemId);
+    if (stored) selectEl.value = stored.status;
+  }
+}
+
+function preorderRowValues() {
+  return [...document.querySelectorAll("#po-item-rows .po-item-row")].map(rowEl => ({
+    id: rowEl.dataset.itemId ? parseInt(rowEl.dataset.itemId, 10) : null,
+    master_item_id: rowEl.dataset.masterItemId ? parseInt(rowEl.dataset.masterItemId, 10) : null,
+    product_name: rowEl.querySelector(".po-row-product").value.trim(),
+    unit: rowEl.querySelector(".po-row-unit").value.trim() || null,
+    quantity: parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 0,
+    unit_price: parseInt(rowEl.querySelector(".po-row-price").value, 10) || 0,
+    status: rowEl.querySelector(".po-row-status").value,
+    rowEl,
+  }));
+}
+
+function updatePreorderTotals() {
+  let total = 0;
+  for (const row of preorderRowValues()) {
+    const lineTotal = row.quantity * row.unit_price;
+    total += lineTotal;
+    row.rowEl.querySelector(".po-row-total").textContent = formatIDR(lineTotal);
+  }
+  const deposit = parseInt(document.getElementById("po-deposit").value, 10) || 0;
+  const remaining = Math.max(total - deposit, 0);
+  document.getElementById("po-total-display").textContent = formatIDR(total);
+  const remainingEl = document.getElementById("po-remaining-display");
+  remainingEl.textContent = formatIDR(remaining);
+  remainingEl.classList.toggle("text-failed", remaining > 0);
+  remainingEl.classList.toggle("text-done", remaining === 0 && total > 0);
+}
+
+function collectPreorderPayload() {
+  const items = preorderRowValues()
+    .filter(r => r.product_name)
+    .map(({ rowEl, ...item }) => item);
+  return {
+    customer_name: document.getElementById("po-customer-name").value.trim(),
+    customer_phone: document.getElementById("po-customer-phone").value.trim(),
+    notes: document.getElementById("po-notes").value.trim() || null,
+    deposit: parseInt(document.getElementById("po-deposit").value, 10) || 0,
+    items,
+  };
+}
+
+function validatePreorderPayload(payload) {
+  if (!payload.customer_name) return "Nama pelanggan wajib diisi.";
+  if (!payload.customer_phone) return "Nomor HP wajib diisi.";
+  if (payload.items.length === 0) return "Isi minimal satu barang.";
+  for (const item of payload.items) {
+    if (item.quantity <= 0) return `Jumlah unit untuk “${item.product_name}” harus lebih dari 0.`;
+    if (item.unit_price < 0) return `Harga untuk “${item.product_name}” tidak boleh minus.`;
+  }
+  return null;
+}
+
+async function savePreorder() {
+  const payload = collectPreorderPayload();
+  const error = validatePreorderPayload(payload);
+  if (error) {
+    showToast(error);
+    return;
+  }
+  const btn = document.getElementById("po-save-btn");
+  btn.disabled = true;
+  try {
+    const editing = Boolean(currentPreorder);
+    const resp = await fetch(editing ? `/api/preorders/${currentPreorder.id}` : "/api/preorders", {
+      method: editing ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || "Gagal menyimpan preorder");
+    }
+    const detail = await resp.json();
+    renderPreorderDetail(detail);
+    showToast(editing ? "Preorder diperbarui." : "Preorder tersimpan.", "success");
+  } catch (e) {
+    showToast(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Delete is a two-click arm/confirm, same as the other destructive buttons.
+function handleDeletePreorderClick(btnEl) {
+  if (btnEl.dataset.armed === "true") {
+    resetPreorderArmButtons();
+    deletePreorder();
+    return;
+  }
+  btnEl.dataset.armed = "true";
+  btnEl.textContent = "Yakin hapus?";
+  btnEl.classList.add("bg-failed", "text-bg");
+  btnEl._poArmTimer = setTimeout(() => resetPreorderArmButtons(), 4000);
+}
+
+function resetPreorderArmButtons() {
+  const btn = document.getElementById("po-delete-btn");
+  if (!btn) return;
+  clearTimeout(btn._poArmTimer);
+  btn.dataset.armed = "false";
+  btn.textContent = "Hapus";
+  btn.classList.remove("bg-failed", "text-bg");
+}
+
+async function deletePreorder() {
+  if (!currentPreorder) return;
+  try {
+    const resp = await fetch(`/api/preorders/${currentPreorder.id}`, { method: "DELETE" });
+    if (!resp.ok && resp.status !== 204) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || "Gagal menghapus preorder");
+    }
+    showToast("Preorder dihapus.", "success");
+    backToPreorderList();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
 // ── Users (admin) ─────────────────────────────────────────────────────────────
 let usersCache = [];
 
@@ -6311,7 +7030,7 @@ const activityState = { page: 1, pageSize: 50, total: 0, actorsLoaded: false };
 
 const ENTITY_LABELS = {
   receipt: "Nota penjualan", master_item: "Barang", inbound_document: "Barang masuk",
-  purchase_invoice: "Faktur pembelian", supplier: "Supplier", brand: "Merek",
+  purchase_invoice: "Faktur pembelian", preorder: "Preorder", supplier: "Supplier", brand: "Merek",
   unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Login / logout",
   scrape: "Scraper", job: "Job scraper",
 };

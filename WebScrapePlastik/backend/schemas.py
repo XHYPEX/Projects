@@ -51,6 +51,9 @@ class ReceiptRequest(BaseModel):
     items: list[ReceiptItemRequest]
     discount: int = 0
     amount_paid: int = 0
+    # When the cashier opened this transaction. Server-sanitised on create and
+    # never accepted on update -- see _sanitize_started_at / update_receipt.
+    started_at: str | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
 
 
@@ -101,6 +104,7 @@ class ReceiptOut(BaseModel):
     amount_paid: int
     status: str
     created_at: str
+    started_at: str | None = None
     item_count: int
 
 

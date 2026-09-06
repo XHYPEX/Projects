@@ -92,5 +92,24 @@ Variabel lingkungan:
 | `SCRAPER_ENABLED` | `false` | Google Maps scraper (lihat `backend/config.py`) |
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` kalau diakses lewat HTTPS |
 
+### Update otomatis di komputer klien
+
+`Start.bat` melakukan `git fetch` + `git reset --hard origin/main` setiap kali
+dijalankan — bukan `git pull`. `git pull` akan **gagal** begitu ada perubahan
+lokal sekecil apa pun, dan komputer klien diam-diam berhenti mendapat update.
+`reset --hard` membuang perubahan lokal sehingga update tidak pernah macet.
+
+Aman karena database ada di luar folder repo, dan `reset --hard` tidak menyentuh
+file untracked (`.venv/`, `results/`). **Jangan tambahkan `git clean`** — itu
+akan menghapus `.venv/` dan memaksa pemasangan ulang tiap kali aplikasi dibuka.
+
+Di komputer developer, buat file kosong `.no-auto-update` di folder aplikasi
+untuk mematikan update otomatis:
+
+```bash
+touch .no-auto-update      # macOS/Linux
+type nul > .no-auto-update  # Windows
+```
+
 Docker masih tersedia (`docker compose up -d --build`) untuk deployment server;
 `Start.bat` ditujukan untuk pemakaian lokal satu komputer.

@@ -66,11 +66,6 @@
     .status-dot.is-posted  { background: #5B7A5B; }
     .status-dot.is-void    { background: #A83B3B; }
 
-    .inv-tab-btn.is-active {
-      background: #D97757;
-      border-color: #D97757;
-      color: #FAF9F5;
-    }
 
     ::selection { background: #D97757; color: #FAF9F5; }
 
@@ -198,6 +193,19 @@
         left: 0;
       }
 
+      /* Batch printing needs each label on its own 58x40mm page. Page breaks
+         inside an absolutely-positioned box are unreliable, so batch mode drops
+         the print area back into normal flow and removes the app shell from the
+         layout entirely (visibility:hidden alone still reserves its space, which
+         would push the first label off the page). */
+      body.print-barcode-batch > *:not(#barcode-print-area) { display: none !important; }
+      body.print-barcode-batch #barcode-print-area {
+        position: static;
+        display: block;
+      }
+      body.print-barcode-batch .barcode-label { break-after: page; page-break-after: always; }
+      body.print-barcode-batch .barcode-label:last-child { break-after: auto; page-break-after: auto; }
+
       body.print-invoice #pi-print-area,
       body.print-invoice #pi-print-area * { visibility: visible; }
       body.print-invoice #pi-print-area {
@@ -258,7 +266,7 @@
         Faktur Pembelian
       </a>
       <div>
-        <button type="button" onclick="toggleInventoryNavGroup()" data-route="/inventory"
+        <button type="button" onclick="toggleInventoryNavGroup()" data-route="/inventory-group"
           class="nav-link w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
             <path d="M21 8l-9-5-9 5 9 5 9-5Z"/>
@@ -271,15 +279,15 @@
           </svg>
         </button>
         <div id="nav-inventory-submenu" class="hidden ml-8 pl-3 mt-0.5 py-0.5 border-l border-line space-y-0.5">
-          <a href="#/inventory" data-inv-tab="inbound" onclick="navigateInventoryTab(event, 'inbound')"
+          <a href="#/inventory" data-route="/inventory"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Barang Masuk</a>
-          <a href="#/inventory" data-inv-tab="master" onclick="navigateInventoryTab(event, 'master')"
+          <a href="#/master-barang" data-route="/master-barang"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Barang</a>
-          <a href="#/inventory" data-inv-tab="brand" onclick="navigateInventoryTab(event, 'brand')"
+          <a href="#/master-brand" data-route="/master-brand"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Brand</a>
-          <a href="#/inventory" data-inv-tab="supplier" onclick="navigateInventoryTab(event, 'supplier')"
+          <a href="#/master-supplier" data-route="/master-supplier"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Supplier</a>
-          <a href="#/inventory" data-inv-tab="unit" onclick="navigateInventoryTab(event, 'unit')"
+          <a href="#/master-satuan" data-route="/master-satuan"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors">Master Satuan</a>
         </div>
       </div>
@@ -296,6 +304,12 @@
           <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
         Pengguna
+      </a>
+      <a href="#/activity" data-route="/activity" class="admin-only nav-link flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+        </svg>
+        Log Aktivitas
       </a>
     </div>
   </nav>
@@ -512,6 +526,35 @@
                inbound-document void/posted banner (#inbound-readonly-banner) — void has
                no unvoid path, so the whole form locks once this shows. -->
           <div id="cashier-void-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted">This receipt has been voided and can no longer be edited.</div>
+
+          <!-- Waktu transaksi: recorded automatically, never editable. Both fields
+               are readonly AND disabled, and are excluded from the payload the form
+               collects -- the server sets created_at and sanitises started_at. -->
+          <div class="mb-5">
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Waktu Transaksi</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <div class="relative">
+                  <input id="receipt-started-at" type="text" readonly disabled tabindex="-1" data-no-uppercase
+                    class="w-full border border-line rounded-lg pl-3 pr-9 py-2 text-sm bg-bg2 text-muted tabular-nums cursor-not-allowed focus:outline-none" />
+                  <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-muted/70 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                  </svg>
+                </div>
+                <p class="text-[10px] text-muted mt-1">Mulai transaksi</p>
+              </div>
+              <div>
+                <div class="relative">
+                  <input id="receipt-created-at" type="text" readonly disabled tabindex="-1" data-no-uppercase
+                    class="w-full border border-line rounded-lg pl-3 pr-9 py-2 text-sm bg-bg2 text-muted tabular-nums cursor-not-allowed focus:outline-none" />
+                  <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-muted/70 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+                  </svg>
+                </div>
+                <p id="receipt-created-at-label" class="text-[10px] text-muted mt-1">Waktu simpan</p>
+              </div>
+            </div>
+          </div>
 
           <!-- Plate number -->
           <div class="mb-5">
@@ -1030,23 +1073,76 @@
     </div>
   </div>
 
+  <!-- PAGE: AKTIVITAS (admin-only audit trail) -->
+  <div id="page-activity" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-serif text-lg font-semibold text-ink">Log Aktivitas</h2>
+        <span id="activity-total" class="text-xs text-muted"></span>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mb-4">
+        <input id="activity-search" type="text" placeholder="Cari aksi, nama, atau alamat…" oninput="debouncedActivitySearch()"
+          class="flex-1 min-w-56 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <select id="activity-filter-user" onchange="reloadActivity()"
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+          <option value="">Semua pengguna</option>
+        </select>
+        <select id="activity-filter-entity" onchange="reloadActivity()"
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+          <option value="">Semua jenis</option>
+          <option value="receipt">Nota penjualan</option>
+          <option value="master_item">Barang</option>
+          <option value="inbound_document">Barang masuk</option>
+          <option value="purchase_invoice">Faktur pembelian</option>
+          <option value="supplier">Supplier</option>
+          <option value="brand">Merek</option>
+          <option value="unit">Satuan</option>
+          <option value="stock">Penyesuaian stok</option>
+          <option value="user">Pengguna</option>
+          <option value="auth">Login / logout</option>
+        </select>
+        <input id="activity-date-from" type="date" onchange="reloadActivity()" data-no-uppercase
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <input id="activity-date-to" type="date" onchange="reloadActivity()" data-no-uppercase
+          class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <label class="flex items-center gap-2 px-3 py-2 border border-line rounded-lg text-sm text-ink cursor-pointer hover:bg-bg2 transition-colors">
+          <input id="activity-failures-only" type="checkbox" onchange="reloadActivity()" class="accent-accent" />
+          Gagal saja
+        </label>
+      </div>
+
+      <div class="border border-line rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap">Waktu</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pengguna</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aktivitas</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+              </tr>
+            </thead>
+            <tbody id="activity-tbody"></tbody>
+          </table>
+        </div>
+        <div id="activity-empty" class="hidden text-center py-10">
+          <p class="text-sm text-muted">Belum ada aktivitas tercatat.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-3">
+        <button id="activity-prev" onclick="activityPage(-1)" class="px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">&larr; Sebelumnya</button>
+        <span id="activity-page-label" class="text-xs text-muted"></span>
+        <button id="activity-next" onclick="activityPage(1)" class="px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Berikutnya &rarr;</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PAGE: BARANG MASUK / MASTER BARANG (inventory module — Bahasa Indonesia UI labels, intentionally, per module scope) -->
   <div id="page-inventory" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-6xl mx-auto">
-
-      <!-- Tab switcher -->
-      <div class="flex flex-wrap gap-2 mb-5">
-        <button type="button" data-tab="inbound" onclick="switchInventoryTab('inbound')"
-          class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Barang Masuk</button>
-        <button type="button" data-tab="master" onclick="switchInventoryTab('master')"
-          class="inv-tab-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Barang</button>
-        <button type="button" data-tab="brand" onclick="switchInventoryTab('brand')"
-          class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Brand</button>
-        <button type="button" data-tab="supplier" onclick="switchInventoryTab('supplier')"
-          class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Supplier</button>
-        <button type="button" data-tab="unit" onclick="switchInventoryTab('unit')"
-          class="inv-tab-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Master Satuan</button>
-      </div>
 
       <!-- TAB: BARANG MASUK (inbound documents) -->
       <section id="inv-tab-inbound" class="hidden">
@@ -1054,7 +1150,10 @@
         <div id="inbound-list-panel">
           <div class="flex items-center justify-between mb-4">
             <h2 class="font-serif text-lg font-semibold text-ink">Dokumen Barang Masuk</h2>
-            <button onclick="newInboundForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Dokumen Baru</button>
+            <div class="flex items-center gap-2">
+              <button onclick="openManualBarcodeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Barcode Manual</button>
+              <button onclick="newInboundForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Dokumen Baru</button>
+            </div>
           </div>
           <div class="border border-line rounded-xl overflow-hidden">
             <table class="w-full text-sm">
@@ -1078,7 +1177,11 @@
         <div id="inbound-form-panel" class="hidden max-w-4xl">
           <div class="flex items-center justify-between mb-4">
             <h2 id="inbound-form-title" class="font-serif text-lg font-semibold text-ink">Dokumen Baru</h2>
-            <button onclick="backToInboundList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+            <div class="flex items-center gap-3">
+              <button id="inbound-barcode-btn" onclick="printInboundBarcodes()"
+                class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Cetak Barcode</button>
+              <button onclick="backToInboundList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+            </div>
           </div>
 
           <div id="inbound-readonly-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted"></div>
@@ -1333,7 +1436,7 @@
             </div>
             <div>
               <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Barang</label>
-              <input id="new-item-name" type="text" oninput="forceUppercaseInput(this); debouncedNewItemSkuPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <input id="new-item-name" type="text" oninput="debouncedNewItemSkuPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
             <div id="new-item-sku-badge" class="text-xs text-muted min-h-[1rem]"></div>
             <div class="flex gap-3">
@@ -1495,6 +1598,51 @@ let resultsLoaded = false;
 let cityData = {};
 let plateCodes = {};
 
+// ── Enforced UPPERCASE input ─────────────────────────────────────────────────
+// Every text field stores what the user typed in capitals, so the same product
+// never gets entered three different ways. This transforms the real value (not
+// just its appearance via CSS text-transform) so what reaches the API is
+// already normalised.
+//
+// Runs in the capture phase, i.e. before the element's own oninput handlers, so
+// searches, comboboxes and autocompletes all see the uppercased value.
+//
+// Excluded: passwords and usernames. Uppercasing a credential silently changes
+// it -- existing accounts were created with lowercase usernames and bcrypt
+// hashes are case-sensitive, so forcing caps there would lock people out.
+const UPPERCASE_SKIP_TYPES = new Set([
+  "password", "email", "url", "date", "datetime-local", "month", "week", "time",
+  "number", "range", "color", "file", "checkbox", "radio", "hidden", "submit", "button",
+]);
+
+function shouldUppercase(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag !== "INPUT" && tag !== "TEXTAREA") return false;
+  if (el.dataset.noUppercase !== undefined) return false;
+  if (tag === "INPUT" && UPPERCASE_SKIP_TYPES.has((el.type || "text").toLowerCase())) return false;
+  if (el.autocomplete === "username" || el.autocomplete === "current-password" || el.autocomplete === "new-password") return false;
+  return true;
+}
+
+document.addEventListener("input", (event) => {
+  const el = event.target;
+  if (!shouldUppercase(el)) return;
+  const before = el.value;
+  const upper = before.toUpperCase();
+  if (upper === before) return;
+  // Preserve the caret. toUpperCase is length-preserving for the characters
+  // this app takes, but a few (e.g. "ß" -> "SS") are not; restoring the old
+  // offsets after a length change would put the cursor in the wrong place, so
+  // only restore when the length held.
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  el.value = upper;
+  if (start !== null && upper.length === before.length) {
+    try { el.setSelectionRange(start, end); } catch (_) {}
+  }
+}, true);
+
 // ── Auth: setup / login / logout ─────────────────────────────────────────────
 function isAdmin() {
   return currentUser?.role === "admin";
@@ -1519,7 +1667,7 @@ function showAuthOverlay(mode) {
       <div class="space-y-3">
         <div>
           <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Username</label>
-          <input id="setup-username" type="text" autocomplete="username"
+          <input id="setup-username" type="text" data-no-uppercase autocomplete="username"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         </div>
         <div>
@@ -1538,7 +1686,7 @@ function showAuthOverlay(mode) {
       <div class="space-y-3">
         <div>
           <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Username</label>
-          <input id="login-username" type="text" autocomplete="username"
+          <input id="login-username" type="text" data-no-uppercase autocomplete="username"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         </div>
         <div>
@@ -1658,17 +1806,34 @@ function closeDrawer() {
 }
 
 // ── Routing ───────────────────────────────────────────────────────────────────
+// The inventory routes share one page element and differ only by which section
+// inside it is shown. They used to be tabs on a single /inventory route, which
+// duplicated the sidebar submenu; each is now its own route with its own URL.
 const ROUTES = {
   "/scraper": { title: "Maps Scraper", page: "page-scraper" },
   "/cashier": { title: "Cashier", page: "page-cashier" },
   "/invoices": { title: "Riwayat Invoice", page: "page-invoices" },
   "/purchase-invoices": { title: "Faktur Pembelian", page: "page-purchase-invoices" },
-  "/inventory": { title: "Inventori", page: "page-inventory" },
+  "/inventory": { title: "Barang Masuk", page: "page-inventory", section: "inv-tab-inbound", data: "inbound" },
+  "/master-barang": { title: "Master Barang", page: "page-inventory", section: "inv-tab-master", data: "master" },
+  "/master-brand": { title: "Master Brand", page: "page-inventory", section: "inv-tab-brand", data: "brand" },
+  "/master-supplier": { title: "Master Supplier", page: "page-inventory", section: "inv-tab-supplier", data: "supplier" },
+  "/master-satuan": { title: "Master Satuan", page: "page-inventory", section: "inv-tab-unit", data: "unit" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
   "/users": { title: "Pengguna", page: "page-users" },
+  "/activity": { title: "Log Aktivitas", page: "page-activity" },
 };
 
-const ADMIN_ONLY_ROUTES = new Set(["/users"]);
+const INVENTORY_ROUTES = new Set(
+  Object.keys(ROUTES).filter(r => ROUTES[r].section)
+);
+
+// Set by goToInventoryRoute() so a follow-up action (open this document/item)
+// runs *after* renderRoute has refreshed the route's list panel, instead of
+// being immediately undone by it.
+let pendingInventoryAction = null;
+
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
 // #page-scraper; it just stops being reachable.
@@ -1688,20 +1853,34 @@ function renderRoute() {
   const route = currentRoute();
   const { title, page } = ROUTES[route];
 
-  for (const key of Object.keys(ROUTES)) {
-    document.getElementById(ROUTES[key].page).classList.toggle("hidden", ROUTES[key].page !== page);
+  // Several routes share #page-inventory, so toggle each page id once rather
+  // than once per route -- otherwise the last route in the loop wins and the
+  // inventory page is hidden on its own routes.
+  for (const id of new Set(Object.values(ROUTES).map(r => r.page))) {
+    document.getElementById(id).classList.toggle("hidden", id !== page);
+  }
+  const section = ROUTES[route].section;
+  if (section) {
+    for (const r of INVENTORY_ROUTES) {
+      document.getElementById(ROUTES[r].section).classList.toggle("hidden", ROUTES[r].section !== section);
+    }
+    currentInventoryTab = ROUTES[route].data;
+    refreshInventoryTab(ROUTES[route].data);
   }
   document.getElementById("topbar-title").textContent = title;
   document.querySelectorAll(".nav-link").forEach(el => {
     el.classList.toggle("is-active", el.dataset.route === route);
   });
-  if (route === "/inventory") {
+  if (INVENTORY_ROUTES.has(route)) {
+    // Keep the parent "Inventori" entry lit on every one of its child routes.
+    document.querySelector('.nav-link[data-route="/inventory-group"]')?.classList.add("is-active");
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
   if (route === "/dashboard") loadDashboardOverview();
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
   if (route === "/users") loadUsers();
+  if (route === "/activity") initActivityPage();
   if (route === "/invoices") {
     document.getElementById("history-search-input").value = "";
     historyStatusFilter = "";
@@ -1712,6 +1891,12 @@ function renderRoute() {
   }
   updateInventoryNavHighlight();
   closeDrawer();
+
+  if (pendingInventoryAction) {
+    const fn = pendingInventoryAction;
+    pendingInventoryAction = null;
+    fn();
+  }
 }
 
 // ── Drawer: Inventori accordion sub-nav ──────────────────────────────────────
@@ -1720,17 +1905,10 @@ function toggleInventoryNavGroup() {
   document.getElementById("nav-inventory-chevron").classList.toggle("rotate-180");
 }
 
-function navigateInventoryTab(event, tab) {
-  event.preventDefault();
-  location.hash = "/inventory";
-  switchInventoryTab(tab);
-  closeDrawer();
-}
-
 function updateInventoryNavHighlight() {
-  const onInventoryRoute = currentRoute() === "/inventory";
+  const route = currentRoute();
   document.querySelectorAll(".nav-sublink").forEach(el => {
-    el.classList.toggle("is-active", onInventoryRoute && el.dataset.invTab === currentInventoryTab);
+    el.classList.toggle("is-active", el.dataset.route === route);
   });
 }
 
@@ -2237,6 +2415,9 @@ function collectReceiptPayload() {
   // are always computed from amount_paid vs total, never sent by hand.
   const tab = getActiveTab();
   if (tab && tab.status === "void") payload.status = "void";
+  // Only on create. The update schema has no started_at, and the server
+  // re-checks this value anyway rather than trusting the browser's clock.
+  if (tab && !tab.receiptId && tab.startedAt) payload.started_at = tab.startedAt;
   return payload;
 }
 
@@ -2351,6 +2532,9 @@ function blankCashierTabState(tabId) {
     customerPhone: "",
     customerName: "",
     items: [{ sku: null, name: "", qty: "1", price: "", warranty: "" }],
+    // Stamped when the tab is opened; sent once on create and never again.
+    startedAt: new Date().toISOString(),
+    createdAt: null,
     discount: "0",
     // A brand-new receipt defaults to "paid in full on the spot" — amountPaid
     // auto-syncs to Total (see recomputeTotals) until the cashier types into
@@ -2378,6 +2562,8 @@ function tabStateFromReceipt(tabId, r) {
       price: String(it.unit_price),
       warranty: it.warranty_date || "",
     })),
+    startedAt: r.started_at || r.created_at,
+    createdAt: r.created_at,
     discount: String(r.discount),
     // A receipt loaded from the server already has an explicit, previously
     // saved amount_paid — treat it as touched so editing line items later
@@ -2474,6 +2660,59 @@ function renderCashierTabBar() {
   `;
 }
 
+// ── Cashier: transaction time (recorded, never editable) ─────────────────────
+// Two timestamps. "Mulai" is stamped when the tab opens and travels with the
+// receipt once. "Waktu simpan" runs as a live clock until the receipt is saved,
+// then freezes to the server's own created_at -- the browser's value is only
+// ever a preview, the recorded one always comes from the server.
+let cashierClockTimer = null;
+
+function formatDateTimeSeconds(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} `
+       + `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+function stopCashierClock() {
+  if (cashierClockTimer) {
+    clearInterval(cashierClockTimer);
+    cashierClockTimer = null;
+  }
+}
+
+function renderCashierTimeFields() {
+  const tab = getActiveTab();
+  const startedEl = document.getElementById("receipt-started-at");
+  const createdEl = document.getElementById("receipt-created-at");
+  const createdLabel = document.getElementById("receipt-created-at-label");
+  if (!tab || !startedEl || !createdEl) return;
+
+  stopCashierClock();
+  startedEl.value = formatDateTimeSeconds(tab.startedAt);
+
+  if (tab.createdAt) {
+    createdEl.value = formatDateTimeSeconds(tab.createdAt);
+    createdLabel.textContent = "Waktu simpan";
+    return;
+  }
+
+  // Not saved yet: tick, so the cashier always sees a real time rather than an
+  // empty box. This is display only and is never what gets stored.
+  createdLabel.textContent = "Waktu simpan (belum disimpan)";
+  const tick = () => {
+    const current = getActiveTab();
+    if (!current || current.tabId !== tab.tabId || current.createdAt) {
+      stopCashierClock();
+      return;
+    }
+    createdEl.value = formatDateTimeSeconds(new Date().toISOString());
+  };
+  tick();
+  cashierClockTimer = setInterval(tick, 1000);
+}
+
 function renderCashierForm() {
   const tab = getActiveTab();
   if (!tab) return;
@@ -2484,6 +2723,8 @@ function renderCashierForm() {
   document.getElementById("customer-phone").value = tab.customerPhone || "";
   document.getElementById("customer-name").value = tab.customerName || "";
   validatePlateRegion();
+
+  renderCashierTimeFields();
 
   document.getElementById("scan-barcode-input").value = "";
   document.getElementById("scan-barcode-feedback").textContent = "";
@@ -2646,7 +2887,7 @@ async function loadReceiptHistory() {
         </div>
         <div class="text-xs text-muted truncate pl-3">${amountLine}</div>
         ${customerLine}
-        <div class="text-[11px] text-muted/70 pl-3">${r.created_at.slice(0, 10)}</div>
+        <div class="text-[11px] text-muted/70 pl-3 tabular-nums">${esc(formatDateTimeSeconds(r.created_at))}</div>
       </button>
     `;
     ul.appendChild(li);
@@ -2775,7 +3016,7 @@ function renderHistoryTable(receipts, query) {
     tr.innerHTML = `
       <td class="px-3 py-2 font-serif font-medium text-ink">${esc(r.plate_full)}</td>
       <td class="px-3 py-2 text-muted">${customerCell}</td>
-      <td class="px-3 py-2 text-muted">${esc((r.created_at || "").slice(0, 10))}</td>
+      <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatDateTimeSeconds(r.created_at))}</td>
       <td class="px-3 py-2">
         <span class="inline-flex items-center gap-1.5 text-xs text-muted">
           <span class="status-dot is-${r.status}"></span>${esc(statusLabel(r.status))}
@@ -2965,13 +3206,6 @@ function esc(str) {
 
 // Forces an input's value to uppercase in place, preserving caret position
 // (same-length transform, so selectionStart/End stay valid after reassignment).
-function forceUppercaseInput(inputEl) {
-  const start = inputEl.selectionStart;
-  const end = inputEl.selectionEnd;
-  inputEl.value = inputEl.value.toUpperCase();
-  inputEl.setSelectionRange(start, end);
-}
-
 // ── Date helpers ───────────────────────────────────────────────────────────
 function pad2(n) { return String(n).padStart(2, "0"); }
 
@@ -3029,16 +3263,16 @@ async function initInventory() {
   showMasterListPanel();
 }
 
-function switchInventoryTab(tab) {
-  currentInventoryTab = tab;
-  document.querySelectorAll(".inv-tab-btn").forEach(btn => btn.classList.toggle("is-active", btn.dataset.tab === tab));
-  document.getElementById("inv-tab-inbound").classList.toggle("hidden", tab !== "inbound");
-  document.getElementById("inv-tab-master").classList.toggle("hidden", tab !== "master");
-  document.getElementById("inv-tab-brand").classList.toggle("hidden", tab !== "brand");
-  document.getElementById("inv-tab-supplier").classList.toggle("hidden", tab !== "supplier");
-  document.getElementById("inv-tab-unit").classList.toggle("hidden", tab !== "unit");
-  updateInventoryNavHighlight();
-  refreshInventoryTab(tab);
+// Each inventory section is its own route now, so navigation goes through the
+// hash. `after` runs once renderRoute has finished, so a detail panel opened by
+// the caller is not immediately replaced by the route's list-panel refresh.
+function goToInventoryRoute(route, after) {
+  if (currentRoute() === route) {
+    if (after) after();
+    return;
+  }
+  pendingInventoryAction = after || null;
+  location.hash = route;
 }
 
 // Re-fetch the activated tab's data so it never shows stale bootstrap-time
@@ -4096,7 +4330,7 @@ function renderLowStockTable(items) {
     `;
     // Low-stock rows now live on the Dashboard, so jump to the Inventori route
     // before switching tabs — otherwise the master panel opens on a hidden page.
-    tr.onclick = () => { location.hash = "/inventory"; switchInventoryTab("master"); viewMasterItem(item.id); };
+    tr.onclick = () => goToInventoryRoute("/master-barang", () => viewMasterItem(item.id));
     tbody.appendChild(tr);
   }
 }
@@ -4301,8 +4535,7 @@ function renderBatchHistoryTable(batches) {
 }
 
 function jumpToInboundDocument(documentId) {
-  switchInventoryTab("inbound");
-  viewInboundDocument(documentId);
+  goToInventoryRoute("/inventory", () => viewInboundDocument(documentId));
 }
 
 function enableMasterItemEdit() {
@@ -4565,11 +4798,13 @@ function setInboundRowDisabled(rowEl, disabled) {
 // ── Inventory: Barang Masuk — line item rows ─────────────────────────────────
 function rowPickButtonHtml() {
   return `
-    <button type="button" onclick="openBarangPicker(this)"
-      class="row-pick-btn w-full flex items-center justify-center gap-2 border border-dashed border-line rounded-lg px-3 py-2 text-sm text-muted hover:border-accent hover:text-accent hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      Pilih Barang dari Master
-    </button>`;
+    <div class="relative">
+      <input type="text" autocomplete="off" placeholder="Cari nama atau SKU barang…"
+        class="row-barang-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        oninput="onBarangComboInput(this)" onfocus="onBarangComboFocus(this)"
+        onblur="onBarangComboBlur(this)" onkeydown="onBarangComboKeydown(event, this)" />
+      <div class="combobox-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+    </div>`;
 }
 
 function inboundItemRowTemplate(rowId) {
@@ -4635,7 +4870,7 @@ function onInboundRowCostKeydown(event, inputEl) {
   if (event.key !== "Enter") return;
   event.preventDefault();
   const newRow = addInboundItemRow();
-  newRow.querySelector(".row-pick-btn")?.focus();
+  newRow.querySelector(".row-barang-input")?.focus();
 }
 
 function updateInboundTotalDisplay() {
@@ -4647,15 +4882,21 @@ function updateInboundTotalDisplay() {
     total += qty * cost;
   });
   document.getElementById("inbound-total-display").textContent = `Total: ${formatIDR(total)}`;
+  updateInboundBarcodeButton();
 }
 
 // ── Inventory: Barang Masuk — product selection (Master Barang only) ─────────
 // A line item can only reference a product that already exists in Master Barang.
-// The row shows a "Pilih Barang" button that opens a searchable picker; new
-// products must be created in Master Barang first.
+// The row searches Master Barang inline (scoped to the document's supplier);
+// new products must be created in Master Barang first.
 
 function renderRowProduct(rowEl, p) {
   rowEl.dataset.masterItemId = (p.master_item_id != null && p.master_item_id !== "") ? String(p.master_item_id) : "";
+  // Stashed for barcode printing, which needs the raw values -- the rendered
+  // slot below only holds them formatted for display.
+  rowEl.dataset.sku = p.sku || "";
+  rowEl.dataset.productName = p.name || "";
+  rowEl.dataset.sellPrice = p.sell_price != null ? String(p.sell_price) : "";
   const slot = rowEl.querySelector(".row-product-slot");
   const sell = p.sell_price != null ? formatIDR(p.sell_price) : "-";
   slot.innerHTML = `
@@ -4669,13 +4910,18 @@ function renderRowProduct(rowEl, p) {
           <span>· Jual ${sell}</span>
         </div>
       </div>
-      <button type="button" onclick="openBarangPicker(this)" class="row-change-btn shrink-0 text-[11px] text-accent hover:text-accentDark font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Ganti</button>
+      <button type="button" onclick="changeRowProduct(this)" class="row-change-btn shrink-0 text-[11px] text-accent hover:text-accentDark font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Ganti</button>
     </div>`;
+  updateInboundBarcodeButton();
 }
 
 function clearRowProduct(rowEl) {
   delete rowEl.dataset.masterItemId;
+  delete rowEl.dataset.sku;
+  delete rowEl.dataset.productName;
+  delete rowEl.dataset.sellPrice;
   rowEl.querySelector(".row-product-slot").innerHTML = rowPickButtonHtml();
+  updateInboundBarcodeButton();
 }
 
 // Master items are supplier-scoped, so changing the document's supplier
@@ -4690,39 +4936,84 @@ function onInboundSupplierChange() {
 // combobox commit path (comboboxNotifyChange) still references it by name.
 function onInboundRowBrandChange() {}
 
-let barangPickerRow = null;
-let barangPickerCache = [];
+// Product selection is inline in the row -- a typeahead over Master Barang,
+// scoped to the document's supplier. It replaces a "Pilih Barang" modal: a
+// modal per line item meant losing your place in the document on every row.
+const barangComboState = new WeakMap(); // input -> { results, activeIndex, timer }
 
-function openBarangPicker(btnEl) {
-  const rowEl = btnEl.closest(".inbound-item-row");
-  const supplierId = comboboxValue(document.getElementById("inbound-supplier-select"));
-  if (!supplierId) { showToast("Pilih supplier terlebih dahulu."); return; }
-  barangPickerRow = rowEl;
-  barangPickerCache = [];
-  openModal("Pilih Barang", `
-    <div class="space-y-3">
-      <input id="barang-picker-search" type="text" autocomplete="off" placeholder="Cari nama atau SKU barang…"
-        class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-        oninput="debouncedBarangPickerSearch()" />
-      <div id="barang-picker-results" class="max-h-72 overflow-y-auto border border-line rounded-lg divide-y divide-line"></div>
-      <div id="barang-picker-empty" class="hidden text-center py-6 space-y-2">
-        <p class="text-sm text-muted">Barang belum ada di Master Barang untuk supplier ini.</p>
-        <p class="text-[11px] text-muted">Tambahkan dulu di Master Barang, lalu pilih di sini.</p>
-        <button type="button" onclick="goAddMasterItem()" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">+ Tambah di Master Barang</button>
-      </div>
-    </div>
-  `);
-  loadBarangPicker("");
-  setTimeout(() => document.getElementById("barang-picker-search")?.focus(), 0);
+function barangComboRow(inputEl) {
+  return inputEl.closest(".inbound-item-row");
 }
 
-const debouncedBarangPickerSearch = debounce(() => {
-  loadBarangPicker(document.getElementById("barang-picker-search")?.value.trim() || "");
-}, 250);
+function barangComboDropdown(inputEl) {
+  return inputEl.parentElement.querySelector(".combobox-dropdown");
+}
 
-async function loadBarangPicker(query) {
+function barangComboClose(inputEl) {
+  const dd = barangComboDropdown(inputEl);
+  if (!dd) return;
+  dd.classList.add("hidden");
+  dd.innerHTML = "";
+}
+
+function barangComboMessage(inputEl, html) {
+  const dd = barangComboDropdown(inputEl);
+  if (!dd) return;
+  dd.innerHTML = html;
+  dd.classList.remove("hidden");
+}
+
+function onBarangComboInput(inputEl) {
+  const state = barangComboState.get(inputEl) || { results: [], activeIndex: -1 };
+  clearTimeout(state.timer);
+  state.activeIndex = -1;
+  barangComboState.set(inputEl, state);
+  state.timer = setTimeout(() => searchBarangCombo(inputEl), 250);
+}
+
+function onBarangComboFocus(inputEl) {
+  searchBarangCombo(inputEl);
+}
+
+function onBarangComboBlur(inputEl) {
+  // Delayed so a mousedown-prevented click on an option still lands.
+  setTimeout(() => barangComboClose(inputEl), 150);
+}
+
+function onBarangComboKeydown(event, inputEl) {
+  const dd = barangComboDropdown(inputEl);
+  if (!dd || dd.classList.contains("hidden")) {
+    if (event.key === "ArrowDown") searchBarangCombo(inputEl);
+    return;
+  }
+  const options = [...dd.querySelectorAll(".combobox-option")];
+  const state = barangComboState.get(inputEl) || { activeIndex: -1 };
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    state.activeIndex = Math.min(state.activeIndex + 1, options.length - 1);
+    comboboxHighlight(options, state.activeIndex);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    state.activeIndex = Math.max(state.activeIndex - 1, 0);
+    comboboxHighlight(options, state.activeIndex);
+  } else if (event.key === "Enter") {
+    if (state.activeIndex >= 0 && options[state.activeIndex]) {
+      event.preventDefault();
+      options[state.activeIndex].click();
+    }
+  } else if (event.key === "Escape") {
+    barangComboClose(inputEl);
+  }
+  barangComboState.set(inputEl, state);
+}
+
+async function searchBarangCombo(inputEl) {
   const supplierId = comboboxValue(document.getElementById("inbound-supplier-select"));
-  if (!supplierId) return;
+  if (!supplierId) {
+    barangComboMessage(inputEl, `<div class="px-3 py-2 text-sm text-muted">Pilih supplier terlebih dahulu.</div>`);
+    return;
+  }
+  const query = inputEl.value.trim();
   const params = new URLSearchParams({ page_size: "50", is_active: "true", supplier_id: supplierId });
   if (query) params.set("search", query);
   let items = [];
@@ -4730,24 +5021,25 @@ async function loadBarangPicker(query) {
     const resp = await fetch(`/api/inventory/master-items?${params.toString()}`);
     if (resp.ok) items = (await resp.json()).items || [];
   } catch (_) {}
-  barangPickerCache = items;
-  renderBarangPickerResults(items);
+  renderBarangComboResults(inputEl, items);
 }
 
-function renderBarangPickerResults(items) {
-  const box = document.getElementById("barang-picker-results");
-  const empty = document.getElementById("barang-picker-empty");
-  if (!box) return;
+function renderBarangComboResults(inputEl, items) {
+  const dd = barangComboDropdown(inputEl);
+  if (!dd) return;
+  barangComboState.set(inputEl, { results: items, activeIndex: -1 });
   if (!items.length) {
-    box.innerHTML = "";
-    box.classList.add("hidden");
-    empty?.classList.remove("hidden");
+    barangComboMessage(inputEl, `
+      <div class="px-3 py-3 space-y-2 text-center">
+        <p class="text-sm text-muted">Barang belum ada di Master Barang untuk supplier ini.</p>
+        <button type="button" onmousedown="event.preventDefault()" onclick="goAddMasterItem()"
+          class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">+ Tambah di Master Barang</button>
+      </div>`);
     return;
   }
-  empty?.classList.add("hidden");
-  box.classList.remove("hidden");
-  box.innerHTML = items.map((item, idx) => `
-    <button type="button" onclick="chooseBarang(${idx})" class="w-full text-left px-3 py-2 hover:bg-bg2 transition-colors">
+  dd.innerHTML = items.map((item, idx) => `
+    <button type="button" data-idx="${idx}" onmousedown="event.preventDefault()" onclick="chooseBarang(this, ${idx})"
+      class="combobox-option w-full text-left px-3 py-2 hover:bg-bg2 transition-colors border-b border-line last:border-b-0">
       <div class="text-sm font-medium text-ink">${esc(item.name)}</div>
       <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
         <span class="font-mono">${esc(item.sku)}</span>
@@ -4758,12 +5050,16 @@ function renderBarangPickerResults(items) {
       </div>
     </button>
   `).join("");
+  dd.classList.remove("hidden");
 }
 
-function chooseBarang(idx) {
-  const item = barangPickerCache[idx];
-  if (!item || !barangPickerRow) return;
-  renderRowProduct(barangPickerRow, {
+function chooseBarang(optionEl, idx) {
+  const inputEl = optionEl.closest(".relative")?.querySelector(".row-barang-input");
+  const rowEl = inputEl && barangComboRow(inputEl);
+  const state = inputEl && barangComboState.get(inputEl);
+  const item = state?.results?.[idx];
+  if (!item || !rowEl) return;
+  renderRowProduct(rowEl, {
     master_item_id: item.id,
     name: item.name,
     sku: item.sku,
@@ -4771,15 +5067,20 @@ function chooseBarang(idx) {
     unit: item.unit,
     sell_price: item.sell_price,
   });
-  closeModal();
-  barangPickerRow = null;
+  rowEl.querySelector(".row-qty")?.focus();
+}
+
+// "Ganti" on a chosen row: drop back to the search input and reopen it.
+function changeRowProduct(btnEl) {
+  const rowEl = btnEl.closest(".inbound-item-row");
+  if (!rowEl) return;
+  clearRowProduct(rowEl);
+  const input = rowEl.querySelector(".row-barang-input");
+  if (input) { input.focus(); searchBarangCombo(input); }
 }
 
 function goAddMasterItem() {
-  closeModal();
-  barangPickerRow = null;
-  switchInventoryTab("master");
-  newMasterItemForm();
+  goToInventoryRoute("/master-barang", () => newMasterItemForm());
 }
 
 // ── Inventory: Barang Masuk — save / validate / post / void ──────────────────
@@ -4926,8 +5227,188 @@ async function submitVoidDocument(docId) {
   goToInboundList();
 }
 
+
+// ── Barang Masuk: barcode labels for received stock ──────────────────────────
+// Prints one label per received unit for every line that resolves to a master
+// item, so incoming stock can be stickered straight off the document. Master
+// Barang keeps its own single-label print for reprints.
+const BARCODE_CONFIRM_THRESHOLD = 100;
+
+function collectInboundBarcodeLabels() {
+  const labels = [];
+  let skipped = 0;
+  document.querySelectorAll("#inbound-item-rows .inbound-item-row").forEach(row => {
+    const sku = row.dataset.sku;
+    const qty = parseInt(row.querySelector(".row-qty")?.value, 10) || 0;
+    if (!sku) {
+      // A row with a quantity but no chosen product cannot produce a barcode.
+      if (qty > 0) skipped++;
+      return;
+    }
+    if (qty <= 0) return;
+    for (let i = 0; i < qty; i++) {
+      labels.push({
+        sku,
+        name: row.dataset.productName || "",
+        sellPrice: row.dataset.sellPrice ? parseInt(row.dataset.sellPrice, 10) : null,
+      });
+    }
+  });
+  return { labels, skipped };
+}
+
+function updateInboundBarcodeButton() {
+  const btn = document.getElementById("inbound-barcode-btn");
+  if (!btn) return;
+  const { labels } = collectInboundBarcodeLabels();
+  btn.disabled = labels.length === 0;
+  btn.textContent = labels.length ? `Cetak Barcode (${labels.length})` : "Cetak Barcode";
+}
+
+function printInboundBarcodes() {
+  const { labels, skipped } = collectInboundBarcodeLabels();
+  if (!labels.length) {
+    showToast("Belum ada barang dengan SKU dan jumlah untuk dicetak.");
+    return;
+  }
+  if (labels.length > BARCODE_CONFIRM_THRESHOLD) {
+    // A mis-typed quantity could otherwise send hundreds of labels to a thermal
+    // printer before anyone can stop it.
+    openModal("Cetak Barcode", `
+      <p class="text-sm text-ink mb-1.5">Akan mencetak <span class="font-semibold">${labels.length} label</span>${skipped ? ` (${skipped} baris tanpa SKU dilewati)` : ""}.</p>
+      <p class="text-sm text-muted mb-4">Pastikan kertas label mencukupi sebelum melanjutkan.</p>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button onclick="closeModal(); runInboundBarcodePrint();" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Cetak</button>
+      </div>
+    `);
+    return;
+  }
+  if (skipped) showToast(`${skipped} baris tanpa SKU dilewati.`);
+  runInboundBarcodePrint();
+}
+
+// Shared by the document print and the manual free-text print. Each label is
+// {sku, name, sellPrice}; sku is whatever string should become the barcode.
+function printBarcodeLabels(labels) {
+  if (!labels.length) return;
+
+  const batch = document.getElementById("barcode-batch");
+  document.getElementById("barcode-single").style.display = "none";
+  batch.innerHTML = labels.map((l, i) => `
+    <div class="barcode-label">
+      <div class="barcode-label-name">${esc(l.name || "")}</div>
+      <svg class="barcode-batch-svg" data-idx="${i}"></svg>
+      <div class="barcode-label-sku">${esc(l.sku)}</div>
+      <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
+    </div>
+  `).join("");
+
+  let failed = 0;
+  batch.querySelectorAll(".barcode-batch-svg").forEach(svg => {
+    const code = labels[parseInt(svg.dataset.idx, 10)].sku;
+    try {
+      JsBarcode(svg, code, {
+        format: "CODE128",
+        displayValue: false,
+        margin: 0,
+        width: 1.5,
+        height: 42,
+      });
+    } catch (_) {
+      // CODE128 rejects some inputs outright; drop that one label rather than
+      // sending a blank sticker to the printer.
+      failed++;
+      svg.closest(".barcode-label")?.remove();
+    }
+  });
+
+  if (!batch.querySelector(".barcode-label")) {
+    batch.innerHTML = "";
+    document.getElementById("barcode-single").style.display = "";
+    showToast("Kode tidak bisa dijadikan barcode.");
+    return;
+  }
+  if (failed) showToast(`${failed} label dilewati karena kodenya tidak valid.`);
+
+  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", "print-barcode-batch");
+
+  // Leave the sheet as the single-label path expects to find it.
+  batch.innerHTML = "";
+  document.getElementById("barcode-single").style.display = "";
+}
+
+function runInboundBarcodePrint() {
+  printBarcodeLabels(collectInboundBarcodeLabels().labels);
+}
+
+// ── Barcode from free text ───────────────────────────────────────────────────
+// Prints a label from any typed code. Nothing is stored: this is a label
+// printer, not a product record, so the code is not linked to a master item and
+// will not resolve at the cashier unless it happens to match an existing SKU.
+function openManualBarcodeModal() {
+  openModal("Barcode Manual", `
+    <div class="space-y-3">
+      <div>
+        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kode Barcode</label>
+        <input id="manual-barcode-code" type="text" data-no-uppercase autocomplete="off" placeholder="Ketik kode bebas…"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitManualBarcode();}"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <p class="text-[11px] text-muted mt-1.5">Ditulis apa adanya, huruf besar/kecil tidak diubah.</p>
+      </div>
+      <div>
+        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama <span class="normal-case font-normal">(opsional)</span></label>
+        <input id="manual-barcode-name" type="text" autocomplete="off"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga <span class="normal-case font-normal">(opsional)</span></label>
+          <input id="manual-barcode-price" type="text" inputmode="numeric" placeholder="0"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'');"
+            class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jumlah Label</label>
+          <input id="manual-barcode-qty" type="text" inputmode="numeric" value="1"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'');"
+            class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button onclick="submitManualBarcode()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Cetak</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById("manual-barcode-code")?.focus(), 0);
+}
+
+function submitManualBarcode() {
+  const code = document.getElementById("manual-barcode-code").value.trim();
+  if (!code) { showToast("Kode barcode belum diisi."); return; }
+
+  const name = document.getElementById("manual-barcode-name").value.trim();
+  const rawPrice = document.getElementById("manual-barcode-price").value.trim();
+  const price = rawPrice ? parseInt(rawPrice, 10) : null;
+  const qty = Math.max(1, parseInt(document.getElementById("manual-barcode-qty").value, 10) || 1);
+
+  if (qty > BARCODE_CONFIRM_THRESHOLD) {
+    showToast(`Maksimal ${BARCODE_CONFIRM_THRESHOLD} label sekali cetak.`);
+    return;
+  }
+
+  const labels = Array.from({ length: qty }, () => ({ sku: code, name, sellPrice: price }));
+  closeModal();
+  printBarcodeLabels(labels);
+}
+
 function printMasterItemBarcode() {
   if (!currentMasterItem) return;
+  // Share one print sheet with the batch path: show the single label, drop any
+  // labels a previous batch print left behind.
+  document.getElementById("barcode-batch").innerHTML = "";
+  document.getElementById("barcode-single").style.display = "";
   document.getElementById("barcode-print-name").textContent = currentMasterItem.name;
   document.getElementById("barcode-print-price").textContent = formatIDR(currentMasterItem.sell_price);
   document.getElementById("barcode-print-sku-text").textContent = currentMasterItem.sku;
@@ -5719,7 +6200,7 @@ function openAddUserModal() {
     <div class="space-y-3">
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Username</label>
-        <input id="new-user-username" type="text" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <input id="new-user-username" type="text" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
       </div>
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Password (min. 8 karakter)</label>
@@ -5825,6 +6306,139 @@ async function submitResetPassword(userId) {
   showToast("Password berhasil direset.", "success");
 }
 
+// ── Activity log (admin) ─────────────────────────────────────────────────────
+const activityState = { page: 1, pageSize: 50, total: 0, actorsLoaded: false };
+
+const ENTITY_LABELS = {
+  receipt: "Nota penjualan", master_item: "Barang", inbound_document: "Barang masuk",
+  purchase_invoice: "Faktur pembelian", supplier: "Supplier", brand: "Merek",
+  unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Login / logout",
+  scrape: "Scraper", job: "Job scraper",
+};
+
+async function initActivityPage() {
+  if (!activityState.actorsLoaded) {
+    activityState.actorsLoaded = true;
+    try {
+      const resp = await fetch("/api/activity/actors");
+      if (resp.ok) {
+        const actors = await resp.json();
+        const sel = document.getElementById("activity-filter-user");
+        const keep = sel.value;
+        sel.innerHTML = `<option value="">Semua pengguna</option>` +
+          actors.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join("");
+        sel.value = keep;
+      }
+    } catch (_) {}
+  }
+  reloadActivity();
+}
+
+function reloadActivity() {
+  activityState.page = 1;
+  loadActivity();
+}
+
+const debouncedActivitySearch = debounce(reloadActivity, 300);
+
+function activityPage(delta) {
+  const maxPage = Math.max(1, Math.ceil(activityState.total / activityState.pageSize));
+  activityState.page = Math.min(maxPage, Math.max(1, activityState.page + delta));
+  loadActivity();
+}
+
+async function loadActivity() {
+  const params = new URLSearchParams({
+    page: activityState.page,
+    page_size: activityState.pageSize,
+  });
+  const search = document.getElementById("activity-search").value.trim();
+  if (search) params.set("search", search);
+  const user = document.getElementById("activity-filter-user").value;
+  if (user) params.set("username", user);
+  const entity = document.getElementById("activity-filter-entity").value;
+  if (entity) params.set("entity", entity);
+  const from = document.getElementById("activity-date-from").value;
+  if (from) params.set("date_from", from);
+  const to = document.getElementById("activity-date-to").value;
+  if (to) params.set("date_to", to);
+  if (document.getElementById("activity-failures-only").checked) params.set("failures_only", "true");
+
+  const resp = await fetch(`/api/activity?${params.toString()}`);
+  if (!resp.ok) { showToast("Gagal memuat log aktivitas."); return; }
+  const data = await resp.json();
+  activityState.total = data.total;
+  renderActivity(data.items);
+
+  const maxPage = Math.max(1, Math.ceil(data.total / activityState.pageSize));
+  document.getElementById("activity-total").textContent = `${data.total} aktivitas tercatat`;
+  document.getElementById("activity-page-label").textContent = `Halaman ${data.page} dari ${maxPage}`;
+  document.getElementById("activity-prev").disabled = data.page <= 1;
+  document.getElementById("activity-next").disabled = data.page >= maxPage;
+}
+
+function formatActivityTime(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function renderActivity(items) {
+  const tbody = document.getElementById("activity-tbody");
+  const empty = document.getElementById("activity-empty");
+  tbody.innerHTML = "";
+  empty.classList.toggle("hidden", items.length > 0);
+
+  for (const row of items) {
+    const ok = row.status_code < 400;
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 transition-colors align-top";
+    tr.innerHTML = `
+      <td class="px-3 py-2 whitespace-nowrap text-muted tabular-nums">${formatActivityTime(row.created_at)}</td>
+      <td class="px-3 py-2 text-ink">${esc(row.username || "-")}</td>
+      <td class="px-3 py-2 text-ink font-medium">${esc(row.action)}</td>
+      <td class="px-3 py-2 text-muted">
+        ${row.summary ? esc(row.summary) : "-"}
+        ${row.entity ? `<span class="ml-1 text-[11px] text-muted/80">· ${esc(ENTITY_LABELS[row.entity] || row.entity)}</span>` : ""}
+      </td>
+      <td class="px-3 py-2">
+        <span class="px-2 py-0.5 rounded-md text-[11px] font-medium ${ok ? "bg-done/10 text-done" : "bg-failed/10 text-failed"}">
+          ${ok ? "Berhasil" : "Gagal " + row.status_code}
+        </span>
+      </td>`;
+    // Row detail: the redacted request body, revealed on click rather than
+    // shown inline so the table stays scannable.
+    if (row.payload) {
+      tr.classList.add("cursor-pointer");
+      tr.onclick = () => showActivityDetail(row);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+function showActivityDetail(row) {
+  let pretty = row.payload;
+  try { pretty = JSON.stringify(JSON.parse(row.payload), null, 2); } catch (_) {}
+  openModal("Detail Aktivitas", `
+    <div class="space-y-3 text-sm">
+      <div class="grid grid-cols-3 gap-2">
+        <span class="text-muted">Waktu</span><span class="col-span-2 text-ink">${formatActivityTime(row.created_at)}</span>
+        <span class="text-muted">Pengguna</span><span class="col-span-2 text-ink">${esc(row.username || "-")}</span>
+        <span class="text-muted">Aktivitas</span><span class="col-span-2 text-ink">${esc(row.action)}</span>
+        <span class="text-muted">Alamat</span><span class="col-span-2 text-ink font-mono text-[12px] break-all">${esc(row.method)} ${esc(row.path)}</span>
+        <span class="text-muted">Status</span><span class="col-span-2 text-ink">${row.status_code}</span>
+        <span class="text-muted">IP</span><span class="col-span-2 text-ink font-mono text-[12px]">${esc(row.ip || "-")}</span>
+      </div>
+      <div>
+        <p class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Data yang dikirim</p>
+        <pre class="bg-bg2 border border-line rounded-lg p-3 text-[12px] text-ink overflow-x-auto whitespace-pre-wrap break-all">${esc(pretty)}</pre>
+        <p class="text-[11px] text-muted mt-1.5">Password dan token tidak pernah disimpan di log.</p>
+      </div>
+    </div>
+  `);
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 function bootApp() {
   applyRoleGating();
@@ -5858,12 +6472,15 @@ checkAuth();
 </script>
 
 <div id="barcode-print-area">
-  <div class="barcode-label">
+  <!-- Single label: Master Barang's "Cetak Barcode" fills these by id. -->
+  <div id="barcode-single" class="barcode-label">
     <div id="barcode-print-name" class="barcode-label-name"></div>
     <svg id="barcode-print-svg"></svg>
     <div id="barcode-print-sku-text" class="barcode-label-sku"></div>
     <div id="barcode-print-price" class="barcode-label-price"></div>
   </div>
+  <!-- Batch: Barang Masuk renders one .barcode-label per received unit here. -->
+  <div id="barcode-batch"></div>
 </div>
 
 <!-- Purchase invoice print sheet — filled by renderPurchaseInvoicePrint() right before window.print(). -->

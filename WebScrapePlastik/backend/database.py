@@ -226,7 +226,40 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+            -- Audit trail. Written by the ActivityLog middleware for every
+            -- mutating API call, so coverage does not depend on remembering to
+            -- instrument each new route. Append-only by intent: nothing in the
+            -- app updates or deletes rows here.
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                user_id INTEGER,
+                username TEXT,
+                method TEXT NOT NULL,
+                path TEXT NOT NULL,
+                status_code INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                entity TEXT,
+                entity_id TEXT,
+                summary TEXT,
+                payload TEXT,
+                ip TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id);
+            CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON activity_log(entity, entity_id);
         """)
+
+        # --- Additive migration: receipt start time ---
+        # created_at is when the sale was saved; started_at is when the cashier
+        # opened the tab and began entering it. Live databases already hold
+        # receipts, so this is an ALTER guarded by a PRAGMA check rather than an
+        # edit to the CREATE TABLE above. Existing rows keep NULL and fall back
+        # to created_at when displayed.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "started_at" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN started_at TEXT")
 
         # --- Additive migration: quick-add brand/supplier support (§7.2) ---
         # data/scraper.db already has live supplier/brand rows, so this uses
@@ -438,6 +471,29 @@ def _compute_receipt_status(total: int, amount_paid: int, requested_status: str 
     return "done" if amount_paid >= total else "pending"
 
 
+def _sanitize_started_at(value: str | None, created_at: str) -> str:
+    """started_at is the one timestamp the browser supplies, so it cannot be
+    trusted the way created_at can. A value that is unparseable, in the future,
+    or implausibly old (a machine with a wrong clock, or a tab left open
+    overnight) falls back to the server's own created_at rather than recording a
+    time the sale did not happen at. It is never editable after this point."""
+    if not value:
+        return created_at
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return created_at
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    # A little slack for clock skew between the browser and the server.
+    if parsed > now + timedelta(minutes=5):
+        return created_at
+    if parsed < now - timedelta(hours=24):
+        return created_at
+    return parsed.isoformat()
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -449,22 +505,24 @@ def create_receipt(
     status: str | None = None,
     customer_phone: str = "",
     customer_name: str | None = None,
+    started_at: str | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
     total = subtotal - discount
     final_status = _compute_receipt_status(total, amount_paid, status)
     created_at = _now()
+    started_at = _sanitize_started_at(started_at, created_at)
 
     with _conn() as con:
         con.execute(
             """INSERT INTO receipts
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, status, amount_paid)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                subtotal, discount, total, created_at, started_at, status, amount_paid)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, final_status, amount_paid,
+                subtotal, discount, total, created_at, started_at, final_status, amount_paid,
             ),
         )
         con.executemany(
@@ -2233,4 +2291,99 @@ def delete_sessions_for_user(user_id: int) -> None:
 def purge_expired_sessions() -> int:
     with _conn() as con:
         cur = con.execute("DELETE FROM sessions WHERE expires_at < ?", (_now(),))
+        return cur.rowcount
+
+
+# ── Activity log ─────────────────────────────────────────────────────────────
+def insert_activity(row: dict) -> None:
+    with _conn() as con:
+        con.execute(
+            """INSERT INTO activity_log
+               (created_at, user_id, username, method, path, status_code,
+                action, entity, entity_id, summary, payload, ip)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                row.get("created_at") or _now(),
+                row.get("user_id"),
+                row.get("username"),
+                row["method"],
+                row["path"],
+                row["status_code"],
+                row["action"],
+                row.get("entity"),
+                row.get("entity_id"),
+                row.get("summary"),
+                row.get("payload"),
+                row.get("ip"),
+            ),
+        )
+
+
+def get_activity(
+    page: int = 1,
+    page_size: int = 50,
+    username: str | None = None,
+    entity: str | None = None,
+    search: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    failures_only: bool = False,
+) -> dict:
+    where = []
+    params: list = []
+    if username:
+        where.append("username = ?")
+        params.append(username)
+    if entity:
+        where.append("entity = ?")
+        params.append(entity)
+    if failures_only:
+        where.append("status_code >= 400")
+    if date_from:
+        where.append("created_at >= ?")
+        params.append(date_from)
+    if date_to:
+        # Callers pass a plain date; compare against the end of that day so the
+        # whole day is included rather than only its midnight timestamp.
+        where.append("created_at <= ?")
+        params.append(date_to + "T23:59:59.999999+00:00")
+    if search:
+        where.append("(action LIKE ? OR summary LIKE ? OR path LIKE ? OR username LIKE ?)")
+        like = f"%{search}%"
+        params.extend([like, like, like, like])
+
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    offset = (page - 1) * page_size
+
+    with _conn() as con:
+        total = con.execute(f"SELECT COUNT(*) AS n FROM activity_log {clause}", params).fetchone()["n"]
+        rows = con.execute(
+            f"""SELECT * FROM activity_log {clause}
+                ORDER BY id DESC LIMIT ? OFFSET ?""",
+            (*params, page_size, offset),
+        ).fetchall()
+    return {
+        "items": [dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def get_activity_actors() -> list[str]:
+    """Distinct usernames present in the log, for the filter dropdown."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT DISTINCT username FROM activity_log WHERE username IS NOT NULL ORDER BY username"
+        ).fetchall()
+        return [r["username"] for r in rows]
+
+
+def purge_activity_before(cutoff_iso: str) -> int:
+    """Retention hook. Not called automatically -- the log is small and the
+    history is the point -- but available for a scheduled trim."""
+    with _conn() as con:
+        cur = con.execute("DELETE FROM activity_log WHERE created_at < ?", (cutoff_iso,))
         return cur.rowcount

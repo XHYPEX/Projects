@@ -108,7 +108,7 @@ async def create_new_receipt(req: ReceiptRequest):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
-        req.amount_paid, req.status, customer_phone, customer_name,
+        req.amount_paid, req.status, customer_phone, customer_name, req.started_at,
     )
     return ReceiptResponse(receipt_id=receipt_id, **result)
 

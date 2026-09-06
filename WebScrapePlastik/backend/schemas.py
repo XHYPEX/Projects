@@ -459,6 +459,20 @@ class PendingInvoiceOut(BaseModel):
     created_at: str
 
 
+class OpenPreorderOut(BaseModel):
+    """Slim preorder row for the dashboard; `status` is the order-level stage
+    derived from its line items."""
+    id: str
+    customer_name: str
+    customer_phone: str
+    item_count: int
+    total: int
+    deposit: int
+    remaining: int
+    status: str
+    created_at: str
+
+
 class IncomingItemOut(BaseModel):
     product_name: str
     sku: str
@@ -486,6 +500,10 @@ class InventoryOverviewOut(BaseModel):
     top_selling: list[TopSellingOut]
     sales_month_revenue: int
     sales_month_count: int
+    preorder_open_count: int
+    preorder_outstanding: int
+    preorder_ready_count: int
+    preorders: list[OpenPreorderOut]
 
 
 # ---------------------------------------------------------------------------
@@ -528,3 +546,85 @@ class UserUpdateRequest(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=72)
+
+
+# ---------------------------------------------------------------------------
+# Preorders
+# ---------------------------------------------------------------------------
+# The status values themselves live in backend.database (PREORDER_STATUSES) so
+# the storage layer and the route validation cannot drift apart.
+
+
+class PreorderItemRequest(BaseModel):
+    # Present when editing an existing line; omitted for a newly added one. The
+    # id is what preserves that line's stage and its status history across an edit.
+    id: int | None = None
+    master_item_id: int | None = None
+    product_name: str
+    unit: str | None = None
+    quantity: int
+    unit_price: int
+    status: str | None = None
+
+
+class PreorderRequest(BaseModel):
+    customer_name: str
+    customer_phone: str
+    items: list[PreorderItemRequest]
+    deposit: int = 0
+    notes: str | None = None
+
+
+class PreorderUpdateRequest(BaseModel):
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    items: list[PreorderItemRequest] | None = None
+    deposit: int | None = None
+    # Nullable, so "omitted" (leave as-is) and "sent as null" (clear it) are told
+    # apart via fields_set in the route, same as ReceiptUpdateRequest.customer_name.
+    notes: str | None = None
+
+
+class PreorderItemStatusRequest(BaseModel):
+    status: str
+
+
+class PreorderItemOut(BaseModel):
+    id: int
+    master_item_id: int | None = None
+    # SKU of the linked master item, null for a free-text line.
+    sku: str | None = None
+    product_name: str
+    unit: str | None = None
+    quantity: int
+    unit_price: int
+    status: str
+
+
+class PreorderHistoryOut(BaseModel):
+    id: int
+    preorder_item_id: int
+    product_name: str
+    status: str
+    changed_at: str
+    changed_by: str | None = None
+
+
+class PreorderOut(BaseModel):
+    id: str
+    customer_name: str
+    customer_phone: str
+    deposit: int
+    notes: str | None = None
+    total: int
+    remaining: int
+    # Derived from the line items: the least advanced stage among them.
+    status: str
+    item_count: int
+    created_at: str
+    updated_at: str
+
+
+class PreorderDetail(PreorderOut):
+    items: list[PreorderItemOut]
+    history: list[PreorderHistoryOut]

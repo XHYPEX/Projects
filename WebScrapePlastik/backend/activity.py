@@ -46,6 +46,11 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/receipts/[^/]+$"), "PATCH", "Ubah nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "DELETE", "Hapus nota penjualan", "receipt"),
 
+    (re.compile(r"^/api/preorders/[^/]+/items/\d+/status$"), "PATCH", "Ubah status preorder", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+$"), "PATCH", "Ubah preorder", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+$"), "DELETE", "Hapus preorder", "preorder"),
+    (re.compile(r"^/api/preorders$"), "POST", "Buat preorder", "preorder"),
+
     (re.compile(r"^/api/suppliers/\d+$"), "PATCH", "Ubah supplier", "supplier"),
     (re.compile(r"^/api/suppliers/\d+$"), "DELETE", "Hapus supplier", "supplier"),
     (re.compile(r"^/api/suppliers$"), "POST", "Tambah supplier", "supplier"),
@@ -85,7 +90,7 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 # Fields worth showing as the one-line "what was this about", in priority order.
 SUMMARY_KEYS = [
     "name", "product_name", "username", "invoice_number", "supplier_invoice_no",
-    "plate_number", "keyword", "reason", "note", "notes",
+    "plate_number", "customer_name", "keyword", "reason", "note", "notes",
 ]
 
 
@@ -113,10 +118,15 @@ def extract_entity_id(path: str) -> str | None:
     """The id a route acts on, taken from the path. Creates have no id in the
     path -- their summary carries the name instead."""
     parts = [p for p in path.split("/") if p]
+    # A uuid-ish segment always names the top-level record (receipts, jobs,
+    # preorders), so it wins over any numeric child id further down the path --
+    # /api/preorders/<uuid>/items/7/status is an edit to that preorder, not to
+    # entity 7.
+    for part in parts:
+        if len(part) >= 32 and "-" in part:
+            return part
     for part in reversed(parts):
         if part.isdigit():
-            return part
-        if len(part) >= 32 and "-" in part:  # uuid-ish (receipts, jobs)
             return part
     return None
 

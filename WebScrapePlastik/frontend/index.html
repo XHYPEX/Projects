@@ -152,13 +152,16 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 1mm;
+      /* Tight: the enlarged type plus the optional free-text line only just
+         clears 40mm. */
+      gap: 0.5mm;
+      line-height: 1.15;
       font-family: 'Inter', system-ui, sans-serif;
       text-align: center;
       overflow: hidden;
     }
     .barcode-label-name {
-      font-size: 8pt;
+      font-size: 12pt;
       font-weight: 600;
       color: #141413;
       max-width: 100%;
@@ -168,12 +171,23 @@
     }
     .barcode-label-sku {
       font-family: 'IBM Plex Mono', ui-monospace, monospace;
-      font-size: 7pt;
+      font-size: 10.5pt;
       color: #141413;
       letter-spacing: 0.5px;
     }
-    .barcode-label-price {
+    /* Optional free-text line. Collapses entirely when unused so labels without
+       one keep the spacing they had. */
+    .barcode-label-note {
       font-size: 9pt;
+      color: #141413;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .barcode-label-note:empty { display: none; }
+    .barcode-label-price {
+      font-size: 13.5pt;
       font-weight: 700;
       color: #141413;
     }
@@ -530,6 +544,8 @@
           <div class="flex items-center justify-between mb-4">
             <h2 id="cashier-form-title" class="font-serif text-lg font-semibold text-ink">New receipt</h2>
             <div class="flex items-center gap-2">
+              <button id="cashier-edit-btn" onclick="unlockActiveReceipt()"
+                class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink hover:bg-bg2 transition-colors">Edit</button>
               <button id="cashier-void-btn" onclick="confirmVoidActiveReceipt()"
                 class="hidden px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Void</button>
               <button id="cashier-delete-btn" onclick="confirmDeleteActiveReceipt()"
@@ -610,8 +626,8 @@
           <div class="mb-5">
             <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Scan Barcode</label>
             <div class="flex items-center gap-2">
-              <input id="scan-barcode-input" type="text" placeholder="Scan or type SKU, then Enter…" autocomplete="off"
-                onkeydown="handleScanInputKeydown(event)"
+              <input id="scan-barcode-input" type="text" placeholder="Scan barcode, or type a SKU and press Enter…" autocomplete="off"
+                onkeydown="handleScanInputKeydown(event)" oninput="handleScanInput(event)"
                 class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono placeholder:font-sans placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
             </div>
             <p id="scan-barcode-feedback" class="text-xs text-muted mt-1.5 min-h-[1rem]"></p>
@@ -620,8 +636,16 @@
           <!-- Line items -->
           <div class="mb-5">
             <div class="flex items-center justify-between mb-2">
-              <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Products</label>
-              <button id="add-item-btn" onclick="addItemRow(); markActiveTabDirty();" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add item</button>
+              <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Barang</label>
+              <button id="add-item-btn" onclick="addItemRow(); markActiveTabDirty();" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Tambah Barang</button>
+            </div>
+            <!-- Column widths here must track the .item-row template in addItemRow(). -->
+            <div class="flex items-center gap-2 px-1 pb-1.5 mb-1 border-b border-line text-[10px] font-medium text-muted uppercase tracking-wider">
+              <div class="flex-1">Nama Barang</div>
+              <div class="w-14 text-center">Qty</div>
+              <div class="w-28 text-right">Harga</div>
+              <div class="w-28 text-right">Subtotal</div>
+              <div class="w-[26px]"></div>
             </div>
             <div id="item-rows" class="space-y-2"></div>
           </div>
@@ -645,9 +669,12 @@
             </div>
             <div class="flex items-center justify-between text-sm gap-3">
               <label for="discount-input" class="text-muted">Discount</label>
-              <input id="discount-input" type="text" inputmode="numeric" value="0"
-                class="w-32 text-right border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                oninput="this.value=this.value.replace(/[^0-9]/g,''); recomputeTotals();" />
+              <div class="relative w-32">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                <input id="discount-input" type="text" inputmode="numeric" value="0"
+                  class="price-input w-full text-right border border-line rounded-lg pl-8 pr-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  oninput="recomputeTotals();" />
+              </div>
             </div>
             <p id="discount-error" class="hidden text-xs text-failed text-right"></p>
             <div class="flex items-center justify-between text-base border-t border-line pt-2">
@@ -655,10 +682,22 @@
               <span id="total-display" class="font-serif font-semibold text-ink tabular-nums">Rp 0</span>
             </div>
             <div class="flex items-center justify-between text-sm gap-3 border-t border-line pt-2">
+              <label for="payment-method-select" class="text-muted">Metode Bayar</label>
+              <select id="payment-method-select"
+                class="w-32 border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <option value="cash">Cash</option>
+                <option value="transfer">Transfer</option>
+                <option value="qris">QRIS</option>
+              </select>
+            </div>
+            <div class="flex items-center justify-between text-sm gap-3">
               <label for="amount-paid-input" class="text-muted">Jumlah Dibayar</label>
-              <input id="amount-paid-input" type="text" inputmode="numeric" value="0"
-                class="w-32 text-right border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                oninput="this.value=this.value.replace(/[^0-9]/g,''); markAmountPaidTouched(); recomputeTotals();" />
+              <div class="relative w-32">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                <input id="amount-paid-input" type="text" inputmode="numeric" value="0"
+                  class="price-input w-full text-right border border-line rounded-lg pl-8 pr-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  oninput="recomputeTotals();" />
+              </div>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span id="remaining-balance-label" class="text-muted">Sisa Bayar</span>
@@ -878,9 +917,12 @@
               <span id="pi-subtotal-display" class="tabular-nums text-ink">Rp 0</span>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <label for="pi-discount" class="text-muted shrink-0">Diskon (Rp)</label>
-              <input id="pi-discount" type="number" min="0" step="1" value="0" oninput="updatePurchaseInvoiceTotals()"
-                class="w-36 border border-line rounded-lg px-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+              <label for="pi-discount" class="text-muted shrink-0">Diskon</label>
+              <div class="relative w-36">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                <input id="pi-discount" type="text" inputmode="numeric" value="0" oninput="updatePurchaseInvoiceTotals()"
+                  class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+              </div>
             </div>
             <div class="flex items-center justify-between gap-3">
               <label for="pi-tax-rate" class="text-muted shrink-0">PPN (%)</label>
@@ -909,8 +951,11 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <input id="pi-payment-amount" type="number" min="1" step="1" placeholder="Jumlah bayar"
-                class="w-40 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <div class="relative w-40">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                <input id="pi-payment-amount" type="text" inputmode="numeric" placeholder="Jumlah bayar"
+                  class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              </div>
               <button type="button" onclick="submitPurchaseInvoicePayment()"
                 class="px-4 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 transition-colors">Catat Bayar</button>
             </div>
@@ -1037,9 +1082,12 @@
               <span id="po-total-display" class="font-serif text-base font-semibold text-ink tabular-nums">Rp 0</span>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <label for="po-deposit" class="text-muted shrink-0">DP Dibayar (Rp)</label>
-              <input id="po-deposit" type="number" min="0" step="1" value="0" oninput="updatePreorderTotals()"
-                class="w-40 border border-line rounded-lg px-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <label for="po-deposit" class="text-muted shrink-0">DP Dibayar</label>
+              <div class="relative w-40">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+                <input id="po-deposit" type="text" inputmode="numeric" value="0" oninput="updatePreorderTotals()"
+                  class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              </div>
             </div>
             <div class="flex items-center justify-between border-t border-line pt-2">
               <span class="text-muted">Sisa</span>
@@ -1055,8 +1103,8 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-          <button id="po-delete-btn" data-armed="false" onclick="handleDeletePreorderClick(this)"
-            class="hidden admin-only px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
+          <button id="po-draft-btn" onclick="togglePreorderDraft()"
+            class="hidden admin-only px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-bg2 transition-colors">Jadikan Draft</button>
           <button id="po-save-btn" onclick="savePreorder()"
             class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan</button>
         </div>
@@ -1530,7 +1578,7 @@
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual</label>
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                  <input id="edit-item-sell-price" type="text" inputmode="numeric" class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                  <input id="edit-item-sell-price" type="text" inputmode="numeric" class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
                 </div>
               </div>
               <div class="flex-1">
@@ -1626,14 +1674,14 @@
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Modal</label>
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                  <input id="new-item-cost-price" type="text" inputmode="numeric" placeholder="0" class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                  <input id="new-item-cost-price" type="text" inputmode="numeric" placeholder="0" class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
                 </div>
               </div>
               <div class="flex-1">
                 <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual</label>
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                  <input id="new-item-sell-price" type="text" inputmode="numeric" placeholder="0" class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                  <input id="new-item-sell-price" type="text" inputmode="numeric" placeholder="0" class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
                 </div>
               </div>
             </div>
@@ -2054,6 +2102,7 @@ function renderRoute() {
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
+  if (route === "/cashier") document.getElementById("scan-barcode-input")?.focus();
   if (route === "/dashboard") loadDashboardOverview();
   if (route === "/preorder") { backToPreorderList(); }
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
@@ -2168,7 +2217,7 @@ async function startScrape() {
   const kecamatan = getSelectedKecamatan();
 
   if (!keyword || kecamatan.length === 0) {
-    showToast("Please enter a keyword and select at least one kecamatan.");
+    showToast("Isi kata kunci dan pilih minimal satu kecamatan.");
     return;
   }
 
@@ -2406,25 +2455,21 @@ function addItemRow(prefill) {
   const row = document.createElement("div");
   row.className = "item-row flex items-center gap-2";
   if (prefill && prefill.sku) row.dataset.sku = prefill.sku;
+  // Garansi has no column any more; the stored date is carried on the row so an
+  // edit to an existing receipt preserves it instead of clearing it.
+  if (prefill && prefill.warranty) row.dataset.warranty = prefill.warranty;
   row.innerHTML = `
-    <input type="text" placeholder="Product name" value="${prefill ? esc(prefill.name || "") : ""}"
+    <input type="text" placeholder="Nama barang" value="${prefill ? esc(prefill.name || "") : ""}"
       class="item-name flex-1 border border-line rounded-lg px-3 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
     <input type="text" inputmode="numeric" value="${prefill && prefill.qty != null && prefill.qty !== "" ? esc(String(prefill.qty)) : "1"}"
       class="item-qty w-14 text-center border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
-    <input type="text" inputmode="numeric" placeholder="Price" value="${prefill && prefill.price != null && prefill.price !== "" ? esc(String(prefill.price)) : ""}"
-      class="item-price w-28 text-right border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
-    <div class="item-warranty-wrap w-36">
-      <button type="button" onclick="revealWarrantyDate(this)"
-        class="item-warranty-toggle w-full flex items-center justify-center gap-1.5 border border-line rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-bg2 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${prefill && prefill.warranty ? "hidden" : ""}"
-        title="Tambah tanggal garansi (opsional)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        Tanggal
-      </button>
-      <input type="date" value="${prefill && prefill.warranty ? esc(prefill.warranty) : ""}"
-        class="item-warranty w-full border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${prefill && prefill.warranty ? "" : "hidden"}" />
+    <div class="relative w-28">
+      <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+      <input type="text" inputmode="numeric" placeholder="Harga" value="${prefill && prefill.price != null && prefill.price !== "" ? esc(groupDigits(prefill.price)) : ""}"
+        class="item-price price-input w-full text-right border border-line rounded-lg pl-8 pr-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
     </div>
+    <div class="item-subtotal w-28 text-right px-2 text-sm tabular-nums text-ink">Rp 0</div>
     <button type="button" onclick="this.closest('.item-row').remove(); recomputeTotals(); markActiveTabDirty();"
       class="p-1.5 rounded-lg hover:bg-bg2 text-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors" aria-label="Remove item">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -2434,24 +2479,69 @@ function addItemRow(prefill) {
   return row;
 }
 
-// Warranty date starts collapsed behind a "Tanggal" button (most items have
-// no warranty) — pressing it swaps in the actual date input, in place, same
-// width slot.
-function revealWarrantyDate(btnEl) {
-  const wrap = btnEl.closest(".item-warranty-wrap");
-  btnEl.classList.add("hidden");
-  const input = wrap.querySelector(".item-warranty");
-  input.classList.remove("hidden");
-  input.focus();
-}
-
 function findItemRowBySku(sku) {
   return document.querySelector(`#item-rows .item-row[data-sku="${CSS.escape(sku)}"]`);
+}
+
+// A keyboard-wedge scanner types the whole code in one burst, and not every
+// model is configured to send a trailing Enter. Characters arriving faster than
+// a person can type mark the entry as a scan; when they stop, it submits
+// itself. Hand-typing stays on Enter, so a half-typed SKU is never looked up.
+const SCAN_BURST_GAP_MS = 50;
+const SCAN_IDLE_SUBMIT_MS = 120;
+const SCAN_MIN_AUTO_LENGTH = 3;
+
+let scanLastInputAt = 0;
+let scanPrevLength = 0;
+let scanLooksMachine = false;
+let scanIdleTimer = null;
+let scanInFlight = false;
+
+function resetScanBurstState() {
+  clearTimeout(scanIdleTimer);
+  scanIdleTimer = null;
+  scanLastInputAt = 0;
+  scanPrevLength = 0;
+  scanLooksMachine = false;
+}
+
+function handleScanInput(event) {
+  const input = event.target;
+  const now = performance.now();
+  const gap = now - scanLastInputAt;
+  const added = input.value.length - scanPrevLength;
+  scanLastInputAt = now;
+  scanPrevLength = input.value.length;
+
+  if (!input.value) { resetScanBurstState(); return; }
+
+  if (added >= 2) {
+    // Several characters in one event: a paste, or keystrokes the browser
+    // batched because they arrived too fast to deliver separately.
+    scanLooksMachine = true;
+  } else if (input.value.length <= 1) {
+    // First character of a fresh entry — nothing to compare against yet.
+    scanLooksMachine = false;
+  } else {
+    scanLooksMachine = gap <= SCAN_BURST_GAP_MS;
+  }
+
+  clearTimeout(scanIdleTimer);
+  scanIdleTimer = null;
+  if (scanLooksMachine && input.value.trim().length >= SCAN_MIN_AUTO_LENGTH) {
+    scanIdleTimer = setTimeout(() => {
+      scanIdleTimer = null;
+      handleBarcodeScan();
+    }, SCAN_IDLE_SUBMIT_MS);
+  }
 }
 
 function handleScanInputKeydown(event) {
   if (event.key !== "Enter") return;
   event.preventDefault();
+  // A scanner that does send Enter would otherwise race its own idle timer.
+  clearTimeout(scanIdleTimer);
+  scanIdleTimer = null;
   handleBarcodeScan();
 }
 
@@ -2459,7 +2549,8 @@ async function handleBarcodeScan() {
   const input = document.getElementById("scan-barcode-input");
   const feedback = document.getElementById("scan-barcode-feedback");
   const sku = input.value.trim();
-  if (!sku) return;
+  if (!sku || scanInFlight) return;
+  scanInFlight = true;
 
   feedback.textContent = "";
   feedback.classList.remove("text-failed");
@@ -2486,12 +2577,54 @@ async function handleBarcodeScan() {
     input.value = "";
     input.disabled = false;
     input.focus();
+    scanInFlight = false;
+    resetScanBurstState();
   }
 }
 
 function formatIDR(n) {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
 }
+
+// ── Price inputs ─────────────────────────────────────────────────────────────
+// Fields marked .price-input group their digits as they are typed ("1.000.000")
+// using the same id-ID separators as formatIDR, so a field and the totals next
+// to it read alike. The separators live in the field's value, so parseInt on it
+// would read "1.000" as 1: read every price field with priceValue() and fill
+// every one with setPriceInput().
+function groupDigits(raw) {
+  const digits = String(raw ?? "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return digits ? Number(digits).toLocaleString("id-ID") : "";
+}
+
+function priceValue(el) {
+  return parseInt(String(el?.value ?? "").replace(/\D/g, ""), 10) || 0;
+}
+
+function setPriceInput(el, value) {
+  if (!el) return;
+  el.value = value === null || value === undefined || value === "" ? "" : groupDigits(value);
+}
+
+// Capture phase, so the field is already grouped when its own oninput runs and
+// recomputes totals. The caret is restored by counting digits rather than
+// characters — a separator appearing to its left must not shift it.
+document.addEventListener("input", (event) => {
+  const el = event.target;
+  if (!el.classList || !el.classList.contains("price-input")) return;
+  const caret = el.selectionStart ?? el.value.length;
+  const digitsBeforeCaret = el.value.slice(0, caret).replace(/\D/g, "").length;
+  const formatted = groupDigits(el.value);
+  if (formatted === el.value) return;
+  el.value = formatted;
+  let seen = 0;
+  let pos = 0;
+  while (pos < formatted.length && seen < digitsBeforeCaret) {
+    if (formatted[pos] >= "0" && formatted[pos] <= "9") seen++;
+    pos++;
+  }
+  try { el.setSelectionRange(pos, pos); } catch (_) {}
+}, true);
 
 // Status (Pending/Done) is never chosen by hand — it's derived from Jumlah
 // Dibayar vs Total, same rule the backend applies on save. Void overrides it
@@ -2511,10 +2644,12 @@ function recomputeTotals() {
   let subtotal = 0;
   rows.forEach(row => {
     const qty = parseInt(row.querySelector(".item-qty").value, 10) || 0;
-    const price = parseInt(row.querySelector(".item-price").value, 10) || 0;
-    subtotal += qty * price;
+    const price = priceValue(row.querySelector(".item-price"));
+    const lineTotal = qty * price;
+    row.querySelector(".item-subtotal").textContent = formatIDR(lineTotal);
+    subtotal += lineTotal;
   });
-  const discount = parseInt(document.getElementById("discount-input").value, 10) || 0;
+  const discount = priceValue(document.getElementById("discount-input"));
   const total = Math.max(subtotal - discount, 0);
 
   document.getElementById("subtotal-display").textContent = formatIDR(subtotal);
@@ -2522,22 +2657,16 @@ function recomputeTotals() {
 
   const discountError = document.getElementById("discount-error");
   if (discount > subtotal) {
-    discountError.textContent = "Discount cannot exceed subtotal";
+    discountError.textContent = "Diskon tidak boleh melebihi subtotal";
     discountError.classList.remove("hidden");
   } else {
     discountError.classList.add("hidden");
   }
 
-  // Amount paid: until the cashier manually overrides it, keep it synced to
-  // Total so the common "customer pays in full on the spot" flow costs zero
-  // extra clicks, while still allowing an explicit lower number for a down
-  // payment (see markAmountPaidTouched / blankCashierTabState).
-  const amountPaidInput = document.getElementById("amount-paid-input");
-  const tab = getActiveTab();
-  if (tab && !tab.amountPaidTouched && tab.status !== "void") {
-    amountPaidInput.value = String(total);
-  }
-  const amountPaid = parseInt(amountPaidInput.value, 10) || 0;
+  // Jumlah Dibayar is always entered by hand and starts at 0 — it is never
+  // auto-filled from Total, so a sale is only ever marked paid for an amount
+  // someone actually typed.
+  const amountPaid = priceValue(document.getElementById("amount-paid-input"));
   const remaining = Math.max(total - amountPaid, 0);
 
   const balanceLabel = document.getElementById("remaining-balance-label");
@@ -2562,22 +2691,17 @@ function recomputeTotals() {
   updateCashierStatusBadge(total, amountPaid);
 }
 
-// Called only from #amount-paid-input's own oninput (a real keystroke) —
-// programmatic `.value =` writes from recomputeTotals()'s auto-sync above
-// don't fire "input", so they never trip this.
-function markAmountPaidTouched() {
-  const tab = getActiveTab();
-  if (tab) tab.amountPaidTouched = true;
-}
-
 // ── Cashier: save / validate ──────────────────────────────────────────────────
 function collectReceiptPayload() {
   const rows = [...document.querySelectorAll("#item-rows .item-row")];
   const items = rows.map(row => ({
     product_name: row.querySelector(".item-name").value.trim(),
     quantity: parseInt(row.querySelector(".item-qty").value, 10) || 0,
-    unit_price: parseInt(row.querySelector(".item-price").value, 10) || 0,
-    warranty_date: row.querySelector(".item-warranty").value || null,
+    unit_price: priceValue(row.querySelector(".item-price")),
+    warranty_date: row.dataset.warranty || null,
+    // Set when the line came from a barcode scan or a master-item pick; a
+    // hand-typed line has none and sells without touching stock.
+    sku: row.dataset.sku || null,
   }));
   const customerName = document.getElementById("customer-name").value.trim();
   const payload = {
@@ -2587,8 +2711,9 @@ function collectReceiptPayload() {
     customer_phone: document.getElementById("customer-phone").value.trim(),
     customer_name: customerName || null,
     items,
-    discount: parseInt(document.getElementById("discount-input").value, 10) || 0,
-    amount_paid: parseInt(document.getElementById("amount-paid-input").value, 10) || 0,
+    discount: priceValue(document.getElementById("discount-input")),
+    amount_paid: priceValue(document.getElementById("amount-paid-input")),
+    payment_method: document.getElementById("payment-method-select").value,
   };
   // status is write-restricted server-side to "void" or omitted — pending/done
   // are always computed from amount_paid vs total, never sent by hand.
@@ -2602,15 +2727,15 @@ function collectReceiptPayload() {
 
 function validateReceiptForm(payload) {
   if (!payload.plate_region || !plateCodes[payload.plate_region]) {
-    showToast("Please enter a valid plate region code.");
+    showToast("Kode wilayah plat tidak valid.");
     return false;
   }
   if (!/^\d{1,4}$/.test(payload.plate_number)) {
-    showToast("Plate number must be 1-4 digits.");
+    showToast("Nomor plat harus 1-4 digit.");
     return false;
   }
   if (!/^[A-Z]{1,3}$/.test(payload.plate_suffix)) {
-    showToast("Plate suffix must be 1-3 letters.");
+    showToast("Huruf belakang plat harus 1-3 huruf.");
     return false;
   }
   // phone is required; normalize the same way the backend does before checking format.
@@ -2624,23 +2749,23 @@ function validateReceiptForm(payload) {
     return false;
   }
   if (payload.items.length === 0) {
-    showToast("Add at least one product.");
+    showToast("Tambahkan minimal satu barang.");
     return false;
   }
   for (const item of payload.items) {
-    if (!item.product_name) { showToast("Every product needs a name."); return false; }
-    if (item.quantity <= 0) { showToast("Quantity must be greater than 0."); return false; }
-    if (item.unit_price < 0) { showToast("Price cannot be negative."); return false; }
+    if (!item.product_name) { showToast("Setiap barang harus punya nama."); return false; }
+    if (item.quantity <= 0) { showToast("Jumlah harus lebih dari 0."); return false; }
+    if (item.unit_price < 0) { showToast("Harga tidak boleh minus."); return false; }
   }
   const subtotal = payload.items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   if (payload.discount > subtotal) {
-    showToast("Discount cannot exceed the subtotal.");
+    showToast("Diskon tidak boleh melebihi subtotal.");
     return false;
   }
   // Belt-and-suspenders: #amount-paid-input's own digit-only oninput sanitizer
   // already makes a negative value untypeable, so this should never trip.
   if (payload.amount_paid < 0) {
-    showToast("Amount paid cannot be negative.");
+    showToast("Jumlah dibayar tidak boleh minus.");
     return false;
   }
   return true;
@@ -2715,12 +2840,13 @@ function blankCashierTabState(tabId) {
     startedAt: new Date().toISOString(),
     createdAt: null,
     discount: "0",
-    // A brand-new receipt defaults to "paid in full on the spot" — amountPaid
-    // auto-syncs to Total (see recomputeTotals) until the cashier types into
-    // Jumlah Dibayar directly, which flips amountPaidTouched and freezes it.
     amountPaid: "0",
-    amountPaidTouched: false,
+    paymentMethod: "cash",
     status: "pending",
+    // A new receipt is being written, so it starts editable. One loaded from
+    // history opens locked (see tabStateFromReceipt) to make editing a past
+    // sale a deliberate act rather than a stray keystroke.
+    locked: false,
     dirty: false,
   };
 }
@@ -2735,7 +2861,7 @@ function tabStateFromReceipt(tabId, r) {
     customerPhone: r.customer_phone || "",
     customerName: r.customer_name || "",
     items: r.items.map(it => ({
-      sku: null,
+      sku: it.sku || null,
       name: it.product_name,
       qty: String(it.quantity),
       price: String(it.unit_price),
@@ -2744,11 +2870,9 @@ function tabStateFromReceipt(tabId, r) {
     startedAt: r.started_at || r.created_at,
     createdAt: r.created_at,
     discount: String(r.discount),
-    // A receipt loaded from the server already has an explicit, previously
-    // saved amount_paid — treat it as touched so editing line items later
-    // doesn't silently overwrite a recorded partial payment.
     amountPaid: String(r.amount_paid),
-    amountPaidTouched: true,
+    paymentMethod: r.payment_method || "cash",
+    locked: true,
     status: r.status || "pending",
     dirty: false,
   };
@@ -2794,7 +2918,7 @@ function captureFormIntoActiveTab() {
     name: row.querySelector(".item-name").value,
     qty: row.querySelector(".item-qty").value,
     price: row.querySelector(".item-price").value,
-    warranty: row.querySelector(".item-warranty").value,
+    warranty: row.dataset.warranty || "",
   }));
   tab.plateRegion = document.getElementById("plate-region").value;
   tab.plateNumber = document.getElementById("plate-number").value;
@@ -2803,6 +2927,7 @@ function captureFormIntoActiveTab() {
   tab.customerName = document.getElementById("customer-name").value;
   tab.discount = document.getElementById("discount-input").value;
   tab.amountPaid = document.getElementById("amount-paid-input").value;
+  tab.paymentMethod = document.getElementById("payment-method-select").value;
   // status isn't user-editable here anymore (see applyCashierVoidLock /
   // confirmVoidActiveReceipt) — it only ever changes via a save response.
 }
@@ -2907,14 +3032,22 @@ function renderCashierForm() {
 
   document.getElementById("scan-barcode-input").value = "";
   document.getElementById("scan-barcode-feedback").textContent = "";
+  // Drops any auto-submit still pending, so a scan started on the tab being
+  // left can't land on the one being opened.
+  resetScanBurstState();
+  // Keep focus on the scan box so a hardware barcode scanner (a keyboard-wedge
+  // device that just types the code + Enter) can be used without clicking in
+  // first, the way a grocery register works.
+  document.getElementById("scan-barcode-input").focus();
 
   const container = document.getElementById("item-rows");
   container.innerHTML = "";
   const items = tab.items.length ? tab.items : [{ sku: null, name: "", qty: "1", price: "", warranty: "" }];
   for (const item of items) addItemRow(item);
 
-  document.getElementById("discount-input").value = tab.discount || "0";
-  document.getElementById("amount-paid-input").value = tab.amountPaid ?? "0";
+  setPriceInput(document.getElementById("discount-input"), tab.discount || 0);
+  setPriceInput(document.getElementById("amount-paid-input"), tab.amountPaid ?? 0);
+  document.getElementById("payment-method-select").value = tab.paymentMethod || "cash";
   recomputeTotals();
 
   document.getElementById("cashier-form-title").textContent = tab.receiptId ? "Edit receipt" : "New receipt";
@@ -2930,25 +3063,42 @@ function renderCashierForm() {
 // read-only treatment (#inbound-readonly-banner / setInboundRowDisabled).
 function applyCashierVoidLock(tab) {
   const isVoid = tab.status === "void";
+  // Two reasons a form is read-only: the sale was voided (permanent), or it is
+  // a saved receipt nobody has pressed Edit on yet (liftable).
+  const readOnly = isVoid || tab.locked;
 
   document.getElementById("cashier-void-banner").classList.toggle("hidden", !isVoid);
 
   const lockIds = [
     "plate-region", "plate-number", "plate-suffix", "customer-phone", "customer-name",
-    "scan-barcode-input", "add-item-btn", "discount-input", "amount-paid-input", "save-receipt-btn",
+    "scan-barcode-input", "add-item-btn", "discount-input", "amount-paid-input",
+    "payment-method-select", "save-receipt-btn",
   ];
   lockIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.disabled = isVoid;
+    if (el) el.disabled = readOnly;
   });
 
   document.querySelectorAll("#item-rows .item-row").forEach(row => {
-    row.querySelectorAll("input, button").forEach(el => { el.disabled = isVoid; });
+    row.querySelectorAll("input, button").forEach(el => { el.disabled = readOnly; });
   });
+
+  // Edit is offered only for a saved receipt that is locked and not voided —
+  // a void can never be edited, and an unsaved tab is editable already.
+  document.getElementById("cashier-edit-btn").classList.toggle(
+    "hidden", !(tab.receiptId && tab.locked && !isVoid)
+  );
 
   // Void itself can't be undone, and there's nothing left to void once a
   // receipt has no persisted id yet — hide the button in both cases.
   document.getElementById("cashier-void-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
+}
+
+function unlockActiveReceipt() {
+  const tab = getActiveTab();
+  if (!tab || tab.status === "void") return;
+  tab.locked = false;
+  applyCashierVoidLock(tab);
 }
 
 function confirmVoidActiveReceipt() {
@@ -2986,7 +3136,7 @@ async function voidActiveReceiptConfirmed() {
   await loadReceiptHistory();
   renderCashierTabBar();
   renderCashierForm();
-  showToast("Receipt voided.", "success");
+  showToast("Nota dibatalkan.", "success");
 }
 
 // Closes a tab, confirming via the shared modal (never native confirm()) if it
@@ -3084,7 +3234,7 @@ async function viewReceipt(receiptId) {
   }
   const resp = await fetch(`/api/receipts/${receiptId}`);
   if (!resp.ok) {
-    showToast("Could not load this receipt.");
+    showToast("Nota tidak bisa dimuat.");
     return;
   }
   const r = await resp.json();
@@ -3129,7 +3279,7 @@ async function deleteActiveReceiptConfirmed() {
   tab.dirty = false; // already deleted server-side — close without a redundant confirm
   discardAndCloseCashierTab(tab.tabId);
   await loadReceiptHistory();
-  showToast("Receipt dihapus.", "success");
+  showToast("Nota dihapus.", "success");
 }
 
 // ── Invoices: history search + status filter ──────────────────────────────────
@@ -4676,8 +4826,8 @@ async function submitNewMasterItem() {
   const brandId = parseInt(comboboxValue(document.getElementById("new-item-brand")), 10);
   const name = document.getElementById("new-item-name").value.trim();
   const unit = document.getElementById("new-item-unit").value.trim();
-  const sellPrice = parseInt(document.getElementById("new-item-sell-price").value, 10) || 0;
-  const costPrice = parseInt(document.getElementById("new-item-cost-price").value, 10) || 0;
+  const sellPrice = priceValue(document.getElementById("new-item-sell-price"));
+  const costPrice = priceValue(document.getElementById("new-item-cost-price"));
 
   if (!supplierId) { showToast("Pilih supplier terlebih dahulu."); return; }
   if (!brandId) { showToast("Pilih merek terlebih dahulu."); return; }
@@ -4748,7 +4898,7 @@ function jumpToInboundDocument(documentId) {
 
 function enableMasterItemEdit() {
   document.getElementById("edit-item-name").value = currentMasterItem.name;
-  document.getElementById("edit-item-sell-price").value = currentMasterItem.sell_price;
+  setPriceInput(document.getElementById("edit-item-sell-price"), currentMasterItem.sell_price);
   setUnitSelectValue(document.getElementById("edit-item-unit"), currentMasterItem.unit);
   document.getElementById("edit-item-sku-note").textContent = currentMasterItem.sku;
   document.getElementById("detail-item-view").classList.add("hidden");
@@ -4764,7 +4914,7 @@ function cancelMasterItemEdit() {
 
 async function saveMasterItemEdit() {
   const name = document.getElementById("edit-item-name").value.trim();
-  const sellPriceRaw = document.getElementById("edit-item-sell-price").value;
+  const sellPrice = priceValue(document.getElementById("edit-item-sell-price"));
   const unit = document.getElementById("edit-item-unit").value.trim();
   if (!name) { showToast("Nama barang tidak boleh kosong."); return; }
   if (!unit) { showToast("Satuan tidak boleh kosong."); return; }
@@ -4772,7 +4922,7 @@ async function saveMasterItemEdit() {
   const resp = await fetch(`/api/inventory/master-items/${currentMasterItemId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, sell_price: parseInt(sellPriceRaw, 10) || 0, unit }),
+    body: JSON.stringify({ name, sell_price: sellPrice, unit }),
   });
   if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
   showToast("Barang diperbarui.", "success");
@@ -5030,8 +5180,8 @@ function inboundItemRowTemplate(rowId) {
         <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Harga Modal</label>
         <div class="relative">
           <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
-          <input type="text" inputmode="numeric" placeholder="0" class="row-cost w-full text-right border border-line rounded-lg pl-6 pr-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-            oninput="this.value=this.value.replace(/[^0-9]/g,'');" onkeydown="onInboundRowCostKeydown(event, this)" />
+          <input type="text" inputmode="numeric" placeholder="0" class="row-cost price-input w-full text-right border border-line rounded-lg pl-6 pr-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+            onkeydown="onInboundRowCostKeydown(event, this)" />
         </div>
       </div>
       <button type="button" onclick="removeInboundItemRow(this)" class="mt-5 p-1.5 rounded-lg hover:bg-bg2 text-muted transition-colors" aria-label="Hapus baris">
@@ -5071,7 +5221,7 @@ function applyPrefillToRow(rowEl, item) {
     sell_price: item.resolved_sell_price != null ? item.resolved_sell_price : item.pending_sell_price,
   });
   rowEl.querySelector(".row-qty").value = item.qty_in;
-  rowEl.querySelector(".row-cost").value = item.cost_price;
+  setPriceInput(rowEl.querySelector(".row-cost"), item.cost_price);
 }
 
 function onInboundRowCostKeydown(event, inputEl) {
@@ -5086,7 +5236,7 @@ function updateInboundTotalDisplay() {
   let total = 0;
   rows.forEach(row => {
     const qty = parseInt(row.querySelector(".row-qty").value, 10) || 0;
-    const cost = parseInt(row.querySelector(".row-cost").value, 10) || 0;
+    const cost = priceValue(row.querySelector(".row-cost"));
     total += qty * cost;
   });
   document.getElementById("inbound-total-display").textContent = `Total: ${formatIDR(total)}`;
@@ -5297,7 +5447,7 @@ function collectInboundPayload() {
   const items = rows.map(row => ({
     master_item_id: row.dataset.masterItemId ? parseInt(row.dataset.masterItemId, 10) : null,
     qty_in: parseInt(row.querySelector(".row-qty").value, 10) || 0,
-    cost_price: parseInt(row.querySelector(".row-cost").value, 10) || 0,
+    cost_price: priceValue(row.querySelector(".row-cost")),
   }));
   return {
     supplier_id: parseInt(comboboxValue(document.getElementById("inbound-supplier-select")), 10) || null,
@@ -5496,8 +5646,35 @@ function printInboundBarcodes() {
   runInboundBarcodePrint();
 }
 
+// 54mm of printable width inside the label's 2mm padding, in CSS px at 96dpi.
+const BARCODE_MAX_WIDTH_PX = 54 / 25.4 * 96;
+
+// A long SKU renders wider than the label (18 characters at 1.5px per module is
+// ~92mm) and would print clipped at both edges. Squeeze it horizontally only:
+// narrower modules still scan, whereas scaling uniformly would also shrink the
+// bar height and leave a stripe too short to aim at. The quiet zone is part of
+// the drawing, so it shrinks in proportion and keeps its 10-module ratio.
+function fitBarcodeToLabel(svg) {
+  // The single-label sheet is reused between prints, so undo a previous
+  // squeeze before deciding whether this code needs one.
+  svg.removeAttribute("viewBox");
+  svg.removeAttribute("preserveAspectRatio");
+  svg.style.width = "";
+  svg.style.height = "";
+
+  const w = parseFloat(svg.getAttribute("width"));
+  const h = parseFloat(svg.getAttribute("height"));
+  if (!w || !h || w <= BARCODE_MAX_WIDTH_PX) return;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.removeAttribute("width");
+  svg.style.width = "100%";
+  svg.style.height = `${h}px`;
+}
+
 // Shared by the document print and the manual free-text print. Each label is
-// {sku, name, sellPrice}; sku is whatever string should become the barcode.
+// {sku, name, sellPrice, note}; sku is whatever string should become the
+// barcode and note is an optional free-text line printed under it.
 function printBarcodeLabels(labels) {
   if (!labels.length) return;
 
@@ -5508,6 +5685,7 @@ function printBarcodeLabels(labels) {
       <div class="barcode-label-name">${esc(l.name || "")}</div>
       <svg class="barcode-batch-svg" data-idx="${i}"></svg>
       <div class="barcode-label-sku">${esc(l.sku)}</div>
+      <div class="barcode-label-note">${esc(l.note || "")}</div>
       <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
     </div>
   `).join("");
@@ -5519,10 +5697,11 @@ function printBarcodeLabels(labels) {
       JsBarcode(svg, code, {
         format: "CODE128",
         displayValue: false,
-        margin: 0,
+        margin: 15,
         width: 1.5,
         height: 42,
       });
+      fitBarcodeToLabel(svg);
     } catch (_) {
       // CODE128 rejects some inputs outright; drop that one label rather than
       // sending a blank sticker to the printer.
@@ -5569,12 +5748,20 @@ function openManualBarcodeModal() {
         <input id="manual-barcode-name" type="text" autocomplete="off"
           class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
       </div>
+      <div>
+        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Teks Bebas <span class="normal-case font-normal">(opsional)</span></label>
+        <input id="manual-barcode-note" type="text" data-no-uppercase autocomplete="off" placeholder="Ukuran, warna, catatan…"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitManualBarcode();}"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga <span class="normal-case font-normal">(opsional)</span></label>
-          <input id="manual-barcode-price" type="text" inputmode="numeric" placeholder="0"
-            oninput="this.value=this.value.replace(/[^0-9]/g,'');"
-            class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+            <input id="manual-barcode-price" type="text" inputmode="numeric" placeholder="0"
+              class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          </div>
         </div>
         <div>
           <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jumlah Label</label>
@@ -5597,8 +5784,9 @@ function submitManualBarcode() {
   if (!code) { showToast("Kode barcode belum diisi."); return; }
 
   const name = document.getElementById("manual-barcode-name").value.trim();
-  const rawPrice = document.getElementById("manual-barcode-price").value.trim();
-  const price = rawPrice ? parseInt(rawPrice, 10) : null;
+  const note = document.getElementById("manual-barcode-note").value.trim();
+  const priceEl = document.getElementById("manual-barcode-price");
+  const price = priceEl.value.trim() ? priceValue(priceEl) : null;
   const qty = Math.max(1, parseInt(document.getElementById("manual-barcode-qty").value, 10) || 1);
 
   if (qty > BARCODE_CONFIRM_THRESHOLD) {
@@ -5606,12 +5794,41 @@ function submitManualBarcode() {
     return;
   }
 
-  const labels = Array.from({ length: qty }, () => ({ sku: code, name, sellPrice: price }));
+  const labels = Array.from({ length: qty }, () => ({ sku: code, name, sellPrice: price, note }));
   closeModal();
   printBarcodeLabels(labels);
 }
 
+// The label can carry a free-text line that isn't part of the master record
+// (size, colour, a shelf note), so printing asks for it first. Leaving it blank
+// prints exactly the label this used to print.
 function printMasterItemBarcode() {
+  if (!currentMasterItem) return;
+  openModal("Cetak Barcode", `
+    <div class="space-y-3">
+      <div>
+        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Teks Bebas <span class="normal-case font-normal">(opsional)</span></label>
+        <input id="master-barcode-note" type="text" data-no-uppercase autocomplete="off" placeholder="Ukuran, warna, catatan…"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitMasterItemBarcode();}"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <p class="text-[11px] text-muted mt-1.5">Dicetak di bawah kode. Kosongkan bila tidak perlu.</p>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button onclick="submitMasterItemBarcode()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Cetak</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById("master-barcode-note")?.focus(), 0);
+}
+
+function submitMasterItemBarcode() {
+  const note = document.getElementById("master-barcode-note").value.trim();
+  closeModal();
+  runMasterItemBarcodePrint(note);
+}
+
+function runMasterItemBarcodePrint(note) {
   if (!currentMasterItem) return;
   // Share one print sheet with the batch path: show the single label, drop any
   // labels a previous batch print left behind.
@@ -5620,13 +5837,15 @@ function printMasterItemBarcode() {
   document.getElementById("barcode-print-name").textContent = currentMasterItem.name;
   document.getElementById("barcode-print-price").textContent = formatIDR(currentMasterItem.sell_price);
   document.getElementById("barcode-print-sku-text").textContent = currentMasterItem.sku;
+  document.getElementById("barcode-print-note").textContent = note || "";
   JsBarcode("#barcode-print-svg", currentMasterItem.sku, {
     format: "CODE128",
     displayValue: false,
-    margin: 0,
+    margin: 15,
     width: 1.5,
     height: 42,
   });
+  fitBarcodeToLabel(document.getElementById("barcode-print-svg"));
   printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", null);
 }
 
@@ -5780,7 +5999,7 @@ function newPurchaseInvoiceForm() {
   document.getElementById("pi-invoice-date").value = toDateInputValue(new Date());
   document.getElementById("pi-payment-terms").value = "NET 30";
   document.getElementById("pi-notes").value = "";
-  document.getElementById("pi-discount").value = "0";
+  setPriceInput(document.getElementById("pi-discount"), 0);
   document.getElementById("pi-tax-rate").value = "0";
   document.getElementById("pi-item-rows").innerHTML = "";
   onPurchaseInvoiceTermsChange();
@@ -5815,7 +6034,7 @@ async function openPurchaseInvoice(invoiceId) {
   document.getElementById("pi-payment-terms").value = inv.payment_terms;
   document.getElementById("pi-due-date").value = inv.due_date;
   document.getElementById("pi-notes").value = inv.notes || "";
-  document.getElementById("pi-discount").value = inv.discount;
+  setPriceInput(document.getElementById("pi-discount"), inv.discount);
   document.getElementById("pi-tax-rate").value = inv.tax_rate;
 
   document.getElementById("pi-item-rows").innerHTML = "";
@@ -5938,9 +6157,12 @@ function purchaseInvoiceRowTemplate(rowId) {
       <input type="number" min="1" step="1" placeholder="Qty" value="1"
         class="pi-row-qty w-20 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors"
         oninput="updatePurchaseInvoiceTotals()" />
-      <input type="number" min="0" step="1" placeholder="Harga" value="0"
-        class="pi-row-price w-32 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors"
-        oninput="updatePurchaseInvoiceTotals()" />
+      <div class="relative w-32">
+        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+        <input type="text" inputmode="numeric" placeholder="Harga" value="0"
+          class="pi-row-price price-input w-full border border-line rounded-lg pl-8 pr-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors"
+          oninput="updatePurchaseInvoiceTotals()" />
+      </div>
       <div class="pi-row-total w-28 px-2 py-2 text-sm text-right tabular-nums text-muted">Rp 0</div>
       <button type="button" onclick="removePurchaseInvoiceRow(this)" title="Hapus baris"
         class="pi-row-remove px-2.5 py-2 border border-line rounded-lg text-sm text-muted hover:text-failed hover:border-failed transition-colors">&times;</button>
@@ -5962,7 +6184,7 @@ function addPurchaseInvoiceRow(prefill) {
     div.querySelector(".pi-row-product").value = prefill.product_name || "";
     div.querySelector(".pi-row-unit").value = prefill.unit || "";
     div.querySelector(".pi-row-qty").value = prefill.qty;
-    div.querySelector(".pi-row-price").value = prefill.unit_price;
+    setPriceInput(div.querySelector(".pi-row-price"), prefill.unit_price);
     setPiRowMeta(div, prefill.sku);
   }
   updatePurchaseInvoiceTotals();
@@ -6048,7 +6270,7 @@ function choosePiProduct(btnEl) {
   rowEl.querySelector(".pi-row-unit").value = item.unit || "";
   const priceEl = rowEl.querySelector(".pi-row-price");
   // Last purchase cost is the best guess for what this supplier will bill again.
-  if (!parseInt(priceEl.value, 10) && item.last_cost_price) priceEl.value = item.last_cost_price;
+  if (!priceValue(priceEl) && item.last_cost_price) setPriceInput(priceEl, item.last_cost_price);
   setPiRowMeta(rowEl, item.sku);
   dd.classList.add("hidden");
   updatePurchaseInvoiceTotals();
@@ -6061,7 +6283,7 @@ function purchaseInvoiceRowValues() {
     product_name: rowEl.querySelector(".pi-row-product").value.trim(),
     unit: rowEl.querySelector(".pi-row-unit").value.trim(),
     qty: parseInt(rowEl.querySelector(".pi-row-qty").value, 10) || 0,
-    unit_price: parseInt(rowEl.querySelector(".pi-row-price").value, 10) || 0,
+    unit_price: priceValue(rowEl.querySelector(".pi-row-price")),
   }));
 }
 
@@ -6075,7 +6297,7 @@ function updatePurchaseInvoiceTotals() {
     subtotal += lineTotal;
     row.rowEl.querySelector(".pi-row-total").textContent = formatIDR(lineTotal);
   }
-  const discountInput = Math.max(0, parseInt(document.getElementById("pi-discount").value, 10) || 0);
+  const discountInput = priceValue(document.getElementById("pi-discount"));
   const discount = Math.min(discountInput, subtotal);
   const taxRate = parseFloat(document.getElementById("pi-tax-rate").value) || 0;
   const taxAmount = Math.round((subtotal - discount) * taxRate / 100);
@@ -6118,7 +6340,7 @@ function collectPurchaseInvoicePayload() {
     payment_terms: document.getElementById("pi-payment-terms").value,
     supplier_invoice_no: document.getElementById("pi-supplier-invoice-no").value.trim() || null,
     notes: document.getElementById("pi-notes").value.trim() || null,
-    discount: Math.max(0, parseInt(document.getElementById("pi-discount").value, 10) || 0),
+    discount: priceValue(document.getElementById("pi-discount")),
     tax_rate: parseFloat(document.getElementById("pi-tax-rate").value) || 0,
     items,
   };
@@ -6241,7 +6463,7 @@ async function deletePurchaseInvoice() {
 
 async function submitPurchaseInvoicePayment() {
   if (!currentPurchaseInvoice) return;
-  const amount = parseInt(document.getElementById("pi-payment-amount").value, 10);
+  const amount = priceValue(document.getElementById("pi-payment-amount"));
   if (!amount || amount <= 0) { showToast("Jumlah bayar harus lebih dari 0."); return; }
   const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/payments`, {
     method: "POST",
@@ -6376,6 +6598,9 @@ let preorderCache = [];
 let currentPreorder = null;   // full detail of the open order; null while composing a new one
 let poRowSeq = 0;
 let poStatusFilter = "";
+// Drafts are parked preorders: hidden from the live list, still fully editable
+// and restorable. Nothing deletes a preorder any more.
+let poDraftView = false;
 let poSearchQuery = "";
 let poProductSearchState = new WeakMap(); // row product input -> { results, timer }
 // Set when a dashboard row asks for a specific order; opened once the route's
@@ -6396,15 +6621,26 @@ function renderPreorderStatusFilters() {
   const chips = [{ key: "", label: "Semua" }, ...PREORDER_STATUSES];
   wrap.innerHTML = chips.map(c => `
     <button type="button" data-po-status="${esc(c.key)}" onclick="setPreorderStatusFilter('${esc(c.key)}')"
-      class="po-status-btn ${c.key === poStatusFilter ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">${esc(c.label)}</button>
-  `).join("");
+      class="po-status-btn ${!poDraftView && c.key === poStatusFilter ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">${esc(c.label)}</button>
+  `).join("") + `
+    <button type="button" onclick="setPreorderDraftView()"
+      class="po-draft-chip ${poDraftView ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-muted hover:bg-bg2 transition-colors ml-1.5">Draft</button>
+  `;
 }
 
 function setPreorderStatusFilter(status) {
   poStatusFilter = status;
-  document.querySelectorAll(".po-status-btn").forEach(btn => {
-    btn.classList.toggle("is-active", btn.dataset.poStatus === status);
-  });
+  poDraftView = false;
+  renderPreorderStatusFilters();
+  loadPreorders();
+}
+
+// The stage filter applies to live preorders only, so entering the draft view
+// clears it rather than intersecting two unrelated filters.
+function setPreorderDraftView() {
+  poDraftView = true;
+  poStatusFilter = "";
+  renderPreorderStatusFilters();
   loadPreorders();
 }
 
@@ -6421,6 +6657,7 @@ async function loadPreorders() {
   const params = new URLSearchParams();
   if (poSearchQuery) params.set("query", poSearchQuery);
   if (poStatusFilter) params.set("status", poStatusFilter);
+  if (poDraftView) params.set("draft", "true");
   try {
     const resp = await fetch(`/api/preorders?${params.toString()}`);
     if (!resp.ok) throw new Error("gagal memuat");
@@ -6452,10 +6689,16 @@ function renderPreorderList(rows) {
 
   if (rows.length === 0) {
     const filtered = Boolean(poSearchQuery || poStatusFilter);
-    document.getElementById("po-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada preorder.";
-    document.getElementById("po-list-empty-msg").textContent = filtered
-      ? "Coba kata kunci lain atau pilih status “Semua”."
-      : "Catat pesanan pelanggan lewat tombol “+ Preorder Baru”.";
+    if (poDraftView) {
+      document.getElementById("po-list-empty-title").textContent = "Belum ada draft.";
+      document.getElementById("po-list-empty-msg").textContent =
+        "Preorder yang dijadikan draft akan muncul di sini dan bisa diaktifkan kembali.";
+    } else {
+      document.getElementById("po-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada preorder.";
+      document.getElementById("po-list-empty-msg").textContent = filtered
+        ? "Coba kata kunci lain atau pilih status “Semua”."
+        : "Catat pesanan pelanggan lewat tombol “+ Preorder Baru”.";
+    }
     emptyEl.classList.remove("hidden");
     return;
   }
@@ -6465,7 +6708,9 @@ function renderPreorderList(rows) {
     const tr = document.createElement("tr");
     tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
     tr.innerHTML = `
-      <td class="px-3 py-2 font-medium text-ink">${esc(r.customer_name)}</td>
+      <td class="px-3 py-2 font-medium text-ink">${esc(r.customer_name)}${r.is_draft
+        ? ' <span class="ml-1.5 align-middle text-[10px] uppercase tracking-wider text-muted border border-line rounded px-1.5 py-0.5">Draft</span>'
+        : ""}</td>
       <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(r.customer_phone)}</td>
       <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatDateTimeSeconds(r.created_at))}</td>
       <td class="px-3 py-2 text-right text-muted tabular-nums">${r.item_count}</td>
@@ -6491,7 +6736,6 @@ function showPreorderForm() {
 
 async function backToPreorderList() {
   currentPreorder = null;
-  resetPreorderArmButtons();
   showPreorderList();
   await loadPreorders();
   if (pendingPreorderId) {
@@ -6511,16 +6755,15 @@ function openPreorderFromDashboard(preorderId) {
 
 function newPreorderForm() {
   currentPreorder = null;
-  resetPreorderArmButtons();
   document.getElementById("po-form-title").textContent = "Preorder Baru";
   document.getElementById("po-form-meta").classList.add("hidden");
   document.getElementById("po-customer-name").value = "";
   document.getElementById("po-customer-phone").value = "";
   document.getElementById("po-notes").value = "";
-  document.getElementById("po-deposit").value = 0;
+  setPriceInput(document.getElementById("po-deposit"), 0);
   document.getElementById("po-item-rows").innerHTML = "";
   document.getElementById("po-history-section").classList.add("hidden");
-  document.getElementById("po-delete-btn").classList.add("hidden");
+  document.getElementById("po-draft-btn").classList.add("hidden");
   addPreorderRow();
   updatePreorderTotals();
   showPreorderForm();
@@ -6542,7 +6785,6 @@ async function openPreorder(preorderId) {
 
 function renderPreorderDetail(detail) {
   currentPreorder = detail;
-  resetPreorderArmButtons();
   document.getElementById("po-form-title").textContent = detail.customer_name;
   const meta = document.getElementById("po-form-meta");
   meta.textContent = `Dibuat ${formatDateTimeSeconds(detail.created_at)} · terakhir diubah ${formatDateTimeSeconds(detail.updated_at)}`;
@@ -6550,11 +6792,13 @@ function renderPreorderDetail(detail) {
   document.getElementById("po-customer-name").value = detail.customer_name;
   document.getElementById("po-customer-phone").value = detail.customer_phone;
   document.getElementById("po-notes").value = detail.notes || "";
-  document.getElementById("po-deposit").value = detail.deposit;
+  setPriceInput(document.getElementById("po-deposit"), detail.deposit);
   document.getElementById("po-item-rows").innerHTML = "";
   for (const item of detail.items) addPreorderRow(item);
   renderPreorderHistory(detail.history);
-  document.getElementById("po-delete-btn").classList.remove("hidden");
+  const draftBtn = document.getElementById("po-draft-btn");
+  draftBtn.textContent = detail.is_draft ? "Aktifkan Kembali" : "Jadikan Draft";
+  draftBtn.classList.remove("hidden");
   updatePreorderTotals();
   showPreorderForm();
 }
@@ -6595,9 +6839,12 @@ function preorderRowTemplate() {
       <input type="number" min="1" step="1" placeholder="Unit" value="1"
         class="po-row-qty w-20 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
         oninput="updatePreorderTotals()" />
-      <input type="number" min="0" step="1" placeholder="Harga" value="0"
-        class="po-row-price w-32 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-        oninput="updatePreorderTotals()" />
+      <div class="relative w-32">
+        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+        <input type="text" inputmode="numeric" placeholder="Harga" value="0"
+          class="po-row-price price-input w-full border border-line rounded-lg pl-8 pr-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+          oninput="updatePreorderTotals()" />
+      </div>
       <select class="po-row-status w-44 border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
         onchange="onPoRowStatusChange(this)">${statusOptions}</select>
       <div class="po-row-total w-28 px-2 py-2 text-sm text-right tabular-nums text-muted">Rp 0</div>
@@ -6623,7 +6870,7 @@ function addPreorderRow(prefill) {
     div.querySelector(".po-row-product").value = prefill.product_name || "";
     div.querySelector(".po-row-unit").value = prefill.unit || "";
     div.querySelector(".po-row-qty").value = prefill.quantity;
-    div.querySelector(".po-row-price").value = prefill.unit_price;
+    setPriceInput(div.querySelector(".po-row-price"), prefill.unit_price);
     div.querySelector(".po-row-status").value = prefill.status;
     setPoRowMeta(div, prefill.sku);
   }
@@ -6710,7 +6957,7 @@ function choosePoProduct(btnEl) {
   rowEl.querySelector(".po-row-unit").value = item.unit || "";
   const priceEl = rowEl.querySelector(".po-row-price");
   // The customer is quoted the selling price, not what the shop pays for it.
-  if (!parseInt(priceEl.value, 10) && item.sell_price) priceEl.value = item.sell_price;
+  if (!priceValue(priceEl) && item.sell_price) setPriceInput(priceEl, item.sell_price);
   setPoRowMeta(rowEl, item.sku);
   dd.classList.add("hidden");
   updatePreorderTotals();
@@ -6755,7 +7002,7 @@ function preorderRowValues() {
     product_name: rowEl.querySelector(".po-row-product").value.trim(),
     unit: rowEl.querySelector(".po-row-unit").value.trim() || null,
     quantity: parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 0,
-    unit_price: parseInt(rowEl.querySelector(".po-row-price").value, 10) || 0,
+    unit_price: priceValue(rowEl.querySelector(".po-row-price")),
     status: rowEl.querySelector(".po-row-status").value,
     rowEl,
   }));
@@ -6768,7 +7015,7 @@ function updatePreorderTotals() {
     total += lineTotal;
     row.rowEl.querySelector(".po-row-total").textContent = formatIDR(lineTotal);
   }
-  const deposit = parseInt(document.getElementById("po-deposit").value, 10) || 0;
+  const deposit = priceValue(document.getElementById("po-deposit"));
   const remaining = Math.max(total - deposit, 0);
   document.getElementById("po-total-display").textContent = formatIDR(total);
   const remainingEl = document.getElementById("po-remaining-display");
@@ -6785,7 +7032,7 @@ function collectPreorderPayload() {
     customer_name: document.getElementById("po-customer-name").value.trim(),
     customer_phone: document.getElementById("po-customer-phone").value.trim(),
     notes: document.getElementById("po-notes").value.trim() || null,
-    deposit: parseInt(document.getElementById("po-deposit").value, 10) || 0,
+    deposit: priceValue(document.getElementById("po-deposit")),
     items,
   };
 }
@@ -6831,37 +7078,22 @@ async function savePreorder() {
   }
 }
 
-// Delete is a two-click arm/confirm, same as the other destructive buttons.
-function handleDeletePreorderClick(btnEl) {
-  if (btnEl.dataset.armed === "true") {
-    resetPreorderArmButtons();
-    deletePreorder();
-    return;
-  }
-  btnEl.dataset.armed = "true";
-  btnEl.textContent = "Yakin hapus?";
-  btnEl.classList.add("bg-failed", "text-bg");
-  btnEl._poArmTimer = setTimeout(() => resetPreorderArmButtons(), 4000);
-}
-
-function resetPreorderArmButtons() {
-  const btn = document.getElementById("po-delete-btn");
-  if (!btn) return;
-  clearTimeout(btn._poArmTimer);
-  btn.dataset.armed = "false";
-  btn.textContent = "Hapus";
-  btn.classList.remove("bg-failed", "text-bg");
-}
-
-async function deletePreorder() {
+// Parking a preorder is reversible and loses nothing, so unlike the delete it
+// replaced it needs no arm/confirm step.
+async function togglePreorderDraft() {
   if (!currentPreorder) return;
+  const makeDraft = !currentPreorder.is_draft;
   try {
-    const resp = await fetch(`/api/preorders/${currentPreorder.id}`, { method: "DELETE" });
-    if (!resp.ok && resp.status !== 204) {
+    const resp = await fetch(`/api/preorders/${currentPreorder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_draft: makeDraft }),
+    });
+    if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.detail || "Gagal menghapus preorder");
+      throw new Error(err.detail || "Gagal mengubah status draft.");
     }
-    showToast("Preorder dihapus.", "success");
+    showToast(makeDraft ? "Preorder dijadikan draft." : "Preorder diaktifkan kembali.", "success");
     backToPreorderList();
   } catch (e) {
     showToast(e.message);
@@ -7196,6 +7428,7 @@ checkAuth();
     <div id="barcode-print-name" class="barcode-label-name"></div>
     <svg id="barcode-print-svg"></svg>
     <div id="barcode-print-sku-text" class="barcode-label-sku"></div>
+    <div id="barcode-print-note" class="barcode-label-note"></div>
     <div id="barcode-print-price" class="barcode-label-price"></div>
   </div>
   <!-- Batch: Barang Masuk renders one .barcode-label per received unit here. -->

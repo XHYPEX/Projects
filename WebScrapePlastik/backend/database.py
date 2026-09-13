@@ -68,7 +68,8 @@ def init_db() -> None:
                 subtotal INTEGER NOT NULL,
                 discount INTEGER NOT NULL DEFAULT 0,
                 total INTEGER NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                payment_method TEXT NOT NULL DEFAULT 'cash'
             );
             CREATE INDEX IF NOT EXISTS idx_receipts_plate_full ON receipts(plate_full);
             CREATE INDEX IF NOT EXISTS idx_receipts_created_at ON receipts(created_at);
@@ -78,7 +79,8 @@ def init_db() -> None:
                 product_name TEXT NOT NULL,
                 quantity INTEGER NOT NULL,
                 unit_price INTEGER NOT NULL,
-                warranty_date TEXT
+                warranty_date TEXT,
+                master_item_id INTEGER REFERENCES master_items(id)
             );
             CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt_id ON receipt_items(receipt_id);
 
@@ -93,7 +95,8 @@ def init_db() -> None:
                 deposit INTEGER NOT NULL DEFAULT 0,
                 notes TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                is_draft INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_preorders_created_at ON preorders(created_at);
             CREATE TABLE IF NOT EXISTS preorder_items (
@@ -372,6 +375,32 @@ def init_db() -> None:
         if "customer_name" not in receipt_cols:
             con.execute("ALTER TABLE receipts ADD COLUMN customer_name TEXT")
 
+        # --- Additive migration: payment method ---
+        # data/scraper.db already has live receipt rows created before this
+        # feature existed. Every sale before now was taken in cash (transfer/QRIS
+        # didn't exist as an option at the register), so the NOT NULL DEFAULT
+        # 'cash' backfills them correctly with no UPDATE needed.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "payment_method" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash'")
+
+        # --- Additive migration: receipt line -> master item link (stock movement) ---
+        # data/scraper.db already has live receipt_items rows created before a sale
+        # could be attributed to a specific product. Those stay NULL rather than
+        # being guessed at — a historical sale that can't be linked to a master
+        # item must never move stock (see _receipt_item_holdings).
+        receipt_item_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipt_items)").fetchall()}
+        if "master_item_id" not in receipt_item_cols:
+            con.execute("ALTER TABLE receipt_items ADD COLUMN master_item_id INTEGER REFERENCES master_items(id)")
+
+        # --- Additive migration: preorder draft/archive flag ---
+        # data/scraper.db already has live preorder rows created before drafts
+        # existed. They're all still active orders, not parked ones, so the
+        # NOT NULL DEFAULT 0 backfills them correctly with no UPDATE needed.
+        preorder_cols = {row["name"] for row in con.execute("PRAGMA table_info(preorders)").fetchall()}
+        if "is_draft" not in preorder_cols:
+            con.execute("ALTER TABLE preorders ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0")
+
         seed_normalized = _normalize_name("Tanpa Merk")
         existing_seed = con.execute("SELECT 1 FROM brands WHERE code=?", ("NOB",)).fetchone()
         if existing_seed is None:
@@ -536,6 +565,67 @@ def _sanitize_started_at(value: str | None, created_at: str) -> str:
     return parsed.isoformat()
 
 
+def _resolve_master_item_id(con: sqlite3.Connection, sku: str | None) -> int | None:
+    """Best-effort sku -> master_items.id lookup for a receipt line. A SKU that
+    doesn't resolve (typo, hand-typed line, product not in master data) is not
+    an error — the line still saves, it simply doesn't move stock."""
+    if not sku or not sku.strip():
+        return None
+    row = con.execute("SELECT id FROM master_items WHERE sku=?", (sku.strip().upper(),)).fetchone()
+    return row["id"] if row is not None else None
+
+
+def _receipt_item_holdings(items: list[dict]) -> dict[int, int]:
+    """Sum of quantity per master_item_id across a set of receipt items, skipping
+    lines with no master item link. This is the 'holding' referenced throughout
+    the stock-movement code: what a non-void receipt currently has taken off the
+    shelf, per product."""
+    holdings: dict[int, int] = {}
+    for item in items:
+        master_item_id = item.get("master_item_id")
+        if master_item_id is None:
+            continue
+        holdings[master_item_id] = holdings.get(master_item_id, 0) + item["quantity"]
+    return holdings
+
+
+def _apply_receipt_stock_delta(
+    con: sqlite3.Connection, receipt_id: str, before: dict[int, int], after: dict[int, int]
+) -> None:
+    """The single place a sale moves stock. A non-void receipt HOLDS
+    sum(quantity) per master_item_id; a void or deleted receipt holds NOTHING.
+    Every receipt mutation (create, item/quantity edit, void, delete) computes
+    its holding before and after and calls this once — that one invariant
+    covers all of those sites without special-casing any of them.
+
+    Overselling is allowed by design (a stale count must never block a real
+    sale at the register), so unlike create_stock_adjustment this never raises
+    on negative stock — it always applies the delta.
+
+    ref_id is left NULL: stock_ledger.ref_id is INTEGER but receipt ids are TEXT
+    UUIDs, so it can't hold one — the receipt id goes in `note` instead."""
+    touched_ids = sorted(set(before) | set(after))
+    now = _now()
+    for master_item_id in touched_ids:
+        # Positive when the receipt's holding shrank (stock returns, e.g. a void
+        # or a quantity decrease); negative when it grew (a sale, or a quantity
+        # increase) — this is the change applied to master_items.stock_qty.
+        stock_delta = before.get(master_item_id, 0) - after.get(master_item_id, 0)
+        if stock_delta == 0:
+            continue
+        mi = con.execute("SELECT stock_qty FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        if mi is None:
+            # Master item was deleted after this line was sold against it — nothing left to move.
+            continue
+        new_stock_qty = mi["stock_qty"] + stock_delta
+        con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_stock_qty, master_item_id))
+        con.execute(
+            """INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at)
+               VALUES (?, ?, ?, ?, 'receipt', NULL, ?, ?)""",
+            (master_item_id, "OUT" if stock_delta < 0 else "IN", stock_delta, new_stock_qty, receipt_id, now),
+        )
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -548,6 +638,7 @@ def create_receipt(
     customer_phone: str = "",
     customer_name: str | None = None,
     started_at: str | None = None,
+    payment_method: str = "cash",
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
@@ -560,25 +651,37 @@ def create_receipt(
         con.execute(
             """INSERT INTO receipts
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, started_at, status, amount_paid)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, started_at, final_status, amount_paid,
+                subtotal, discount, total, created_at, started_at, final_status, amount_paid, payment_method,
             ),
         )
+        resolved_items = [
+            {**item, "master_item_id": _resolve_master_item_id(con, item.get("sku"))} for item in items
+        ]
         con.executemany(
-            """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date)
-               VALUES (?, ?, ?, ?, ?)""",
+            """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
             [
-                (receipt_id, item["product_name"], item["quantity"], item["unit_price"], item.get("warranty_date"))
-                for item in items
+                (
+                    receipt_id, item["product_name"], item["quantity"], item["unit_price"], item.get("warranty_date"),
+                    item["master_item_id"],
+                )
+                for item in resolved_items
             ],
         )
+
+        # A brand-new receipt has no prior holding; a receipt created straight
+        # into 'void' (the only status a caller can set directly) holds nothing.
+        after_holdings = _receipt_item_holdings(resolved_items) if final_status != "void" else {}
+        _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings)
 
     return {
         "subtotal": subtotal, "discount": discount, "total": total, "status": final_status,
         "amount_paid": amount_paid, "customer_phone": customer_phone, "customer_name": customer_name,
+        "payment_method": payment_method,
     }
 
 
@@ -621,6 +724,7 @@ def update_receipt(
     customer_phone: str | None = None,
     customer_name: str | None = None,
     update_customer_name: bool = False,
+    payment_method: str | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -639,22 +743,35 @@ def update_receipt(
         new_customer_name = customer_name if update_customer_name else existing["customer_name"]
 
         new_amount_paid = amount_paid if amount_paid is not None else existing["amount_paid"]
+        new_payment_method = payment_method if payment_method is not None else existing["payment_method"]
+
+        # Stock: snapshot what this receipt currently holds, before anything below
+        # changes — a void receipt holds nothing regardless of what its old line
+        # items say, so this stays a plain [] rather than a query in that case.
+        existing_items = [dict(r) for r in con.execute(
+            "SELECT * FROM receipt_items WHERE receipt_id=? ORDER BY id ASC", (receipt_id,)
+        ).fetchall()]
+        before_holdings = _receipt_item_holdings(existing_items) if existing["status"] != "void" else {}
 
         if items is not None:
+            resolved_items = [
+                {**item, "master_item_id": _resolve_master_item_id(con, item.get("sku"))} for item in items
+            ]
             con.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
             con.executemany(
-                """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date)
-                   VALUES (?, ?, ?, ?, ?)""",
+                """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 [
-                    (receipt_id, item["product_name"], item["quantity"], item["unit_price"], item.get("warranty_date"))
-                    for item in items
+                    (
+                        receipt_id, item["product_name"], item["quantity"], item["unit_price"],
+                        item.get("warranty_date"), item["master_item_id"],
+                    )
+                    for item in resolved_items
                 ],
             )
-            effective_items = items
+            effective_items = resolved_items
         elif discount is not None:
-            effective_items = [dict(r) for r in con.execute(
-                "SELECT * FROM receipt_items WHERE receipt_id=? ORDER BY id ASC", (receipt_id,)
-            ).fetchall()]
+            effective_items = existing_items
         else:
             effective_items = None
 
@@ -678,13 +795,23 @@ def update_receipt(
 
         con.execute(
             """UPDATE receipts SET plate_region=?, plate_number=?, plate_suffix=?, plate_full=?,
-               customer_phone=?, customer_name=?, subtotal=?, discount=?, total=?, status=?, amount_paid=? WHERE id=?""",
+               customer_phone=?, customer_name=?, subtotal=?, discount=?, total=?, status=?, amount_paid=?,
+               payment_method=? WHERE id=?""",
             (
                 new_plate_region, new_plate_number, new_plate_suffix, new_plate_full,
                 new_customer_phone, new_customer_name,
-                new_subtotal, new_discount, new_total, new_status, new_amount_paid, receipt_id,
+                new_subtotal, new_discount, new_total, new_status, new_amount_paid, new_payment_method, receipt_id,
             ),
         )
+
+        # Stock: holding after this change is nothing if the receipt ends up void
+        # (covers a fresh void here, and keeps a receipt that was already void
+        # from re-applying anything even if its items/discount were also sent in
+        # the same request); otherwise it's whatever items are in effect now —
+        # the ones just written, or the untouched existing ones.
+        after_items = effective_items if effective_items is not None else existing_items
+        after_holdings = _receipt_item_holdings(after_items) if new_status != "void" else {}
+        _apply_receipt_stock_delta(con, receipt_id, before_holdings, after_holdings)
 
         updated = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         return dict(updated)
@@ -692,8 +819,14 @@ def update_receipt(
 
 def get_receipt_items(receipt_id: str) -> list[dict]:
     with _conn() as con:
+        # LEFT JOIN so a line with no master item link (unresolved/hand-typed
+        # SKU, or a historical row from before this link existed) still returns,
+        # just with sku=NULL — reopening it for edit keeps that link, or lack of
+        # one, as-is.
         rows = con.execute(
-            "SELECT * FROM receipt_items WHERE receipt_id=? ORDER BY id ASC",
+            """SELECT ri.*, mi.sku AS sku FROM receipt_items ri
+               LEFT JOIN master_items mi ON mi.id = ri.master_item_id
+               WHERE ri.receipt_id=? ORDER BY ri.id ASC""",
             (receipt_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -701,9 +834,21 @@ def get_receipt_items(receipt_id: str) -> list[dict]:
 
 def delete_receipt(receipt_id: str) -> None:
     with _conn() as con:
-        row = con.execute("SELECT 1 FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
             raise ValueError(f"Receipt {receipt_id} not found")
+        existing = dict(row)
+
+        # Stock: deleting a receipt that still held stock returns it, same as a
+        # void — but a receipt already void holds nothing, so this is a no-op
+        # for it (no double-restore).
+        if existing["status"] != "void":
+            items = [dict(r) for r in con.execute(
+                "SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,)
+            ).fetchall()]
+            before_holdings = _receipt_item_holdings(items)
+            _apply_receipt_stock_delta(con, receipt_id, before_holdings, {})
+
         con.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
         con.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
 
@@ -1866,11 +2011,13 @@ def create_stock_adjustment(master_item_id: int, qty_delta: int, reason: str) ->
     with _conn() as con:
         mi = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if mi is None:
-            raise ValueError(f"Master item {master_item_id} not found")
+            # Race-guard only — the route already checks existence before calling this,
+            # so this is not the normal path a cashier/admin would ever see.
+            raise ValueError(f"Barang dengan id {master_item_id} tidak ditemukan.")
         new_stock_qty = mi["stock_qty"] + qty_delta
         if new_stock_qty < 0:
             raise ValueError(
-                f"Adjustment would result in negative stock ({new_stock_qty}) for SKU {mi['sku']}"
+                f"Stok tidak mencukupi untuk SKU {mi['sku']} (sisa akan menjadi {new_stock_qty})."
             )
         con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_stock_qty, master_item_id))
         con.execute(
@@ -2590,15 +2737,21 @@ def get_preorder_history(preorder_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def get_all_preorders(query: str | None = None, status: str | None = None) -> list[dict]:
+def get_all_preorders(query: str | None = None, status: str | None = None, draft: bool = False) -> list[dict]:
     """`status` filters on the computed order-level stage, so it is applied in
-    Python rather than SQL — the value does not exist as a column."""
-    where_sql = ""
-    params: list = []
+    Python rather than SQL — the value does not exist as a column. `draft` is a
+    real column, so it's applied in SQL: False (the default) is the active
+    list, True is the parked/archived one — the two never mix."""
+    where_clauses = ["is_draft=?"]
+    params: list = [1 if draft else 0]
     if query:
-        where_sql = "WHERE customer_name LIKE ? OR customer_phone LIKE ? OR id IN (SELECT preorder_id FROM preorder_items WHERE product_name LIKE ?)"
+        where_clauses.append(
+            "(customer_name LIKE ? OR customer_phone LIKE ? OR id IN "
+            "(SELECT preorder_id FROM preorder_items WHERE product_name LIKE ?))"
+        )
         like = f"%{query}%"
-        params = [like, like, like]
+        params.extend([like, like, like])
+    where_sql = "WHERE " + " AND ".join(where_clauses)
 
     with _conn() as con:
         rows = [dict(r) for r in con.execute(
@@ -2625,6 +2778,7 @@ def update_preorder(
     notes: str | None = None,
     update_notes: bool = False,
     changed_by: str | None = None,
+    is_draft: bool | None = None,
 ) -> dict:
     """Items are matched by id rather than deleted and re-inserted (the pattern
     receipts use), because a line item owns its stage and its status history —
@@ -2637,13 +2791,15 @@ def update_preorder(
         existing = dict(row)
 
         con.execute(
-            "UPDATE preorders SET customer_name=?, customer_phone=?, deposit=?, notes=?, updated_at=? WHERE id=?",
+            """UPDATE preorders SET customer_name=?, customer_phone=?, deposit=?, notes=?, updated_at=?,
+               is_draft=? WHERE id=?""",
             (
                 customer_name if customer_name is not None else existing["customer_name"],
                 customer_phone if customer_phone is not None else existing["customer_phone"],
                 deposit if deposit is not None else existing["deposit"],
                 notes if update_notes else existing["notes"],
                 now,
+                int(is_draft) if is_draft is not None else existing["is_draft"],
                 preorder_id,
             ),
         )
@@ -2705,11 +2861,5 @@ def set_preorder_item_status(
     return updated
 
 
-def delete_preorder(preorder_id: str) -> None:
-    with _conn() as con:
-        row = con.execute("SELECT 1 FROM preorders WHERE id=?", (preorder_id,)).fetchone()
-        if row is None:
-            raise ValueError(f"Preorder {preorder_id} not found")
-        con.execute("DELETE FROM preorder_status_history WHERE preorder_id=?", (preorder_id,))
-        con.execute("DELETE FROM preorder_items WHERE preorder_id=?", (preorder_id,))
-        con.execute("DELETE FROM preorders WHERE id=?", (preorder_id,))
+# Preorders are archived as drafts (is_draft=1 via update_preorder), never
+# deleted -- there is deliberately no delete_preorder function. Do not re-add one.

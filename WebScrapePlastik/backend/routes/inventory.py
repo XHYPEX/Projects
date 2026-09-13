@@ -95,8 +95,11 @@ router = APIRouter()
 
 
 def _raise_from_value_error(e: ValueError) -> None:
+    # Dispatches on the message text, so it has to recognise both languages:
+    # user-facing messages are Indonesian, but older ones are still English and
+    # a missed match silently downgrades a 404 into a 409.
     msg = str(e)
-    if "not found" in msg:
+    if "not found" in msg or "tidak ditemukan" in msg:
         raise HTTPException(status_code=404, detail=msg)
     raise HTTPException(status_code=409, detail=msg)
 
@@ -774,13 +777,13 @@ async def void_document(document_id: int, req: VoidRequest):
 @router.post("/inventory/stock-adjustments", response_model=StockAdjustmentResponse, status_code=201, dependencies=[Depends(require_admin)])
 async def create_new_stock_adjustment(req: StockAdjustmentRequest):
     if not req.reason.strip():
-        raise HTTPException(status_code=422, detail="reason must not be empty")
+        raise HTTPException(status_code=422, detail="Alasan penyesuaian wajib diisi.")
     if req.qty_delta == 0:
-        raise HTTPException(status_code=422, detail="qty_delta must not be zero")
+        raise HTTPException(status_code=422, detail="Jumlah penyesuaian tidak boleh nol.")
 
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, req.master_item_id) is None:
-        raise HTTPException(status_code=422, detail=f"master_item_id {req.master_item_id} not found")
+        raise HTTPException(status_code=422, detail=f"Barang dengan id {req.master_item_id} tidak ditemukan.")
 
     try:
         result = await loop.run_in_executor(

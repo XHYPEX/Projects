@@ -47,8 +47,9 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/receipts/[^/]+$"), "DELETE", "Hapus nota penjualan", "receipt"),
 
     (re.compile(r"^/api/preorders/[^/]+/items/\d+/status$"), "PATCH", "Ubah status preorder", "preorder"),
+    # No DELETE rule: there is no DELETE /preorders/{id} route (removed --
+    # preorders are archived as drafts via PATCH is_draft, never deleted).
     (re.compile(r"^/api/preorders/[^/]+$"), "PATCH", "Ubah preorder", "preorder"),
-    (re.compile(r"^/api/preorders/[^/]+$"), "DELETE", "Hapus preorder", "preorder"),
     (re.compile(r"^/api/preorders$"), "POST", "Buat preorder", "preorder"),
 
     (re.compile(r"^/api/suppliers/\d+$"), "PATCH", "Ubah supplier", "supplier"),

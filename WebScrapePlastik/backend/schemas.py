@@ -33,6 +33,7 @@ class PlaceOut(BaseModel):
 
 
 VALID_RECEIPT_STATUSES = {"pending", "done", "void"}
+VALID_PAYMENT_METHODS = {"cash", "transfer", "qris"}
 
 
 class ReceiptItemRequest(BaseModel):
@@ -40,6 +41,9 @@ class ReceiptItemRequest(BaseModel):
     quantity: int
     unit_price: int
     warranty_date: str | None = None
+    # Resolved server-side to master_items.id (backend.database._resolve_master_item_id).
+    # An unknown/absent SKU is not an error — the line still saves, just unlinked.
+    sku: str | None = None
 
 
 class ReceiptRequest(BaseModel):
@@ -55,6 +59,7 @@ class ReceiptRequest(BaseModel):
     # never accepted on update -- see _sanitize_started_at / update_receipt.
     started_at: str | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
+    payment_method: str = "cash"  # one of VALID_PAYMENT_METHODS
 
 
 class ReceiptUpdateRequest(BaseModel):
@@ -69,6 +74,7 @@ class ReceiptUpdateRequest(BaseModel):
     discount: int | None = None
     amount_paid: int | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
+    payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
 
 
 class ReceiptResponse(BaseModel):
@@ -80,6 +86,7 @@ class ReceiptResponse(BaseModel):
     status: str
     customer_phone: str
     customer_name: str | None = None
+    payment_method: str
 
 
 class ReceiptItemOut(BaseModel):
@@ -88,6 +95,7 @@ class ReceiptItemOut(BaseModel):
     quantity: int
     unit_price: int
     warranty_date: str | None
+    sku: str | None = None
 
 
 class ReceiptOut(BaseModel):
@@ -105,6 +113,7 @@ class ReceiptOut(BaseModel):
     status: str
     created_at: str
     started_at: str | None = None
+    payment_method: str
     item_count: int
 
 
@@ -583,6 +592,8 @@ class PreorderUpdateRequest(BaseModel):
     # Nullable, so "omitted" (leave as-is) and "sent as null" (clear it) are told
     # apart via fields_set in the route, same as ReceiptUpdateRequest.customer_name.
     notes: str | None = None
+    # No null state to distinguish here -- a plain bool | None (omitted = leave as-is) is enough.
+    is_draft: bool | None = None
 
 
 class PreorderItemStatusRequest(BaseModel):
@@ -622,6 +633,8 @@ class PreorderOut(BaseModel):
     status: str
     item_count: int
     created_at: str
+    # Stored, not computed -- a parked/archived preorder, independent of `status`.
+    is_draft: bool
     updated_at: str
 
 

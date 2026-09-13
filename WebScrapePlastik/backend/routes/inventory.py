@@ -537,7 +537,7 @@ async def autocomplete(query: str, supplier_id: int | None = None, brand_id: int
 
 @router.get("/inventory/master-items/by-sku/{sku}", response_model=MasterItemOut)
 async def get_master_item_by_sku_route(sku: str):
-    # `sku` here is whatever the cashier's scanner/keyboard sent -- an EAN-13
+    # `sku` here is whatever the cashier's scanner/keyboard sent -- a CODE128
     # barcode or a SKU. See get_master_item_by_code for how that's resolved;
     # the route path/param name stay as-is so nothing on the frontend changes.
     loop = asyncio.get_event_loop()

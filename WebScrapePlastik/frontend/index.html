@@ -5834,12 +5834,12 @@ function printInboundBarcodes() {
   runInboundBarcodePrint();
 }
 
-// An in-store EAN-13 is 13 digits and 95 modules, so it prints at roughly
-// 0.4mm per bar on this label — about triple the width of the old CODE128 of
-// the full SKU, which was too dense for the scanner to resolve. Anything that
-// isn't a 13-digit number (a free-text label) stays on CODE128.
-function barcodeOptionsFor(code) {
-  return /^\d{13}$/.test(String(code || "")) ? { format: "EAN13", flat: true } : { format: "CODE128" };
+// Everything prints as CODE128. The product code is 10 digits, which CODE128
+// packs two-to-a-character in its Code C subset — 90 modules, so the bars come
+// out ~0.50mm on this label. EAN-13 was tried first and would not read on the
+// shop's scanner, while a CODE128 label from another shop scans fine on it.
+function barcodeOptionsFor(_code) {
+  return { format: "CODE128" };
 }
 
 // 57mm of printable width inside the label's 1.5mm padding, in CSS px at 96dpi.
@@ -5897,8 +5897,8 @@ function printBarcodeLabels(labels) {
       JsBarcode(svg, label.barcode || label.sku, {
         ...barcodeOptionsFor(label.barcode),
         displayValue: false,
-        margin: 18,
-        width: 1.8,
+        margin: 19,
+        width: 1.9,
         height: 38,
       });
       fitBarcodeToLabel(svg);
@@ -6041,8 +6041,8 @@ function runMasterItemBarcodePrint(note) {
   JsBarcode("#barcode-print-svg", currentMasterItem.barcode || currentMasterItem.sku, {
     ...barcodeOptionsFor(currentMasterItem.barcode),
     displayValue: false,
-    margin: 18,
-    width: 1.8,
+    margin: 19,
+    width: 1.9,
     height: 38,
   });
   fitBarcodeToLabel(document.getElementById("barcode-print-svg"));

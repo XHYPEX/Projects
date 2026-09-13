@@ -402,20 +402,26 @@ def init_db() -> None:
         if "is_draft" not in preorder_cols:
             con.execute("ALTER TABLE preorders ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0")
 
-        # --- Additive migration: in-store EAN-13 barcode ---
-        # data/scraper.db already has live master items with no barcode. Every
-        # one of them is backfilled here (not just left NULL like the other
-        # migrations above) because a barcode has to exist on every item before
-        # a cashier can scan any of them — there is no acceptable "not printed
-        # yet" state at the DB layer.
+        # --- Additive migration: in-store CODE128 barcode (10 digits) ---
+        # data/scraper.db already has live master items with no barcode, or
+        # with a stale 13-digit EAN-13 value from an earlier revision of this
+        # feature (that symbology didn't scan reliably; see
+        # _generate_barcode_for_id). No label had gone to print with an EAN-13
+        # value, so those are regenerated outright rather than edited in place
+        # -- a barcode has to exist, in the current format, on every item
+        # before a cashier can scan any of them. Anything not already exactly
+        # 10 digits (NULL, or a leftover 13-digit value) is regenerated; that
+        # same check makes re-running this a no-op once every row is current.
         master_item_cols = {row["name"] for row in con.execute("PRAGMA table_info(master_items)").fetchall()}
         if "barcode" not in master_item_cols:
             con.execute("ALTER TABLE master_items ADD COLUMN barcode TEXT")
         con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_master_items_barcode ON master_items(barcode)")
-        for missing_row in con.execute("SELECT id FROM master_items WHERE barcode IS NULL").fetchall():
+        for stale_row in con.execute(
+            "SELECT id FROM master_items WHERE barcode IS NULL OR length(barcode) != 10"
+        ).fetchall():
             con.execute(
                 "UPDATE master_items SET barcode=? WHERE id=?",
-                (_generate_barcode_for_id(missing_row["id"]), missing_row["id"]),
+                (_generate_barcode_for_id(stale_row["id"]), stale_row["id"]),
             )
 
         seed_normalized = _normalize_name("Tanpa Merk")
@@ -1410,36 +1416,32 @@ def preview_sku(supplier_id: int, brand_id: int, product_name: str) -> dict:
 
 
 # --- Master items ------------------------------------------------------
-# In-store EAN-13 barcodes: the shop's own CODE128-encoded SKU labels came out
-# with bars too thin for its 203dpi thermal printer/scanner combo to read
-# reliably, and CODE128 support on that scanner couldn't even be confirmed.
-# EAN-13 is the format it demonstrably reads. The 200-299 GTIN prefix range is
-# reserved for in-store/internal use, so a code generated here can never
-# collide with a real manufacturer's barcode.
-
-
-def _ean13_check_digit(digits12: str) -> str:
-    """Standard EAN-13 check digit algorithm: sum the digits in odd positions
-    (1st, 3rd, ...) x1 and the digits in even positions (2nd, 4th, ...) x3 over
-    the 12-digit payload, then check digit = (10 - sum mod 10) mod 10."""
-    total = 0
-    for position, ch in enumerate(digits12, start=1):
-        d = int(ch)
-        total += d if position % 2 == 1 else d * 3
-    return str((10 - total % 10) % 10)
+# In-store barcodes, CODE128 symbology: the shop's original CODE128-encoded SKU
+# labels came out with bars too thin for its 203dpi thermal printer/scanner
+# combo to read reliably. Switching the *value* to EAN-13 didn't fix it either
+# (and CODE128 support on that scanner was confirmed working via a label from
+# another shop) — the real fix is a shorter, even-length all-digit payload, so
+# CODE128's Code C subset can pack two digits per 11 modules instead of falling
+# back to a wider subset. A 10-digit code is what buys the noticeably wider
+# bars this whole exercise is for.
+#
+# Digit count is load-bearing: it must stay EVEN (Code C requires an
+# even-length numeric payload) and distinct from a real product's own EAN-8 (8
+# digits) or EAN-13 (13 digits) so a scanned real barcode is never mistaken for
+# one of ours. Do not "tidy" this to 9 or 11 digits.
+#
+# No trailing check digit: CODE128 carries its own internal checksum, so an
+# extra EAN-style check digit here would just be dead weight on the label.
 
 
 def _generate_barcode_for_id(master_item_id: int) -> str:
-    """Deterministic EAN-13 from a master_items.id: "200" + id zero-padded to 9
-    digits (12 digits) + check digit (13 total). Deriving it from the row id —
-    rather than a separate counter — makes it unique with no extra state, and
-    reproducible if it ever needs regenerating."""
-    if master_item_id >= 10**9:
-        raise ValueError(f"master_item_id {master_item_id} too large to encode in a 9-digit barcode segment")
-    payload = "200" + str(master_item_id).zfill(9)
-    barcode = payload + _ean13_check_digit(payload)
-    assert _ean13_check_digit(barcode[:12]) == barcode[12], "generated barcode failed its own check digit"
-    return barcode
+    """Deterministic 10-digit CODE128 value from a master_items.id: "20" + id
+    zero-padded to 8 digits. Deriving it from the row id — rather than a
+    separate counter — makes it unique with no extra state, and reproducible
+    if it ever needs regenerating."""
+    if master_item_id >= 10**8:
+        raise ValueError(f"master_item_id {master_item_id} too large to encode in an 8-digit barcode segment")
+    return "20" + str(master_item_id).zfill(8)
 
 
 def create_master_item(
@@ -1562,10 +1564,11 @@ def get_master_item_by_barcode(barcode: str) -> dict | None:
 
 
 def get_master_item_by_code(code: str) -> dict | None:
-    """What the cashier's scanner/keyboard actually sends could be either an
-    EAN-13 barcode or a hand-typed/old SKU. A barcode is only ever numeric, so
-    it's tried first when the code looks like one; SKU is always the fallback,
-    which keeps old CODE128 labels and typed SKUs resolving unchanged."""
+    """What the cashier's scanner/keyboard actually sends could be either the
+    10-digit CODE128 barcode or a hand-typed/old SKU. A barcode is only ever
+    numeric, so it's tried first when the code looks like one; SKU is always
+    the fallback, which keeps old SKU-encoded labels and typed SKUs resolving
+    unchanged."""
     if code.isdigit():
         by_barcode = get_master_item_by_barcode(code)
         if by_barcode is not None:

@@ -2,13 +2,12 @@ import asyncio
 import re
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth import get_current_user, require_admin
+from backend.auth import get_current_user
 from backend.database import (
     PREORDER_STATUSES,
     create_preorder,
-    delete_preorder,
     get_all_preorders,
     get_preorder,
     get_preorder_history,
@@ -128,11 +127,11 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
 
 
 @router.get("/preorders", response_model=list[PreorderOut])
-async def list_preorders(query: str | None = None, status: str | None = None):
+async def list_preorders(query: str | None = None, status: str | None = None, draft: bool = False):
     if status:
         _validate_status(status)
     loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, get_all_preorders, query, status)
+    rows = await loop.run_in_executor(None, get_all_preorders, query, status, draft)
     return [PreorderOut(**r) for r in rows]
 
 
@@ -171,7 +170,7 @@ async def update_preorder_route(
 
     await loop.run_in_executor(
         None, update_preorder, preorder_id, customer_name, customer_phone, items,
-        req.deposit, notes, update_notes, user["username"],
+        req.deposit, notes, update_notes, user["username"], req.is_draft,
     )
     return await _detail(preorder_id)
 
@@ -196,11 +195,7 @@ async def update_preorder_item_status(
     return await _detail(preorder_id)
 
 
-@router.delete("/preorders/{preorder_id}", status_code=204, response_class=Response,
-               dependencies=[Depends(require_admin)])
-async def delete_preorder_route(preorder_id: str):
-    loop = asyncio.get_event_loop()
-    if await loop.run_in_executor(None, get_preorder, preorder_id) is None:
-        raise HTTPException(status_code=404, detail="Preorder not found")
-    await loop.run_in_executor(None, delete_preorder, preorder_id)
-    return Response(status_code=204)
+# There is deliberately no DELETE /preorders/{preorder_id} route. A preorder
+# someone wants off the active list is archived via
+# PATCH /preorders/{preorder_id} {"is_draft": true} instead -- preorders are
+# never deleted. Do not re-add a delete route here.

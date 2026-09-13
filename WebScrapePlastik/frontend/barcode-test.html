@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Tes Barcode Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<style>
+  :root { --ink:#141413; --muted:#6B6B66; --line:#E5E3DC; }
+  body { margin:0; padding:16px; font-family:'Inter',system-ui,sans-serif; color:var(--ink); background:#FAF9F5; }
+  h1 { font-size:16pt; margin:0 0 4px; }
+  .lead { font-size:10pt; color:var(--muted); margin:0 0 16px; max-width:70ch; }
+  .sheet { background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px; }
+  .card { break-inside:avoid; page-break-inside:avoid; border-bottom:1px dashed var(--line); padding:6px 4px 10px; }
+  .card:last-child { border-bottom:none; }
+  .tag { font-size:9pt; font-weight:700; }
+  .spec { font-size:8pt; color:var(--muted); margin-bottom:3px; }
+  svg { display:block; }
+  @media print {
+    body { background:#fff; padding:0; }
+    h1, .lead, .noprint { display:none; }
+    .sheet { border:none; border-radius:0; padding:0; }
+    @page { margin:8mm; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Tes Barcode — cari format &amp; lebar yang terbaca</h1>
+<p class="lead">
+  Cetak halaman ini di printer label (skala 100%, tanpa margin tambahan), lalu scan setiap barcode
+  satu per satu. Catat nomor mana saja yang terbaca. Setiap kartu menyebut format dan lebar barnya,
+  jadi hasilnya langsung menunjukkan format apa yang didukung scanner dan seberapa kecil bar masih terbaca.
+</p>
+
+<div class="sheet" id="sheet"></div>
+
+<script>
+// Each test isolates one variable so a failure points at something specific:
+// symbology support, or the minimum bar width this printer/scanner pair manages.
+const DOT_MM = 25.4 / 203;           // one dot on a 203dpi thermal head
+const mmPerPx = 25.4 / 96;
+
+const TESTS = [
+  { n: 1,  format: "EAN13",   value: "2000000000015", width: 1.8, height: 38, note: "Format & lebar yang dipakai label kita sekarang" },
+  { n: 2,  format: "EAN13",   value: "2000000000015", width: 2.4, height: 50, note: "Sama, tapi jauh lebih besar" },
+  { n: 3,  format: "EAN13",   value: "2000000000015", width: 3.0, height: 60, note: "Sangat besar — kalau ini pun gagal, masalahnya bukan ukuran" },
+  { n: 4,  format: "CODE128", value: "12345678",      width: 2.0, height: 45, note: "CODE128 angka pendek" },
+  { n: 5,  format: "CODE128", value: "12345678",      width: 3.0, height: 55, note: "CODE128 angka pendek, lebih besar" },
+  { n: 6,  format: "CODE39",  value: "12345678",      width: 2.0, height: 45, note: "CODE39 — format lama, hampir selalu didukung" },
+  { n: 7,  format: "CODE128", value: "LEO-NOB-TES123-001", width: 1.5, height: 42, note: "SKU panjang — ini yang dulu gagal" },
+  { n: 8,  format: "EAN8",    value: "20000017",      width: 2.4, height: 50, note: "EAN-8, versi pendek dari EAN-13" },
+];
+
+const sheet = document.getElementById("sheet");
+for (const t of TESTS) {
+  const card = document.createElement("div");
+  card.className = "card";
+  const barMm = (t.width * mmPerPx).toFixed(2);
+  const dots = (t.width * mmPerPx / DOT_MM).toFixed(1);
+  card.innerHTML = `
+    <div class="tag">#${t.n} — ${t.format}</div>
+    <div class="spec">lebar bar ${barMm}mm (${dots} titik) · isi: ${t.value} · ${t.note}</div>
+    <svg id="bc-${t.n}"></svg>`;
+  sheet.appendChild(card);
+  try {
+    JsBarcode(`#bc-${t.n}`, t.value, {
+      format: t.format, displayValue: true, fontSize: 11,
+      margin: Math.round(t.width * 10), width: t.width, height: t.height,
+    });
+  } catch (e) {
+    card.querySelector(".spec").textContent += "  [GAGAL DIRENDER: " + e.message + "]";
+  }
+}
+</script>
+
+<p class="noprint" style="font-size:10pt;color:#6B6B66;margin-top:16px">
+  Setelah scan: sebutkan nomor yang berhasil dan yang gagal.
+</p>
+
+</body>
+</html>

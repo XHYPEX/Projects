@@ -141,19 +141,19 @@
       .header-sprite { animation-play-state: paused; }
     }
 
-    /* Barcode label: 58mm x 40mm thermal label, only rendered when printing (see @media print below). */
+    /* Barcode label: 60mm x 30mm thermal label, only rendered when printing (see @media print below). */
     #barcode-print-area { display: none; }
     .barcode-label {
-      width: 58mm;
-      height: 40mm;
-      padding: 2mm;
+      width: 60mm;
+      height: 30mm;
+      padding: 1.5mm;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      /* Tight: the enlarged type plus the optional free-text line only just
-         clears 40mm. */
+      /* Tight: on a 30mm label the type and the optional free-text line leave
+         only about 1mm to spare, so gaps stay small. */
       gap: 0.5mm;
       line-height: 1.15;
       font-family: 'Inter', system-ui, sans-serif;
@@ -161,7 +161,7 @@
       overflow: hidden;
     }
     .barcode-label-name {
-      font-size: 12pt;
+      font-size: 11pt;
       font-weight: 600;
       color: #141413;
       max-width: 100%;
@@ -169,16 +169,23 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .barcode-label-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 4mm;
+      max-width: 100%;
+    }
     .barcode-label-sku {
       font-family: 'IBM Plex Mono', ui-monospace, monospace;
-      font-size: 10.5pt;
+      font-size: 9pt;
       color: #141413;
       letter-spacing: 0.5px;
     }
     /* Optional free-text line. Collapses entirely when unused so labels without
        one keep the spacing they had. */
     .barcode-label-note {
-      font-size: 9pt;
+      font-size: 7pt;
       color: #141413;
       max-width: 100%;
       overflow: hidden;
@@ -187,7 +194,7 @@
     }
     .barcode-label-note:empty { display: none; }
     .barcode-label-price {
-      font-size: 13.5pt;
+      font-size: 12pt;
       font-weight: 700;
       color: #141413;
     }
@@ -624,11 +631,13 @@
 
           <!-- Barcode scan -->
           <div class="mb-5">
-            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Scan Barcode</label>
-            <div class="flex items-center gap-2">
-              <input id="scan-barcode-input" type="text" placeholder="Scan barcode, or type a SKU and press Enter…" autocomplete="off"
-                onkeydown="handleScanInputKeydown(event)" oninput="handleScanInput(event)"
-                class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono placeholder:font-sans placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
+            <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Scan / Cari Barang</label>
+            <div class="relative">
+              <input id="scan-barcode-input" type="text" placeholder="Scan barcode, atau ketik SKU / nama barang…" autocomplete="off"
+                onkeydown="handleScanInputKeydown(event)" oninput="handleScanInput(event)" onblur="onScanInputBlur()"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono placeholder:font-sans placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
+              <div id="scan-suggest-dropdown"
+                class="hidden absolute left-0 right-0 top-full mt-1 z-30 max-h-72 overflow-y-auto bg-white border border-line rounded-lg shadow-sm"></div>
             </div>
             <p id="scan-barcode-feedback" class="text-xs text-muted mt-1.5 min-h-[1rem]"></p>
           </div>
@@ -2529,19 +2538,159 @@ function handleScanInput(event) {
   clearTimeout(scanIdleTimer);
   scanIdleTimer = null;
   if (scanLooksMachine && input.value.trim().length >= SCAN_MIN_AUTO_LENGTH) {
+    // A scanner burst resolves on its own; a suggestion list would only flash.
+    hideScanSuggest();
     scanIdleTimer = setTimeout(() => {
       scanIdleTimer = null;
       handleBarcodeScan();
     }, SCAN_IDLE_SUBMIT_MS);
+    return;
   }
+  queueScanSuggest(input.value.trim());
+}
+
+// ── Cashier: type-to-find ────────────────────────────────────────────────────
+// The same box serves the scanner and the keyboard. A scanner burst is added
+// straight away and never opens this list (handleScanInput decides which is
+// which by keystroke speed); hand-typing a SKU or a product name searches
+// Master Barang instead. Nothing here fires for a machine-speed burst, so the
+// register keeps working at scanner pace.
+const SCAN_SUGGEST_MIN_CHARS = 2;
+const SCAN_SUGGEST_DEBOUNCE_MS = 180;
+
+let scanSuggestTimer = null;
+let scanSuggestResults = [];
+let scanSuggestIndex = -1;
+let scanSuggestQuery = "";
+
+function scanSuggestDropdown() {
+  return document.getElementById("scan-suggest-dropdown");
+}
+
+function hideScanSuggest() {
+  clearTimeout(scanSuggestTimer);
+  scanSuggestTimer = null;
+  scanSuggestResults = [];
+  scanSuggestIndex = -1;
+  scanSuggestQuery = "";
+  const dd = scanSuggestDropdown();
+  if (dd) { dd.classList.add("hidden"); dd.innerHTML = ""; }
+}
+
+// A click inside the list would otherwise be lost to the blur that closes it,
+// so the options use onmousedown preventDefault (same trick as the other
+// comboboxes) and this only tidies up on a genuine focus loss.
+function onScanInputBlur() {
+  setTimeout(hideScanSuggest, 150);
+}
+
+function queueScanSuggest(query) {
+  clearTimeout(scanSuggestTimer);
+  if (query.length < SCAN_SUGGEST_MIN_CHARS) { hideScanSuggest(); return; }
+  scanSuggestTimer = setTimeout(() => runScanSuggest(query), SCAN_SUGGEST_DEBOUNCE_MS);
+}
+
+async function runScanSuggest(query) {
+  let results = [];
+  try {
+    const resp = await fetch(`/api/inventory/master-items/autocomplete?query=${encodeURIComponent(query)}&limit=8`);
+    if (resp.ok) results = await resp.json();
+  } catch (_) {}
+  const input = document.getElementById("scan-barcode-input");
+  if (!input || input.value.trim() !== query) return;  // stale: they kept typing
+  scanSuggestResults = results;
+  scanSuggestIndex = -1;
+  scanSuggestQuery = query;
+  renderScanSuggest();
+}
+
+function renderScanSuggest() {
+  const dd = scanSuggestDropdown();
+  if (!dd) return;
+  if (!scanSuggestResults.length) {
+    // The whole point of this branch: a product the shop sells but hasn't
+    // registered yet shouldn't be a dead end at the register.
+    dd.innerHTML = `
+      <button type="button" onmousedown="event.preventDefault()" onclick="goAddMasterItemFromCashier()"
+        class="w-full text-left px-3 py-3 hover:bg-bg2 transition-colors">
+        <div class="text-sm font-medium text-ink">Produk tidak ditemukan</div>
+        <div class="text-[11px] text-muted mt-0.5">Pergi ke Master Barang untuk menambahkan &ldquo;${esc(scanSuggestQuery)}&rdquo;</div>
+      </button>`;
+    dd.classList.remove("hidden");
+    return;
+  }
+  dd.innerHTML = scanSuggestResults.map((item, idx) => `
+    <button type="button" data-idx="${idx}" onmousedown="event.preventDefault()" onclick="chooseScanSuggestion(${idx})"
+      class="scan-suggest-option w-full text-left px-3 py-2 hover:bg-bg2 transition-colors border-b border-line last:border-b-0 ${idx === scanSuggestIndex ? "bg-bg2" : ""}">
+      <div class="text-sm font-medium text-ink">${esc(item.name)}</div>
+      <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
+        <span class="font-mono">${esc(item.sku)}</span>
+        ${item.brand_name ? `<span>&middot; ${esc(item.brand_name)}</span>` : ""}
+        <span>&middot; ${esc(item.unit)}</span>
+        <span>&middot; Stok ${item.stock_qty}</span>
+        <span>&middot; ${formatIDR(item.sell_price)}</span>
+      </div>
+    </button>
+  `).join("");
+  dd.classList.remove("hidden");
+}
+
+function moveScanSuggestFocus(delta) {
+  if (!scanSuggestResults.length) return;
+  scanSuggestIndex = (scanSuggestIndex + delta + scanSuggestResults.length) % scanSuggestResults.length;
+  renderScanSuggest();
+  scanSuggestDropdown()?.querySelectorAll(".scan-suggest-option")[scanSuggestIndex]
+    ?.scrollIntoView({ block: "nearest" });
+}
+
+// Picking a suggestion lands the same line a successful scan would.
+function chooseScanSuggestion(idx) {
+  const item = scanSuggestResults[idx];
+  if (!item) return;
+  addScannedItemToReceipt(item);
+  const input = document.getElementById("scan-barcode-input");
+  hideScanSuggest();
+  if (input) { input.value = ""; input.focus(); }
+  resetScanBurstState();
+}
+
+// Shared by the scan path and the suggestion path so both add a line the same
+// way: an existing row for the SKU gains a unit, otherwise a new row appears.
+function addScannedItemToReceipt(item) {
+  const existingRow = findItemRowBySku(item.sku);
+  if (existingRow) {
+    const qtyInput = existingRow.querySelector(".item-qty");
+    qtyInput.value = (parseInt(qtyInput.value, 10) || 0) + 1;
+  } else {
+    addItemRow({ sku: item.sku, name: item.name, price: item.sell_price });
+  }
+  recomputeTotals();
+  markActiveTabDirty();
 }
 
 function handleScanInputKeydown(event) {
+  const dropdownOpen = !scanSuggestDropdown()?.classList.contains("hidden");
+  if (dropdownOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    event.preventDefault();
+    moveScanSuggestFocus(event.key === "ArrowDown" ? 1 : -1);
+    return;
+  }
+  if (event.key === "Escape" && dropdownOpen) {
+    event.preventDefault();
+    hideScanSuggest();
+    return;
+  }
   if (event.key !== "Enter") return;
   event.preventDefault();
   // A scanner that does send Enter would otherwise race its own idle timer.
   clearTimeout(scanIdleTimer);
   scanIdleTimer = null;
+  // Enter takes a highlighted suggestion; otherwise it's a plain code lookup.
+  if (dropdownOpen && scanSuggestIndex >= 0) {
+    chooseScanSuggestion(scanSuggestIndex);
+    return;
+  }
+  hideScanSuggest();
   handleBarcodeScan();
 }
 
@@ -2560,18 +2709,15 @@ async function handleBarcodeScan() {
     if (!resp.ok) {
       feedback.textContent = `SKU tidak ditemukan: ${sku}`;
       feedback.classList.add("text-failed");
+      // Same dead-end as an empty search, so offer the same way out.
+      scanSuggestResults = [];
+      scanSuggestIndex = -1;
+      scanSuggestQuery = sku;
+      renderScanSuggest();
       return;
     }
     const item = await resp.json();
-    const existingRow = findItemRowBySku(item.sku);
-    if (existingRow) {
-      const qtyInput = existingRow.querySelector(".item-qty");
-      qtyInput.value = (parseInt(qtyInput.value, 10) || 0) + 1;
-    } else {
-      addItemRow({ sku: item.sku, name: item.name, price: item.sell_price });
-    }
-    recomputeTotals();
-    markActiveTabDirty();
+    addScannedItemToReceipt(item);
     feedback.textContent = `Ditambahkan: ${item.name}`;
   } finally {
     input.value = "";
@@ -3035,6 +3181,7 @@ function renderCashierForm() {
   // Drops any auto-submit still pending, so a scan started on the tab being
   // left can't land on the one being opened.
   resetScanBurstState();
+  hideScanSuggest();
   // Keep focus on the scan box so a hardware barcode scanner (a keyboard-wedge
   // device that just types the code + Enter) can be used without clicking in
   // first, the way a grocery register works.
@@ -4794,10 +4941,10 @@ function downloadMasterItemsCsv() {
 }
 
 // ── Inventory: Master Barang — standalone create ─────────────────────────────
-function newMasterItemForm() {
+function newMasterItemForm(prefillName) {
   comboboxSetValue(document.getElementById("new-item-supplier"), "", "");
   comboboxSetValue(document.getElementById("new-item-brand"), "", "");
-  document.getElementById("new-item-name").value = "";
+  document.getElementById("new-item-name").value = (prefillName || "").toUpperCase();
   document.getElementById("new-item-unit").value = "";
   document.getElementById("new-item-cost-price").value = "";
   document.getElementById("new-item-sell-price").value = "";
@@ -4841,6 +4988,7 @@ async function submitNewMasterItem() {
   });
   if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
   const item = await resp.json();
+  if (returnToCashierWithItem(item)) return;
   showToast(`Barang "${item.name}" (${item.sku}) ditambahkan.`, "success");
   backToMasterList();
 }
@@ -4997,6 +5145,7 @@ function showMasterNewItemPanel() {
 }
 
 function backToMasterList() {
+  pendingCashierItemReturn = null;
   masterListState.page = 1;
   showMasterListPanel();
   loadMasterItems();
@@ -5253,6 +5402,7 @@ function renderRowProduct(rowEl, p) {
   // Stashed for barcode printing, which needs the raw values -- the rendered
   // slot below only holds them formatted for display.
   rowEl.dataset.sku = p.sku || "";
+  rowEl.dataset.barcode = p.barcode || "";
   rowEl.dataset.productName = p.name || "";
   rowEl.dataset.sellPrice = p.sell_price != null ? String(p.sell_price) : "";
   const slot = rowEl.querySelector(".row-product-slot");
@@ -5276,6 +5426,7 @@ function renderRowProduct(rowEl, p) {
 function clearRowProduct(rowEl) {
   delete rowEl.dataset.masterItemId;
   delete rowEl.dataset.sku;
+  delete rowEl.dataset.barcode;
   delete rowEl.dataset.productName;
   delete rowEl.dataset.sellPrice;
   rowEl.querySelector(".row-product-slot").innerHTML = rowPickButtonHtml();
@@ -5437,8 +5588,44 @@ function changeRowProduct(btnEl) {
   if (input) { input.focus(); searchBarangCombo(input); }
 }
 
-function goAddMasterItem() {
-  goToInventoryRoute("/master-barang", () => newMasterItemForm());
+function goAddMasterItem(prefillName) {
+  goToInventoryRoute("/master-barang", () => newMasterItemForm(prefillName));
+}
+
+// Set when the cashier sends someone to Master Barang for a product that isn't
+// registered yet. Saving there returns to the same receipt tab and drops the
+// new item straight in, so the customer standing at the counter isn't waiting
+// while someone navigates back and re-searches.
+let pendingCashierItemReturn = null;
+
+function goAddMasterItemFromCashier() {
+  const tab = getActiveTab();
+  const typed = scanSuggestQuery;
+  pendingCashierItemReturn = tab ? tab.tabId : null;
+  hideScanSuggest();
+  const input = document.getElementById("scan-barcode-input");
+  if (input) input.value = "";
+  goAddMasterItem(typed);
+}
+
+// Called after a master item is created. Returns to the waiting receipt only
+// when the trip started from the cashier; a normal Master Barang add is
+// unaffected.
+function returnToCashierWithItem(item) {
+  const tabId = pendingCashierItemReturn;
+  pendingCashierItemReturn = null;
+  if (!tabId) return false;
+  const tab = cashierTabs.find(t => t.tabId === tabId);
+  // A voided receipt is permanently read-only, so there is nowhere to put the
+  // item — fall back to the normal "saved in Master Barang" path.
+  if (!tab || tab.status === "void") return false;
+  if (tab.locked) tab.locked = false;
+  setActiveCashierTab(tabId);
+  location.hash = "/cashier";
+  addScannedItemToReceipt(item);
+  captureFormIntoActiveTab();
+  showToast(`${item.name} ditambahkan ke nota.`, "success");
+  return true;
 }
 
 // ── Inventory: Barang Masuk — save / validate / post / void ──────────────────
@@ -5607,6 +5794,7 @@ function collectInboundBarcodeLabels() {
     for (let i = 0; i < qty; i++) {
       labels.push({
         sku,
+        barcode: row.dataset.barcode || "",
         name: row.dataset.productName || "",
         sellPrice: row.dataset.sellPrice ? parseInt(row.dataset.sellPrice, 10) : null,
       });
@@ -5646,8 +5834,16 @@ function printInboundBarcodes() {
   runInboundBarcodePrint();
 }
 
-// 54mm of printable width inside the label's 2mm padding, in CSS px at 96dpi.
-const BARCODE_MAX_WIDTH_PX = 54 / 25.4 * 96;
+// An in-store EAN-13 is 13 digits and 95 modules, so it prints at roughly
+// 0.4mm per bar on this label — about triple the width of the old CODE128 of
+// the full SKU, which was too dense for the scanner to resolve. Anything that
+// isn't a 13-digit number (a free-text label) stays on CODE128.
+function barcodeOptionsFor(code) {
+  return /^\d{13}$/.test(String(code || "")) ? { format: "EAN13", flat: true } : { format: "CODE128" };
+}
+
+// 57mm of printable width inside the label's 1.5mm padding, in CSS px at 96dpi.
+const BARCODE_MAX_WIDTH_PX = 57 / 25.4 * 96;
 
 // A long SKU renders wider than the label (18 characters at 1.5px per module is
 // ~92mm) and would print clipped at both edges. Squeeze it horizontally only:
@@ -5673,8 +5869,10 @@ function fitBarcodeToLabel(svg) {
 }
 
 // Shared by the document print and the manual free-text print. Each label is
-// {sku, name, sellPrice, note}; sku is whatever string should become the
-// barcode and note is an optional free-text line printed under it.
+// {sku, barcode, name, sellPrice, note}. The BARS encode `barcode` — a 13-digit
+// in-store EAN-13 — because the SKU is far too long to print at a scannable
+// density on a 58mm label. `sku` stays as the human-readable line, and a label
+// with no EAN (a free-text print) falls back to CODE128 of whatever it has.
 function printBarcodeLabels(labels) {
   if (!labels.length) return;
 
@@ -5684,22 +5882,24 @@ function printBarcodeLabels(labels) {
     <div class="barcode-label">
       <div class="barcode-label-name">${esc(l.name || "")}</div>
       <svg class="barcode-batch-svg" data-idx="${i}"></svg>
-      <div class="barcode-label-sku">${esc(l.sku)}</div>
+      <div class="barcode-label-meta">
+        <span class="barcode-label-sku">${esc(l.sku)}</span>
+        <span class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</span>
+      </div>
       <div class="barcode-label-note">${esc(l.note || "")}</div>
-      <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
     </div>
   `).join("");
 
   let failed = 0;
   batch.querySelectorAll(".barcode-batch-svg").forEach(svg => {
-    const code = labels[parseInt(svg.dataset.idx, 10)].sku;
+    const label = labels[parseInt(svg.dataset.idx, 10)];
     try {
-      JsBarcode(svg, code, {
-        format: "CODE128",
+      JsBarcode(svg, label.barcode || label.sku, {
+        ...barcodeOptionsFor(label.barcode),
         displayValue: false,
-        margin: 15,
-        width: 1.5,
-        height: 42,
+        margin: 18,
+        width: 1.8,
+        height: 38,
       });
       fitBarcodeToLabel(svg);
     } catch (_) {
@@ -5718,7 +5918,7 @@ function printBarcodeLabels(labels) {
   }
   if (failed) showToast(`${failed} label dilewati karena kodenya tidak valid.`);
 
-  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", "print-barcode-batch");
+  printWithPageRule("@page { size: 60mm 30mm; margin: 0; }", "print-barcode-batch");
 
   // Leave the sheet as the single-label path expects to find it.
   batch.innerHTML = "";
@@ -5838,15 +6038,15 @@ function runMasterItemBarcodePrint(note) {
   document.getElementById("barcode-print-price").textContent = formatIDR(currentMasterItem.sell_price);
   document.getElementById("barcode-print-sku-text").textContent = currentMasterItem.sku;
   document.getElementById("barcode-print-note").textContent = note || "";
-  JsBarcode("#barcode-print-svg", currentMasterItem.sku, {
-    format: "CODE128",
+  JsBarcode("#barcode-print-svg", currentMasterItem.barcode || currentMasterItem.sku, {
+    ...barcodeOptionsFor(currentMasterItem.barcode),
     displayValue: false,
-    margin: 15,
-    width: 1.5,
-    height: 42,
+    margin: 18,
+    width: 1.8,
+    height: 38,
   });
   fitBarcodeToLabel(document.getElementById("barcode-print-svg"));
-  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", null);
+  printWithPageRule("@page { size: 60mm 30mm; margin: 0; }", null);
 }
 
 // Two print targets, one stylesheet: `bodyClass` selects which block becomes
@@ -7427,9 +7627,11 @@ checkAuth();
   <div id="barcode-single" class="barcode-label">
     <div id="barcode-print-name" class="barcode-label-name"></div>
     <svg id="barcode-print-svg"></svg>
-    <div id="barcode-print-sku-text" class="barcode-label-sku"></div>
+    <div class="barcode-label-meta">
+      <span id="barcode-print-sku-text" class="barcode-label-sku"></span>
+      <span id="barcode-print-price" class="barcode-label-price"></span>
+    </div>
     <div id="barcode-print-note" class="barcode-label-note"></div>
-    <div id="barcode-print-price" class="barcode-label-price"></div>
   </div>
   <!-- Batch: Barang Masuk renders one .barcode-label per received unit here. -->
   <div id="barcode-batch"></div>

@@ -32,7 +32,7 @@ from backend.database import (
     get_inventory_overview,
     get_master_item,
     get_master_item_batch_history,
-    get_master_item_by_sku,
+    get_master_item_by_code,
     get_master_items_for_export,
     get_stock_ledger,
     get_supplier,
@@ -209,6 +209,7 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         first_received_date=row["first_received_date"],
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
+        barcode=row.get("barcode"),
     )
 
 
@@ -536,10 +537,13 @@ async def autocomplete(query: str, supplier_id: int | None = None, brand_id: int
 
 @router.get("/inventory/master-items/by-sku/{sku}", response_model=MasterItemOut)
 async def get_master_item_by_sku_route(sku: str):
+    # `sku` here is whatever the cashier's scanner/keyboard sent -- an EAN-13
+    # barcode or a SKU. See get_master_item_by_code for how that's resolved;
+    # the route path/param name stay as-is so nothing on the frontend changes.
     loop = asyncio.get_event_loop()
-    row = await loop.run_in_executor(None, get_master_item_by_sku, sku)
+    row = await loop.run_in_executor(None, get_master_item_by_code, sku)
     if row is None:
-        raise HTTPException(status_code=404, detail=f"No product found for SKU {sku}")
+        raise HTTPException(status_code=404, detail=f"Barang dengan kode {sku} tidak ditemukan.")
     return _row_to_master_item(row)
 
 

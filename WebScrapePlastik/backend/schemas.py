@@ -244,6 +244,9 @@ class MasterItemOut(BaseModel):
     first_received_date: str | None
     is_active: bool
     created_at: str
+    # In-store EAN-13, generated from the row id. Null only for the brief instant
+    # between insert and backfill inside the same transaction that creates it.
+    barcode: str | None = None
 
 
 class DuplicateCheckOut(BaseModel):

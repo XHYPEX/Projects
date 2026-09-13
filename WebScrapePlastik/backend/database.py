@@ -166,6 +166,7 @@ def init_db() -> None:
                 first_received_date TEXT,
                 is_active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
+                barcode TEXT,
                 UNIQUE(supplier_id, brand_id, name_normalized)
             );
             CREATE INDEX IF NOT EXISTS idx_master_items_sku_prefix ON master_items(sku_prefix);
@@ -400,6 +401,22 @@ def init_db() -> None:
         preorder_cols = {row["name"] for row in con.execute("PRAGMA table_info(preorders)").fetchall()}
         if "is_draft" not in preorder_cols:
             con.execute("ALTER TABLE preorders ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0")
+
+        # --- Additive migration: in-store EAN-13 barcode ---
+        # data/scraper.db already has live master items with no barcode. Every
+        # one of them is backfilled here (not just left NULL like the other
+        # migrations above) because a barcode has to exist on every item before
+        # a cashier can scan any of them — there is no acceptable "not printed
+        # yet" state at the DB layer.
+        master_item_cols = {row["name"] for row in con.execute("PRAGMA table_info(master_items)").fetchall()}
+        if "barcode" not in master_item_cols:
+            con.execute("ALTER TABLE master_items ADD COLUMN barcode TEXT")
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_master_items_barcode ON master_items(barcode)")
+        for missing_row in con.execute("SELECT id FROM master_items WHERE barcode IS NULL").fetchall():
+            con.execute(
+                "UPDATE master_items SET barcode=? WHERE id=?",
+                (_generate_barcode_for_id(missing_row["id"]), missing_row["id"]),
+            )
 
         seed_normalized = _normalize_name("Tanpa Merk")
         existing_seed = con.execute("SELECT 1 FROM brands WHERE code=?", ("NOB",)).fetchone()
@@ -1393,6 +1410,36 @@ def preview_sku(supplier_id: int, brand_id: int, product_name: str) -> dict:
 
 
 # --- Master items ------------------------------------------------------
+# In-store EAN-13 barcodes: the shop's own CODE128-encoded SKU labels came out
+# with bars too thin for its 203dpi thermal printer/scanner combo to read
+# reliably, and CODE128 support on that scanner couldn't even be confirmed.
+# EAN-13 is the format it demonstrably reads. The 200-299 GTIN prefix range is
+# reserved for in-store/internal use, so a code generated here can never
+# collide with a real manufacturer's barcode.
+
+
+def _ean13_check_digit(digits12: str) -> str:
+    """Standard EAN-13 check digit algorithm: sum the digits in odd positions
+    (1st, 3rd, ...) x1 and the digits in even positions (2nd, 4th, ...) x3 over
+    the 12-digit payload, then check digit = (10 - sum mod 10) mod 10."""
+    total = 0
+    for position, ch in enumerate(digits12, start=1):
+        d = int(ch)
+        total += d if position % 2 == 1 else d * 3
+    return str((10 - total % 10) % 10)
+
+
+def _generate_barcode_for_id(master_item_id: int) -> str:
+    """Deterministic EAN-13 from a master_items.id: "200" + id zero-padded to 9
+    digits (12 digits) + check digit (13 total). Deriving it from the row id —
+    rather than a separate counter — makes it unique with no extra state, and
+    reproducible if it ever needs regenerating."""
+    if master_item_id >= 10**9:
+        raise ValueError(f"master_item_id {master_item_id} too large to encode in a 9-digit barcode segment")
+    payload = "200" + str(master_item_id).zfill(9)
+    barcode = payload + _ean13_check_digit(payload)
+    assert _ean13_check_digit(barcode[:12]) == barcode[12], "generated barcode failed its own check digit"
+    return barcode
 
 
 def create_master_item(
@@ -1423,7 +1470,14 @@ def create_master_item(
                 cost_price, cost_price, sell_price, created_at,
             ),
         )
-        row = con.execute("SELECT * FROM master_items WHERE id=?", (cur.lastrowid,)).fetchone()
+        # The row id isn't known until after INSERT, so the barcode is generated
+        # and written back in the same transaction as the insert.
+        master_item_id = cur.lastrowid
+        con.execute(
+            "UPDATE master_items SET barcode=? WHERE id=?",
+            (_generate_barcode_for_id(master_item_id), master_item_id),
+        )
+        row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         return dict(row)
 
 
@@ -1493,6 +1547,30 @@ def get_master_item_by_sku(sku: str) -> dict | None:
             (sku,),
         ).fetchone()
         return dict(row) if row is not None else None
+
+
+def get_master_item_by_barcode(barcode: str) -> dict | None:
+    with _conn() as con:
+        row = con.execute(
+            """SELECT mi.*, s.name AS supplier_name, b.name AS brand_name FROM master_items mi
+               JOIN suppliers s ON s.id = mi.supplier_id
+               JOIN brands b ON b.id = mi.brand_id
+               WHERE mi.barcode=? AND mi.is_active=1""",
+            (barcode,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+
+def get_master_item_by_code(code: str) -> dict | None:
+    """What the cashier's scanner/keyboard actually sends could be either an
+    EAN-13 barcode or a hand-typed/old SKU. A barcode is only ever numeric, so
+    it's tried first when the code looks like one; SKU is always the fallback,
+    which keeps old CODE128 labels and typed SKUs resolving unchanged."""
+    if code.isdigit():
+        by_barcode = get_master_item_by_barcode(code)
+        if by_barcode is not None:
+            return by_barcode
+    return get_master_item_by_sku(code)
 
 
 def list_master_items(
@@ -1670,8 +1748,20 @@ def get_inventory_overview() -> dict:
 def autocomplete_master_items(
     query: str, supplier_id: int | None = None, brand_id: int | None = None, limit: int = 20
 ) -> list[dict]:
-    where_clauses = ["mi.is_active=1", "mi.name LIKE ?"]
-    params: list = [f"%{query}%"]
+    """Matches against name OR sku OR barcode (barcode may be NULL on a row that
+    somehow missed the backfill -- LIKE/`=` against NULL is simply never true, so
+    it never breaks the filter or the sort). LIKE is SQLite's default
+    case-insensitive-for-ASCII behaviour, same as the plain name-only match this
+    replaced; the CASE keys use UPPER() to keep the same case-insensitivity
+    explicit for the `=` comparisons, which aren't case-insensitive by default.
+
+    Ordered so a typeahead never buries what you typed verbatim: exact
+    barcode/SKU match first, then a SKU-prefix match, then everything else
+    (substring name/sku/barcode hits), alphabetically by name within each
+    group -- all as a SQL sort key rather than a Python sort."""
+    like = f"%{query}%"
+    where_clauses = ["mi.is_active=1", "(mi.name LIKE ? OR mi.sku LIKE ? OR mi.barcode LIKE ?)"]
+    params: list = [like, like, like]
     if supplier_id is not None:
         where_clauses.append("mi.supplier_id=?")
         params.append(supplier_id)
@@ -1679,6 +1769,8 @@ def autocomplete_master_items(
         where_clauses.append("mi.brand_id=?")
         params.append(brand_id)
     where_sql = " AND ".join(where_clauses)
+
+    order_params = [query, query, f"{query}%"]
     with _conn() as con:
         rows = con.execute(
             f"""SELECT mi.*, s.name AS supplier_name, b.name AS brand_name
@@ -1686,8 +1778,15 @@ def autocomplete_master_items(
                 JOIN suppliers s ON s.id = mi.supplier_id
                 JOIN brands b ON b.id = mi.brand_id
                 WHERE {where_sql}
-                ORDER BY mi.name ASC LIMIT ?""",
-            params + [limit],
+                ORDER BY
+                    CASE
+                        WHEN UPPER(mi.barcode)=UPPER(?) OR UPPER(mi.sku)=UPPER(?) THEN 0
+                        WHEN UPPER(mi.sku) LIKE UPPER(?) THEN 1
+                        ELSE 2
+                    END,
+                    mi.name ASC
+                LIMIT ?""",
+            params + order_params + [limit],
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -1907,6 +2006,10 @@ def post_inbound_document(document_id: int) -> dict:
                         ),
                     )
                     master_item_id = cur.lastrowid
+                    con.execute(
+                        "UPDATE master_items SET barcode=? WHERE id=?",
+                        (_generate_barcode_for_id(master_item_id), master_item_id),
+                    )
 
                 con.execute("UPDATE inbound_items SET master_item_id=? WHERE id=?", (master_item_id, item["id"]))
                 item["master_item_id"] = master_item_id

@@ -141,19 +141,19 @@
       .header-sprite { animation-play-state: paused; }
     }
 
-    /* Barcode label: 58mm x 40mm thermal label, only rendered when printing (see @media print below). */
+    /* Barcode label: 60mm x 30mm thermal label, only rendered when printing (see @media print below). */
     #barcode-print-area { display: none; }
     .barcode-label {
-      width: 58mm;
-      height: 40mm;
-      padding: 2mm;
+      width: 60mm;
+      height: 30mm;
+      padding: 1.5mm;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      /* Tight: the enlarged type plus the optional free-text line only just
-         clears 40mm. */
+      /* Tight: on a 30mm label the type and the optional free-text line leave
+         only about 1mm to spare, so gaps stay small. */
       gap: 0.5mm;
       line-height: 1.15;
       font-family: 'Inter', system-ui, sans-serif;
@@ -161,7 +161,7 @@
       overflow: hidden;
     }
     .barcode-label-name {
-      font-size: 12pt;
+      font-size: 11pt;
       font-weight: 600;
       color: #141413;
       max-width: 100%;
@@ -169,16 +169,23 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .barcode-label-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 4mm;
+      max-width: 100%;
+    }
     .barcode-label-sku {
       font-family: 'IBM Plex Mono', ui-monospace, monospace;
-      font-size: 10.5pt;
+      font-size: 9pt;
       color: #141413;
       letter-spacing: 0.5px;
     }
     /* Optional free-text line. Collapses entirely when unused so labels without
        one keep the spacing they had. */
     .barcode-label-note {
-      font-size: 9pt;
+      font-size: 7pt;
       color: #141413;
       max-width: 100%;
       overflow: hidden;
@@ -187,7 +194,7 @@
     }
     .barcode-label-note:empty { display: none; }
     .barcode-label-price {
-      font-size: 13.5pt;
+      font-size: 12pt;
       font-weight: 700;
       color: #141413;
     }
@@ -5835,8 +5842,8 @@ function barcodeOptionsFor(code) {
   return /^\d{13}$/.test(String(code || "")) ? { format: "EAN13", flat: true } : { format: "CODE128" };
 }
 
-// 54mm of printable width inside the label's 2mm padding, in CSS px at 96dpi.
-const BARCODE_MAX_WIDTH_PX = 54 / 25.4 * 96;
+// 57mm of printable width inside the label's 1.5mm padding, in CSS px at 96dpi.
+const BARCODE_MAX_WIDTH_PX = 57 / 25.4 * 96;
 
 // A long SKU renders wider than the label (18 characters at 1.5px per module is
 // ~92mm) and would print clipped at both edges. Squeeze it horizontally only:
@@ -5875,9 +5882,11 @@ function printBarcodeLabels(labels) {
     <div class="barcode-label">
       <div class="barcode-label-name">${esc(l.name || "")}</div>
       <svg class="barcode-batch-svg" data-idx="${i}"></svg>
-      <div class="barcode-label-sku">${esc(l.sku)}</div>
+      <div class="barcode-label-meta">
+        <span class="barcode-label-sku">${esc(l.sku)}</span>
+        <span class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</span>
+      </div>
       <div class="barcode-label-note">${esc(l.note || "")}</div>
-      <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
     </div>
   `).join("");
 
@@ -5888,9 +5897,9 @@ function printBarcodeLabels(labels) {
       JsBarcode(svg, label.barcode || label.sku, {
         ...barcodeOptionsFor(label.barcode),
         displayValue: false,
-        margin: 15,
-        width: 1.5,
-        height: 42,
+        margin: 18,
+        width: 1.8,
+        height: 38,
       });
       fitBarcodeToLabel(svg);
     } catch (_) {
@@ -5909,7 +5918,7 @@ function printBarcodeLabels(labels) {
   }
   if (failed) showToast(`${failed} label dilewati karena kodenya tidak valid.`);
 
-  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", "print-barcode-batch");
+  printWithPageRule("@page { size: 60mm 30mm; margin: 0; }", "print-barcode-batch");
 
   // Leave the sheet as the single-label path expects to find it.
   batch.innerHTML = "";
@@ -6032,12 +6041,12 @@ function runMasterItemBarcodePrint(note) {
   JsBarcode("#barcode-print-svg", currentMasterItem.barcode || currentMasterItem.sku, {
     ...barcodeOptionsFor(currentMasterItem.barcode),
     displayValue: false,
-    margin: 15,
-    width: 1.5,
-    height: 42,
+    margin: 18,
+    width: 1.8,
+    height: 38,
   });
   fitBarcodeToLabel(document.getElementById("barcode-print-svg"));
-  printWithPageRule("@page { size: 58mm 40mm; margin: 0; }", null);
+  printWithPageRule("@page { size: 60mm 30mm; margin: 0; }", null);
 }
 
 // Two print targets, one stylesheet: `bodyClass` selects which block becomes
@@ -7618,9 +7627,11 @@ checkAuth();
   <div id="barcode-single" class="barcode-label">
     <div id="barcode-print-name" class="barcode-label-name"></div>
     <svg id="barcode-print-svg"></svg>
-    <div id="barcode-print-sku-text" class="barcode-label-sku"></div>
+    <div class="barcode-label-meta">
+      <span id="barcode-print-sku-text" class="barcode-label-sku"></span>
+      <span id="barcode-print-price" class="barcode-label-price"></span>
+    </div>
     <div id="barcode-print-note" class="barcode-label-note"></div>
-    <div id="barcode-print-price" class="barcode-label-price"></div>
   </div>
   <!-- Batch: Barang Masuk renders one .barcode-label per received unit here. -->
   <div id="barcode-batch"></div>

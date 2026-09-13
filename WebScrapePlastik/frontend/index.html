@@ -169,19 +169,6 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .barcode-label-meta {
-      display: flex;
-      align-items: baseline;
-      justify-content: center;
-      gap: 4mm;
-      max-width: 100%;
-    }
-    .barcode-label-sku {
-      font-family: 'IBM Plex Mono', ui-monospace, monospace;
-      font-size: 9pt;
-      color: #141413;
-      letter-spacing: 0.5px;
-    }
     /* Optional free-text line. Collapses entirely when unused so labels without
        one keep the spacing they had. */
     .barcode-label-note {
@@ -197,6 +184,7 @@
       font-size: 12pt;
       font-weight: 700;
       color: #141413;
+      white-space: nowrap;
     }
 
     .is-staff .admin-only { display: none !important; }
@@ -5882,10 +5870,7 @@ function printBarcodeLabels(labels) {
     <div class="barcode-label">
       <div class="barcode-label-name">${esc(l.name || "")}</div>
       <svg class="barcode-batch-svg" data-idx="${i}"></svg>
-      <div class="barcode-label-meta">
-        <span class="barcode-label-sku">${esc(l.sku)}</span>
-        <span class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</span>
-      </div>
+      <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
       <div class="barcode-label-note">${esc(l.note || "")}</div>
     </div>
   `).join("");
@@ -5897,7 +5882,10 @@ function printBarcodeLabels(labels) {
       JsBarcode(svg, label.barcode || label.sku, {
         ...barcodeOptionsFor(label.barcode),
         displayValue: false,
-        margin: 19,
+        marginTop: 0,
+        marginBottom: 0,
+        marginLeft: 19,
+        marginRight: 19,
         width: 1.9,
         height: 38,
       });
@@ -6036,12 +6024,14 @@ function runMasterItemBarcodePrint(note) {
   document.getElementById("barcode-single").style.display = "";
   document.getElementById("barcode-print-name").textContent = currentMasterItem.name;
   document.getElementById("barcode-print-price").textContent = formatIDR(currentMasterItem.sell_price);
-  document.getElementById("barcode-print-sku-text").textContent = currentMasterItem.sku;
   document.getElementById("barcode-print-note").textContent = note || "";
   JsBarcode("#barcode-print-svg", currentMasterItem.barcode || currentMasterItem.sku, {
     ...barcodeOptionsFor(currentMasterItem.barcode),
     displayValue: false,
-    margin: 19,
+    marginTop: 0,
+    marginBottom: 0,
+    marginLeft: 19,
+    marginRight: 19,
     width: 1.9,
     height: 38,
   });
@@ -7627,10 +7617,7 @@ checkAuth();
   <div id="barcode-single" class="barcode-label">
     <div id="barcode-print-name" class="barcode-label-name"></div>
     <svg id="barcode-print-svg"></svg>
-    <div class="barcode-label-meta">
-      <span id="barcode-print-sku-text" class="barcode-label-sku"></span>
-      <span id="barcode-print-price" class="barcode-label-price"></span>
-    </div>
+    <div id="barcode-print-price" class="barcode-label-price"></div>
     <div id="barcode-print-note" class="barcode-label-note"></div>
   </div>
   <!-- Batch: Barang Masuk renders one .barcode-label per received unit here. -->

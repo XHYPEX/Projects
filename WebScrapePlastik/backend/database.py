@@ -7,6 +7,8 @@ from pathlib import Path
 
 from rapidfuzz import fuzz
 
+from backend.seed_brands import SEED_BRANDS
+
 DB_PATH = Path(os.environ.get("DB_PATH", str(Path(__file__).parent.parent / "data" / "scraper.db")))
 
 LOW_STOCK_THRESHOLD = 5
@@ -432,6 +434,29 @@ def init_db() -> None:
                    VALUES (?, ?, 1, ?, ?, 1, 'master')""",
                 ("NOB", "Tanpa Merk", _now(), seed_normalized),
             )
+
+        # --- Seed: initial Master Merek list ---
+        # The shop's own brand list, so a fresh install isn't an empty master.
+        # Matched on name_normalized, not code: an admin may have renamed or
+        # recoded a brand, and re-seeding must never resurrect or duplicate it.
+        # is_system stays 0 -- unlike "Tanpa Merk" these are ordinary brands an
+        # admin can rename, deactivate or delete.
+        for seed_brand_name in SEED_BRANDS:
+            brand_seed_normalized = _normalize_name(seed_brand_name)
+            existing_brand_seed = con.execute(
+                "SELECT 1 FROM brands WHERE name_normalized=?", (brand_seed_normalized,)
+            ).fetchone()
+            if existing_brand_seed is None:
+                con.execute(
+                    """INSERT INTO brands (code, name, is_active, created_at, name_normalized, is_system, source)
+                       VALUES (?, ?, 1, ?, ?, 0, 'master')""",
+                    (
+                        _generate_entity_code(con, "brands", seed_brand_name),
+                        seed_brand_name,
+                        _now(),
+                        brand_seed_normalized,
+                    ),
+                )
 
         # --- Seed: initial Satuan (unit) master list ---
         # Only the starting values requested when this master was introduced;

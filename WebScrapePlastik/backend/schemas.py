@@ -50,8 +50,14 @@ class ReceiptRequest(BaseModel):
     plate_region: str
     plate_number: str
     plate_suffix: str
-    customer_phone: str
+    # Required unless customer_id is given (then it defaults to that customer's
+    # phone) -- the route enforces it, so the old "phone is mandatory" message
+    # still comes from one place.
+    customer_phone: str | None = None
     customer_name: str | None = None
+    # Master customer (Master Pelanggan). When omitted the route links by phone,
+    # creating the customer from phone + name if none holds that phone yet.
+    customer_id: int | None = None
     items: list[ReceiptItemRequest]
     discount: int = 0
     amount_paid: int = 0
@@ -70,6 +76,8 @@ class ReceiptUpdateRequest(BaseModel):
     # from "sent as null" (clear it); the route checks fields_set to tell them apart.
     customer_phone: str | None = None
     customer_name: str | None = None
+    # null is the same as omitted: a receipt cannot be un-linked, only re-pointed.
+    customer_id: int | None = None
     items: list[ReceiptItemRequest] | None = None
     discount: int | None = None
     amount_paid: int | None = None
@@ -87,6 +95,8 @@ class ReceiptResponse(BaseModel):
     customer_phone: str
     customer_name: str | None = None
     payment_method: str
+    customer_id: int | None = None
+    customer_full_name: str | None = None
 
 
 class ReceiptItemOut(BaseModel):
@@ -115,10 +125,73 @@ class ReceiptOut(BaseModel):
     started_at: str | None = None
     payment_method: str
     item_count: int
+    customer_id: int | None = None
+    # The linked master customer's name when there is one, else the receipt's own
+    # customer_name -- what a listing should show. customer_name/customer_phone
+    # stay the snapshot taken when the receipt was saved.
+    customer_full_name: str | None = None
 
 
 class ReceiptDetail(ReceiptOut):
     items: list[ReceiptItemOut]
+
+
+class ReceiptSettleRequest(BaseModel):
+    # Optional: how the remaining balance was paid. Omitted keeps the receipt's own.
+    payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
+
+
+class CustomerRequest(BaseModel):
+    first_name: str
+    last_name: str | None = None
+    phone: str
+    email: str | None = None
+    birth_date: str | None = None  # YYYY-MM-DD
+    address: str | None = None
+
+
+class CustomerUpdateRequest(BaseModel):
+    # Only fields the client sent are applied (the route reads model_fields_set),
+    # so for the nullable ones an omitted field is left alone and an explicit
+    # null/blank clears it.
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    birth_date: str | None = None
+    address: str | None = None
+    is_active: bool | None = None
+
+
+class CustomerOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: str | None = None
+    full_name: str
+    phone: str
+    email: str | None = None
+    birth_date: str | None = None
+    address: str | None = None
+    is_active: bool
+    created_at: str
+    updated_at: str
+    # Receipts linked to this customer, of any status (void included), and the
+    # created_at of the newest one (UTC ISO string, null when there are none).
+    receipt_count: int = 0
+    last_visit: str | None = None
+
+
+class CustomerListOut(BaseModel):
+    items: list[CustomerOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class CustomerAutocompleteOut(BaseModel):
+    id: int
+    full_name: str
+    phone: str
 
 
 class SalesDayOut(BaseModel):
@@ -248,6 +321,11 @@ class MasterItemOut(BaseModel):
     # id. Null only for the brief instant between insert and backfill inside the
     # same transaction that creates it.
     barcode: str | None = None
+    # Optional product photo. Null when none has been uploaded; otherwise a
+    # same-origin URL whose ?v= token changes on every upload, so an <img> never
+    # shows a stale picture after a replace. Built from master_items.image_path,
+    # which is deliberately not exposed.
+    image_url: str | None = None
 
 
 class DuplicateCheckOut(BaseModel):
@@ -262,6 +340,8 @@ class MasterItemCreateRequest(BaseModel):
     unit: str
     sell_price: int = 0
     cost_price: int = 0
+    # Opening stock counted at entry time; recorded in the stock ledger.
+    stock_qty: int = 0
 
 
 class MasterItemUpdateRequest(BaseModel):

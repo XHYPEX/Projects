@@ -43,8 +43,13 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/users$"), "POST", "Tambah pengguna", "user"),
 
     (re.compile(r"^/api/receipts$"), "POST", "Buat nota penjualan", "receipt"),
+    (re.compile(r"^/api/receipts/[^/]+/settle$"), "POST", "Tandai nota selesai", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "PATCH", "Ubah nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "DELETE", "Hapus nota penjualan", "receipt"),
+
+    (re.compile(r"^/api/customers/\d+$"), "PATCH", "Ubah pelanggan", "customer"),
+    (re.compile(r"^/api/customers/\d+$"), "DELETE", "Hapus pelanggan", "customer"),
+    (re.compile(r"^/api/customers$"), "POST", "Tambah pelanggan", "customer"),
 
     (re.compile(r"^/api/preorders/[^/]+/items/\d+/status$"), "PATCH", "Ubah status preorder", "preorder"),
     # No DELETE rule: there is no DELETE /preorders/{id} route (removed --
@@ -69,6 +74,8 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 
     (re.compile(r"^/api/inventory/master-items/\d+$"), "PATCH", "Ubah barang", "master_item"),
     (re.compile(r"^/api/inventory/master-items/\d+$"), "DELETE", "Hapus barang", "master_item"),
+    (re.compile(r"^/api/inventory/master-items/\d+/image$"), "PUT", "Ubah foto barang", "master_item"),
+    (re.compile(r"^/api/inventory/master-items/\d+/image$"), "DELETE", "Hapus foto barang", "master_item"),
     (re.compile(r"^/api/inventory/master-items$"), "POST", "Tambah barang", "master_item"),
 
     (re.compile(r"^/api/inventory/inbound-documents/\d+/post$"), "POST", "Posting barang masuk", "inbound_document"),
@@ -91,7 +98,7 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 # Fields worth showing as the one-line "what was this about", in priority order.
 SUMMARY_KEYS = [
     "name", "product_name", "username", "invoice_number", "supplier_invoice_no",
-    "plate_number", "customer_name", "keyword", "reason", "note", "notes",
+    "plate_number", "customer_name", "first_name", "keyword", "reason", "note", "notes",
 ]
 
 

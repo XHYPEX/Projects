@@ -3,8 +3,10 @@ import csv
 import io
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 
+from backend import product_images
 from backend.auth import require_admin
 from backend.database import (
     autocomplete_master_items,
@@ -46,6 +48,7 @@ from backend.database import (
     preview_supplier_code,
     search_brands,
     search_suppliers,
+    set_master_item_image_path,
     update_brand,
     update_inbound_document,
     update_master_item,
@@ -210,6 +213,7 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
         barcode=row.get("barcode"),
+        image_url=product_images.image_url(row["id"], row.get("image_path")),
     )
 
 
@@ -560,6 +564,8 @@ async def create_new_master_item(req: MasterItemCreateRequest):
         raise HTTPException(status_code=422, detail="sell_price must be >= 0")
     if req.cost_price < 0:
         raise HTTPException(status_code=422, detail="cost_price must be >= 0")
+    if req.stock_qty < 0:
+        raise HTTPException(status_code=422, detail="stock_qty must be >= 0")
 
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
@@ -572,7 +578,7 @@ async def create_new_master_item(req: MasterItemCreateRequest):
     try:
         row = await loop.run_in_executor(
             None, create_master_item, req.supplier_id, req.brand_id, req.name.strip(), req.unit.strip(),
-            req.sell_price, req.cost_price,
+            req.sell_price, req.cost_price, req.stock_qty,
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -674,9 +680,126 @@ async def delete_master_item_route(master_item_id: int):
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
         raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
     try:
-        await loop.run_in_executor(None, delete_master_item, master_item_id)
+        image_filename = await loop.run_in_executor(None, delete_master_item, master_item_id)
     except ValueError as e:
         _raise_from_value_error(e)
+    # Only after the delete committed: a rejected delete (item has history) must
+    # keep its photo.
+    await loop.run_in_executor(None, product_images.delete_image_file, image_filename)
+    return Response(status_code=204)
+
+
+# --- master item photo -------------------------------------------------------
+# Upload is a raw-body PUT (the body *is* the image, Content-Type names its
+# format) so no multipart parser dependency is needed. The file lives on disk
+# under a server-generated name (backend/product_images.py); the row only keeps
+# that name. Auth is the router-level get_current_user, exactly like PATCH on
+# the item -- any logged-in user may set or clear a photo, only deleting the
+# item itself is admin-only.
+
+
+async def _read_image_body(request: Request) -> bytes:
+    too_big = HTTPException(status_code=413, detail="Ukuran gambar maksimal 2 MB.")
+    declared = request.headers.get("content-length", "")
+    # Reject on the declared size before reading anything; the running total below
+    # still guards chunked bodies and a Content-Length that lies.
+    if declared.isdigit() and int(declared) > product_images.MAX_IMAGE_BYTES:
+        raise too_big
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > product_images.MAX_IMAGE_BYTES:
+            raise too_big
+    return bytes(data)
+
+
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    if not if_none_match:
+        return False
+    candidates = [c.strip().removeprefix("W/") for c in if_none_match.split(",")]
+    return "*" in candidates or etag in candidates
+
+
+@router.put("/inventory/master-items/{master_item_id}/image", response_model=MasterItemOut)
+async def put_master_item_image(master_item_id: int, request: Request):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type not in product_images.IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=422,
+            detail="Format gambar harus JPEG, PNG, atau WebP (Content-Type: image/jpeg, image/png, atau image/webp).",
+        )
+    data = await _read_image_body(request)
+    if not data:
+        raise HTTPException(status_code=422, detail="File gambar kosong.")
+    # The header is client-controlled; the bytes have to agree with it.
+    if not product_images.matches_content_type(content_type, data):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Isi file bukan gambar {content_type.split('/')[1].upper()} yang valid (tidak cocok dengan Content-Type {content_type}).",
+        )
+
+    filename = await loop.run_in_executor(None, product_images.save_image, data, content_type)
+    try:
+        previous = await loop.run_in_executor(None, set_master_item_image_path, master_item_id, filename)
+    except Exception as e:
+        # The new file was never referenced by a row; don't leave it behind.
+        await loop.run_in_executor(None, product_images.delete_image_file, filename)
+        if isinstance(e, ValueError):
+            _raise_from_value_error(e)
+        raise
+    await loop.run_in_executor(None, product_images.delete_image_file, previous)
+
+    row = await loop.run_in_executor(None, get_master_item, master_item_id)
+    if row is None:
+        # Deleted by someone else between the update and this read. Their delete
+        # removed the file that row pointed at, so there is nothing to clean up.
+        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+    return _row_to_master_item(row)
+
+
+@router.get("/inventory/master-items/{master_item_id}/image")
+async def get_master_item_image(master_item_id: int, request: Request, v: str | None = None):
+    loop = asyncio.get_event_loop()
+    row = await loop.run_in_executor(None, get_master_item, master_item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+    filename = row.get("image_path")
+    path = await loop.run_in_executor(None, product_images.image_file, filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Barang ini belum memiliki foto.")
+
+    version = product_images.image_version(filename)
+    etag = f'"{filename.rsplit(".", 1)[0]}"'  # a filename is never reused, so it is a strong validator
+    headers = {
+        "ETag": etag,
+        "X-Content-Type-Options": "nosniff",
+        # "private": the photo is behind the login, shared caches must not keep it.
+        # The URL the API hands out carries the current ?v= token, which changes on
+        # every upload, so it can be cached for good. A request without the current
+        # token (a hand-typed or stale URL) must revalidate instead.
+        "Cache-Control": "private, max-age=31536000, immutable" if v == version else "private, no-cache",
+    }
+    if _etag_matches(request.headers.get("if-none-match"), etag):
+        return Response(status_code=304, headers=headers)
+    return FileResponse(path, media_type=product_images.media_type_for(filename), headers=headers)
+
+
+@router.delete("/inventory/master-items/{master_item_id}/image", status_code=204, response_class=Response)
+async def delete_master_item_image(master_item_id: int):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+    try:
+        previous = await loop.run_in_executor(None, set_master_item_image_path, master_item_id, None)
+    except ValueError as e:
+        _raise_from_value_error(e)
+    # No photo to begin with is fine: previous is None and this is a no-op, so the
+    # call is idempotent.
+    await loop.run_in_executor(None, product_images.delete_image_file, previous)
     return Response(status_code=204)
 
 

@@ -453,6 +453,21 @@ def init_db() -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_receipts_customer_id ON receipts(customer_id)")
         _backfill_receipt_customers(con)
 
+        # --- Additive migration: printed nota number (receipt_no) ---
+        # The id is a UUID, which means nothing on paper. Existing receipts are numbered in
+        # the order they were saved, so the printed series matches the shop's history.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "receipt_no" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN receipt_no TEXT")
+        for unnumbered in con.execute(
+            "SELECT id, created_at FROM receipts WHERE receipt_no IS NULL ORDER BY created_at ASC, rowid ASC"
+        ).fetchall():
+            con.execute(
+                "UPDATE receipts SET receipt_no=? WHERE id=?",
+                (_next_receipt_no(con, unnumbered["created_at"]), unnumbered["id"]),
+            )
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_receipt_no ON receipts(receipt_no)")
+
         # --- Additive migration: receipt line -> master item link (stock movement) ---
         # data/scraper.db already has live receipt_items rows created before a sale
         # could be attributed to a specific product. Those stay NULL rather than
@@ -897,6 +912,21 @@ _RECEIPT_SELECT = f"""SELECT r.*,
     FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id"""
 
 
+RECEIPT_NO_PREFIX = "PJSG"
+
+
+def _next_receipt_no(con: sqlite3.Connection, created_at: str) -> str:
+    """PJSG/YY/MM/NNNN: a counter per calendar month on the shop's wall clock, restarting at
+    0001. Called inside the inserting transaction, so two saves can't take the same number."""
+    local = datetime.fromisoformat(created_at) + timedelta(minutes=SHOP_UTC_OFFSET_MINUTES)
+    prefix = f"{RECEIPT_NO_PREFIX}/{local:%y}/{local:%m}/"
+    row = con.execute(
+        "SELECT MAX(CAST(SUBSTR(receipt_no, ?) AS INTEGER)) AS n FROM receipts WHERE receipt_no LIKE ?",
+        (len(prefix) + 1, prefix + "%"),
+    ).fetchone()
+    return f"{prefix}{(row['n'] or 0) + 1:04d}"
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -923,15 +953,17 @@ def create_receipt(
         customer_id, customer_phone, customer_name = _resolve_receipt_customer(
             con, customer_id, customer_phone, customer_name
         )
+        receipt_no = _next_receipt_no(con, created_at)
         con.execute(
             """INSERT INTO receipts
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method, customer_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method, customer_id,
+                receipt_no)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
                 subtotal, discount, total, created_at, started_at, final_status, amount_paid, payment_method,
-                customer_id,
+                customer_id, receipt_no,
             ),
         )
         resolved_items = [
@@ -962,6 +994,7 @@ def create_receipt(
         "subtotal": subtotal, "discount": discount, "total": total, "status": final_status,
         "amount_paid": amount_paid, "customer_phone": customer_phone, "customer_name": customer_name,
         "payment_method": payment_method, "customer_id": customer_id, "customer_full_name": customer_full_name,
+        "receipt_no": receipt_no,
     }
 
 
@@ -1041,7 +1074,8 @@ def _receipt_filters(
             clauses.append(cust[0])
             params += cust[1]
     if q:
-        either = [c for c in (_plate_clause(q), _customer_clause(q)) if c]
+        nota_no = ("r.receipt_no LIKE ?" + _LIKE_ESCAPE, [_like_contains(q.strip())]) if "/" in q else None
+        either = [c for c in (_plate_clause(q), _customer_clause(q), nota_no) if c]
         if either:
             clauses.append("(" + " OR ".join(c[0] for c in either) + ")")
             for c in either:
@@ -1282,7 +1316,7 @@ def get_receipt_items(receipt_id: str) -> list[dict]:
         # just with sku=NULL — reopening it for edit keeps that link, or lack of
         # one, as-is.
         rows = con.execute(
-            """SELECT ri.*, mi.sku AS sku FROM receipt_items ri
+            """SELECT ri.*, mi.sku AS sku, mi.unit AS unit FROM receipt_items ri
                LEFT JOIN master_items mi ON mi.id = ri.master_item_id
                WHERE ri.receipt_id=? ORDER BY ri.id ASC""",
             (receipt_id,),

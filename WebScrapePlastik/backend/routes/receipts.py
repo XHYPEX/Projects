@@ -78,6 +78,7 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         unit_price=row["unit_price"],
         warranty_date=row["warranty_date"],
         sku=row.get("sku"),
+        unit=row.get("unit"),
     )
 
 

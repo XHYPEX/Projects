@@ -97,6 +97,7 @@ class ReceiptResponse(BaseModel):
     payment_method: str
     customer_id: int | None = None
     customer_full_name: str | None = None
+    receipt_no: str | None = None
 
 
 class ReceiptItemOut(BaseModel):
@@ -106,6 +107,7 @@ class ReceiptItemOut(BaseModel):
     unit_price: int
     warranty_date: str | None
     sku: str | None = None
+    unit: str | None = None  # the linked master item's unit; None for a hand-typed line
 
 
 class ReceiptOut(BaseModel):
@@ -130,6 +132,7 @@ class ReceiptOut(BaseModel):
     # customer_name -- what a listing should show. customer_name/customer_phone
     # stay the snapshot taken when the receipt was saved.
     customer_full_name: str | None = None
+    receipt_no: str | None = None  # printed nota number, PJSG/YY/MM/NNNN
 
 
 class ReceiptDetail(ReceiptOut):

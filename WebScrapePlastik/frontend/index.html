@@ -256,6 +256,8 @@
 
     /* Purchase invoice: A4 document, screen-hidden and only laid out for print. */
     #pi-print-area { display: none; }
+    /* Customer nota (Nota Penjualan): A5 landscape, filled by printReceiptNota() right before printing. */
+    #nota-print-area { display: none; }
 
     @media print {
       body * { visibility: hidden; }
@@ -263,9 +265,9 @@
       /* Two print targets share one stylesheet — the body class picks which one
          becomes visible. @page can't be class-scoped, so the paper size lives in
          the #print-page-rule <style> element that each print helper rewrites. */
-      body:not(.print-invoice) #barcode-print-area,
-      body:not(.print-invoice) #barcode-print-area * { visibility: visible; }
-      body:not(.print-invoice) #barcode-print-area {
+      body:not(.print-invoice):not(.print-nota) #barcode-print-area,
+      body:not(.print-invoice):not(.print-nota) #barcode-print-area * { visibility: visible; }
+      body:not(.print-invoice):not(.print-nota) #barcode-print-area {
         display: block;
         position: absolute;
         top: 0;
@@ -298,6 +300,19 @@
       }
       body.print-invoice #pi-print-area table { page-break-inside: auto; }
       body.print-invoice #pi-print-area tr { page-break-inside: avoid; }
+
+      body.print-nota #nota-print-area,
+      body.print-nota #nota-print-area * { visibility: visible; }
+      /* Like batch barcodes: take the app shell out of the layout entirely, or its
+         (invisible) full-height panels push blank pages after the nota. */
+      body.print-nota { height: auto !important; overflow: visible !important; background: #fff !important; }
+      body.print-nota > *:not(#nota-print-area) { display: none !important; }
+      body.print-nota #nota-print-area {
+        display: block;
+        position: static;
+        width: 100%;
+      }
+      body.print-nota #nota-print-area tr { page-break-inside: avoid; }
     }
   </style>
   <style id="print-page-rule">@page { size: 58mm 40mm; margin: 0; }</style>
@@ -670,6 +685,8 @@
               <div class="ml-auto flex flex-wrap items-center gap-2">
                 <button id="cashier-settle-btn" type="button" onclick="openCashierSettleModal()"
                   class="hidden px-4 py-1.5 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">Tandai Selesai</button>
+                <button id="cashier-print-btn" type="button" onclick="printActiveReceiptNota()"
+                  class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Cetak Nota</button>
                 <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
                   class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah</button>
                 <button id="cashier-void-btn" type="button" onclick="confirmVoidActiveReceipt()"
@@ -4072,6 +4089,9 @@ async function saveReceipt() {
   renderCashierForm();
   btn.disabled = false;
   showToast(isUpdate ? "Nota diperbarui." : "Nota disimpan.", "success");
+  // A new sale goes straight to the printer so the customer leaves with their nota;
+  // after an edit, Cetak Nota reprints it on request.
+  if (!isUpdate) printReceiptNota(savedId);
 }
 
 // ── Cashier: multi-tab workspace ──────────────────────────────────────────────
@@ -4365,6 +4385,8 @@ function applyCashierVoidLock(tab) {
   // Void itself can't be undone, and there's nothing left to void once a
   // receipt has no persisted id yet — hide the button in both cases.
   document.getElementById("cashier-void-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
+  // Reprint any saved nota; a void one is no longer a sale to hand to a customer.
+  document.getElementById("cashier-print-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
 
   updateCashierSettleButtons();
 }
@@ -9131,6 +9153,10 @@ const SHOP_PROFILE = {
   name: "TOKO PLASTIK",
   address: "",
   phone: "",
+  // Customer nota (Nota Penjualan) only. Empty values are simply left off the printout.
+  notaName: "SINAR GALAKSI",
+  logo: "assets/logo-nota.png",   // hidden on the nota if the file is missing
+  bankAccount: "",                // e.g. "BCA : 1234567890  A/N : SINAR GALAKSI"
 };
 
 const PI_STATUS_LABELS = { draft: "Draft", posted: "Diposting", void: "Void" };
@@ -9730,6 +9756,161 @@ async function submitPurchaseInvoicePayment() {
   const inv = await resp.json();
   showToast(inv.payment_status === "lunas" ? "Faktur lunas." : "Pembayaran dicatat.", "success");
   await openPurchaseInvoice(inv.id);
+}
+
+// ── Cashier: customer nota (Nota Penjualan) ──────────────────────────────────
+// Printed on A5 landscape from the saved receipt, never from the form, so the paper always
+// matches what was stored (number, items, totals).
+
+const TERBILANG_WORDS = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+
+function terbilang(n) {
+  n = Math.floor(Math.abs(n));
+  if (n < 12) return TERBILANG_WORDS[n];
+  if (n < 20) return terbilang(n - 10) + " belas";
+  if (n < 100) return terbilang(Math.floor(n / 10)) + " puluh" + (n % 10 ? " " + terbilang(n % 10) : "");
+  if (n < 200) return "seratus" + (n > 100 ? " " + terbilang(n - 100) : "");
+  if (n < 1000) return terbilang(Math.floor(n / 100)) + " ratus" + (n % 100 ? " " + terbilang(n % 100) : "");
+  if (n < 2000) return "seribu" + (n > 1000 ? " " + terbilang(n - 1000) : "");
+  for (const [size, word] of [[1e12, "triliun"], [1e9, "miliar"], [1e6, "juta"], [1e3, "ribu"]]) {
+    if (n >= size) {
+      const rest = n % size;
+      return terbilang(Math.floor(n / size)) + " " + word + (rest ? " " + terbilang(rest) : "");
+    }
+  }
+  return "";
+}
+
+function terbilangRupiah(n) {
+  const words = n > 0 ? terbilang(n) : "nol";
+  return words.charAt(0).toUpperCase() + words.slice(1) + " Rupiah";
+}
+
+function formatNotaDate(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? "" : `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+function printActiveReceiptNota() {
+  const tab = getActiveTab();
+  if (tab && tab.receiptId) printReceiptNota(tab.receiptId);
+}
+
+async function printReceiptNota(receiptId) {
+  const resp = await fetch(`/api/receipts/${receiptId}`);
+  if (!resp.ok) {
+    showToast("Nota tidak bisa dicetak: data nota gagal dimuat.");
+    return;
+  }
+  const receipt = await resp.json();
+  let customer = null;
+  if (receipt.customer_id) {
+    const cResp = await fetch(`/api/customers/${receipt.customer_id}`);
+    if (cResp.ok) customer = await cResp.json();
+  }
+  document.getElementById("nota-print-area").innerHTML = receiptNotaHtml(receipt, customer);
+  // Wait for the logo (or its failure) so the dialog never prints a half-loaded header.
+  const logo = document.querySelector("#nota-print-area img");
+  if (logo && !logo.complete) {
+    await new Promise(done => { logo.onload = done; logo.onerror = () => { logo.remove(); done(); }; });
+  } else if (logo && !logo.naturalWidth) {
+    logo.remove();  // already failed (missing file) before we started waiting
+  }
+  printWithPageRule("@page { size: A5 landscape; margin: 7mm 9mm; }", "print-nota");
+}
+
+function receiptNotaHtml(r, customer) {
+  const cell = "padding:3px 6px;";
+  const name = r.customer_full_name || r.customer_name || "";
+  const addressBits = [customer && customer.address, r.customer_phone].filter(Boolean);
+  const shopContact = [SHOP_PROFILE.phone && `Telp. ${SHOP_PROFILE.phone}`, SHOP_PROFILE.address].filter(Boolean);
+  const remaining = Math.max(r.total - r.amount_paid, 0);
+
+  const rows = r.items.map((item, idx) => `
+    <tr>
+      <td style="${cell}text-align:center;">${idx + 1}</td>
+      <td style="${cell}">${esc(item.product_name)}</td>
+      <td style="${cell}text-align:center;">${item.quantity}</td>
+      <td style="${cell}text-align:center;">${esc(item.unit || "")}</td>
+      <td style="${cell}text-align:right;">${groupDigits(item.unit_price) || "0"}</td>
+      <td style="${cell}text-align:right;">${groupDigits(item.quantity * item.unit_price) || "0"}</td>
+    </tr>`).join("");
+
+  const totalRow = (label, value, extra = "") => `
+    <tr>
+      <td style="padding:2px 0;">${label}</td>
+      <td style="padding:2px 6px;">:</td>
+      <td style="padding:2px 0;text-align:right;${extra}">${value}</td>
+    </tr>`;
+
+  const kv = (label, value) => `
+    <tr>
+      <td style="padding:1px 0;vertical-align:top;white-space:nowrap;">${label}</td>
+      <td style="padding:1px 8px;vertical-align:top;">:</td>
+      <td style="padding:1px 0;vertical-align:top;">${value}</td>
+    </tr>`;
+
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:132mm;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;gap:16px;">
+      <div style="display:flex;gap:12px;align-items:center;">
+        ${SHOP_PROFILE.logo ? `<img src="${esc(SHOP_PROFILE.logo)}" alt="" onerror="this.remove()" style="width:30mm;max-height:22mm;object-fit:contain;">` : ""}
+        <div>
+          <div style="font-size:12pt;">Nota Penjualan${r.status === "void" ? " &mdash; <b>VOID</b>" : ""}</div>
+          <div style="font-size:14pt;font-weight:bold;letter-spacing:0.02em;">${esc(SHOP_PROFILE.notaName || SHOP_PROFILE.name)}</div>
+          ${shopContact.length ? `<div style="font-size:8pt;">${shopContact.map(esc).join(" &middot; ")}</div>` : ""}
+        </div>
+      </div>
+      <table style="border-collapse:collapse;font-size:9pt;">
+        ${kv("Kepada", esc(name) || "&ndash;")}
+        ${addressBits.length ? kv("Alamat", addressBits.map(esc).join("&nbsp;&nbsp;")) : ""}
+        ${kv("Tgl. Order", esc(formatNotaDate(r.created_at)))}
+        ${kv("No. Plat", esc(r.plate_full))}
+      </table>
+    </div>
+
+    <div style="margin-top:8px;">No. Nota&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.receipt_no || "")}</div>
+
+    <div style="flex:1 0 auto;">
+    <table style="width:100%;border-collapse:collapse;margin-top:4px;">
+      <thead>
+        <tr style="border-top:1px solid #000;border-bottom:1px solid #000;">
+          <th style="${cell}width:7mm;font-weight:normal;text-align:center;">No.</th>
+          <th style="${cell}font-weight:normal;text-align:left;">Nama Barang</th>
+          <th style="${cell}width:12mm;font-weight:normal;text-align:center;">Qty</th>
+          <th style="${cell}width:16mm;font-weight:normal;text-align:center;">Satuan</th>
+          <th style="${cell}width:28mm;font-weight:normal;text-align:right;">Harga Satuan</th>
+          <th style="${cell}width:28mm;font-weight:normal;text-align:right;">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+
+    <div style="border-top:1px solid #000;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;gap:16px;">
+      <div style="flex:1;min-width:0;">
+        <table style="border-collapse:collapse;">
+          ${kv("Terbilang", esc(terbilangRupiah(r.total)))}
+          ${kv("Keterangan", "Barang yang diterima sudah diperiksa dalam keadaan baik &amp; lengkap<br>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan!!!")}
+        </table>
+        ${SHOP_PROFILE.bankAccount ? `
+        <div style="display:inline-block;margin:6px 0 0 70px;border:1px solid #000;padding:3px 8px;font-family:'Courier New',monospace;font-weight:bold;font-size:8.5pt;">
+          PEMBAYARAN TRANSFER KE REKENING :<br>${esc(SHOP_PROFILE.bankAccount)}
+        </div>` : ""}
+      </div>
+      <table style="border-collapse:collapse;min-width:62mm;">
+        ${totalRow("Sub Total", groupDigits(r.subtotal) || "0")}
+        ${totalRow("Potongan", groupDigits(r.discount) || "0", "border-bottom:1px solid #000;")}
+        ${totalRow("Jumlah", groupDigits(r.total) || "0", "font-weight:bold;")}
+        ${remaining > 0 && r.status !== "void" ? totalRow("Dibayar", groupDigits(r.amount_paid) || "0") + totalRow("Sisa", groupDigits(remaining), "font-weight:bold;") : ""}
+      </table>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-top:10px;padding:0 20mm 0 12mm;">
+      <div style="text-align:center;">Penerima<div style="margin-top:14mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
+      <div style="text-align:center;">Hormat kami,<div style="margin-top:14mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
+    </div>
+  </div>`;
 }
 
 // --- print -----------------------------------------------------------------
@@ -10692,5 +10873,7 @@ checkAuth();
 
 <!-- Purchase invoice print sheet — filled by renderPurchaseInvoicePrint() right before window.print(). -->
 <div id="pi-print-area"></div>
+<!-- Customer nota print sheet — filled by printReceiptNota() right before window.print(). -->
+<div id="nota-print-area"></div>
 </body>
 </html>

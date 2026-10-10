@@ -154,7 +154,7 @@
     @media (min-width: 640px) { .cashier-inner { padding-inline: 1.5rem; } }
     #receipt-list { max-height: 24rem; overflow-y: auto; }
     @media (min-width: 1360px) {
-      .cashier-split { display: grid; overflow: hidden; width: 100%; max-width: 96rem; margin-inline: auto;
+      .cashier-split { display: grid; overflow: hidden; width: 100%;
         grid-template-columns: minmax(0, 1fr) 19rem; grid-template-rows: auto minmax(0, 1fr) auto; }
       .cashier-inner { max-width: none; }
       .cashier-strip, .cashier-bar { position: static; }
@@ -3641,7 +3641,7 @@ function renderScanSuggest() {
         <span class="font-mono">${esc(item.sku)}</span>
         ${item.brand_name ? `<span>&middot; ${esc(item.brand_name)}</span>` : ""}
         <span>&middot; ${esc(item.unit)}</span>
-        <span>&middot; Stok ${item.stock_qty}</span>
+        <span class="${item.stock_qty <= 0 ? "text-failed font-medium" : ""}">&middot; Stok ${item.stock_qty}</span>
         <span>&middot; ${formatIDR(item.sell_price)}</span>
       </div>
     </button>
@@ -3673,9 +3673,11 @@ function chooseScanSuggestion(idx) {
 function addScannedItemToReceipt(item, targetRow) {
   rememberItemImage(item);
   const existingRow = findItemRowBySku(item.sku);
+  let qtyOnReceipt = 1;
   if (existingRow) {
     const qtyInput = existingRow.querySelector(".item-qty");
-    qtyInput.value = (parseInt(qtyInput.value, 10) || 0) + 1;
+    qtyOnReceipt = (parseInt(qtyInput.value, 10) || 0) + 1;
+    qtyInput.value = qtyOnReceipt;
     if (targetRow && targetRow !== existingRow && !targetRow.dataset.sku) {
       targetRow.querySelector(".item-name").value = "";
       refreshItemRowMeta(targetRow);
@@ -3694,6 +3696,17 @@ function addScannedItemToReceipt(item, targetRow) {
   recomputeTotals();
   renderCashierSummary();
   markActiveTabDirty();
+  warnIfShortOfStock(item, qtyOnReceipt);
+}
+
+// Selling past the recorded stock is allowed (the count may simply be behind), but the
+// cashier should know, so a short item is flagged as it lands on the receipt.
+function warnIfShortOfStock(item, qtyOnReceipt) {
+  const stock = Number(item.stock_qty);
+  if (!Number.isFinite(stock) || qtyOnReceipt <= stock) return;
+  showToast(stock <= 0
+    ? `Stok ${item.name} kosong (0). Barang tetap ditambahkan ke nota.`
+    : `Stok ${item.name} tinggal ${stock}, di nota ${qtyOnReceipt}. Barang tetap ditambahkan.`);
 }
 
 function handleScanInputKeydown(event) {

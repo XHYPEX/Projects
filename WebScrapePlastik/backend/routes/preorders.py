@@ -40,11 +40,11 @@ def _normalize_phone(raw: str) -> str:
 def _validate_phone(raw: str) -> str:
     phone = _normalize_phone(raw)
     if not phone:
-        raise HTTPException(status_code=422, detail="customer_phone is required")
+        raise HTTPException(status_code=422, detail="Nomor HP pelanggan wajib diisi.")
     if not PHONE_RE.match(phone):
         raise HTTPException(
             status_code=422,
-            detail="customer_phone must be 7-15 digits (an optional leading + is allowed)",
+            detail="Nomor HP pelanggan harus 7-15 digit (boleh diawali tanda +).",
         )
     return phone
 
@@ -53,7 +53,7 @@ def _validate_status(status: str) -> str:
     if status not in PREORDER_STATUSES:
         raise HTTPException(
             status_code=422,
-            detail=f"Unknown status '{status}'. Expected one of: {', '.join(PREORDER_STATUSES)}",
+            detail=f"Status '{status}' tidak dikenal. Pilihan: {', '.join(PREORDER_STATUSES)}.",
         )
     return status
 
@@ -62,11 +62,11 @@ def _validate_items(items: list[PreorderItemRequest]) -> list[dict]:
     validated: list[dict] = []
     for item in items:
         if not item.product_name.strip():
-            raise HTTPException(status_code=422, detail="product_name must not be empty")
+            raise HTTPException(status_code=422, detail="Nama barang wajib diisi.")
         if item.quantity <= 0:
-            raise HTTPException(status_code=422, detail="quantity must be a positive integer")
+            raise HTTPException(status_code=422, detail="Jumlah harus bilangan bulat positif.")
         if item.unit_price < 0:
-            raise HTTPException(status_code=422, detail="unit_price must be >= 0")
+            raise HTTPException(status_code=422, detail="Harga satuan tidak boleh negatif.")
         if item.status is not None:
             _validate_status(item.status)
         payload = item.model_dump()
@@ -93,7 +93,7 @@ async def _detail(preorder_id: str) -> PreorderDetail:
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_preorder, preorder_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Preorder not found")
+        raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
     items = await loop.run_in_executor(None, get_preorder_items, preorder_id)
     history = await loop.run_in_executor(None, get_preorder_history, preorder_id)
     return PreorderDetail(
@@ -107,12 +107,12 @@ async def _detail(preorder_id: str) -> PreorderDetail:
 async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_current_user)):
     customer_name = req.customer_name.strip()
     if not customer_name:
-        raise HTTPException(status_code=422, detail="customer_name is required")
+        raise HTTPException(status_code=422, detail="Nama pelanggan wajib diisi.")
     customer_phone = _validate_phone(req.customer_phone)
     if not req.items:
-        raise HTTPException(status_code=422, detail="At least one line item is required")
+        raise HTTPException(status_code=422, detail="Minimal harus ada satu baris barang.")
     if req.deposit < 0:
-        raise HTTPException(status_code=422, detail="deposit must be >= 0")
+        raise HTTPException(status_code=422, detail="Uang muka tidak boleh negatif.")
 
     items = _validate_items(req.items)
     notes = req.notes.strip() if req.notes else None
@@ -146,21 +146,21 @@ async def update_preorder_route(
 ):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_preorder, preorder_id) is None:
-        raise HTTPException(status_code=404, detail="Preorder not found")
+        raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
 
     customer_name: str | None = None
     if req.customer_name is not None:
         customer_name = req.customer_name.strip()
         if not customer_name:
-            raise HTTPException(status_code=422, detail="customer_name is required")
+            raise HTTPException(status_code=422, detail="Nama pelanggan wajib diisi.")
     customer_phone = _validate_phone(req.customer_phone) if req.customer_phone is not None else None
     if req.deposit is not None and req.deposit < 0:
-        raise HTTPException(status_code=422, detail="deposit must be >= 0")
+        raise HTTPException(status_code=422, detail="Uang muka tidak boleh negatif.")
 
     items: list[dict] | None = None
     if req.items is not None:
         if not req.items:
-            raise HTTPException(status_code=422, detail="At least one line item is required")
+            raise HTTPException(status_code=422, detail="Minimal harus ada satu baris barang.")
         items = _validate_items(req.items)
 
     # Only touch notes when the client actually sent the field, so an omitted
@@ -185,7 +185,7 @@ async def update_preorder_item_status(
     status = _validate_status(req.status)
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_preorder, preorder_id) is None:
-        raise HTTPException(status_code=404, detail="Preorder not found")
+        raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
     try:
         await loop.run_in_executor(
             None, set_preorder_item_status, preorder_id, item_id, status, user["username"]

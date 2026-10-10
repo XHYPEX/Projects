@@ -7,11 +7,20 @@ from pathlib import Path
 
 from rapidfuzz import fuzz
 
+from backend.config import SHOP_UTC_OFFSET_MINUTES
+from backend.seed_brands import SEED_BRANDS
+
 DB_PATH = Path(os.environ.get("DB_PATH", str(Path(__file__).parent.parent / "data" / "scraper.db")))
 
 LOW_STOCK_THRESHOLD = 5
 
 _STOPWORDS = {"DAN", "THE", "OF", "FOR", "DENGAN", "UNTUK"}
+
+# A valid customer phone: an optional leading +, then 7-15 digits once separators
+# are stripped. The one definition shared by the receipt routes, the customer
+# routes and the receipts->customers backfill below.
+PHONE_RE = re.compile(r"^\+?\d{7,15}$")
+_YMD_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _conn() -> sqlite3.Connection:
@@ -19,6 +28,35 @@ def _conn() -> sqlite3.Connection:
     con = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     con.row_factory = sqlite3.Row
     return con
+
+
+def normalize_phone(raw: str | None) -> str:
+    """Strip spaces, dashes, dots and parens so '(0812) 3456-7890' and '081234567890'
+    validate the same way; the cleaned form is what gets stored and compared."""
+    return re.sub(r"[\s\-.()]", "", raw or "")
+
+
+def parse_ymd(raw: str) -> date:
+    """Strict YYYY-MM-DD. date.fromisoformat alone also accepts '20261009' and ISO
+    week dates on Python 3.11+, which a user typing a date never means. Raises
+    ValueError for anything else, including a real-looking impossible day."""
+    if not _YMD_RE.match(raw or ""):
+        raise ValueError(f"Bukan tanggal berformat YYYY-MM-DD: {raw!r}")
+    return date.fromisoformat(raw)
+
+
+def shop_today(offset_minutes: int | None = None) -> date:
+    """Today's calendar date on the shop's wall clock. Timestamps are stored in
+    UTC, so 'what day is it' needs an explicit offset (backend/config.py)."""
+    offset = SHOP_UTC_OFFSET_MINUTES if offset_minutes is None else offset_minutes
+    return (datetime.now(timezone.utc) + timedelta(minutes=offset)).date()
+
+
+def _shop_midnight_utc_iso(day: date, offset_minutes: int) -> str:
+    """The UTC instant at which `day` starts on the shop's wall clock, as an ISO
+    string in the same shape created_at uses, so it compares correctly as text."""
+    local_midnight = datetime(day.year, day.month, day.day, tzinfo=timezone(timedelta(minutes=offset_minutes)))
+    return local_midnight.astimezone(timezone.utc).isoformat()
 
 
 def init_db() -> None:
@@ -57,6 +95,21 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 message TEXT NOT NULL
             );
+            -- Master pelanggan. The phone is the identity (UNIQUE, stored normalised
+            -- like receipts.customer_phone). Receipts keep their own phone/name
+            -- snapshot and merely point here via receipts.customer_id.
+            CREATE TABLE IF NOT EXISTS customers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                first_name TEXT NOT NULL,
+                last_name TEXT,
+                phone TEXT NOT NULL UNIQUE,
+                email TEXT,
+                birth_date TEXT,
+                address TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS receipts (
                 id TEXT PRIMARY KEY,
                 plate_region TEXT NOT NULL,
@@ -69,7 +122,8 @@ def init_db() -> None:
                 discount INTEGER NOT NULL DEFAULT 0,
                 total INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
-                payment_method TEXT NOT NULL DEFAULT 'cash'
+                payment_method TEXT NOT NULL DEFAULT 'cash',
+                customer_id INTEGER REFERENCES customers(id)
             );
             CREATE INDEX IF NOT EXISTS idx_receipts_plate_full ON receipts(plate_full);
             CREATE INDEX IF NOT EXISTS idx_receipts_created_at ON receipts(created_at);
@@ -167,6 +221,7 @@ def init_db() -> None:
                 is_active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
                 barcode TEXT,
+                image_path TEXT,
                 UNIQUE(supplier_id, brand_id, name_normalized)
             );
             CREATE INDEX IF NOT EXISTS idx_master_items_sku_prefix ON master_items(sku_prefix);
@@ -385,6 +440,19 @@ def init_db() -> None:
         if "payment_method" not in receipt_cols:
             con.execute("ALTER TABLE receipts ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash'")
 
+        # --- Additive migration: receipt -> master customer link ---
+        # data/scraper.db already holds receipts that carry only a phone/name
+        # snapshot. customer_id is nullable and the snapshot columns are never
+        # touched; the backfill below fills in the link (and creates the master
+        # rows it needs) for every receipt that has a usable phone. The index
+        # goes after the ALTER because a pre-existing receipts table has no such
+        # column until this point.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "customer_id" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN customer_id INTEGER REFERENCES customers(id)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_receipts_customer_id ON receipts(customer_id)")
+        _backfill_receipt_customers(con)
+
         # --- Additive migration: receipt line -> master item link (stock movement) ---
         # data/scraper.db already has live receipt_items rows created before a sale
         # could be attributed to a specific product. Those stay NULL rather than
@@ -424,6 +492,13 @@ def init_db() -> None:
                 (_generate_barcode_for_id(stale_row["id"]), stale_row["id"]),
             )
 
+        # --- Additive migration: optional product photo ---
+        # Nullable, no backfill: every existing item simply has no photo. Holds
+        # only the generated filename inside PRODUCT_IMAGE_DIR (backend/config.py),
+        # never a path, so the data folder can move without rewriting rows.
+        if "image_path" not in master_item_cols:
+            con.execute("ALTER TABLE master_items ADD COLUMN image_path TEXT")
+
         seed_normalized = _normalize_name("Tanpa Merk")
         existing_seed = con.execute("SELECT 1 FROM brands WHERE code=?", ("NOB",)).fetchone()
         if existing_seed is None:
@@ -432,6 +507,29 @@ def init_db() -> None:
                    VALUES (?, ?, 1, ?, ?, 1, 'master')""",
                 ("NOB", "Tanpa Merk", _now(), seed_normalized),
             )
+
+        # --- Seed: initial Master Merek list ---
+        # The shop's own brand list, so a fresh install isn't an empty master.
+        # Matched on name_normalized, not code: an admin may have renamed or
+        # recoded a brand, and re-seeding must never resurrect or duplicate it.
+        # is_system stays 0 -- unlike "Tanpa Merk" these are ordinary brands an
+        # admin can rename, deactivate or delete.
+        for seed_brand_name in SEED_BRANDS:
+            brand_seed_normalized = _normalize_name(seed_brand_name)
+            existing_brand_seed = con.execute(
+                "SELECT 1 FROM brands WHERE name_normalized=?", (brand_seed_normalized,)
+            ).fetchone()
+            if existing_brand_seed is None:
+                con.execute(
+                    """INSERT INTO brands (code, name, is_active, created_at, name_normalized, is_system, source)
+                       VALUES (?, ?, 1, ?, ?, 0, 'master')""",
+                    (
+                        _generate_entity_code(con, "brands", seed_brand_name),
+                        seed_brand_name,
+                        _now(),
+                        brand_seed_normalized,
+                    ),
+                )
 
         # --- Seed: initial Satuan (unit) master list ---
         # Only the starting values requested when this master was introduced;
@@ -555,6 +653,90 @@ def delete_job(job_id: str) -> None:
         con.execute("DELETE FROM jobs WHERE id=?", (job_id,))
 
 
+def _customer_full_name(first_name: str, last_name: str | None) -> str:
+    return f"{first_name} {last_name}" if last_name else first_name
+
+
+def _split_customer_name(full_name: str) -> tuple[str, str | None]:
+    """'Budi Santoso Putra' -> ('Budi', 'Santoso Putra'): split on the first space.
+    Only used where a single free-text name has to become first/last (the
+    receipt auto-create and the backfill); the master form captures them apart."""
+    parts = full_name.split(None, 1)
+    return parts[0], (" ".join(parts[1].split()) if len(parts) > 1 else None)
+
+
+def _placeholder_first_name(phone: str) -> str:
+    """first_name for a customer created from a phone number alone (the cashier
+    left the name blank, or a historical receipt never had one). The last four
+    digits keep two such customers tellable apart in a list."""
+    return f"Pelanggan {phone[-4:]}"
+
+
+def _is_placeholder_customer(row) -> bool:
+    return row["last_name"] is None and row["first_name"] == _placeholder_first_name(row["phone"])
+
+
+def _backfill_receipt_customers(con: sqlite3.Connection) -> dict:
+    """One-time (and safe to re-run) link of historical receipts to master
+    customers. Runs inside init_db's transaction.
+
+    Every receipt with no customer_id and a usable phone is grouped by its
+    normalised phone. A customer with that phone is reused if one exists;
+    otherwise one is created, named after the most recent receipt for that phone
+    that carries a name (first/last split on the first space), or the placeholder
+    when none ever did. Its created_at is the date of that phone's first receipt.
+
+    Only receipts.customer_id is written: the phone/name snapshot on each receipt
+    is left exactly as it was. Receipts with an empty phone (grandfathered from
+    before contact capture) or a phone that fails PHONE_RE stay unlinked -- a
+    master row must always satisfy the same rules as one made through the API.
+    Re-running finds nothing left to link, so it is a no-op."""
+    rows = con.execute(
+        """SELECT id, customer_phone, customer_name, created_at FROM receipts
+           WHERE customer_id IS NULL AND customer_phone != ''
+           ORDER BY created_at ASC, rowid ASC"""
+    ).fetchall()
+
+    by_phone: dict[str, dict] = {}
+    skipped = 0
+    for row in rows:
+        phone = normalize_phone(row["customer_phone"])
+        if not PHONE_RE.match(phone):
+            skipped += 1
+            continue
+        entry = by_phone.setdefault(phone, {"receipt_ids": [], "name": None, "first_seen": row["created_at"]})
+        entry["receipt_ids"].append(row["id"])
+        name = " ".join((row["customer_name"] or "").split())
+        if name:
+            # Oldest-first order means the last non-empty name seen is the newest.
+            entry["name"] = name
+
+    created = 0
+    linked = 0
+    for phone, entry in by_phone.items():
+        master = con.execute("SELECT id FROM customers WHERE phone=?", (phone,)).fetchone()
+        if master is None:
+            first_name, last_name = (
+                _split_customer_name(entry["name"]) if entry["name"] else (_placeholder_first_name(phone), None)
+            )
+            cur = con.execute(
+                """INSERT INTO customers (first_name, last_name, phone, is_active, created_at, updated_at)
+                   VALUES (?, ?, ?, 1, ?, ?)""",
+                (first_name, last_name, phone, entry["first_seen"], entry["first_seen"]),
+            )
+            customer_id = cur.lastrowid
+            created += 1
+        else:
+            customer_id = master["id"]
+        con.executemany(
+            "UPDATE receipts SET customer_id=? WHERE id=?",
+            [(customer_id, receipt_id) for receipt_id in entry["receipt_ids"]],
+        )
+        linked += len(entry["receipt_ids"])
+
+    return {"customers_created": created, "receipts_linked": linked, "receipts_skipped": skipped}
+
+
 def _compute_receipt_status(total: int, amount_paid: int, requested_status: str | None) -> str:
     """'void' is the only status a caller can force directly — pending/done are
     always derived from whether amount_paid covers total. The routes layer
@@ -649,6 +831,72 @@ def _apply_receipt_stock_delta(
         )
 
 
+def _resolve_receipt_customer(
+    con: sqlite3.Connection, customer_id: int | None, phone: str | None, name: str | None
+) -> tuple[int | None, str, str | None]:
+    """Decide which master customer a receipt belongs to and what phone/name
+    snapshot it stores. Returns (customer_id, phone, name). Runs inside the
+    caller's transaction so an auto-created customer commits or rolls back with
+    the receipt it was created for. `phone` is already normalised and validated
+    by the route; `phone`/`name` of None or '' mean "the request did not say".
+
+    - customer_id given: that customer must exist. The snapshot is synced from
+      it for whatever the request left out -- except a placeholder name, which is
+      not worth copying onto a receipt.
+    - no customer_id: link to the customer holding that phone, or create one
+      from phone + name so the master grows from cashier use. The snapshot is
+      stored exactly as typed.
+
+    Either way, when the customer only has the placeholder name and this receipt
+    supplies a real one, the master takes it -- otherwise the typed name would
+    never show up, because listings display the master's name for a linked
+    receipt."""
+    phone = phone or ""
+    name = name or None
+
+    if customer_id is not None:
+        master = con.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
+        if master is None:
+            raise ValueError("Pelanggan tidak ditemukan.")
+        if name is None and not _is_placeholder_customer(master):
+            name = _customer_full_name(master["first_name"], master["last_name"])
+        phone = phone or master["phone"]
+    elif not phone:
+        # Grandfathered shape: the routes never let a new receipt through without a phone.
+        return None, "", name
+    else:
+        master = con.execute("SELECT * FROM customers WHERE phone=?", (phone,)).fetchone()
+        if master is None:
+            first_name, last_name = _split_customer_name(name) if name else (_placeholder_first_name(phone), None)
+            now = _now()
+            # OR IGNORE + re-select rather than check-then-insert: two tabs saving
+            # the first receipt for a brand-new phone must both end up linked to
+            # the one row, not have the second hit the UNIQUE constraint and fail
+            # the sale.
+            con.execute(
+                """INSERT OR IGNORE INTO customers (first_name, last_name, phone, is_active, created_at, updated_at)
+                   VALUES (?, ?, ?, 1, ?, ?)""",
+                (first_name, last_name, phone, now, now),
+            )
+            master = con.execute("SELECT * FROM customers WHERE phone=?", (phone,)).fetchone()
+
+    if name and _is_placeholder_customer(master):
+        first_name, last_name = _split_customer_name(name)
+        con.execute(
+            "UPDATE customers SET first_name=?, last_name=?, updated_at=? WHERE id=?",
+            (first_name, last_name, _now(), master["id"]),
+        )
+    return master["id"], phone, name
+
+
+# Name shown for a receipt's customer: the master's name when linked, else the
+# receipt's own snapshot. Kept in SQL so list, detail and search share one rule.
+_CUSTOMER_FULL_NAME_SQL = "TRIM(c.first_name || ' ' || COALESCE(c.last_name, ''))"
+_RECEIPT_SELECT = f"""SELECT r.*,
+        CASE WHEN c.id IS NOT NULL THEN {_CUSTOMER_FULL_NAME_SQL} ELSE r.customer_name END AS customer_full_name
+    FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id"""
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -658,10 +906,11 @@ def create_receipt(
     discount: int,
     amount_paid: int = 0,
     status: str | None = None,
-    customer_phone: str = "",
+    customer_phone: str | None = "",
     customer_name: str | None = None,
     started_at: str | None = None,
     payment_method: str = "cash",
+    customer_id: int | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
@@ -671,14 +920,18 @@ def create_receipt(
     started_at = _sanitize_started_at(started_at, created_at)
 
     with _conn() as con:
+        customer_id, customer_phone, customer_name = _resolve_receipt_customer(
+            con, customer_id, customer_phone, customer_name
+        )
         con.execute(
             """INSERT INTO receipts
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
-                subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method, customer_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
                 subtotal, discount, total, created_at, started_at, final_status, amount_paid, payment_method,
+                customer_id,
             ),
         )
         resolved_items = [
@@ -701,38 +954,162 @@ def create_receipt(
         after_holdings = _receipt_item_holdings(resolved_items) if final_status != "void" else {}
         _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings)
 
+        customer_full_name = con.execute(
+            _RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)
+        ).fetchone()["customer_full_name"]
+
     return {
         "subtotal": subtotal, "discount": discount, "total": total, "status": final_status,
         "amount_paid": amount_paid, "customer_phone": customer_phone, "customer_name": customer_name,
-        "payment_method": payment_method,
+        "payment_method": payment_method, "customer_id": customer_id, "customer_full_name": customer_full_name,
     }
 
 
 def get_receipt(receipt_id: str) -> dict | None:
     with _conn() as con:
-        row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        row = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
         return dict(row) if row is not None else None
 
 
-def get_all_receipts(plate_query: str | None = None, status: str | None = None) -> list[dict]:
-    where_clauses = []
+_LIKE_ESCAPE = " ESCAPE '\\'"
+# A search box that holds only digits and phone punctuation is also tried as a
+# phone number; anything with letters in it is a name or a plate, never a phone.
+_PHONE_QUERY_RE = re.compile(r"^\+?[\d\s\-.()]+$")
+
+
+def _like_escape(text: str) -> str:
+    """Make the user's own % _ \\ literal inside a LIKE pattern (see _LIKE_ESCAPE)."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _like_contains(text: str) -> str:
+    return f"%{_like_escape(text)}%"
+
+
+def _plate_clause(query: str) -> tuple[str, list] | None:
+    """Plate search that ignores case, spaces and punctuation on both sides:
+    'KT 1234 AB', 'kt1234ab' and '1234' all find plate_full 'KT 1234 AB'."""
+    squashed = re.sub(r"[^A-Za-z0-9]", "", query).upper()
+    if not squashed:
+        return None
+    return "REPLACE(r.plate_full, ' ', '') LIKE ?", [f"%{squashed}%"]
+
+
+def _customer_clause(query: str) -> tuple[str, list] | None:
+    """Customer search: case-insensitive substring over the linked master
+    customer's full name and the receipt's own customer_name, plus the phone
+    digits (receipt snapshot and master) when the query looks like a number."""
+    text = " ".join(query.split())
+    if not text:
+        return None
+    like = _like_contains(text)
+    parts = [
+        "r.customer_name LIKE ?" + _LIKE_ESCAPE,
+        f"{_CUSTOMER_FULL_NAME_SQL} LIKE ?" + _LIKE_ESCAPE,
+    ]
+    params: list = [like, like]
+    if _PHONE_QUERY_RE.match(text):
+        digits = re.sub(r"\D", "", text)
+        if digits:
+            parts += ["REPLACE(r.customer_phone, '+', '') LIKE ?", "REPLACE(c.phone, '+', '') LIKE ?"]
+            params += [f"%{digits}%", f"%{digits}%"]
+    return "(" + " OR ".join(parts) + ")", params
+
+
+def _receipt_filters(
+    plate_query: str | None,
+    status: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    customer: str | None,
+    q: str | None,
+    tz_offset_minutes: int | None,
+) -> tuple[str, list]:
+    """WHERE clause shared by the receipt list and its total count. Every given
+    filter is ANDed; `q` is the one-box search, matching plate OR customer."""
+    clauses: list[str] = []
     params: list = []
+
     if plate_query:
-        where_clauses.append("plate_full LIKE ?")
-        params.append(f"%{plate_query.upper()}%")
+        plate = _plate_clause(plate_query)
+        if plate:
+            clauses.append(plate[0])
+            params += plate[1]
+    if customer:
+        cust = _customer_clause(customer)
+        if cust:
+            clauses.append(cust[0])
+            params += cust[1]
+    if q:
+        either = [c for c in (_plate_clause(q), _customer_clause(q)) if c]
+        if either:
+            clauses.append("(" + " OR ".join(c[0] for c in either) + ")")
+            for c in either:
+                params += c[1]
     if status:
-        where_clauses.append("status=?")
+        clauses.append("r.status=?")
         params.append(status)
-    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    # Day boundaries are the shop's local midnights converted to UTC, because
+    # created_at is stored as a UTC ISO string -- comparing those strings keeps
+    # the created_at index usable and is correct for same-format timestamps.
+    offset = SHOP_UTC_OFFSET_MINUTES if tz_offset_minutes is None else tz_offset_minutes
+    if date_from:
+        clauses.append("r.created_at >= ?")
+        params.append(_shop_midnight_utc_iso(date.fromisoformat(date_from), offset))
+    if date_to:
+        clauses.append("r.created_at < ?")
+        params.append(_shop_midnight_utc_iso(date.fromisoformat(date_to) + timedelta(days=1), offset))
+
+    return (f"WHERE {' AND '.join(clauses)}" if clauses else ""), params
+
+
+def get_all_receipts(
+    plate_query: str | None = None,
+    status: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    customer: str | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+    tz_offset_minutes: int | None = None,
+) -> list[dict]:
+    where_sql, params = _receipt_filters(plate_query, status, date_from, date_to, customer, q, tz_offset_minutes)
+    limit_sql = ""
+    if limit is not None:
+        limit_sql = " LIMIT ?"
+        params = params + [limit]
 
     with _conn() as con:
+        # rowid breaks created_at ties so the newest-first order is stable.
         rows = con.execute(
-            f"""SELECT *,
-                   (SELECT COUNT(*) FROM receipt_items WHERE receipt_items.receipt_id = receipts.id) AS item_count
-               FROM receipts {where_sql} ORDER BY created_at DESC""",
+            f"""SELECT r.*,
+                   CASE WHEN c.id IS NOT NULL THEN {_CUSTOMER_FULL_NAME_SQL} ELSE r.customer_name END AS customer_full_name,
+                   (SELECT COUNT(*) FROM receipt_items ri WHERE ri.receipt_id = r.id) AS item_count
+               FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id
+               {where_sql} ORDER BY r.created_at DESC, r.rowid DESC{limit_sql}""",
             params,
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_receipts(
+    plate_query: str | None = None,
+    status: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    customer: str | None = None,
+    q: str | None = None,
+    tz_offset_minutes: int | None = None,
+) -> int:
+    """How many receipts the same filters match before any limit, so a client
+    can tell 'these are all of them' from 'these are the newest N'."""
+    where_sql, params = _receipt_filters(plate_query, status, date_from, date_to, customer, q, tz_offset_minutes)
+    with _conn() as con:
+        return con.execute(
+            f"SELECT COUNT(*) AS n FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id {where_sql}",
+            params,
+        ).fetchone()["n"]
 
 
 def update_receipt(
@@ -748,11 +1125,12 @@ def update_receipt(
     customer_name: str | None = None,
     update_customer_name: bool = False,
     payment_method: str | None = None,
+    customer_id: int | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Receipt {receipt_id} not found")
+            raise ValueError(f"Nota {receipt_id} tidak ditemukan.")
         existing = dict(row)
 
         new_plate_region = plate_region if plate_region is not None else existing["plate_region"]
@@ -764,6 +1142,31 @@ def update_receipt(
         # name is nullable, so "clear it" (None) is distinct from "leave unchanged" — the route
         # sets update_customer_name only when the field was actually present in the request.
         new_customer_name = customer_name if update_customer_name else existing["customer_name"]
+
+        # Master customer link. The snapshot above is only rewritten as a side effect of
+        # re-pointing the receipt, never to chase later edits of the master record:
+        #  - a customer_id different from the current one re-points it and syncs the snapshot
+        #    for whatever the request did not state itself;
+        #  - the same customer_id (a client echoing it back on every save) changes nothing;
+        #  - a phone that differs from the stored one -- or any phone on a receipt that was
+        #    never linked -- is resolved like a new receipt's: link to that phone's customer,
+        #    or create one;
+        #  - otherwise the link is left alone.
+        new_customer_id = existing["customer_id"]
+        if customer_id is not None:
+            if customer_id != existing["customer_id"]:
+                new_customer_id, new_customer_phone, new_customer_name = _resolve_receipt_customer(
+                    con,
+                    customer_id,
+                    customer_phone,
+                    customer_name if update_customer_name else None,
+                )
+        elif customer_phone is not None and (
+            customer_phone != existing["customer_phone"] or existing["customer_id"] is None
+        ):
+            new_customer_id, new_customer_phone, new_customer_name = _resolve_receipt_customer(
+                con, None, customer_phone, new_customer_name
+            )
 
         new_amount_paid = amount_paid if amount_paid is not None else existing["amount_paid"]
         new_payment_method = payment_method if payment_method is not None else existing["payment_method"]
@@ -818,11 +1221,11 @@ def update_receipt(
 
         con.execute(
             """UPDATE receipts SET plate_region=?, plate_number=?, plate_suffix=?, plate_full=?,
-               customer_phone=?, customer_name=?, subtotal=?, discount=?, total=?, status=?, amount_paid=?,
-               payment_method=? WHERE id=?""",
+               customer_phone=?, customer_name=?, customer_id=?, subtotal=?, discount=?, total=?, status=?,
+               amount_paid=?, payment_method=? WHERE id=?""",
             (
                 new_plate_region, new_plate_number, new_plate_suffix, new_plate_full,
-                new_customer_phone, new_customer_name,
+                new_customer_phone, new_customer_name, new_customer_id,
                 new_subtotal, new_discount, new_total, new_status, new_amount_paid, new_payment_method, receipt_id,
             ),
         )
@@ -836,7 +1239,39 @@ def update_receipt(
         after_holdings = _receipt_item_holdings(after_items) if new_status != "void" else {}
         _apply_receipt_stock_delta(con, receipt_id, before_holdings, after_holdings)
 
-        updated = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        updated = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
+        return dict(updated)
+
+
+def settle_receipt(receipt_id: str, payment_method: str | None = None) -> dict:
+    """Mark a pending receipt paid in full: the remaining balance is recorded as
+    paid (amount_paid = total), which makes the computed status 'done'. Touches
+    only the payment columns -- items, totals and stock are exactly as they were.
+    A void receipt stays void and an already-done one has nothing left to settle,
+    so both are refused rather than silently re-saved."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        if row is None:
+            raise ValueError("Struk tidak ditemukan.")
+        if row["status"] == "void":
+            raise ValueError("Struk sudah dibatalkan (void), jadi tidak bisa ditandai selesai.")
+        if row["status"] == "done":
+            raise ValueError("Struk ini sudah selesai (lunas), tidak ada sisa pembayaran.")
+        # status='pending' in the WHERE makes this a compare-and-set: a double click (or
+        # two tills) that both read 'pending' above cannot both win -- the loser matches
+        # no row and is told the receipt is already done instead of reporting a second success.
+        cur = con.execute(
+            "UPDATE receipts SET amount_paid=?, status=?, payment_method=? WHERE id=? AND status='pending'",
+            (
+                row["total"],
+                _compute_receipt_status(row["total"], row["total"], None),
+                payment_method if payment_method is not None else row["payment_method"],
+                receipt_id,
+            ),
+        )
+        if cur.rowcount == 0:
+            raise ValueError("Struk ini sudah selesai (lunas), tidak ada sisa pembayaran.")
+        updated = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
         return dict(updated)
 
 
@@ -859,7 +1294,7 @@ def delete_receipt(receipt_id: str) -> None:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Receipt {receipt_id} not found")
+            raise ValueError(f"Nota {receipt_id} tidak ditemukan.")
         existing = dict(row)
 
         # Stock: deleting a receipt that still held stock returns it, same as a
@@ -914,6 +1349,184 @@ def get_sales_summary(date_from: str, date_to: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Master Pelanggan (customers)
+# ---------------------------------------------------------------------------
+# Deliberately not "one function per table with is_system/code" like suppliers
+# and brands: a customer is identified by phone, has no generated code, and no
+# row is system-owned. Delete is blocked while a receipt points at the customer
+# (same rule as suppliers/brands: SQLite runs here without FK enforcement, so a
+# delete would silently orphan the receipts); deactivating is the way to retire
+# someone who has history.
+
+_CUSTOMER_SELECT = """SELECT c.*,
+        (SELECT COUNT(*) FROM receipts r WHERE r.customer_id = c.id) AS receipt_count,
+        (SELECT MAX(r.created_at) FROM receipts r WHERE r.customer_id = c.id) AS last_visit
+    FROM customers c"""
+
+
+def _customer_row(row) -> dict:
+    d = dict(row)
+    d["full_name"] = _customer_full_name(d["first_name"], d["last_name"])
+    return d
+
+
+def _duplicate_phone_message(phone: str, holder) -> str:
+    name = _customer_full_name(holder["first_name"], holder["last_name"])
+    if holder["is_active"]:
+        return f"Nomor HP {phone} sudah terdaftar atas nama {name}."
+    return f"Nomor HP {phone} sudah terdaftar atas nama {name} (nonaktif). Aktifkan kembali pelanggan tersebut atau pakai nomor lain."
+
+
+def _customer_search_clause(text: str) -> tuple[str, list]:
+    """Name (first, last, or the two together), email, or phone digits contain
+    `text`, case-insensitively for ASCII (SQLite LIKE). `text` is non-empty."""
+    like = _like_contains(text)
+    parts = [
+        "c.first_name LIKE ?" + _LIKE_ESCAPE,
+        "COALESCE(c.last_name, '') LIKE ?" + _LIKE_ESCAPE,
+        f"{_CUSTOMER_FULL_NAME_SQL} LIKE ?" + _LIKE_ESCAPE,
+        "COALESCE(c.email, '') LIKE ?" + _LIKE_ESCAPE,
+    ]
+    params: list = [like, like, like, like]
+    phone = normalize_phone(text)
+    if phone:
+        parts.append("c.phone LIKE ?" + _LIKE_ESCAPE)
+        params.append(_like_contains(phone))
+    return "(" + " OR ".join(parts) + ")", params
+
+
+def create_customer(
+    first_name: str,
+    last_name: str | None,
+    phone: str,
+    email: str | None = None,
+    birth_date: str | None = None,
+    address: str | None = None,
+) -> dict:
+    now = _now()
+    with _conn() as con:
+        holder = con.execute("SELECT * FROM customers WHERE phone=?", (phone,)).fetchone()
+        if holder is not None:
+            raise ValueError(_duplicate_phone_message(phone, holder))
+        try:
+            cur = con.execute(
+                """INSERT INTO customers
+                   (first_name, last_name, phone, email, birth_date, address, is_active, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)""",
+                (first_name, last_name, phone, email, birth_date, address, now, now),
+            )
+        except sqlite3.IntegrityError:
+            # Lost a race with another writer between the check above and the insert.
+            raise ValueError(f"Nomor HP {phone} sudah terdaftar atas nama pelanggan lain.")
+        row = con.execute(_CUSTOMER_SELECT + " WHERE c.id=?", (cur.lastrowid,)).fetchone()
+        return _customer_row(row)
+
+
+def get_customer(customer_id: int) -> dict | None:
+    with _conn() as con:
+        row = con.execute(_CUSTOMER_SELECT + " WHERE c.id=?", (customer_id,)).fetchone()
+        return _customer_row(row) if row is not None else None
+
+
+def update_customer(customer_id: int, changes: dict) -> dict:
+    """`changes` holds only the fields the request actually sent (already cleaned
+    and validated by the route), so an omitted field stays as it is while an
+    explicit None clears a nullable one."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
+        if row is None:
+            raise ValueError("Pelanggan tidak ditemukan.")
+        merged = {**dict(row), **changes}
+
+        if merged["phone"] != row["phone"]:
+            holder = con.execute(
+                "SELECT * FROM customers WHERE phone=? AND id!=?", (merged["phone"], customer_id)
+            ).fetchone()
+            if holder is not None:
+                raise ValueError(_duplicate_phone_message(merged["phone"], holder))
+
+        try:
+            con.execute(
+                """UPDATE customers SET first_name=?, last_name=?, phone=?, email=?, birth_date=?, address=?,
+                   is_active=?, updated_at=? WHERE id=?""",
+                (
+                    merged["first_name"], merged["last_name"], merged["phone"], merged["email"],
+                    merged["birth_date"], merged["address"], int(bool(merged["is_active"])), _now(), customer_id,
+                ),
+            )
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Nomor HP {merged['phone']} sudah terdaftar atas nama pelanggan lain.")
+        updated = con.execute(_CUSTOMER_SELECT + " WHERE c.id=?", (customer_id,)).fetchone()
+        return _customer_row(updated)
+
+
+def list_customers(
+    page: int = 1,
+    page_size: int = 20,
+    search: str | None = None,
+    is_active: bool | None = None,
+) -> dict:
+    offset = (page - 1) * page_size
+    where_clauses: list[str] = []
+    params: list = []
+    text = " ".join((search or "").split())
+    if text:
+        clause, clause_params = _customer_search_clause(text)
+        where_clauses.append(clause)
+        params += clause_params
+    if is_active is not None:
+        where_clauses.append("c.is_active=?")
+        params.append(1 if is_active else 0)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    with _conn() as con:
+        total = con.execute(f"SELECT COUNT(*) AS n FROM customers c {where_sql}", params).fetchone()["n"]
+        rows = con.execute(
+            f"""{_CUSTOMER_SELECT} {where_sql}
+                ORDER BY c.first_name COLLATE NOCASE, c.last_name COLLATE NOCASE, c.id
+                LIMIT ? OFFSET ?""",
+            params + [page_size, offset],
+        ).fetchall()
+        return {"items": [_customer_row(r) for r in rows], "total": total, "page": page, "page_size": page_size}
+
+
+def autocomplete_customers(query: str, limit: int = 8) -> list[dict]:
+    """Small rows (id, full_name, phone) for the cashier's picker. Active
+    customers only -- a deactivated one must not be pickable -- with names or
+    numbers that START with the query listed ahead of ones that merely contain it."""
+    text = " ".join(query.split())
+    clause, params = _customer_search_clause(text)
+    prefix = f"{_like_escape(text)}%"
+    phone_prefix = f"{_like_escape(normalize_phone(text))}%" if normalize_phone(text) else prefix
+    with _conn() as con:
+        rows = con.execute(
+            f"""SELECT c.id, {_CUSTOMER_FULL_NAME_SQL} AS full_name, c.phone
+                FROM customers c
+                WHERE c.is_active=1 AND {clause}
+                ORDER BY CASE WHEN {_CUSTOMER_FULL_NAME_SQL} LIKE ?{_LIKE_ESCAPE}
+                                OR c.phone LIKE ?{_LIKE_ESCAPE} THEN 0 ELSE 1 END,
+                         c.first_name COLLATE NOCASE, c.last_name COLLATE NOCASE, c.id
+                LIMIT ?""",
+            params + [prefix, phone_prefix, limit],
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_customer(customer_id: int) -> None:
+    with _conn() as con:
+        row = con.execute("SELECT id FROM customers WHERE id=?", (customer_id,)).fetchone()
+        if row is None:
+            raise ValueError("Pelanggan tidak ditemukan.")
+        in_use = con.execute("SELECT COUNT(*) AS n FROM receipts WHERE customer_id=?", (customer_id,)).fetchone()["n"]
+        if in_use:
+            raise ValueError(
+                f"Pelanggan masih dipakai oleh {in_use} nota dan tidak bisa dihapus. "
+                "Nonaktifkan saja jika sudah tidak dipakai."
+            )
+        con.execute("DELETE FROM customers WHERE id=?", (customer_id,))
+
+
+# ---------------------------------------------------------------------------
 # Barang Masuk / Master Barang (inventory & procurement) module
 # ---------------------------------------------------------------------------
 
@@ -955,7 +1568,7 @@ def _next_sku(con: sqlite3.Connection, supplier_code: str, brand_code: str, segm
     ).fetchone()
     seq = row["next_seq"]
     if seq > 999:
-        raise ValueError(f"SKU sequence exhausted for prefix {prefix} (999 reached) — cannot allocate a new SKU")
+        raise ValueError(f"Urutan SKU untuk prefiks {prefix} sudah habis (mencapai 999), SKU baru tidak bisa dibuat")
     sku = f"{prefix}-{seq:03d}"
     return sku, prefix, seq
 
@@ -978,7 +1591,7 @@ def _create_quick_add_entity(
     insert shape for both tables, only the table name differs. `phone`/`address`/
     `contact_person`/`npwp` are suppliers-only columns (brands have no such
     fields) — ignored for brands."""
-    entity_label = "Supplier" if table == "suppliers" else "Brand"
+    entity_label = "Supplier" if table == "suppliers" else "Merek"
     name_normalized = _normalize_name(name)
     created_at = _now()
     with _conn() as con:
@@ -986,15 +1599,15 @@ def _create_quick_add_entity(
             f"SELECT 1 FROM {table} WHERE name_normalized=? AND is_active=1", (name_normalized,)
         ).fetchone()
         if dup is not None:
-            raise ValueError(f"{entity_label} '{name}' already exists")
+            raise ValueError(f"{entity_label} '{name}' sudah ada")
 
         if code is not None:
             code = code.strip().upper()
             if not _CODE_PATTERN.match(code):
-                raise ValueError("code must be 2-10 alphanumeric characters")
+                raise ValueError("Kode harus 2-10 karakter huruf atau angka")
             existing_code = con.execute(f"SELECT 1 FROM {table} WHERE code=?", (code,)).fetchone()
             if existing_code is not None:
-                raise ValueError(f"Code '{code}' is already in use")
+                raise ValueError(f"Kode '{code}' sudah dipakai")
         else:
             code = _generate_entity_code(con, table, name)
 
@@ -1036,14 +1649,14 @@ def _update_quick_add_entity(
     contact_person: str | None = None,
     npwp: str | None = None,
 ) -> dict:
-    entity_label = "Supplier" if table == "suppliers" else "Brand"
+    entity_label = "Supplier" if table == "suppliers" else "Merek"
     supplier_details = (phone, address, contact_person, npwp)
     with _conn() as con:
         row = con.execute(f"SELECT * FROM {table} WHERE id=?", (entity_id,)).fetchone()
         if row is None:
-            raise ValueError(f"{entity_label} {entity_id} not found")
+            raise ValueError(f"{entity_label} {entity_id} tidak ditemukan")
         if row["is_system"] and (name is not None or is_active is not None or any(d is not None for d in supplier_details)):
-            raise ValueError(f"System {entity_label.lower()} cannot be modified")
+            raise ValueError(f"{entity_label} bawaan sistem tidak bisa diubah")
         new_name = name if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         if name is not None:
@@ -1052,7 +1665,7 @@ def _update_quick_add_entity(
                 (new_name_normalized, entity_id),
             ).fetchone()
             if dup is not None:
-                raise ValueError(f"{entity_label} '{name}' already exists")
+                raise ValueError(f"{entity_label} '{name}' sudah ada")
         new_active = int(is_active) if is_active is not None else row["is_active"]
 
         if table == "suppliers":
@@ -1104,15 +1717,15 @@ def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
 
 
 def _delete_quick_add_entity(table: str, entity_id: int) -> None:
-    entity_label = "Supplier" if table == "suppliers" else "Brand"
+    entity_label = "Supplier" if table == "suppliers" else "Merek"
     with _conn() as con:
         row = con.execute(f"SELECT * FROM {table} WHERE id=?", (entity_id,)).fetchone()
         if row is None:
-            raise ValueError(f"{entity_label} {entity_id} not found")
+            raise ValueError(f"{entity_label} {entity_id} tidak ditemukan")
         if row["is_system"]:
-            raise ValueError(f"System {entity_label.lower()} cannot be deleted")
+            raise ValueError(f"{entity_label} bawaan sistem tidak bisa dihapus")
         if _entity_in_use(con, table, entity_id):
-            raise ValueError(f"{entity_label} is still in use and cannot be deleted")
+            raise ValueError(f"{entity_label} masih dipakai dan tidak bisa dihapus")
         con.execute(f"DELETE FROM {table} WHERE id=?", (entity_id,))
 
 
@@ -1269,7 +1882,7 @@ def create_unit(name: str) -> dict:
             "SELECT 1 FROM units WHERE name_normalized=? AND is_active=1", (name_normalized,)
         ).fetchone()
         if dup is not None:
-            raise ValueError(f"Satuan '{name}' already exists")
+            raise ValueError(f"Satuan '{name}' sudah ada")
         cur = con.execute(
             "INSERT INTO units (name, name_normalized, is_active, created_at) VALUES (?, ?, 1, ?)",
             (name.strip(), name_normalized, created_at),
@@ -1282,7 +1895,7 @@ def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = 
     with _conn() as con:
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Unit {unit_id} not found")
+            raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
         new_name = name.strip() if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         if name is not None:
@@ -1291,7 +1904,7 @@ def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = 
                 (new_name_normalized, unit_id),
             ).fetchone()
             if dup is not None:
-                raise ValueError(f"Satuan '{name}' already exists")
+                raise ValueError(f"Satuan '{name}' sudah ada")
         new_active = int(is_active) if is_active is not None else row["is_active"]
         con.execute(
             "UPDATE units SET name=?, name_normalized=?, is_active=? WHERE id=?",
@@ -1340,9 +1953,9 @@ def delete_unit(unit_id: int) -> None:
     with _conn() as con:
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Unit {unit_id} not found")
+            raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
         if _unit_in_use(con, row["name"]):
-            raise ValueError("Satuan is still in use and cannot be deleted")
+            raise ValueError("Satuan masih dipakai dan tidak bisa dihapus")
         con.execute("DELETE FROM units WHERE id=?", (unit_id,))
 
 
@@ -1401,10 +2014,10 @@ def preview_sku(supplier_id: int, brand_id: int, product_name: str) -> dict:
     with _conn() as con:
         supplier = con.execute("SELECT code FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if supplier is None:
-            raise ValueError(f"Supplier {supplier_id} not found")
+            raise ValueError(f"Supplier {supplier_id} tidak ditemukan.")
         brand = con.execute("SELECT code FROM brands WHERE id=?", (brand_id,)).fetchone()
         if brand is None:
-            raise ValueError(f"Brand {brand_id} not found")
+            raise ValueError(f"Merek {brand_id} tidak ditemukan.")
         prefix = f"{supplier['code']}-{brand['code']}-{segment}"
         row = con.execute(
             "SELECT COALESCE(MAX(sku_seq),0)+1 AS next_seq FROM master_items WHERE sku_prefix=?",
@@ -1440,24 +2053,25 @@ def _generate_barcode_for_id(master_item_id: int) -> str:
     separate counter — makes it unique with no extra state, and reproducible
     if it ever needs regenerating."""
     if master_item_id >= 10**8:
-        raise ValueError(f"master_item_id {master_item_id} too large to encode in an 8-digit barcode segment")
+        raise ValueError(f"ID barang {master_item_id} terlalu besar untuk dikodekan dalam 8 digit barcode")
     return "20" + str(master_item_id).zfill(8)
 
 
 def create_master_item(
-    supplier_id: int, brand_id: int, name: str, unit: str, sell_price: int = 0, cost_price: int = 0
+    supplier_id: int, brand_id: int, name: str, unit: str, sell_price: int = 0, cost_price: int = 0,
+    stock_qty: int = 0,
 ) -> dict:
     name_normalized = _normalize_name(name)
     with _conn() as con:
         supplier = con.execute("SELECT code FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if supplier is None:
-            raise ValueError(f"Supplier {supplier_id} not found")
+            raise ValueError(f"Supplier {supplier_id} tidak ditemukan.")
         brand = con.execute("SELECT code FROM brands WHERE id=?", (brand_id,)).fetchone()
         if brand is None:
-            raise ValueError(f"Brand {brand_id} not found")
+            raise ValueError(f"Merek {brand_id} tidak ditemukan.")
         dup = _find_exact_duplicate_master_item(con, supplier_id, brand_id, name_normalized)
         if dup is not None:
-            raise ValueError(f"Duplicate product: SKU {dup['sku']} already exists for this supplier and brand")
+            raise ValueError(f"Barang ganda: SKU {dup['sku']} sudah ada untuk supplier dan merek ini")
 
         segment = _compute_product_segment(name_normalized)
         sku, prefix, seq = _next_sku(con, supplier["code"], brand["code"], segment)
@@ -1466,10 +2080,10 @@ def create_master_item(
             """INSERT INTO master_items
                (sku, sku_prefix, sku_seq, supplier_id, brand_id, name, name_normalized, unit,
                 last_cost_price, avg_cost_price, sell_price, stock_qty, first_received_date, is_active, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 1, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?)""",
             (
                 sku, prefix, seq, supplier_id, brand_id, name, name_normalized, unit,
-                cost_price, cost_price, sell_price, created_at,
+                cost_price, cost_price, sell_price, stock_qty, created_at,
             ),
         )
         # The row id isn't known until after INSERT, so the barcode is generated
@@ -1479,6 +2093,12 @@ def create_master_item(
             "UPDATE master_items SET barcode=? WHERE id=?",
             (_generate_barcode_for_id(master_item_id), master_item_id),
         )
+        if stock_qty > 0:
+            con.execute(
+                """INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at)
+                   VALUES (?, 'ADJUSTMENT', ?, ?, 'manual', NULL, 'Stok awal', ?)""",
+                (master_item_id, stock_qty, stock_qty, created_at),
+            )
         row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         return dict(row)
 
@@ -1489,7 +2109,7 @@ def update_master_item(
     with _conn() as con:
         row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Master item {master_item_id} not found")
+            raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
         new_name = name if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         new_sell_price = sell_price if sell_price is not None else row["sell_price"]
@@ -1501,20 +2121,26 @@ def update_master_item(
             )
         except sqlite3.IntegrityError:
             raise ValueError(
-                f"Cannot rename: another product with this name already exists for this supplier and brand"
+                "Nama tidak bisa diubah: sudah ada barang lain dengan nama ini untuk supplier dan merek yang sama"
             )
         updated = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         return dict(updated)
 
 
-def delete_master_item(master_item_id: int) -> None:
+def delete_master_item(master_item_id: int) -> str | None:
     """Hard-deletes a master item. Only allowed when it has no receipt or stock
     history — deleting a referenced product would orphan stock_ledger rows and
-    corrupt costing. Products that have ever been received should be kept."""
+    corrupt costing. Products that have ever been received should be kept.
+
+    Returns the deleted row's image filename (or None) so the caller can remove
+    the file once the delete has actually committed; read in the same transaction
+    as the DELETE (BEGIN IMMEDIATE) so a concurrent photo replace can't slip a
+    new file past it."""
     with _conn() as con:
-        row = con.execute("SELECT id FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT id, image_path FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Master item {master_item_id} not found")
+            raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
         in_use = con.execute(
             "SELECT 1 FROM inbound_items WHERE master_item_id=? LIMIT 1", (master_item_id,)
         ).fetchone() or con.execute(
@@ -1525,6 +2151,21 @@ def delete_master_item(master_item_id: int) -> None:
                 "Barang memiliki riwayat barang masuk atau pergerakan stok dan tidak dapat dihapus"
             )
         con.execute("DELETE FROM master_items WHERE id=?", (master_item_id,))
+        return row["image_path"]
+
+
+def set_master_item_image_path(master_item_id: int, image_path: str | None) -> str | None:
+    """Points the item at a new photo file (None clears it) and returns the
+    filename it pointed at before, so the caller can delete the replaced file.
+    BEGIN IMMEDIATE takes the write lock before the read, so two concurrent
+    replaces can't both see the same "previous" and leave a file orphaned."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT image_path FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
+        con.execute("UPDATE master_items SET image_path=? WHERE id=?", (image_path, master_item_id))
+        return row["image_path"]
 
 
 def get_master_item(master_item_id: int) -> dict | None:
@@ -1864,10 +2505,10 @@ def update_inbound_document(
     with _conn() as con:
         row = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Inbound document {document_id} not found")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Cannot edit inbound document {document_id}: status is '{row['status']}', only draft documents can be edited"
+                f"Dokumen barang masuk {document_id} tidak bisa diubah: statusnya '{row['status']}', hanya dokumen draft yang bisa diubah"
             )
         total_value = sum(i["qty_in"] * i["cost_price"] for i in items)
         con.execute(
@@ -1944,10 +2585,10 @@ def post_inbound_document(document_id: int) -> dict:
     with _conn() as con:
         header = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if header is None:
-            raise ValueError(f"Inbound document {document_id} not found")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if header["status"] != "draft":
             raise ValueError(
-                f"Cannot post inbound document {document_id}: status is '{header['status']}', only draft documents can be posted"
+                f"Dokumen barang masuk {document_id} tidak bisa diposting: statusnya '{header['status']}', hanya dokumen draft yang bisa diposting"
             )
 
         # Step 2: re-validate received_date, even though it may have already been
@@ -1956,17 +2597,17 @@ def post_inbound_document(document_id: int) -> dict:
         try:
             rd = date.fromisoformat(received_date)
         except ValueError:
-            raise ValueError(f"Invalid received_date '{received_date}' on document {document_id}")
+            raise ValueError(f"Tanggal terima '{received_date}' pada dokumen {document_id} tidak valid")
         today = date.today()
         if rd > today:
-            raise ValueError(f"received_date {received_date} is in the future")
+            raise ValueError(f"Tanggal terima {received_date} ada di masa depan")
         if (today - rd).days > 30:
-            raise ValueError(f"received_date {received_date} is more than 30 days in the past")
+            raise ValueError(f"Tanggal terima {received_date} lebih dari 30 hari yang lalu")
 
         # Step 3: fetch line items, reject if empty.
         items = [dict(r) for r in con.execute("SELECT * FROM inbound_items WHERE document_id=?", (document_id,)).fetchall()]
         if not items:
-            raise ValueError(f"Cannot post inbound document {document_id}: it has no line items")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak bisa diposting: tidak ada baris barang")
 
         # Step 4: flip status to posted FIRST — the avg-cost recompute below filters
         # on d.status='posted' and must see this document's own new rows.
@@ -1991,10 +2632,10 @@ def post_inbound_document(document_id: int) -> dict:
                         "SELECT code FROM suppliers WHERE id=?", (header["supplier_id"],)
                     ).fetchone()
                     if supplier_row is None:
-                        raise ValueError(f"Supplier {header['supplier_id']} not found")
+                        raise ValueError(f"Supplier {header['supplier_id']} tidak ditemukan.")
                     brand_row = con.execute("SELECT code FROM brands WHERE id=?", (brand_id,)).fetchone()
                     if brand_row is None:
-                        raise ValueError(f"Brand {brand_id} not found")
+                        raise ValueError(f"Merek {brand_id} tidak ditemukan.")
                     segment = _compute_product_segment(name_normalized)
                     sku, prefix, seq = _next_sku(con, supplier_row["code"], brand_row["code"], segment)
                     created_at = _now()
@@ -2063,9 +2704,9 @@ def void_inbound_document(document_id: int, reason: str) -> dict:
     with _conn() as con:
         header = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if header is None:
-            raise ValueError(f"Inbound document {document_id} not found")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if header["status"] == "void":
-            raise ValueError(f"Inbound document {document_id} is already void")
+            raise ValueError(f"Dokumen barang masuk {document_id} sudah dibatalkan")
 
         if header["status"] == "draft":
             con.execute("UPDATE inbound_documents SET status='void' WHERE id=?", (document_id,))
@@ -2085,8 +2726,8 @@ def void_inbound_document(document_id: int, reason: str) -> dict:
         for item in items:
             if item["qty_remaining"] != item["qty_in"]:
                 raise ValueError(
-                    f"Cannot void document {document_id}: item SKU {item['sku']} has already had stock "
-                    f"consumed (qty_remaining={item['qty_remaining']} != qty_in={item['qty_in']})"
+                    f"Dokumen {document_id} tidak bisa dibatalkan: stok barang SKU {item['sku']} sudah terpakai "
+                    f"(sisa={item['qty_remaining']} dari jumlah masuk={item['qty_in']})"
                 )
 
         for item in items:
@@ -2211,7 +2852,7 @@ def _supplier_snapshot(con: sqlite3.Connection, supplier_id: int) -> dict:
     to the supplier master can't silently rewrite an already-printed document."""
     row = con.execute("SELECT * FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
     if row is None:
-        raise ValueError(f"Supplier {supplier_id} not found")
+        raise ValueError(f"Supplier {supplier_id} tidak ditemukan.")
     return {
         "supplier_name_snapshot": row["name"],
         "supplier_phone_snapshot": row["phone"],
@@ -2286,11 +2927,11 @@ def update_purchase_invoice(
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Cannot edit purchase invoice {invoice_id}: status is '{row['status']}', "
-                "only draft invoices can be edited"
+                f"Faktur pembelian {invoice_id} tidak bisa diubah: statusnya '{row['status']}', "
+                "hanya faktur draft yang bisa diubah"
             )
         snapshot = _supplier_snapshot(con, supplier_id)
         con.execute(
@@ -2388,14 +3029,14 @@ def post_purchase_invoice(invoice_id: int) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
-            raise ValueError(f"Purchase invoice {invoice_id} is already '{row['status']}'")
+            raise ValueError(f"Faktur pembelian {invoice_id} sudah berstatus '{row['status']}'")
         item_count = con.execute(
             "SELECT COUNT(*) AS n FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,)
         ).fetchone()["n"]
         if item_count == 0:
-            raise ValueError(f"Cannot post purchase invoice {invoice_id}: it has no line items")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak bisa diposting: tidak ada baris barang")
         con.execute(
             "UPDATE purchase_invoices SET status='posted', updated_at=? WHERE id=?", (_now(), invoice_id)
         )
@@ -2407,13 +3048,13 @@ def void_purchase_invoice(invoice_id: int, reason: str) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] == "void":
-            raise ValueError(f"Purchase invoice {invoice_id} is already void")
+            raise ValueError(f"Faktur pembelian {invoice_id} sudah dibatalkan")
         if row["amount_paid"] > 0:
             raise ValueError(
-                f"Cannot void purchase invoice {invoice_id}: {row['amount_paid']} already recorded as paid. "
-                "Reverse the payment first."
+                f"Faktur pembelian {invoice_id} tidak bisa dibatalkan: sudah tercatat pembayaran {row['amount_paid']}. "
+                "Batalkan pembayarannya terlebih dahulu."
             )
         con.execute(
             "UPDATE purchase_invoices SET status='void', void_reason=?, updated_at=? WHERE id=?",
@@ -2427,11 +3068,11 @@ def delete_purchase_invoice(invoice_id: int) -> None:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Cannot delete purchase invoice {invoice_id}: status is '{row['status']}'. "
-                "Void it instead so the number stays on record."
+                f"Faktur pembelian {invoice_id} tidak bisa dihapus: statusnya '{row['status']}'. "
+                "Batalkan (void) saja agar nomornya tetap tercatat."
             )
         con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
         con.execute("DELETE FROM purchase_invoices WHERE id=?", (invoice_id,))
@@ -2443,20 +3084,20 @@ def record_purchase_invoice_payment(invoice_id: int, amount: int) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "posted":
             raise ValueError(
-                f"Cannot record payment on purchase invoice {invoice_id}: status is '{row['status']}', "
-                "only posted invoices accept payments"
+                f"Pembayaran tidak bisa dicatat pada faktur pembelian {invoice_id}: statusnya '{row['status']}', "
+                "hanya faktur yang sudah diposting yang bisa dibayar"
             )
         if amount == 0:
-            raise ValueError("Payment amount must not be zero")
+            raise ValueError("Jumlah pembayaran tidak boleh nol")
         new_paid = row["amount_paid"] + amount
         if new_paid < 0:
-            raise ValueError("Payment reversal is larger than the amount recorded as paid")
+            raise ValueError("Pembatalan pembayaran melebihi jumlah yang tercatat sudah dibayar")
         if new_paid > row["total"]:
             raise ValueError(
-                f"Payment exceeds the outstanding balance ({row['total'] - row['amount_paid']})"
+                f"Pembayaran melebihi sisa tagihan ({row['total'] - row['amount_paid']})"
             )
         con.execute(
             "UPDATE purchase_invoices SET amount_paid=?, updated_at=? WHERE id=?",
@@ -2502,7 +3143,7 @@ def create_user(username: str, password_hash: str, role: str = "staff") -> dict:
     with _conn() as con:
         dup = con.execute("SELECT 1 FROM users WHERE username_normalized=?", (username_normalized,)).fetchone()
         if dup is not None:
-            raise ValueError(f"Username '{username}' already exists")
+            raise ValueError(f"Username '{username}' sudah ada")
         cur = con.execute(
             """INSERT INTO users (username, username_normalized, password_hash, role, is_active, created_at, updated_at)
                VALUES (?, ?, ?, ?, 1, ?, ?)""",
@@ -2547,9 +3188,9 @@ def update_user_role(user_id: int, role: str) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         if row["role"] == "admin" and role != "admin" and row["is_active"] and _active_admin_count(con, user_id) == 0:
-            raise ValueError("Cannot demote the last remaining admin")
+            raise ValueError("Admin terakhir tidak bisa diturunkan perannya")
         con.execute("UPDATE users SET role=?, updated_at=? WHERE id=?", (role, _now(), user_id))
         updated = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         return dict(updated)
@@ -2559,9 +3200,9 @@ def set_user_active(user_id: int, is_active: bool) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         if not is_active and row["role"] == "admin" and row["is_active"] and _active_admin_count(con, user_id) == 0:
-            raise ValueError("Cannot deactivate the last remaining admin")
+            raise ValueError("Admin terakhir tidak bisa dinonaktifkan")
         con.execute("UPDATE users SET is_active=?, updated_at=? WHERE id=?", (int(is_active), _now(), user_id))
         if not is_active:
             con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
@@ -2573,7 +3214,7 @@ def reset_user_password(user_id: int, password_hash: str) -> None:
     with _conn() as con:
         row = con.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         con.execute("UPDATE users SET password_hash=?, updated_at=? WHERE id=?", (password_hash, _now(), user_id))
         con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
 
@@ -2893,7 +3534,7 @@ def update_preorder(
     with _conn() as con:
         row = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Preorder {preorder_id} not found")
+            raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
         existing = dict(row)
 
         con.execute(
@@ -2957,7 +3598,7 @@ def set_preorder_item_status(
             "SELECT * FROM preorder_items WHERE id=? AND preorder_id=?", (item_id, preorder_id)
         ).fetchone()
         if row is None:
-            raise ValueError(f"Preorder item {item_id} not found")
+            raise ValueError(f"Item preorder {item_id} tidak ditemukan.")
         item = dict(row)
         if item["status"] != status:
             con.execute("UPDATE preorder_items SET status=? WHERE id=?", (status, item_id))

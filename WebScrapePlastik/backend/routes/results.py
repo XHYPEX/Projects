@@ -16,9 +16,9 @@ async def get_results(job_id: str):
     loop = asyncio.get_event_loop()
     job = await loop.run_in_executor(None, get_job, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Job tidak ditemukan.")
     if job["status"] != "done":
-        raise HTTPException(status_code=409, detail="Job not complete yet")
+        raise HTTPException(status_code=409, detail="Job belum selesai.")
     rows = await loop.run_in_executor(None, get_places, job_id)
     return [PlaceOut(**r) for r in rows]
 
@@ -28,9 +28,9 @@ async def download_csv(job_id: str):
     loop = asyncio.get_event_loop()
     job = await loop.run_in_executor(None, get_job, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Job tidak ditemukan.")
     if job["status"] != "done":
-        raise HTTPException(status_code=409, detail="Job not complete yet")
+        raise HTTPException(status_code=409, detail="Job belum selesai.")
 
     rows = await loop.run_in_executor(None, get_places, job_id)
     buf = io.StringIO()
@@ -52,7 +52,7 @@ async def get_map(job_id: str):
     loop = asyncio.get_event_loop()
     job = await loop.run_in_executor(None, get_job, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Job tidak ditemukan.")
 
     rows = await loop.run_in_executor(None, get_places, job_id)
     features = []

@@ -51,11 +51,11 @@ async def setup_required():
 @router.post("/auth/setup", response_model=UserOut, status_code=201)
 async def setup(req: SetupRequest, response: Response):
     if not req.username.strip():
-        raise HTTPException(status_code=422, detail="username must not be empty")
+        raise HTTPException(status_code=422, detail="Username wajib diisi.")
     loop = asyncio.get_event_loop()
     n = await loop.run_in_executor(None, count_users)
     if n != 0:
-        raise HTTPException(status_code=409, detail="Setup already completed")
+        raise HTTPException(status_code=409, detail="Pengaturan awal sudah selesai.")
     password_hash = hash_password(req.password)
     try:
         row = await loop.run_in_executor(None, create_user, req.username.strip(), password_hash, "admin")
@@ -70,9 +70,9 @@ async def login(req: LoginRequest, response: Response):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_user_by_username, req.username)
     if row is None or not verify_password(req.password, row["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Username atau password salah.")
     if not row["is_active"]:
-        raise HTTPException(status_code=401, detail="Account is deactivated")
+        raise HTTPException(status_code=401, detail="Akun sudah dinonaktifkan.")
     _start_session(response, row["id"])
     return _row_to_user(row)
 
@@ -91,5 +91,5 @@ async def me(user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_user_by_username, user["username"])
     if row is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Belum login. Silakan login terlebih dahulu.")
     return _row_to_user(row)

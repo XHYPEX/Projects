@@ -48,13 +48,13 @@ def run_scrape_job(job_id: str, keyword: str, city: str, kecamatan_list: list[st
                     new_count += 1
 
             total_so_far = len(get_places(job_id))
-            insert_log(job_id, f"  ✔ {new_count} new unique places (total: {total_so_far})")
+            insert_log(job_id, f"  ✔ {new_count} tempat unik baru (total: {total_so_far})")
 
-        insert_log(job_id, f"━━━ Done. {len(get_places(job_id))} total unique places. ━━━")
+        insert_log(job_id, f"━━━ Selesai. Total {len(get_places(job_id))} tempat unik. ━━━")
         update_job_status(job_id, "done", progress=100, completed_at=_now())
 
     except Exception as exc:
-        insert_log(job_id, f"  ✗ Error: {exc}")
+        insert_log(job_id, f"  ✗ Gagal: {exc}")
         update_job_status(job_id, "failed", error=str(exc), completed_at=_now())
 
 

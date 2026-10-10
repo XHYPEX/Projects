@@ -11,6 +11,7 @@ from backend.config import SCRAPER_ENABLED
 from backend.database import fail_orphaned_jobs, init_db, purge_expired_sessions
 from backend.routes.activity import router as activity_router
 from backend.routes.auth import router as auth_router
+from backend.routes.customers import router as customers_router
 from backend.routes.inventory import router as inventory_router
 from backend.routes.preorders import router as preorders_router
 from backend.routes.purchase_invoices import router as purchase_invoices_router
@@ -55,6 +56,7 @@ async def get_app_config():
 app.include_router(auth_router, prefix="/api")
 app.include_router(users_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(activity_router, prefix="/api", dependencies=[Depends(require_admin)])
+app.include_router(customers_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(inventory_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(preorders_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(purchase_invoices_router, prefix="/api", dependencies=[Depends(get_current_user)])

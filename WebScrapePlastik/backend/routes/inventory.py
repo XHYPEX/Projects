@@ -3,8 +3,10 @@ import csv
 import io
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 
+from backend import product_images
 from backend.auth import require_admin
 from backend.database import (
     autocomplete_master_items,
@@ -46,6 +48,7 @@ from backend.database import (
     preview_supplier_code,
     search_brands,
     search_suppliers,
+    set_master_item_image_path,
     update_brand,
     update_inbound_document,
     update_master_item,
@@ -99,7 +102,7 @@ def _raise_from_value_error(e: ValueError) -> None:
     # user-facing messages are Indonesian, but older ones are still English and
     # a missed match silently downgrades a 404 into a 409.
     msg = str(e)
-    if "not found" in msg or "tidak ditemukan" in msg:
+    if "tidak ditemukan" in msg:
         raise HTTPException(status_code=404, detail=msg)
     raise HTTPException(status_code=409, detail=msg)
 
@@ -108,17 +111,17 @@ def _validate_received_date(received_date: str) -> None:
     try:
         rd = date.fromisoformat(received_date)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid received_date, expected YYYY-MM-DD")
+        raise HTTPException(status_code=422, detail="Tanggal terima tidak valid, gunakan format YYYY-MM-DD.")
     today = date.today()
     if rd > today:
-        raise HTTPException(status_code=422, detail="received_date cannot be in the future")
+        raise HTTPException(status_code=422, detail="Tanggal terima tidak boleh di masa depan.")
     if (today - rd).days > 30:
-        raise HTTPException(status_code=422, detail="received_date cannot be more than 30 days in the past")
+        raise HTTPException(status_code=422, detail="Tanggal terima tidak boleh lebih dari 30 hari yang lalu.")
 
 
 def _validate_inbound_items(items: list) -> None:
     if not items:
-        raise HTTPException(status_code=422, detail="At least one line item is required")
+        raise HTTPException(status_code=422, detail="Minimal harus ada satu baris barang.")
     seen: set = set()
     for item in items:
         # Barang can only be received if it already exists in Master Barang.
@@ -134,18 +137,18 @@ def _validate_inbound_items(items: list) -> None:
                 detail="Barang baru tidak dapat dibuat langsung di Barang Masuk — tambahkan dulu di Master Barang",
             )
         if item.qty_in <= 0:
-            raise HTTPException(status_code=422, detail="qty_in must be a positive integer")
+            raise HTTPException(status_code=422, detail="Jumlah masuk harus bilangan bulat positif.")
         if item.cost_price < 0:
-            raise HTTPException(status_code=422, detail="cost_price must be >= 0")
+            raise HTTPException(status_code=422, detail="Harga modal tidak boleh negatif.")
 
         if get_master_item(item.master_item_id) is None:
-            raise HTTPException(status_code=422, detail=f"master_item_id {item.master_item_id} not found")
+            raise HTTPException(status_code=422, detail=f"Barang dengan ID {item.master_item_id} tidak ditemukan.")
         key = ("existing", item.master_item_id)
 
         if key in seen:
             raise HTTPException(
                 status_code=422,
-                detail="Duplicate product line: two line items in this document resolve to the same product — combine them into one line instead",
+                detail="Baris barang ganda: dua baris di dokumen ini merujuk ke barang yang sama — gabungkan menjadi satu baris.",
             )
         seen.add(key)
 
@@ -210,6 +213,7 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
         barcode=row.get("barcode"),
+        image_url=product_images.image_url(row["id"], row.get("image_path")),
     )
 
 
@@ -289,7 +293,7 @@ def _row_to_ledger(row: dict) -> StockLedgerOut:
 @router.post("/suppliers", response_model=SupplierOut, status_code=201)
 async def create_new_supplier(req: SupplierRequest):
     if not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     try:
         row = await loop.run_in_executor(
@@ -313,7 +317,7 @@ async def list_suppliers(active_only: bool = False, search: str | None = None):
     loop = asyncio.get_event_loop()
     if search is not None:
         if not search.strip():
-            raise HTTPException(status_code=422, detail="search must not be empty")
+            raise HTTPException(status_code=422, detail="Kata pencarian tidak boleh kosong.")
         rows = await loop.run_in_executor(None, search_suppliers, search.strip(), True, 8)
     else:
         rows = await loop.run_in_executor(None, get_all_suppliers, active_only)
@@ -323,7 +327,7 @@ async def list_suppliers(active_only: bool = False, search: str | None = None):
 @router.get("/suppliers/code-preview", response_model=CodePreviewOut)
 async def supplier_code_preview(name: str):
     if not name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     code = await loop.run_in_executor(None, preview_supplier_code, name.strip())
     return CodePreviewOut(code=code)
@@ -332,10 +336,10 @@ async def supplier_code_preview(name: str):
 @router.patch("/suppliers/{supplier_id}", response_model=SupplierOut)
 async def patch_supplier(supplier_id: int, req: SupplierUpdateRequest):
     if req.name is not None and not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, supplier_id) is None:
-        raise HTTPException(status_code=404, detail=f"Supplier {supplier_id} not found")
+        raise HTTPException(status_code=404, detail=f"Supplier {supplier_id} tidak ditemukan.")
     try:
         row = await loop.run_in_executor(
             None,
@@ -364,7 +368,7 @@ async def delete_all_suppliers_route():
 async def delete_supplier_route(supplier_id: int):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, supplier_id) is None:
-        raise HTTPException(status_code=404, detail=f"Supplier {supplier_id} not found")
+        raise HTTPException(status_code=404, detail=f"Supplier {supplier_id} tidak ditemukan.")
     try:
         await loop.run_in_executor(None, delete_supplier, supplier_id)
     except ValueError as e:
@@ -378,7 +382,7 @@ async def delete_supplier_route(supplier_id: int):
 @router.post("/brands", response_model=BrandOut, status_code=201)
 async def create_new_brand(req: BrandRequest):
     if not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     try:
         row = await loop.run_in_executor(None, create_brand, req.name.strip(), req.code, "quick_add")
@@ -392,7 +396,7 @@ async def list_brands(active_only: bool = False, search: str | None = None):
     loop = asyncio.get_event_loop()
     if search is not None:
         if not search.strip():
-            raise HTTPException(status_code=422, detail="search must not be empty")
+            raise HTTPException(status_code=422, detail="Kata pencarian tidak boleh kosong.")
         rows = await loop.run_in_executor(None, search_brands, search.strip(), True, 8)
     else:
         rows = await loop.run_in_executor(None, get_all_brands, active_only)
@@ -402,7 +406,7 @@ async def list_brands(active_only: bool = False, search: str | None = None):
 @router.get("/brands/code-preview", response_model=CodePreviewOut)
 async def brand_code_preview(name: str):
     if not name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     code = await loop.run_in_executor(None, preview_brand_code, name.strip())
     return CodePreviewOut(code=code)
@@ -411,10 +415,10 @@ async def brand_code_preview(name: str):
 @router.patch("/brands/{brand_id}", response_model=BrandOut)
 async def patch_brand(brand_id: int, req: BrandUpdateRequest):
     if req.name is not None and not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_brand, brand_id) is None:
-        raise HTTPException(status_code=404, detail=f"Brand {brand_id} not found")
+        raise HTTPException(status_code=404, detail=f"Merek {brand_id} tidak ditemukan.")
     try:
         row = await loop.run_in_executor(None, update_brand, brand_id, req.name, req.is_active)
     except ValueError as e:
@@ -433,7 +437,7 @@ async def delete_all_brands_route():
 async def delete_brand_route(brand_id: int):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_brand, brand_id) is None:
-        raise HTTPException(status_code=404, detail=f"Brand {brand_id} not found")
+        raise HTTPException(status_code=404, detail=f"Merek {brand_id} tidak ditemukan.")
     try:
         await loop.run_in_executor(None, delete_brand, brand_id)
     except ValueError as e:
@@ -447,7 +451,7 @@ async def delete_brand_route(brand_id: int):
 @router.post("/units", response_model=UnitOut, status_code=201)
 async def create_new_unit(req: UnitRequest):
     if not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     try:
         row = await loop.run_in_executor(None, create_unit, req.name.strip())
@@ -466,10 +470,10 @@ async def list_units(active_only: bool = False):
 @router.patch("/units/{unit_id}", response_model=UnitOut)
 async def patch_unit(unit_id: int, req: UnitUpdateRequest):
     if req.name is not None and not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_unit, unit_id) is None:
-        raise HTTPException(status_code=404, detail=f"Unit {unit_id} not found")
+        raise HTTPException(status_code=404, detail=f"Satuan {unit_id} tidak ditemukan.")
     try:
         row = await loop.run_in_executor(None, update_unit, unit_id, req.name, req.is_active)
     except ValueError as e:
@@ -488,7 +492,7 @@ async def delete_all_units_route():
 async def delete_unit_route(unit_id: int):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_unit, unit_id) is None:
-        raise HTTPException(status_code=404, detail=f"Unit {unit_id} not found")
+        raise HTTPException(status_code=404, detail=f"Satuan {unit_id} tidak ditemukan.")
     try:
         await loop.run_in_executor(None, delete_unit, unit_id)
     except ValueError as e:
@@ -502,7 +506,7 @@ async def delete_unit_route(unit_id: int):
 @router.get("/inventory/sku-preview", response_model=SkuPreviewOut)
 async def sku_preview(supplier_id: int, brand_id: int, product_name: str):
     if not product_name.strip():
-        raise HTTPException(status_code=422, detail="product_name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama barang wajib diisi.")
     loop = asyncio.get_event_loop()
     try:
         result = await loop.run_in_executor(None, preview_sku, supplier_id, brand_id, product_name)
@@ -514,7 +518,7 @@ async def sku_preview(supplier_id: int, brand_id: int, product_name: str):
 @router.get("/inventory/duplicate-check", response_model=DuplicateCheckOut)
 async def duplicate_check(supplier_id: int, brand_id: int, product_name: str):
     if not product_name.strip():
-        raise HTTPException(status_code=422, detail="product_name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama barang wajib diisi.")
     loop = asyncio.get_event_loop()
     exact = await loop.run_in_executor(None, find_exact_duplicate_master_item, supplier_id, brand_id, product_name)
     cross = await loop.run_in_executor(None, find_cross_supplier_master_items, supplier_id, brand_id, product_name)
@@ -527,9 +531,9 @@ async def duplicate_check(supplier_id: int, brand_id: int, product_name: str):
 @router.get("/inventory/master-items/autocomplete", response_model=list[MasterItemOut])
 async def autocomplete(query: str, supplier_id: int | None = None, brand_id: int | None = None, limit: int = 20):
     if not query.strip():
-        raise HTTPException(status_code=422, detail="query must not be empty")
+        raise HTTPException(status_code=422, detail="Kata kunci tidak boleh kosong.")
     if limit < 1 or limit > 100:
-        raise HTTPException(status_code=422, detail="limit must be between 1 and 100")
+        raise HTTPException(status_code=422, detail="Limit harus antara 1 dan 100.")
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(None, autocomplete_master_items, query, supplier_id, brand_id, limit)
     return [_row_to_master_item(r) for r in rows]
@@ -553,26 +557,28 @@ async def get_master_item_by_sku_route(sku: str):
 @router.post("/inventory/master-items", response_model=MasterItemOut, status_code=201)
 async def create_new_master_item(req: MasterItemCreateRequest):
     if not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     if not req.unit.strip():
-        raise HTTPException(status_code=422, detail="unit must not be empty")
+        raise HTTPException(status_code=422, detail="Satuan wajib diisi.")
     if req.sell_price < 0:
-        raise HTTPException(status_code=422, detail="sell_price must be >= 0")
+        raise HTTPException(status_code=422, detail="Harga jual tidak boleh negatif.")
     if req.cost_price < 0:
-        raise HTTPException(status_code=422, detail="cost_price must be >= 0")
+        raise HTTPException(status_code=422, detail="Harga modal tidak boleh negatif.")
+    if req.stock_qty < 0:
+        raise HTTPException(status_code=422, detail="Stok tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
-        raise HTTPException(status_code=422, detail=f"supplier_id {req.supplier_id} not found")
+        raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
     if await loop.run_in_executor(None, get_brand, req.brand_id) is None:
-        raise HTTPException(status_code=422, detail=f"brand_id {req.brand_id} not found")
+        raise HTTPException(status_code=422, detail=f"Merek dengan ID {req.brand_id} tidak ditemukan.")
     if await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
-        raise HTTPException(status_code=422, detail=f"unit '{req.unit}' is not a valid satuan")
+        raise HTTPException(status_code=422, detail=f"Satuan '{req.unit}' tidak valid.")
 
     try:
         row = await loop.run_in_executor(
             None, create_master_item, req.supplier_id, req.brand_id, req.name.strip(), req.unit.strip(),
-            req.sell_price, req.cost_price,
+            req.sell_price, req.cost_price, req.stock_qty,
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -589,9 +595,9 @@ async def list_master_items_route(
     is_active: bool | None = None,
 ):
     if page < 1:
-        raise HTTPException(status_code=422, detail="page must be >= 1")
+        raise HTTPException(status_code=422, detail="Halaman minimal 1.")
     if page_size < 1 or page_size > 200:
-        raise HTTPException(status_code=422, detail="page_size must be between 1 and 200")
+        raise HTTPException(status_code=422, detail="Ukuran halaman harus antara 1 dan 200.")
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         None, list_master_items, page, page_size, search, supplier_id, brand_id, is_active
@@ -632,7 +638,7 @@ async def get_master_item_detail(master_item_id: int):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_master_item, master_item_id)
     if row is None:
-        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
     batches = await loop.run_in_executor(None, get_master_item_batch_history, master_item_id)
     base = _row_to_master_item(row)
     return MasterItemDetailOut(**base.model_dump(), batches=[_row_to_batch(b) for b in batches])
@@ -641,17 +647,17 @@ async def get_master_item_detail(master_item_id: int):
 @router.patch("/inventory/master-items/{master_item_id}", response_model=MasterItemOut)
 async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest):
     if req.name is not None and not req.name.strip():
-        raise HTTPException(status_code=422, detail="name must not be empty")
+        raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     if req.unit is not None and not req.unit.strip():
-        raise HTTPException(status_code=422, detail="unit must not be empty")
+        raise HTTPException(status_code=422, detail="Satuan wajib diisi.")
     if req.sell_price is not None and req.sell_price < 0:
-        raise HTTPException(status_code=422, detail="sell_price must be >= 0")
+        raise HTTPException(status_code=422, detail="Harga jual tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
-        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
     if req.unit is not None and await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
-        raise HTTPException(status_code=422, detail=f"unit '{req.unit}' is not a valid satuan")
+        raise HTTPException(status_code=422, detail=f"Satuan '{req.unit}' tidak valid.")
     try:
         row = await loop.run_in_executor(None, update_master_item, master_item_id, req.name, req.sell_price, req.unit)
     except ValueError as e:
@@ -663,7 +669,7 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest):
 async def master_item_ledger(master_item_id: int):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
-        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
     rows = await loop.run_in_executor(None, get_stock_ledger, master_item_id)
     return [_row_to_ledger(r) for r in rows]
 
@@ -672,11 +678,128 @@ async def master_item_ledger(master_item_id: int):
 async def delete_master_item_route(master_item_id: int):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
-        raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
     try:
-        await loop.run_in_executor(None, delete_master_item, master_item_id)
+        image_filename = await loop.run_in_executor(None, delete_master_item, master_item_id)
     except ValueError as e:
         _raise_from_value_error(e)
+    # Only after the delete committed: a rejected delete (item has history) must
+    # keep its photo.
+    await loop.run_in_executor(None, product_images.delete_image_file, image_filename)
+    return Response(status_code=204)
+
+
+# --- master item photo -------------------------------------------------------
+# Upload is a raw-body PUT (the body *is* the image, Content-Type names its
+# format) so no multipart parser dependency is needed. The file lives on disk
+# under a server-generated name (backend/product_images.py); the row only keeps
+# that name. Auth is the router-level get_current_user, exactly like PATCH on
+# the item -- any logged-in user may set or clear a photo, only deleting the
+# item itself is admin-only.
+
+
+async def _read_image_body(request: Request) -> bytes:
+    too_big = HTTPException(status_code=413, detail="Ukuran gambar maksimal 2 MB.")
+    declared = request.headers.get("content-length", "")
+    # Reject on the declared size before reading anything; the running total below
+    # still guards chunked bodies and a Content-Length that lies.
+    if declared.isdigit() and int(declared) > product_images.MAX_IMAGE_BYTES:
+        raise too_big
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > product_images.MAX_IMAGE_BYTES:
+            raise too_big
+    return bytes(data)
+
+
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    if not if_none_match:
+        return False
+    candidates = [c.strip().removeprefix("W/") for c in if_none_match.split(",")]
+    return "*" in candidates or etag in candidates
+
+
+@router.put("/inventory/master-items/{master_item_id}/image", response_model=MasterItemOut)
+async def put_master_item_image(master_item_id: int, request: Request):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type not in product_images.IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=422,
+            detail="Format gambar harus JPEG, PNG, atau WebP (Content-Type: image/jpeg, image/png, atau image/webp).",
+        )
+    data = await _read_image_body(request)
+    if not data:
+        raise HTTPException(status_code=422, detail="File gambar kosong.")
+    # The header is client-controlled; the bytes have to agree with it.
+    if not product_images.matches_content_type(content_type, data):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Isi file bukan gambar {content_type.split('/')[1].upper()} yang valid (tidak cocok dengan Content-Type {content_type}).",
+        )
+
+    filename = await loop.run_in_executor(None, product_images.save_image, data, content_type)
+    try:
+        previous = await loop.run_in_executor(None, set_master_item_image_path, master_item_id, filename)
+    except Exception as e:
+        # The new file was never referenced by a row; don't leave it behind.
+        await loop.run_in_executor(None, product_images.delete_image_file, filename)
+        if isinstance(e, ValueError):
+            _raise_from_value_error(e)
+        raise
+    await loop.run_in_executor(None, product_images.delete_image_file, previous)
+
+    row = await loop.run_in_executor(None, get_master_item, master_item_id)
+    if row is None:
+        # Deleted by someone else between the update and this read. Their delete
+        # removed the file that row pointed at, so there is nothing to clean up.
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    return _row_to_master_item(row)
+
+
+@router.get("/inventory/master-items/{master_item_id}/image")
+async def get_master_item_image(master_item_id: int, request: Request, v: str | None = None):
+    loop = asyncio.get_event_loop()
+    row = await loop.run_in_executor(None, get_master_item, master_item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    filename = row.get("image_path")
+    path = await loop.run_in_executor(None, product_images.image_file, filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Barang ini belum memiliki foto.")
+
+    version = product_images.image_version(filename)
+    etag = f'"{filename.rsplit(".", 1)[0]}"'  # a filename is never reused, so it is a strong validator
+    headers = {
+        "ETag": etag,
+        "X-Content-Type-Options": "nosniff",
+        # "private": the photo is behind the login, shared caches must not keep it.
+        # The URL the API hands out carries the current ?v= token, which changes on
+        # every upload, so it can be cached for good. A request without the current
+        # token (a hand-typed or stale URL) must revalidate instead.
+        "Cache-Control": "private, max-age=31536000, immutable" if v == version else "private, no-cache",
+    }
+    if _etag_matches(request.headers.get("if-none-match"), etag):
+        return Response(status_code=304, headers=headers)
+    return FileResponse(path, media_type=product_images.media_type_for(filename), headers=headers)
+
+
+@router.delete("/inventory/master-items/{master_item_id}/image", status_code=204, response_class=Response)
+async def delete_master_item_image(master_item_id: int):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    try:
+        previous = await loop.run_in_executor(None, set_master_item_image_path, master_item_id, None)
+    except ValueError as e:
+        _raise_from_value_error(e)
+    # No photo to begin with is fine: previous is None and this is a no-op, so the
+    # call is idempotent.
+    await loop.run_in_executor(None, product_images.delete_image_file, previous)
     return Response(status_code=204)
 
 
@@ -687,7 +810,7 @@ async def delete_master_item_route(master_item_id: int):
 async def create_new_inbound_document(req: InboundDocumentCreateRequest):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
-        raise HTTPException(status_code=422, detail=f"supplier_id {req.supplier_id} not found")
+        raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
     _validate_received_date(req.received_date)
     _validate_inbound_items(req.items)
 
@@ -703,7 +826,7 @@ async def create_new_inbound_document(req: InboundDocumentCreateRequest):
 @router.get("/inventory/inbound-documents", response_model=list[InboundDocumentOut])
 async def list_inbound_documents_route(status: str | None = None, supplier_id: int | None = None):
     if status is not None and status not in ("draft", "posted", "void"):
-        raise HTTPException(status_code=422, detail="status must be one of: draft, posted, void")
+        raise HTTPException(status_code=422, detail="Status harus salah satu dari: draft, posted, void.")
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(None, list_inbound_documents, status, supplier_id)
     return [_row_to_document(r) for r in rows]
@@ -714,7 +837,7 @@ async def get_inbound_document_detail(document_id: int):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_inbound_document, document_id)
     if row is None:
-        raise HTTPException(status_code=404, detail=f"Inbound document {document_id} not found")
+        raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     items = await loop.run_in_executor(None, get_inbound_document_items, document_id)
     return _row_to_document_detail(row, items)
 
@@ -723,9 +846,9 @@ async def get_inbound_document_detail(document_id: int):
 async def put_inbound_document(document_id: int, req: InboundDocumentCreateRequest):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
-        raise HTTPException(status_code=404, detail=f"Inbound document {document_id} not found")
+        raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
-        raise HTTPException(status_code=422, detail=f"supplier_id {req.supplier_id} not found")
+        raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
     _validate_received_date(req.received_date)
     _validate_inbound_items(req.items)
 
@@ -747,7 +870,7 @@ async def put_inbound_document(document_id: int, req: InboundDocumentCreateReque
 async def post_document(document_id: int):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
-        raise HTTPException(status_code=404, detail=f"Inbound document {document_id} not found")
+        raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     try:
         await loop.run_in_executor(None, post_inbound_document, document_id)
     except ValueError as e:
@@ -761,10 +884,10 @@ async def post_document(document_id: int):
 @router.post("/inventory/inbound-documents/{document_id}/void", response_model=InboundDocumentDetail, dependencies=[Depends(require_admin)])
 async def void_document(document_id: int, req: VoidRequest):
     if not req.reason.strip():
-        raise HTTPException(status_code=422, detail="reason must not be empty")
+        raise HTTPException(status_code=422, detail="Alasan wajib diisi.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
-        raise HTTPException(status_code=404, detail=f"Inbound document {document_id} not found")
+        raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     try:
         await loop.run_in_executor(None, void_inbound_document, document_id, req.reason.strip())
     except ValueError as e:

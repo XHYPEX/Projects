@@ -56,18 +56,18 @@ def clear_session_cookie(response) -> None:
 
 async def get_current_user(session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME)) -> dict:
     if not session_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Belum login. Silakan login terlebih dahulu.")
     session = get_session(hash_token(session_token))
     if session is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Belum login. Silakan login terlebih dahulu.")
     if session["expires_at"] < datetime.now(timezone.utc).isoformat():
-        raise HTTPException(status_code=401, detail="Session expired")
+        raise HTTPException(status_code=401, detail="Sesi berakhir. Silakan login kembali.")
     if not session["is_active"]:
-        raise HTTPException(status_code=401, detail="Account deactivated")
+        raise HTTPException(status_code=401, detail="Akun sudah dinonaktifkan.")
     return {"id": session["user_id"], "username": session["username"], "role": session["role"]}
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise HTTPException(status_code=403, detail="Hanya admin yang diizinkan.")
     return user

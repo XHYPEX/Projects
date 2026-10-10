@@ -14,13 +14,13 @@ async def sales_summary(date_from: str, date_to: str):
     try:
         date.fromisoformat(date_from)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid date_from, expected YYYY-MM-DD")
+        raise HTTPException(status_code=422, detail="Tanggal awal tidak valid, gunakan format YYYY-MM-DD.")
     try:
         date.fromisoformat(date_to)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid date_to, expected YYYY-MM-DD")
+        raise HTTPException(status_code=422, detail="Tanggal akhir tidak valid, gunakan format YYYY-MM-DD.")
     if date_from > date_to:
-        raise HTTPException(status_code=422, detail="date_from must not be after date_to")
+        raise HTTPException(status_code=422, detail="Tanggal awal tidak boleh setelah tanggal akhir.")
 
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, get_sales_summary, date_from, date_to)

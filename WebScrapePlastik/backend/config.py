@@ -1,4 +1,25 @@
 import os
+from pathlib import Path
+
+# Where uploaded product photos live on disk (master_items.image_path stores only
+# the generated filename, relative to this directory). The default sits inside
+# data/, which docker-compose already bind-mounts (./data:/app/data), so photos
+# persist across container rebuilds exactly like scraper.db does. Override with
+# PRODUCT_IMAGE_DIR (tests point it at a temp dir).
+PRODUCT_IMAGE_DIR = Path(
+    os.environ.get("PRODUCT_IMAGE_DIR", str(Path(__file__).parent.parent / "data" / "product_images"))
+)
+
+# The shop's wall-clock offset from UTC, in minutes (WIB = 420, WITA = 480,
+# WIT = 540; Indonesia has no daylight saving, so a fixed offset is exact and
+# needs no tz database -- which a local Windows install may not have).
+#
+# Every timestamp is stored in UTC, but "which day was this sale" is a question
+# about the shop's calendar, and the cashier UI answers it from the browser's
+# local clock ("Hari ini"). The receipt history date filters use this offset to
+# draw the same day boundaries; a client can pass its own offset per request
+# (GET /api/receipts?tz_offset=) to match its browser exactly.
+SHOP_UTC_OFFSET_MINUTES = int(os.environ.get("SHOP_UTC_OFFSET_MINUTES", "420"))
 
 # Master switch for the Google Maps scraper.
 #

@@ -11,6 +11,8 @@ from backend.database import (
     count_receipts,
     create_receipt,
     delete_receipt,
+    delete_transfer_sender,
+    list_transfer_senders,
     get_all_receipts,
     get_customer,
     get_receipt,
@@ -30,6 +32,7 @@ from backend.schemas import (
     ReceiptResponse,
     ReceiptSettleRequest,
     ReceiptUpdateRequest,
+    TransferSenderOut,
 )
 from plate_codes import PLATE_CODES
 
@@ -80,6 +83,13 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         sku=row.get("sku"),
         unit=row.get("unit"),
     )
+
+
+def _clean_sender(raw: str | None) -> str | None:
+    name = " ".join((raw or "").split())
+    if len(name) > 100:
+        raise HTTPException(status_code=422, detail="Nama pengirim maksimal 100 karakter.")
+    return name or None
 
 
 async def _require_customer(loop, customer_id: int, allow_inactive: bool = False) -> None:
@@ -138,13 +148,19 @@ async def create_new_receipt(req: ReceiptRequest):
     subtotal = sum(i["quantity"] * i["unit_price"] for i in items)
     if req.discount > subtotal:
         raise HTTPException(status_code=422, detail="Diskon tidak boleh melebihi subtotal.")
+    # New sales are paid in full at the register; there are no down payments.
+    if req.status != "void" and req.amount_paid != subtotal - req.discount:
+        raise HTTPException(status_code=422, detail="Jumlah dibayar harus sama dengan total.")
+    transfer_sender = _clean_sender(req.transfer_sender)
+    if req.payment_method == "transfer" and not transfer_sender:
+        raise HTTPException(status_code=422, detail="Nama pengirim transfer wajib diisi.")
 
     receipt_id = str(uuid4())
     try:
         result = await loop.run_in_executor(
             None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
-            req.customer_id,
+            req.customer_id, transfer_sender,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -279,6 +295,13 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
         if effective_discount > effective_subtotal:
             raise HTTPException(status_code=422, detail="Diskon tidak boleh melebihi subtotal.")
 
+    update_transfer_sender = "transfer_sender" in req.model_fields_set
+    transfer_sender = _clean_sender(req.transfer_sender) if update_transfer_sender else None
+    effective_method = req.payment_method or existing["payment_method"]
+    effective_sender = transfer_sender if update_transfer_sender else existing.get("transfer_sender")
+    if effective_method == "transfer" and req.status != "void" and not effective_sender:
+        raise HTTPException(status_code=422, detail="Nama pengirim transfer wajib diisi.")
+
     try:
         updated = await loop.run_in_executor(
             None,
@@ -296,6 +319,8 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
             update_customer_name,
             req.payment_method,
             req.customer_id,
+            transfer_sender,
+            update_transfer_sender,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -337,3 +362,19 @@ async def delete_receipt_route(receipt_id: str):
 @router.get("/plate-codes")
 async def get_plate_codes():
     return PLATE_CODES
+
+
+@router.get("/transfer-senders", response_model=list[TransferSenderOut])
+async def get_transfer_senders():
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, list_transfer_senders)
+
+
+@router.delete("/transfer-senders/{sender_id}", status_code=204, response_class=Response)
+async def remove_transfer_sender(sender_id: int):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, delete_transfer_sender, sender_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return Response(status_code=204)

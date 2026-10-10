@@ -66,6 +66,7 @@ class ReceiptRequest(BaseModel):
     started_at: str | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str = "cash"  # one of VALID_PAYMENT_METHODS
+    transfer_sender: str | None = None  # required when payment_method is "transfer"
 
 
 class ReceiptUpdateRequest(BaseModel):
@@ -83,6 +84,7 @@ class ReceiptUpdateRequest(BaseModel):
     amount_paid: int | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
+    transfer_sender: str | None = None  # name on the sending account; kept only for "transfer"
 
 
 class ReceiptResponse(BaseModel):
@@ -98,6 +100,12 @@ class ReceiptResponse(BaseModel):
     customer_id: int | None = None
     customer_full_name: str | None = None
     receipt_no: str | None = None
+    transfer_sender: str | None = None
+
+
+class TransferSenderOut(BaseModel):
+    id: int
+    name: str
 
 
 class ReceiptItemOut(BaseModel):
@@ -133,6 +141,7 @@ class ReceiptOut(BaseModel):
     # stay the snapshot taken when the receipt was saved.
     customer_full_name: str | None = None
     receipt_no: str | None = None  # printed nota number, PJSG/YY/MM/NNNN
+    transfer_sender: str | None = None  # for a transfer: the name on the sending account
 
 
 class ReceiptDetail(ReceiptOut):

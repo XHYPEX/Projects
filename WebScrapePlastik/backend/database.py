@@ -468,6 +468,23 @@ def init_db() -> None:
             )
         con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_receipt_no ON receipts(receipt_no)")
 
+        # --- Additive migration: transfer sender ---
+        # For a transfer payment, the name on the account the money came from, so it can be
+        # matched against the bank statement. NULL for cash/QRIS and for older receipts.
+        receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        if "transfer_sender" not in receipt_cols:
+            con.execute("ALTER TABLE receipts ADD COLUMN transfer_sender TEXT")
+        # Sender names the cashier can pick from. Filled as transfers are saved; the cashier
+        # removes stale ones from the payment pop-up.
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS transfer_senders (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   name TEXT NOT NULL,
+                   name_key TEXT NOT NULL UNIQUE,
+                   created_at TEXT NOT NULL
+               )"""
+        )
+
         # --- Additive migration: receipt line -> master item link (stock movement) ---
         # data/scraper.db already has live receipt_items rows created before a sale
         # could be attributed to a specific product. Those stay NULL rather than
@@ -818,13 +835,24 @@ def _apply_receipt_stock_delta(
     its holding before and after and calls this once — that one invariant
     covers all of those sites without special-casing any of them.
 
-    Overselling is allowed by design (a stale count must never block a real
-    sale at the register), so unlike create_stock_adjustment this never raises
-    on negative stock — it always applies the delta.
+    Overselling is refused: a change that would take a product below zero raises
+    ValueError before anything is written, and the caller's transaction rolls back
+    the whole save. The receipt row is written first, so this connection already
+    holds SQLite's write lock here -- two notas saved at once are checked one after
+    the other, and the second sees the first one's sale (first to pay gets the stock).
 
     ref_id is left NULL: stock_ledger.ref_id is INTEGER but receipt ids are TEXT
     UUIDs, so it can't hold one — the receipt id goes in `note` instead."""
     touched_ids = sorted(set(before) | set(after))
+    for master_item_id in touched_ids:
+        taken = after.get(master_item_id, 0) - before.get(master_item_id, 0)
+        if taken <= 0:
+            continue
+        mi = con.execute("SELECT name, stock_qty FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        if mi is not None and mi["stock_qty"] - taken < 0:
+            raise ValueError(
+                f"Stok {mi['name']} tidak cukup: tersedia {max(mi['stock_qty'], 0)}, dibutuhkan {taken}."
+            )
     now = _now()
     for master_item_id in touched_ids:
         # Positive when the receipt's holding shrank (stock returns, e.g. a void
@@ -927,6 +955,32 @@ def _next_receipt_no(con: sqlite3.Connection, created_at: str) -> str:
     return f"{prefix}{(row['n'] or 0) + 1:04d}"
 
 
+def _sender_key(name: str) -> str:
+    return " ".join(name.split()).upper()
+
+
+def _remember_transfer_sender(con: sqlite3.Connection, name: str | None) -> None:
+    if name and name.strip():
+        con.execute(
+            "INSERT OR IGNORE INTO transfer_senders (name, name_key, created_at) VALUES (?, ?, ?)",
+            (" ".join(name.split()), _sender_key(name), _now()),
+        )
+
+
+def list_transfer_senders() -> list[dict]:
+    with _conn() as con:
+        rows = con.execute("SELECT id, name FROM transfer_senders ORDER BY name_key ASC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_transfer_sender(sender_id: int) -> None:
+    """Only the pick list: receipts keep the name they were saved with."""
+    with _conn() as con:
+        cur = con.execute("DELETE FROM transfer_senders WHERE id=?", (sender_id,))
+        if cur.rowcount == 0:
+            raise ValueError(f"Nama pengirim {sender_id} tidak ditemukan.")
+
+
 def create_receipt(
     receipt_id: str,
     plate_region: str,
@@ -941,8 +995,10 @@ def create_receipt(
     started_at: str | None = None,
     payment_method: str = "cash",
     customer_id: int | None = None,
+    transfer_sender: str | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
+    transfer_sender = transfer_sender if payment_method == "transfer" else None
     subtotal = sum(item["quantity"] * item["unit_price"] for item in items)
     total = subtotal - discount
     final_status = _compute_receipt_status(total, amount_paid, status)
@@ -958,14 +1014,15 @@ def create_receipt(
             """INSERT INTO receipts
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
                 subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method, customer_id,
-                receipt_no)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                receipt_no, transfer_sender)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
                 subtotal, discount, total, created_at, started_at, final_status, amount_paid, payment_method,
-                customer_id, receipt_no,
+                customer_id, receipt_no, transfer_sender,
             ),
         )
+        _remember_transfer_sender(con, transfer_sender)
         resolved_items = [
             {**item, "master_item_id": _resolve_master_item_id(con, item.get("sku"))} for item in items
         ]
@@ -994,7 +1051,7 @@ def create_receipt(
         "subtotal": subtotal, "discount": discount, "total": total, "status": final_status,
         "amount_paid": amount_paid, "customer_phone": customer_phone, "customer_name": customer_name,
         "payment_method": payment_method, "customer_id": customer_id, "customer_full_name": customer_full_name,
-        "receipt_no": receipt_no,
+        "receipt_no": receipt_no, "transfer_sender": transfer_sender,
     }
 
 
@@ -1160,6 +1217,8 @@ def update_receipt(
     update_customer_name: bool = False,
     payment_method: str | None = None,
     customer_id: int | None = None,
+    transfer_sender: str | None = None,
+    update_transfer_sender: bool = False,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -1204,6 +1263,10 @@ def update_receipt(
 
         new_amount_paid = amount_paid if amount_paid is not None else existing["amount_paid"]
         new_payment_method = payment_method if payment_method is not None else existing["payment_method"]
+        new_transfer_sender = transfer_sender if update_transfer_sender else existing.get("transfer_sender")
+        if new_payment_method != "transfer":
+            new_transfer_sender = None
+        _remember_transfer_sender(con, new_transfer_sender)
 
         # Stock: snapshot what this receipt currently holds, before anything below
         # changes — a void receipt holds nothing regardless of what its old line
@@ -1256,11 +1319,12 @@ def update_receipt(
         con.execute(
             """UPDATE receipts SET plate_region=?, plate_number=?, plate_suffix=?, plate_full=?,
                customer_phone=?, customer_name=?, customer_id=?, subtotal=?, discount=?, total=?, status=?,
-               amount_paid=?, payment_method=? WHERE id=?""",
+               amount_paid=?, payment_method=?, transfer_sender=? WHERE id=?""",
             (
                 new_plate_region, new_plate_number, new_plate_suffix, new_plate_full,
                 new_customer_phone, new_customer_name, new_customer_id,
-                new_subtotal, new_discount, new_total, new_status, new_amount_paid, new_payment_method, receipt_id,
+                new_subtotal, new_discount, new_total, new_status, new_amount_paid, new_payment_method,
+                new_transfer_sender, receipt_id,
             ),
         )
 

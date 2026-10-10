@@ -840,9 +840,11 @@
               </div>
             </div>
 
-            <!-- Payment: Pending/Done are computed from Jumlah Dibayar vs Total, never chosen by
-                 hand (see updateCashierStatusBadge), so the only inputs are method and amount. -->
-            <div class="px-4 sm:px-5 py-4 bg-bg2 border-t border-line rounded-b-xl grid grid-cols-1 sm:grid-cols-3 gap-4 sm:items-end">
+            <!-- Payment state of the open receipt. Not shown: it is filled through the Pembayaran
+                 pop-up (openPaymentModal), and Ringkasan Pesanan shows the result. Kept as fields so
+                 tabs, totals and the save payload read it the same way as before. -->
+            <input type="hidden" id="transfer-sender-input" />
+            <div class="hidden px-4 sm:px-5 py-4 bg-bg2 border-t border-line rounded-b-xl grid grid-cols-1 sm:grid-cols-3 gap-4 sm:items-end">
               <div>
                 <label for="payment-method-select" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Metode Bayar</label>
                 <select id="payment-method-select"
@@ -869,8 +871,8 @@
           </section>
         </section>
 
-        <!-- ACTION BAR: pinned under the form. Simpan Nota is the only way a receipt is saved; the
-             label is swapped to Perbarui Nota for an existing one. Tutup Nota closes the open tab
+        <!-- ACTION BAR: pinned under the form. Pembayaran is the only way a receipt is saved: it
+             opens the payment pop-up, whose Selesai saves (and prints a new nota). Tutup Nota closes the open tab
              (asking first if it has unsaved changes), so on a fresh tab it doubles as "start over". -->
         <div class="cashier-bar">
           <div class="cashier-inner py-3 flex items-center gap-3">
@@ -879,9 +881,9 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="text-muted" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
               Tutup Nota
             </button>
-            <button id="save-receipt-btn" type="button" onclick="saveReceipt()"
+            <button id="save-receipt-btn" type="button" onclick="openPaymentModal()"
               class="ml-auto inline-flex items-center gap-2 px-6 py-2.5 bg-accent text-bg rounded-xl text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
-              <span id="save-receipt-label">Simpan Nota</span>
+              <span id="save-receipt-label">Pembayaran</span>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
             </button>
           </div>
@@ -3228,6 +3230,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const itemRows = document.getElementById("item-rows");
   itemRows.addEventListener("input", (e) => {
     if (e.target.classList.contains("item-qty") || e.target.classList.contains("item-price")) {
+      if (e.target.classList.contains("item-qty")) clampItemQtyToStock(e.target.closest(".item-row"));
       recomputeTotals();
     } else if (e.target.classList.contains("item-name")) {
       refreshItemRowMeta(e.target.closest(".item-row"));
@@ -3400,6 +3403,7 @@ function addItemRow(prefill) {
   // about this SKU. Dataset values are plain strings, so this stays out of the markup below.
   const knownImage = (prefill && prefill.imageUrl) || (prefill && prefill.sku ? skuImageCache.get(prefill.sku) : "") || "";
   if (knownImage) row.dataset.imageUrl = knownImage;
+  if (prefill && prefill.stock !== undefined && prefill.stock !== null && prefill.stock !== "") row.dataset.stock = prefill.stock;
   row.innerHTML = `
     <span class="item-no text-sm text-muted tabular-nums" aria-hidden="true"></span>
     <div class="min-w-0 flex items-center gap-3 lg:contents">
@@ -3465,11 +3469,27 @@ function refreshItemRowMeta(row) {
 // event, so the totals and the dirty flag are updated here. Quantity never goes below 1;
 // removing a line is the trash button's job.
 function stepItemQty(btn, delta) {
-  const input = btn.closest(".item-row")?.querySelector(".item-qty");
+  const row = btn.closest(".item-row");
+  const input = row?.querySelector(".item-qty");
   if (!input) return;
   input.value = Math.max(1, (parseInt(input.value, 10) || 0) + delta);
+  clampItemQtyToStock(row);
   recomputeTotals();
   markActiveTabDirty();
+}
+
+// A line knows its product's stock when it was scanned or picked in this session
+// (data-stock); it can't be raised past that. Lines loaded from a saved nota don't carry
+// it, so for those the server's check at save is the limit.
+function clampItemQtyToStock(row) {
+  if (!row || row.dataset.stock === undefined) return;
+  const stock = Number(row.dataset.stock);
+  const input = row.querySelector(".item-qty");
+  const qty = parseInt(input.value, 10) || 0;
+  if (qty > stock) {
+    input.value = Math.max(stock, 1);
+    showToast(`Stok ${row.querySelector(".item-name").value} hanya ${stock}.`);
+  }
 }
 
 // ── Cashier: the blank entry row ─────────────────────────────────────────────
@@ -3487,6 +3507,9 @@ function isCashierReadOnly() {
 
 function ensureTrailingEmptyRow() {
   if (isCashierReadOnly()) return null;
+  // Exactly one blank row, at the end: a line emptied mid-list (search text cleared) goes away.
+  const rows = [...document.querySelectorAll("#item-rows .item-row")];
+  rows.slice(0, -1).forEach(row => { if (isBlankItemRow(row)) row.remove(); });
   const last = document.querySelector("#item-rows .item-row:last-child");
   return last && isBlankItemRow(last) ? last : addItemRow();
 }
@@ -3680,21 +3703,25 @@ function chooseScanSuggestion(idx) {
   if (!item) return;
   hideScanSuggest();
   resetScanBurstState();
-  addScannedItemToReceipt(item, scanInput?.closest(".item-row"));
-  itemEntryInput()?.focus();
+  if (addScannedItemToReceipt(item, scanInput?.closest(".item-row"))) itemEntryInput()?.focus();
 }
 
 // Shared by the scan path and the suggestion path so both add a line the same
 // way: an existing row for the SKU gains a unit, otherwise the row being typed in
 // (or the blank entry row) becomes that product. Either way a blank row follows.
+// Returns false when stock is short: the pop-up opens and nothing is added.
 function addScannedItemToReceipt(item, targetRow) {
   rememberItemImage(item);
   const existingRow = findItemRowBySku(item.sku);
-  let qtyOnReceipt = 1;
+  const qtyOnReceipt = existingRow ? (parseInt(existingRow.querySelector(".item-qty").value, 10) || 0) + 1 : 1;
+  const stock = Number(item.stock_qty);
+  if (Number.isFinite(stock) && qtyOnReceipt > stock) {
+    openStockShortModal(item, targetRow, qtyOnReceipt);
+    return false;
+  }
   if (existingRow) {
-    const qtyInput = existingRow.querySelector(".item-qty");
-    qtyOnReceipt = (parseInt(qtyInput.value, 10) || 0) + 1;
-    qtyInput.value = qtyOnReceipt;
+    existingRow.querySelector(".item-qty").value = qtyOnReceipt;
+    if (Number.isFinite(stock)) existingRow.dataset.stock = stock;
     if (targetRow && targetRow !== existingRow && !targetRow.dataset.sku) {
       targetRow.querySelector(".item-name").value = "";
       refreshItemRowMeta(targetRow);
@@ -3702,6 +3729,7 @@ function addScannedItemToReceipt(item, targetRow) {
   } else {
     const row = targetRow && !targetRow.dataset.sku ? targetRow : (itemEntryInput()?.closest(".item-row") || addItemRow());
     row.dataset.sku = item.sku;
+    if (Number.isFinite(stock)) row.dataset.stock = stock;
     if (item.image_url) row.dataset.imageUrl = item.image_url;
     else delete row.dataset.imageUrl;
     row.querySelector(".item-name").value = item.name;
@@ -3713,17 +3741,54 @@ function addScannedItemToReceipt(item, targetRow) {
   recomputeTotals();
   renderCashierSummary();
   markActiveTabDirty();
-  warnIfShortOfStock(item, qtyOnReceipt);
+  return true;
 }
 
-// Selling past the recorded stock is allowed (the count may simply be behind), but the
-// cashier should know, so a short item is flagged as it lands on the receipt.
-function warnIfShortOfStock(item, qtyOnReceipt) {
+// A product can't be sold past its stock (the server refuses the save too). The pop-up says
+// why it was not added and offers to open the product, e.g. to enter stock that arrived.
+let pendingStockShort = null;  // { item, targetRow } while the pop-up is open
+
+function openStockShortModal(item, targetRow, qtyOnReceipt) {
+  pendingStockShort = { item, targetRow };
   const stock = Number(item.stock_qty);
-  if (!Number.isFinite(stock) || qtyOnReceipt <= stock) return;
-  showToast(stock <= 0
-    ? `Stok ${item.name} kosong (0). Barang tetap ditambahkan ke nota.`
-    : `Stok ${item.name} tinggal ${stock}, di nota ${qtyOnReceipt}. Barang tetap ditambahkan.`);
+  const detail = stock <= 0
+    ? `Stok <span class="font-medium text-failed">kosong (0)</span>, barang tidak bisa ditambahkan.`
+    : `Stok hanya <span class="font-medium text-failed">${stock}</span>, tidak bisa menjadi ${qtyOnReceipt} di nota.`;
+  openModal("Stok tidak cukup", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink"><span class="font-serif font-semibold">${esc(item.name)}</span></p>
+      <p class="text-sm text-muted">${detail}</p>
+      <div class="flex flex-wrap justify-end gap-2 pt-2">
+        <button type="button" onclick="resolveStockShort('edit')" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Barang</button>
+        <button type="button" id="stock-short-ok" onclick="resolveStockShort('cancel')" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2">Batal</button>
+      </div>
+    </div>`);
+  document.getElementById("stock-short-ok").focus();
+}
+
+function resolveStockShort(choice) {
+  const pending = pendingStockShort;
+  pendingStockShort = null;
+  closeModal();
+  if (!pending) return;
+  const { item, targetRow } = pending;
+  // The search text that found the item is not a line of its own.
+  const clearSearchText = () => {
+    if (targetRow && targetRow.isConnected && !targetRow.dataset.sku) {
+      targetRow.querySelector(".item-name").value = "";
+      refreshItemRowMeta(targetRow);
+      ensureTrailingEmptyRow();
+    }
+  };
+  if (choice === "edit") {
+    // Leave the receipt as it is (saved into its tab) and open the product in Master Barang.
+    clearSearchText();
+    captureFormIntoActiveTab();
+    goToInventoryRoute("/master-barang", () => viewMasterItem(item.id));
+  } else {
+    clearSearchText();
+    itemEntryInput()?.focus();
+  }
 }
 
 function handleScanInputKeydown(event) {
@@ -3762,6 +3827,7 @@ async function handleBarcodeScan() {
 
   input.disabled = true;
   let added = false;
+  let held = false;  // waiting on the stock pop-up, which owns the focus
   try {
     const resp = await fetch(`/api/inventory/master-items/by-sku/${encodeURIComponent(sku)}`);
     if (!resp.ok) {
@@ -3776,11 +3842,11 @@ async function handleBarcodeScan() {
       renderScanSuggest();
       return;
     }
-    addScannedItemToReceipt(await resp.json(), row);
-    added = true;
+    added = addScannedItemToReceipt(await resp.json(), row);
+    held = !added;
   } finally {
     input.disabled = false;
-    (added ? itemEntryInput() : input)?.focus();
+    if (!held) (added ? itemEntryInput() : input)?.focus();
     scanInFlight = false;
     resetScanBurstState();
   }
@@ -3991,6 +4057,9 @@ function collectReceiptPayload() {
   payload.customer_id = linkTab && linkTab.customerId ? linkTab.customerId : null;
   // status is write-restricted server-side to "void" or omitted — pending/done
   // are always computed from amount_paid vs total, never sent by hand.
+  payload.transfer_sender = payload.payment_method === "transfer"
+    ? (document.getElementById("transfer-sender-input").value.trim() || null)
+    : null;
   const tab = getActiveTab();
   if (tab && tab.status === "void") payload.status = "void";
   // Only on create. The update schema has no started_at, and the server
@@ -3999,7 +4068,7 @@ function collectReceiptPayload() {
   return payload;
 }
 
-function validateReceiptForm(payload) {
+function validateReceiptForm(payload, { skipPayment = false } = {}) {
   if (!payload.plate_region || !plateCodes[payload.plate_region]) {
     showToast("Kode wilayah plat tidak valid.");
     return false;
@@ -4042,7 +4111,195 @@ function validateReceiptForm(payload) {
     showToast("Jumlah dibayar tidak boleh minus.");
     return false;
   }
+  // A nota is only saved once it is paid in full: no down payments at the register.
+  const total = subtotal - payload.discount;
+  if (skipPayment) return true;
+  if (payload.payment_method === "transfer" && !payload.transfer_sender) {
+    showToast("Nama pengirim transfer wajib diisi.");
+    return false;
+  }
+  if (payload.amount_paid !== total) {
+    showToast(`Jumlah dibayar harus sama dengan total (${formatIDR(total)}).`);
+    document.getElementById("amount-paid-input").focus();
+    return false;
+  }
   return true;
+}
+
+// ── Cashier: payment pop-up ──────────────────────────────────────────────────
+// Pembayaran opens this instead of saving straight away: the cashier picks how the customer
+// paid (and, for a transfer, whose account it came from) and enters the amount. Selesai only
+// unlocks when the amount is exactly the total, then writes it into the form and saves.
+let paymentModalState = null;  // { total, method, senders: [{id, name}] } while open
+
+async function openPaymentModal() {
+  const tab = getActiveTab();
+  if (!tab || isCashierReadOnly()) return;
+  const payload = collectReceiptPayload();
+  if (!validateReceiptForm(payload, { skipPayment: true })) return;
+  const subtotal = payload.items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+  const total = subtotal - payload.discount;
+
+  let senders = [];
+  try {
+    const resp = await fetch("/api/transfer-senders");
+    if (resp.ok) senders = await resp.json();
+  } catch (_) {}
+  paymentModalState = { total, method: payload.payment_method || "cash", senders };
+
+  const amount = payload.amount_paid === total ? payload.amount_paid : 0;
+  openModal("Pembayaran", `
+    <div class="space-y-4">
+      <div class="flex items-baseline justify-between gap-3 rounded-lg bg-accent/10 px-3 py-2.5">
+        <span class="font-serif text-base font-semibold text-ink">Total</span>
+        <span class="font-serif text-2xl font-semibold text-accentDark tabular-nums">${formatIDR(total)}</span>
+      </div>
+
+      <div>
+        <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Metode Bayar</div>
+        <div class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Metode bayar">
+          ${Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => `
+            <button type="button" role="radio" data-method="${value}" onclick="setPaymentMethodChoice('${value}')"
+              class="pay-method-btn px-3 py-2 border rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${label}</button>`).join("")}
+        </div>
+      </div>
+
+      <div id="pay-transfer-section" class="hidden">
+        <label for="pay-sender-input" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Pengirim</label>
+        <input id="pay-sender-input" type="text" autocomplete="off" placeholder="Nama di rekening pengirim"
+          oninput="renderSenderChoices(); updatePaymentModal();"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <ul id="pay-sender-list" class="mt-2 max-h-36 overflow-y-auto space-y-1"></ul>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label for="pay-amount-input" class="block text-[11px] font-medium text-muted uppercase tracking-wider">Jumlah Dibayar</label>
+          <button type="button" onclick="fillPaymentExact()" class="text-xs font-medium text-accentDark hover:underline">Uang pas</button>
+        </div>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+          <input id="pay-amount-input" type="text" inputmode="numeric" autocomplete="off"
+            oninput="updatePaymentModal();" onkeydown="if (event.key === 'Enter') { event.preventDefault(); finishPayment(); }"
+            class="price-input w-full text-right border border-line rounded-lg pl-9 pr-3 py-2 text-base bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        </div>
+        <p id="pay-amount-hint" class="text-xs mt-1.5 min-h-[1rem]"></p>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closePaymentModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Batal</button>
+        <button type="button" id="pay-done-btn" onclick="finishPayment()" disabled
+          class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2">Selesai</button>
+      </div>
+    </div>`);
+  setPriceInput(document.getElementById("pay-amount-input"), amount || "");
+  document.getElementById("pay-sender-input").value = document.getElementById("transfer-sender-input").value;
+  setPaymentMethodChoice(paymentModalState.method);
+  document.getElementById("pay-amount-input").focus();
+}
+
+function closePaymentModal() {
+  paymentModalState = null;
+  closeModal();
+}
+
+function setPaymentMethodChoice(method) {
+  if (!paymentModalState) return;
+  paymentModalState.method = method;
+  document.querySelectorAll(".pay-method-btn").forEach(btn => {
+    const on = btn.dataset.method === method;
+    btn.setAttribute("aria-checked", on ? "true" : "false");
+    btn.classList.toggle("border-accent", on);
+    btn.classList.toggle("bg-accent/10", on);
+    btn.classList.toggle("text-ink", on);
+    btn.classList.toggle("border-line", !on);
+    btn.classList.toggle("text-muted", !on);
+  });
+  const isTransfer = method === "transfer";
+  document.getElementById("pay-transfer-section").classList.toggle("hidden", !isTransfer);
+  if (isTransfer) renderSenderChoices();
+  updatePaymentModal();
+}
+
+// The saved sender names, filtered by what is typed; picking one fills the box, × forgets it.
+function renderSenderChoices() {
+  if (!paymentModalState) return;
+  const typed = document.getElementById("pay-sender-input").value.trim().toUpperCase();
+  const matches = paymentModalState.senders.filter(s => !typed || s.name.toUpperCase().includes(typed));
+  document.getElementById("pay-sender-list").innerHTML = matches.map(s => `
+    <li class="flex items-center gap-1">
+      <button type="button" onclick="pickSender(${s.id})"
+        class="flex-1 min-w-0 truncate text-left px-2.5 py-1.5 rounded-md text-sm text-ink hover:bg-bg2 transition-colors">${esc(s.name)}</button>
+      <button type="button" onclick="forgetSender(${s.id})" aria-label="Hapus ${esc(s.name)} dari daftar" title="Hapus dari daftar"
+        class="w-7 h-7 shrink-0 grid place-items-center rounded-md text-muted hover:text-failed hover:bg-failed/10 transition-colors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </li>`).join("") || (paymentModalState.senders.length
+      ? ""
+      : `<li class="px-2.5 py-1.5 text-xs text-muted">Belum ada nama tersimpan. Nama yang diketik akan disimpan untuk transfer berikutnya.</li>`);
+}
+
+function pickSender(id) {
+  const sender = paymentModalState?.senders.find(s => s.id === id);
+  if (!sender) return;
+  document.getElementById("pay-sender-input").value = sender.name;
+  renderSenderChoices();
+  updatePaymentModal();
+  document.getElementById("pay-amount-input").focus();
+}
+
+async function forgetSender(id) {
+  const resp = await fetch(`/api/transfer-senders/${id}`, { method: "DELETE" });
+  if (!resp.ok && resp.status !== 404) {
+    showToast(await responseErrorDetail(resp, "Nama pengirim tidak bisa dihapus."));
+    return;
+  }
+  if (!paymentModalState) return;
+  paymentModalState.senders = paymentModalState.senders.filter(s => s.id !== id);
+  renderSenderChoices();
+}
+
+function fillPaymentExact() {
+  if (!paymentModalState) return;
+  setPriceInput(document.getElementById("pay-amount-input"), paymentModalState.total);
+  updatePaymentModal();
+  document.getElementById("pay-amount-input").focus();
+}
+
+function updatePaymentModal() {
+  if (!paymentModalState) return;
+  const { total, method } = paymentModalState;
+  const amount = priceValue(document.getElementById("pay-amount-input"));
+  const sender = document.getElementById("pay-sender-input").value.trim();
+  const hint = document.getElementById("pay-amount-hint");
+  const typed = document.getElementById("pay-amount-input").value.trim() !== "";
+  if (!typed) {
+    hint.textContent = "";
+  } else if (amount < total) {
+    hint.textContent = `Kurang ${formatIDR(total - amount)}`;
+    hint.className = "text-xs mt-1.5 min-h-[1rem] text-failed";
+  } else if (amount > total) {
+    hint.textContent = `Lebih ${formatIDR(amount - total)} — jumlah harus sama dengan total`;
+    hint.className = "text-xs mt-1.5 min-h-[1rem] text-failed";
+  } else {
+    hint.textContent = "Pas dengan total";
+    hint.className = "text-xs mt-1.5 min-h-[1rem] text-done";
+  }
+  const ready = amount === total && (method !== "transfer" || sender !== "");
+  document.getElementById("pay-done-btn").disabled = !ready;
+}
+
+function finishPayment() {
+  if (!paymentModalState || document.getElementById("pay-done-btn").disabled) return;
+  const { total, method } = paymentModalState;
+  document.getElementById("payment-method-select").value = method;
+  setPriceInput(document.getElementById("amount-paid-input"), total);
+  document.getElementById("transfer-sender-input").value =
+    method === "transfer" ? document.getElementById("pay-sender-input").value.trim() : "";
+  closePaymentModal();
+  recomputeTotals();
+  markActiveTabDirty();
+  saveReceipt();
 }
 
 async function saveReceipt() {
@@ -4125,6 +4382,7 @@ function blankCashierTabState(tabId) {
     discount: "0",
     amountPaid: "0",
     paymentMethod: "cash",
+    transferSender: "",
     status: "pending",
     // A new receipt is being written, so it starts editable. One loaded from
     // history opens locked (see tabStateFromReceipt) to make editing a past
@@ -4158,6 +4416,7 @@ function tabStateFromReceipt(tabId, r) {
     discount: String(r.discount),
     amountPaid: String(r.amount_paid),
     paymentMethod: r.payment_method || "cash",
+    transferSender: r.transfer_sender || "",
     locked: true,
     status: r.status || "pending",
     dirty: false,
@@ -4206,6 +4465,7 @@ function captureFormIntoActiveTab() {
     price: row.querySelector(".item-price").value,
     warranty: row.dataset.warranty || "",
     imageUrl: row.dataset.imageUrl || "",
+    stock: row.dataset.stock,
   }));
   tab.plateRegion = document.getElementById("plate-region").value;
   tab.plateNumber = document.getElementById("plate-number").value;
@@ -4215,6 +4475,7 @@ function captureFormIntoActiveTab() {
   tab.discount = document.getElementById("discount-input").value;
   tab.amountPaid = document.getElementById("amount-paid-input").value;
   tab.paymentMethod = document.getElementById("payment-method-select").value;
+  tab.transferSender = document.getElementById("transfer-sender-input").value;
   // status isn't user-editable here anymore (see applyCashierVoidLock /
   // confirmVoidActiveReceipt) — it only ever changes via a save response.
 }
@@ -4330,10 +4591,11 @@ function renderCashierForm() {
   setPriceInput(document.getElementById("discount-input"), tab.discount || 0);
   setPriceInput(document.getElementById("amount-paid-input"), tab.amountPaid ?? 0);
   document.getElementById("payment-method-select").value = tab.paymentMethod || "cash";
+  document.getElementById("transfer-sender-input").value = tab.transferSender || "";
   recomputeTotals();
 
   document.getElementById("cashier-form-title").textContent = tab.receiptId ? "Ubah nota" : "Nota baru";
-  document.getElementById("save-receipt-label").textContent = tab.receiptId ? "Perbarui Nota" : "Simpan Nota";
+  document.getElementById("save-receipt-label").textContent = "Pembayaran";
   document.getElementById("save-receipt-btn").disabled = false;
   document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId);
 
@@ -9156,6 +9418,7 @@ const SHOP_PROFILE = {
   // Customer nota (Nota Penjualan) only. Empty values are simply left off the printout.
   notaName: "SINAR GALAKSI",
   logo: "assets/logo-nota.png",   // hidden on the nota if the file is missing
+  tagline: "AUTOMOTIVE ACCESSORIES",  // printed under the logo as text (it is not in the image)
   bankAccount: "",                // e.g. "BCA : 1234567890  A/N : SINAR GALAKSI"
 };
 
@@ -9812,9 +10075,9 @@ async function printReceiptNota(receiptId) {
   // Wait for the logo (or its failure) so the dialog never prints a half-loaded header.
   const logo = document.querySelector("#nota-print-area img");
   if (logo && !logo.complete) {
-    await new Promise(done => { logo.onload = done; logo.onerror = () => { logo.remove(); done(); }; });
+    await new Promise(done => { logo.onload = done; logo.onerror = () => { logo.parentElement.remove(); done(); }; });
   } else if (logo && !logo.naturalWidth) {
-    logo.remove();  // already failed (missing file) before we started waiting
+    logo.parentElement.remove();  // already failed (missing file) before we started waiting
   }
   printWithPageRule("@page { size: A5 landscape; margin: 7mm 9mm; }", "print-nota");
 }
@@ -9854,7 +10117,11 @@ function receiptNotaHtml(r, customer) {
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:132mm;display:flex;flex-direction:column;">
     <div style="display:flex;justify-content:space-between;gap:16px;">
       <div style="display:flex;gap:12px;align-items:center;">
-        ${SHOP_PROFILE.logo ? `<img src="${esc(SHOP_PROFILE.logo)}" alt="" onerror="this.remove()" style="width:30mm;max-height:22mm;object-fit:contain;">` : ""}
+        ${SHOP_PROFILE.logo ? `
+        <div style="width:32mm;text-align:center;">
+          <img src="${esc(SHOP_PROFILE.logo)}" alt="" onerror="this.parentElement.remove()" style="width:32mm;max-height:16mm;object-fit:contain;display:block;">
+          ${SHOP_PROFILE.tagline ? `<div style="font-size:5.5pt;font-weight:bold;letter-spacing:0.08em;margin-top:1px;">${esc(SHOP_PROFILE.tagline)}</div>` : ""}
+        </div>` : ""}
         <div>
           <div style="font-size:12pt;">Nota Penjualan${r.status === "void" ? " &mdash; <b>VOID</b>" : ""}</div>
           <div style="font-size:14pt;font-weight:bold;letter-spacing:0.02em;">${esc(SHOP_PROFILE.notaName || SHOP_PROFILE.name)}</div>
@@ -9869,7 +10136,10 @@ function receiptNotaHtml(r, customer) {
       </table>
     </div>
 
-    <div style="margin-top:8px;">No. Nota&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.receipt_no || "")}</div>
+    <div style="margin-top:8px;display:flex;gap:28px;">
+      <span>No. Nota&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.receipt_no || "")}</span>
+      <span>Pembayaran&nbsp;&nbsp;:&nbsp;&nbsp;${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_sender ? ` (a/n ${esc(r.transfer_sender)})` : ""}</span>
+    </div>
 
     <div style="flex:1 0 auto;">
     <table style="width:100%;border-collapse:collapse;margin-top:4px;">

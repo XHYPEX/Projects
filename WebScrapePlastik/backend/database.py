@@ -41,7 +41,7 @@ def parse_ymd(raw: str) -> date:
     week dates on Python 3.11+, which a user typing a date never means. Raises
     ValueError for anything else, including a real-looking impossible day."""
     if not _YMD_RE.match(raw or ""):
-        raise ValueError(f"Not a YYYY-MM-DD date: {raw!r}")
+        raise ValueError(f"Bukan tanggal berformat YYYY-MM-DD: {raw!r}")
     return date.fromisoformat(raw)
 
 
@@ -1130,7 +1130,7 @@ def update_receipt(
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Receipt {receipt_id} not found")
+            raise ValueError(f"Nota {receipt_id} tidak ditemukan.")
         existing = dict(row)
 
         new_plate_region = plate_region if plate_region is not None else existing["plate_region"]
@@ -1294,7 +1294,7 @@ def delete_receipt(receipt_id: str) -> None:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Receipt {receipt_id} not found")
+            raise ValueError(f"Nota {receipt_id} tidak ditemukan.")
         existing = dict(row)
 
         # Stock: deleting a receipt that still held stock returns it, same as a
@@ -1568,7 +1568,7 @@ def _next_sku(con: sqlite3.Connection, supplier_code: str, brand_code: str, segm
     ).fetchone()
     seq = row["next_seq"]
     if seq > 999:
-        raise ValueError(f"SKU sequence exhausted for prefix {prefix} (999 reached) — cannot allocate a new SKU")
+        raise ValueError(f"Urutan SKU untuk prefiks {prefix} sudah habis (mencapai 999), SKU baru tidak bisa dibuat")
     sku = f"{prefix}-{seq:03d}"
     return sku, prefix, seq
 
@@ -1591,7 +1591,7 @@ def _create_quick_add_entity(
     insert shape for both tables, only the table name differs. `phone`/`address`/
     `contact_person`/`npwp` are suppliers-only columns (brands have no such
     fields) — ignored for brands."""
-    entity_label = "Supplier" if table == "suppliers" else "Brand"
+    entity_label = "Supplier" if table == "suppliers" else "Merek"
     name_normalized = _normalize_name(name)
     created_at = _now()
     with _conn() as con:
@@ -1599,15 +1599,15 @@ def _create_quick_add_entity(
             f"SELECT 1 FROM {table} WHERE name_normalized=? AND is_active=1", (name_normalized,)
         ).fetchone()
         if dup is not None:
-            raise ValueError(f"{entity_label} '{name}' already exists")
+            raise ValueError(f"{entity_label} '{name}' sudah ada")
 
         if code is not None:
             code = code.strip().upper()
             if not _CODE_PATTERN.match(code):
-                raise ValueError("code must be 2-10 alphanumeric characters")
+                raise ValueError("Kode harus 2-10 karakter huruf atau angka")
             existing_code = con.execute(f"SELECT 1 FROM {table} WHERE code=?", (code,)).fetchone()
             if existing_code is not None:
-                raise ValueError(f"Code '{code}' is already in use")
+                raise ValueError(f"Kode '{code}' sudah dipakai")
         else:
             code = _generate_entity_code(con, table, name)
 
@@ -1649,14 +1649,14 @@ def _update_quick_add_entity(
     contact_person: str | None = None,
     npwp: str | None = None,
 ) -> dict:
-    entity_label = "Supplier" if table == "suppliers" else "Brand"
+    entity_label = "Supplier" if table == "suppliers" else "Merek"
     supplier_details = (phone, address, contact_person, npwp)
     with _conn() as con:
         row = con.execute(f"SELECT * FROM {table} WHERE id=?", (entity_id,)).fetchone()
         if row is None:
-            raise ValueError(f"{entity_label} {entity_id} not found")
+            raise ValueError(f"{entity_label} {entity_id} tidak ditemukan")
         if row["is_system"] and (name is not None or is_active is not None or any(d is not None for d in supplier_details)):
-            raise ValueError(f"System {entity_label.lower()} cannot be modified")
+            raise ValueError(f"{entity_label} bawaan sistem tidak bisa diubah")
         new_name = name if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         if name is not None:
@@ -1665,7 +1665,7 @@ def _update_quick_add_entity(
                 (new_name_normalized, entity_id),
             ).fetchone()
             if dup is not None:
-                raise ValueError(f"{entity_label} '{name}' already exists")
+                raise ValueError(f"{entity_label} '{name}' sudah ada")
         new_active = int(is_active) if is_active is not None else row["is_active"]
 
         if table == "suppliers":
@@ -1717,15 +1717,15 @@ def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
 
 
 def _delete_quick_add_entity(table: str, entity_id: int) -> None:
-    entity_label = "Supplier" if table == "suppliers" else "Brand"
+    entity_label = "Supplier" if table == "suppliers" else "Merek"
     with _conn() as con:
         row = con.execute(f"SELECT * FROM {table} WHERE id=?", (entity_id,)).fetchone()
         if row is None:
-            raise ValueError(f"{entity_label} {entity_id} not found")
+            raise ValueError(f"{entity_label} {entity_id} tidak ditemukan")
         if row["is_system"]:
-            raise ValueError(f"System {entity_label.lower()} cannot be deleted")
+            raise ValueError(f"{entity_label} bawaan sistem tidak bisa dihapus")
         if _entity_in_use(con, table, entity_id):
-            raise ValueError(f"{entity_label} is still in use and cannot be deleted")
+            raise ValueError(f"{entity_label} masih dipakai dan tidak bisa dihapus")
         con.execute(f"DELETE FROM {table} WHERE id=?", (entity_id,))
 
 
@@ -1882,7 +1882,7 @@ def create_unit(name: str) -> dict:
             "SELECT 1 FROM units WHERE name_normalized=? AND is_active=1", (name_normalized,)
         ).fetchone()
         if dup is not None:
-            raise ValueError(f"Satuan '{name}' already exists")
+            raise ValueError(f"Satuan '{name}' sudah ada")
         cur = con.execute(
             "INSERT INTO units (name, name_normalized, is_active, created_at) VALUES (?, ?, 1, ?)",
             (name.strip(), name_normalized, created_at),
@@ -1895,7 +1895,7 @@ def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = 
     with _conn() as con:
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Unit {unit_id} not found")
+            raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
         new_name = name.strip() if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         if name is not None:
@@ -1904,7 +1904,7 @@ def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = 
                 (new_name_normalized, unit_id),
             ).fetchone()
             if dup is not None:
-                raise ValueError(f"Satuan '{name}' already exists")
+                raise ValueError(f"Satuan '{name}' sudah ada")
         new_active = int(is_active) if is_active is not None else row["is_active"]
         con.execute(
             "UPDATE units SET name=?, name_normalized=?, is_active=? WHERE id=?",
@@ -1953,9 +1953,9 @@ def delete_unit(unit_id: int) -> None:
     with _conn() as con:
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Unit {unit_id} not found")
+            raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
         if _unit_in_use(con, row["name"]):
-            raise ValueError("Satuan is still in use and cannot be deleted")
+            raise ValueError("Satuan masih dipakai dan tidak bisa dihapus")
         con.execute("DELETE FROM units WHERE id=?", (unit_id,))
 
 
@@ -2014,10 +2014,10 @@ def preview_sku(supplier_id: int, brand_id: int, product_name: str) -> dict:
     with _conn() as con:
         supplier = con.execute("SELECT code FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if supplier is None:
-            raise ValueError(f"Supplier {supplier_id} not found")
+            raise ValueError(f"Supplier {supplier_id} tidak ditemukan.")
         brand = con.execute("SELECT code FROM brands WHERE id=?", (brand_id,)).fetchone()
         if brand is None:
-            raise ValueError(f"Brand {brand_id} not found")
+            raise ValueError(f"Merek {brand_id} tidak ditemukan.")
         prefix = f"{supplier['code']}-{brand['code']}-{segment}"
         row = con.execute(
             "SELECT COALESCE(MAX(sku_seq),0)+1 AS next_seq FROM master_items WHERE sku_prefix=?",
@@ -2053,7 +2053,7 @@ def _generate_barcode_for_id(master_item_id: int) -> str:
     separate counter — makes it unique with no extra state, and reproducible
     if it ever needs regenerating."""
     if master_item_id >= 10**8:
-        raise ValueError(f"master_item_id {master_item_id} too large to encode in an 8-digit barcode segment")
+        raise ValueError(f"ID barang {master_item_id} terlalu besar untuk dikodekan dalam 8 digit barcode")
     return "20" + str(master_item_id).zfill(8)
 
 
@@ -2065,13 +2065,13 @@ def create_master_item(
     with _conn() as con:
         supplier = con.execute("SELECT code FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if supplier is None:
-            raise ValueError(f"Supplier {supplier_id} not found")
+            raise ValueError(f"Supplier {supplier_id} tidak ditemukan.")
         brand = con.execute("SELECT code FROM brands WHERE id=?", (brand_id,)).fetchone()
         if brand is None:
-            raise ValueError(f"Brand {brand_id} not found")
+            raise ValueError(f"Merek {brand_id} tidak ditemukan.")
         dup = _find_exact_duplicate_master_item(con, supplier_id, brand_id, name_normalized)
         if dup is not None:
-            raise ValueError(f"Duplicate product: SKU {dup['sku']} already exists for this supplier and brand")
+            raise ValueError(f"Barang ganda: SKU {dup['sku']} sudah ada untuk supplier dan merek ini")
 
         segment = _compute_product_segment(name_normalized)
         sku, prefix, seq = _next_sku(con, supplier["code"], brand["code"], segment)
@@ -2109,7 +2109,7 @@ def update_master_item(
     with _conn() as con:
         row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Master item {master_item_id} not found")
+            raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
         new_name = name if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         new_sell_price = sell_price if sell_price is not None else row["sell_price"]
@@ -2121,7 +2121,7 @@ def update_master_item(
             )
         except sqlite3.IntegrityError:
             raise ValueError(
-                f"Cannot rename: another product with this name already exists for this supplier and brand"
+                "Nama tidak bisa diubah: sudah ada barang lain dengan nama ini untuk supplier dan merek yang sama"
             )
         updated = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         return dict(updated)
@@ -2140,7 +2140,7 @@ def delete_master_item(master_item_id: int) -> str | None:
         con.execute("BEGIN IMMEDIATE")
         row = con.execute("SELECT id, image_path FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Master item {master_item_id} not found")
+            raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
         in_use = con.execute(
             "SELECT 1 FROM inbound_items WHERE master_item_id=? LIMIT 1", (master_item_id,)
         ).fetchone() or con.execute(
@@ -2163,7 +2163,7 @@ def set_master_item_image_path(master_item_id: int, image_path: str | None) -> s
         con.execute("BEGIN IMMEDIATE")
         row = con.execute("SELECT image_path FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Master item {master_item_id} not found")
+            raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
         con.execute("UPDATE master_items SET image_path=? WHERE id=?", (image_path, master_item_id))
         return row["image_path"]
 
@@ -2505,10 +2505,10 @@ def update_inbound_document(
     with _conn() as con:
         row = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Inbound document {document_id} not found")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Cannot edit inbound document {document_id}: status is '{row['status']}', only draft documents can be edited"
+                f"Dokumen barang masuk {document_id} tidak bisa diubah: statusnya '{row['status']}', hanya dokumen draft yang bisa diubah"
             )
         total_value = sum(i["qty_in"] * i["cost_price"] for i in items)
         con.execute(
@@ -2585,10 +2585,10 @@ def post_inbound_document(document_id: int) -> dict:
     with _conn() as con:
         header = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if header is None:
-            raise ValueError(f"Inbound document {document_id} not found")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if header["status"] != "draft":
             raise ValueError(
-                f"Cannot post inbound document {document_id}: status is '{header['status']}', only draft documents can be posted"
+                f"Dokumen barang masuk {document_id} tidak bisa diposting: statusnya '{header['status']}', hanya dokumen draft yang bisa diposting"
             )
 
         # Step 2: re-validate received_date, even though it may have already been
@@ -2597,17 +2597,17 @@ def post_inbound_document(document_id: int) -> dict:
         try:
             rd = date.fromisoformat(received_date)
         except ValueError:
-            raise ValueError(f"Invalid received_date '{received_date}' on document {document_id}")
+            raise ValueError(f"Tanggal terima '{received_date}' pada dokumen {document_id} tidak valid")
         today = date.today()
         if rd > today:
-            raise ValueError(f"received_date {received_date} is in the future")
+            raise ValueError(f"Tanggal terima {received_date} ada di masa depan")
         if (today - rd).days > 30:
-            raise ValueError(f"received_date {received_date} is more than 30 days in the past")
+            raise ValueError(f"Tanggal terima {received_date} lebih dari 30 hari yang lalu")
 
         # Step 3: fetch line items, reject if empty.
         items = [dict(r) for r in con.execute("SELECT * FROM inbound_items WHERE document_id=?", (document_id,)).fetchall()]
         if not items:
-            raise ValueError(f"Cannot post inbound document {document_id}: it has no line items")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak bisa diposting: tidak ada baris barang")
 
         # Step 4: flip status to posted FIRST — the avg-cost recompute below filters
         # on d.status='posted' and must see this document's own new rows.
@@ -2632,10 +2632,10 @@ def post_inbound_document(document_id: int) -> dict:
                         "SELECT code FROM suppliers WHERE id=?", (header["supplier_id"],)
                     ).fetchone()
                     if supplier_row is None:
-                        raise ValueError(f"Supplier {header['supplier_id']} not found")
+                        raise ValueError(f"Supplier {header['supplier_id']} tidak ditemukan.")
                     brand_row = con.execute("SELECT code FROM brands WHERE id=?", (brand_id,)).fetchone()
                     if brand_row is None:
-                        raise ValueError(f"Brand {brand_id} not found")
+                        raise ValueError(f"Merek {brand_id} tidak ditemukan.")
                     segment = _compute_product_segment(name_normalized)
                     sku, prefix, seq = _next_sku(con, supplier_row["code"], brand_row["code"], segment)
                     created_at = _now()
@@ -2704,9 +2704,9 @@ def void_inbound_document(document_id: int, reason: str) -> dict:
     with _conn() as con:
         header = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if header is None:
-            raise ValueError(f"Inbound document {document_id} not found")
+            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if header["status"] == "void":
-            raise ValueError(f"Inbound document {document_id} is already void")
+            raise ValueError(f"Dokumen barang masuk {document_id} sudah dibatalkan")
 
         if header["status"] == "draft":
             con.execute("UPDATE inbound_documents SET status='void' WHERE id=?", (document_id,))
@@ -2726,8 +2726,8 @@ def void_inbound_document(document_id: int, reason: str) -> dict:
         for item in items:
             if item["qty_remaining"] != item["qty_in"]:
                 raise ValueError(
-                    f"Cannot void document {document_id}: item SKU {item['sku']} has already had stock "
-                    f"consumed (qty_remaining={item['qty_remaining']} != qty_in={item['qty_in']})"
+                    f"Dokumen {document_id} tidak bisa dibatalkan: stok barang SKU {item['sku']} sudah terpakai "
+                    f"(sisa={item['qty_remaining']} dari jumlah masuk={item['qty_in']})"
                 )
 
         for item in items:
@@ -2852,7 +2852,7 @@ def _supplier_snapshot(con: sqlite3.Connection, supplier_id: int) -> dict:
     to the supplier master can't silently rewrite an already-printed document."""
     row = con.execute("SELECT * FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
     if row is None:
-        raise ValueError(f"Supplier {supplier_id} not found")
+        raise ValueError(f"Supplier {supplier_id} tidak ditemukan.")
     return {
         "supplier_name_snapshot": row["name"],
         "supplier_phone_snapshot": row["phone"],
@@ -2927,11 +2927,11 @@ def update_purchase_invoice(
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Cannot edit purchase invoice {invoice_id}: status is '{row['status']}', "
-                "only draft invoices can be edited"
+                f"Faktur pembelian {invoice_id} tidak bisa diubah: statusnya '{row['status']}', "
+                "hanya faktur draft yang bisa diubah"
             )
         snapshot = _supplier_snapshot(con, supplier_id)
         con.execute(
@@ -3029,14 +3029,14 @@ def post_purchase_invoice(invoice_id: int) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
-            raise ValueError(f"Purchase invoice {invoice_id} is already '{row['status']}'")
+            raise ValueError(f"Faktur pembelian {invoice_id} sudah berstatus '{row['status']}'")
         item_count = con.execute(
             "SELECT COUNT(*) AS n FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,)
         ).fetchone()["n"]
         if item_count == 0:
-            raise ValueError(f"Cannot post purchase invoice {invoice_id}: it has no line items")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak bisa diposting: tidak ada baris barang")
         con.execute(
             "UPDATE purchase_invoices SET status='posted', updated_at=? WHERE id=?", (_now(), invoice_id)
         )
@@ -3048,13 +3048,13 @@ def void_purchase_invoice(invoice_id: int, reason: str) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] == "void":
-            raise ValueError(f"Purchase invoice {invoice_id} is already void")
+            raise ValueError(f"Faktur pembelian {invoice_id} sudah dibatalkan")
         if row["amount_paid"] > 0:
             raise ValueError(
-                f"Cannot void purchase invoice {invoice_id}: {row['amount_paid']} already recorded as paid. "
-                "Reverse the payment first."
+                f"Faktur pembelian {invoice_id} tidak bisa dibatalkan: sudah tercatat pembayaran {row['amount_paid']}. "
+                "Batalkan pembayarannya terlebih dahulu."
             )
         con.execute(
             "UPDATE purchase_invoices SET status='void', void_reason=?, updated_at=? WHERE id=?",
@@ -3068,11 +3068,11 @@ def delete_purchase_invoice(invoice_id: int) -> None:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Cannot delete purchase invoice {invoice_id}: status is '{row['status']}'. "
-                "Void it instead so the number stays on record."
+                f"Faktur pembelian {invoice_id} tidak bisa dihapus: statusnya '{row['status']}'. "
+                "Batalkan (void) saja agar nomornya tetap tercatat."
             )
         con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
         con.execute("DELETE FROM purchase_invoices WHERE id=?", (invoice_id,))
@@ -3084,20 +3084,20 @@ def record_purchase_invoice_payment(invoice_id: int, amount: int) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Purchase invoice {invoice_id} not found")
+            raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "posted":
             raise ValueError(
-                f"Cannot record payment on purchase invoice {invoice_id}: status is '{row['status']}', "
-                "only posted invoices accept payments"
+                f"Pembayaran tidak bisa dicatat pada faktur pembelian {invoice_id}: statusnya '{row['status']}', "
+                "hanya faktur yang sudah diposting yang bisa dibayar"
             )
         if amount == 0:
-            raise ValueError("Payment amount must not be zero")
+            raise ValueError("Jumlah pembayaran tidak boleh nol")
         new_paid = row["amount_paid"] + amount
         if new_paid < 0:
-            raise ValueError("Payment reversal is larger than the amount recorded as paid")
+            raise ValueError("Pembatalan pembayaran melebihi jumlah yang tercatat sudah dibayar")
         if new_paid > row["total"]:
             raise ValueError(
-                f"Payment exceeds the outstanding balance ({row['total'] - row['amount_paid']})"
+                f"Pembayaran melebihi sisa tagihan ({row['total'] - row['amount_paid']})"
             )
         con.execute(
             "UPDATE purchase_invoices SET amount_paid=?, updated_at=? WHERE id=?",
@@ -3143,7 +3143,7 @@ def create_user(username: str, password_hash: str, role: str = "staff") -> dict:
     with _conn() as con:
         dup = con.execute("SELECT 1 FROM users WHERE username_normalized=?", (username_normalized,)).fetchone()
         if dup is not None:
-            raise ValueError(f"Username '{username}' already exists")
+            raise ValueError(f"Username '{username}' sudah ada")
         cur = con.execute(
             """INSERT INTO users (username, username_normalized, password_hash, role, is_active, created_at, updated_at)
                VALUES (?, ?, ?, ?, 1, ?, ?)""",
@@ -3188,9 +3188,9 @@ def update_user_role(user_id: int, role: str) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         if row["role"] == "admin" and role != "admin" and row["is_active"] and _active_admin_count(con, user_id) == 0:
-            raise ValueError("Cannot demote the last remaining admin")
+            raise ValueError("Admin terakhir tidak bisa diturunkan perannya")
         con.execute("UPDATE users SET role=?, updated_at=? WHERE id=?", (role, _now(), user_id))
         updated = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         return dict(updated)
@@ -3200,9 +3200,9 @@ def set_user_active(user_id: int, is_active: bool) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         if not is_active and row["role"] == "admin" and row["is_active"] and _active_admin_count(con, user_id) == 0:
-            raise ValueError("Cannot deactivate the last remaining admin")
+            raise ValueError("Admin terakhir tidak bisa dinonaktifkan")
         con.execute("UPDATE users SET is_active=?, updated_at=? WHERE id=?", (int(is_active), _now(), user_id))
         if not is_active:
             con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
@@ -3214,7 +3214,7 @@ def reset_user_password(user_id: int, password_hash: str) -> None:
     with _conn() as con:
         row = con.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone()
         if row is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         con.execute("UPDATE users SET password_hash=?, updated_at=? WHERE id=?", (password_hash, _now(), user_id))
         con.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
 
@@ -3534,7 +3534,7 @@ def update_preorder(
     with _conn() as con:
         row = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
         if row is None:
-            raise ValueError(f"Preorder {preorder_id} not found")
+            raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
         existing = dict(row)
 
         con.execute(
@@ -3598,7 +3598,7 @@ def set_preorder_item_status(
             "SELECT * FROM preorder_items WHERE id=? AND preorder_id=?", (item_id, preorder_id)
         ).fetchone()
         if row is None:
-            raise ValueError(f"Preorder item {item_id} not found")
+            raise ValueError(f"Item preorder {item_id} tidak ditemukan.")
         item = dict(row)
         if item["status"] != status:
             con.execute("UPDATE preorder_items SET status=? WHERE id=?", (status, item_id))

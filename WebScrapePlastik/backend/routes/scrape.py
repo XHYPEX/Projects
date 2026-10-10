@@ -41,16 +41,16 @@ async def start_scrape(req: ScrapeRequest):
     if not SCRAPER_ENABLED:
         raise HTTPException(
             status_code=503,
-            detail="The Maps scraper is currently disabled.",
+            detail="Scraper Maps sedang dinonaktifkan.",
         )
     if req.city not in CITY_KECAMATAN:
-        raise HTTPException(status_code=422, detail=f"Unknown city: {req.city}")
+        raise HTTPException(status_code=422, detail=f"Kota tidak dikenal: {req.city}")
     valid = set(CITY_KECAMATAN[req.city])
     invalid = [k for k in req.kecamatan if k not in valid]
     if invalid:
-        raise HTTPException(status_code=422, detail=f"Unknown kecamatan: {invalid}")
+        raise HTTPException(status_code=422, detail=f"Kecamatan tidak dikenal: {invalid}")
     if not req.kecamatan:
-        raise HTTPException(status_code=422, detail="kecamatan list must not be empty")
+        raise HTTPException(status_code=422, detail="Daftar kecamatan tidak boleh kosong.")
 
     job_id = str(uuid4())
     loop = asyncio.get_event_loop()
@@ -71,7 +71,7 @@ async def get_job_status(job_id: str):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_job, job_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Job tidak ditemukan.")
     return _job_to_status(row)
 
 
@@ -80,9 +80,9 @@ async def delete_job_route(job_id: str):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_job, job_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Job tidak ditemukan.")
     if row["status"] in ("pending", "running"):
-        raise HTTPException(status_code=409, detail="Cannot delete a job that is still in progress")
+        raise HTTPException(status_code=409, detail="Job yang masih berjalan tidak bisa dihapus.")
     await loop.run_in_executor(None, delete_job, job_id)
 
 
@@ -98,7 +98,7 @@ async def _log_event_generator(job_id: str):
     # Verify job exists
     row = await loop.run_in_executor(None, get_job, job_id)
     if row is None:
-        yield f"event: error\ndata: {json.dumps({'message': 'Job not found'})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'message': 'Job tidak ditemukan.'})}\n\n"
         return
 
     while True:

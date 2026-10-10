@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Maps Scraper — Jabodetabek Plastik Directory</title>
+  <title>Maps Scraper — Direktori Plastik Jabodetabek</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -171,9 +171,8 @@
     }
 
     /* Item numbers come from a CSS counter so adding or removing a row never needs renumbering. */
-    #receipt-form-panel { counter-reset: item-no; }
-    #item-rows .item-no::before,
-    #item-entry-row .item-no::before { counter-increment: item-no; content: counter(item-no); }
+    #item-rows { counter-reset: item-no; }
+    #item-rows .item-no::before { counter-increment: item-no; content: counter(item-no); }
 
     /* Hari ini / Semua toggle on the history card: a neutral lifted segment, not another coral fill. */
     .cashier-scope-btn { color: #6B6B66; }
@@ -325,7 +324,7 @@
         <div id="brand-name" class="font-serif font-semibold text-ink leading-tight truncate">Toko Plastik</div>
         <div class="text-[11px] text-muted leading-tight mt-0.5">Kasir &amp; stok</div>
       </div>
-      <button onclick="closeDrawer()" aria-label="Close menu" class="xl:hidden p-1.5 -mr-1 rounded-lg hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+      <button onclick="closeDrawer()" aria-label="Tutup menu" class="xl:hidden p-1.5 -mr-1 rounded-lg hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="text-muted">
           <path d="M6 6l12 12M18 6L6 18"/>
         </svg>
@@ -344,7 +343,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
           <path d="M3 7h18M6 7l1.5 10.5A2 2 0 0 0 9.48 19h5.04a2 2 0 0 0 1.98-1.5L18 7M9 11h6"/>
         </svg>
-        Cashier
+        Kasir
       </a>
       <a href="#/preorder" data-route="/preorder" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
@@ -440,7 +439,7 @@
        #topbar-title is still written by renderRoute(); the tile and subtitle are filled by
        renderPageHeader() from ROUTE_META. The dachshund keeps walking across it on every page. -->
   <header class="h-[72px] shrink-0 bg-bg2 border-b border-line flex items-center gap-3 px-3 sm:px-6 z-10 relative">
-    <button onclick="openDrawer()" aria-label="Open menu" class="xl:hidden p-2 -ml-1 rounded-lg hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+    <button onclick="openDrawer()" aria-label="Buka menu" class="xl:hidden p-2 -ml-1 rounded-lg hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="text-ink">
         <path d="M4 7h16M4 12h16M4 17h16"/>
       </svg>
@@ -479,7 +478,7 @@
         <path d="M8.5 12.5l2.5 2.5 5-5"/>
       </svg>
       <p id="toast-message" class="flex-1 text-sm text-ink"></p>
-      <button onclick="hideToast()" aria-label="Dismiss notification" class="p-1 -m-1 rounded-lg hover:bg-bg2 text-muted transition-colors shrink-0">
+      <button onclick="hideToast()" aria-label="Tutup notifikasi" class="p-1 -m-1 rounded-lg hover:bg-bg2 text-muted transition-colors shrink-0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <path d="M6 6l12 12M18 6L6 18"/>
         </svg>
@@ -493,7 +492,7 @@
     <div class="bg-bg border border-line rounded-xl max-w-md w-full max-h-[85vh] overflow-y-auto p-5 pointer-events-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 id="modal-title" class="font-serif text-lg font-semibold text-ink"></h3>
-        <button type="button" onclick="closeModal()" aria-label="Close dialog" class="p-1.5 -m-1.5 rounded-lg hover:bg-bg2 text-muted transition-colors shrink-0">
+        <button type="button" onclick="closeModal()" aria-label="Tutup dialog" class="p-1.5 -m-1.5 rounded-lg hover:bg-bg2 text-muted transition-colors shrink-0">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
@@ -511,9 +510,9 @@
 
   <!-- SIDEBAR: Job History -->
   <aside class="w-64 bg-bg2 border-r border-line flex flex-col shrink-0">
-    <div class="px-4 pt-4 pb-2 text-[11px] font-semibold text-muted uppercase tracking-wider">History</div>
+    <div class="px-4 pt-4 pb-2 text-[11px] font-semibold text-muted uppercase tracking-wider">Riwayat</div>
     <ul id="job-list" class="overflow-y-auto flex-1 px-2 space-y-0.5 pb-4">
-      <li class="text-xs text-muted px-2 py-1">No past jobs</li>
+      <li class="text-xs text-muted px-2 py-1">Belum ada riwayat scrape</li>
     </ul>
   </aside>
 
@@ -524,19 +523,19 @@
     <section class="bg-bg border-b border-line p-4">
       <div class="flex flex-wrap gap-3 items-end">
         <div class="flex-1 min-w-48">
-          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Search keyword</label>
-          <input id="keyword" type="text" placeholder="e.g. toko plastik"
+          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kata kunci</label>
+          <input id="keyword" type="text" placeholder="mis. toko plastik"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         </div>
         <div class="min-w-40">
-          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">City</label>
+          <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kota</label>
           <select id="city-select"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
           </select>
         </div>
         <button id="scrape-btn" onclick="startScrape()"
           class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-          Scrape
+          Mulai Scrape
         </button>
       </div>
 
@@ -546,7 +545,7 @@
           <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Kecamatan</label>
           <label class="flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
             <input type="checkbox" id="select-all" onchange="toggleSelectAll()" class="rounded accent-accent" />
-            Select all
+            Pilih semua
           </label>
           <span id="kec-count" class="text-xs text-muted"></span>
         </div>
@@ -574,11 +573,11 @@
       <!-- Toolbar -->
       <div class="bg-bg border-b border-line px-4 py-2.5 flex items-center gap-3">
         <span id="results-count" class="text-sm font-medium text-ink"></span>
-        <input id="filter-input" type="text" placeholder="Filter by name, address, or phone…"
+        <input id="filter-input" type="text" placeholder="Cari nama, alamat, atau no. telepon…"
           class="flex-1 border border-line rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         <button id="csv-btn"
           class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">
-          Download CSV
+          Unduh CSV
         </button>
       </div>
 
@@ -590,9 +589,9 @@
           <table class="w-full text-sm">
             <thead class="bg-bg2 sticky top-0 z-10">
               <tr>
-                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Name</th>
-                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Address</th>
-                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Phone</th>
+                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
+                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Alamat</th>
+                <th class="text-left px-4 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Telepon</th>
               </tr>
             </thead>
             <tbody id="results-tbody"></tbody>
@@ -614,8 +613,8 @@
           <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
           <circle cx="12" cy="9.5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <p class="font-serif text-base text-ink mb-1">Ready when you are</p>
-        <p class="text-sm text-muted">Enter a keyword, pick a city and kecamatan, then click <span class="text-ink font-medium">Scrape</span>.</p>
+        <p class="font-serif text-base text-ink mb-1">Siap mulai mencari</p>
+        <p class="text-sm text-muted">Masukkan kata kunci, pilih kota dan kecamatan, lalu klik <span class="text-ink font-medium">Mulai Scrape</span>.</p>
       </div>
     </div>
 
@@ -672,7 +671,7 @@
                 <button id="cashier-settle-btn" type="button" onclick="openCashierSettleModal()"
                   class="hidden px-4 py-1.5 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">Tandai Selesai</button>
                 <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
-                  class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Edit</button>
+                  class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah</button>
                 <button id="cashier-void-btn" type="button" onclick="confirmVoidActiveReceipt()"
                   class="hidden px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-failed/40">Void</button>
                 <button id="cashier-delete-btn" type="button" onclick="confirmDeleteActiveReceipt()"
@@ -770,8 +769,8 @@
           </section>
 
           <!-- CARD: Daftar Barang. Rows are built by addItemRow(); the header grid below and the row
-               grid there must keep the same column template. The scan dropdown is absolute, so the card
-               must not get overflow-hidden; the payment footer rounds its own bottom corners. -->
+               grid there must keep the same column template. The payment footer rounds its own bottom
+               corners because the card cannot be overflow-hidden (see #item-rows). -->
           <section class="bg-white border border-line rounded-xl" aria-labelledby="cashier-items-title">
             <div class="flex items-center gap-3 px-4 sm:px-5 pt-4 sm:pt-5 pb-4">
               <span class="w-8 h-8 rounded-lg bg-bg2 text-ink grid place-items-center shrink-0" aria-hidden="true">
@@ -780,40 +779,22 @@
               <h2 id="cashier-items-title" class="font-serif text-base font-semibold text-ink">Daftar Barang</h2>
             </div>
 
-            <div class="hidden lg:grid grid-cols-[1.5rem_minmax(0,1fr)_6rem_7.5rem_7rem_2rem] gap-x-3 px-5 py-2.5 bg-bg2 border-y border-line text-[11px] font-medium text-muted uppercase tracking-wider" aria-hidden="true">
+            <div class="hidden lg:grid grid-cols-[1.5rem_3.5rem_minmax(0,1fr)_6rem_7.5rem_7rem_2rem] gap-x-3 px-5 py-2.5 bg-bg2 border-y border-line text-[11px] font-medium text-muted uppercase tracking-wider" aria-hidden="true">
               <div>No</div>
+              <div>Gambar</div>
               <div>Nama Barang</div>
               <div class="text-center">Qty</div>
               <div class="text-right pr-2.5">Harga</div>
               <div class="text-right">Subtotal</div>
               <div class="text-center">Aksi</div>
             </div>
-            <div id="item-rows" class="peer divide-y divide-line border-t border-line lg:border-t-0 empty:border-t-0"></div>
-            <!-- Entry row: always the next numbered line (1 on an empty receipt, 2 after one item...).
-                 Scanning or picking a suggestion turns it into a real row in #item-rows above, so it is
-                 never part of the save payload. Its dropdown is absolutely positioned, so the card must
-                 never get overflow-hidden. -->
-            <div id="item-entry-row" class="grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-3 px-4 sm:px-5 py-3 border-t border-line lg:peer-empty:border-t-0">
-              <span class="item-no text-sm text-muted tabular-nums" aria-hidden="true"></span>
-              <div class="min-w-0 flex items-center gap-3">
-                <span class="w-14 h-14 rounded-lg border border-dashed border-line text-muted grid place-items-center shrink-0" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M18 5v14M20.5 5v14"/></svg>
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div class="relative">
-                    <input id="scan-barcode-input" type="text" aria-label="Scan atau cari barang" placeholder="Scan barcode, ketik SKU / nama barang…" autocomplete="off"
-                      onkeydown="handleScanInputKeydown(event)" oninput="handleScanInput(event)" onblur="onScanInputBlur()"
-                      class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono placeholder:font-sans placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" />
-                    <div id="scan-suggest-dropdown"
-                      class="hidden absolute left-0 right-0 top-full mt-1 z-30 max-h-72 overflow-y-auto bg-white border border-line rounded-lg shadow-sm"></div>
-                  </div>
-                  <p id="scan-barcode-feedback" class="text-xs text-muted mt-1.5 empty:hidden"></p>
-                </div>
-              </div>
-            </div>
+            <!-- The last row is always a blank one: its Nama Barang box is where a barcode is scanned
+                 or a product searched, and filling it adds the next blank row. The suggestion list is
+                 absolutely positioned inside that row, so the card must never get overflow-hidden. -->
+            <div id="item-rows" class="divide-y divide-line border-t border-line lg:border-t-0"></div>
 
             <div class="px-4 sm:px-5 py-4 border-t border-line flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <button id="add-item-btn" type="button" onclick="addItemRow().querySelector('.item-name').focus(); markActiveTabDirty();"
+              <button id="add-item-btn" type="button" onclick="focusItemEntryRow()"
                 class="self-start inline-flex items-center gap-1.5 px-4 py-2 border border-accent/60 rounded-lg text-sm font-medium text-ink bg-white hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-accentDark" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                 Tambah Item
@@ -849,7 +830,7 @@
                 <label for="payment-method-select" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Metode Bayar</label>
                 <select id="payment-method-select"
                   class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                  <option value="cash">Cash</option>
+                  <option value="cash">Tunai</option>
                   <option value="transfer">Transfer</option>
                   <option value="qris">QRIS</option>
                 </select>
@@ -894,11 +875,11 @@
 
           <section class="bg-white border border-line rounded-xl" aria-labelledby="cashier-summary-title">
             <div class="flex items-center gap-2 px-4 pt-4 pb-3 min-h-[3.5rem]">
-              <h2 id="cashier-summary-title" class="font-serif text-base font-semibold text-ink">Ringkasan Pesanan</h2>
+              <h2 id="cashier-summary-title" class="font-serif text-base font-semibold text-ink whitespace-nowrap">Ringkasan Pesanan</h2>
               <!-- Read-only status, derived from Jumlah Dibayar vs Total. Hidden until there is a total. -->
-              <span id="cashier-status-badge" class="ml-auto hidden inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium text-ink bg-pending/10">
+              <span id="cashier-status-badge" class="ml-auto hidden inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-ink bg-pending/10">
                 <span id="cashier-status-dot" class="status-dot is-pending"></span>
-                <span id="cashier-status-label">Pending</span>
+                <span id="cashier-status-label">Belum Lunas</span>
               </span>
             </div>
             <div class="px-4 pb-4">
@@ -1016,9 +997,9 @@
             <button type="button" data-status-filter="" onclick="applyHistoryStatusFilter('')"
               class="history-status-btn is-active px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Semua</button>
             <button type="button" data-status-filter="pending" onclick="applyHistoryStatusFilter('pending')"
-              class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Pending</button>
+              class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Belum Lunas</button>
             <button type="button" data-status-filter="done" onclick="applyHistoryStatusFilter('done')"
-              class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Done</button>
+              class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Lunas</button>
             <button type="button" data-status-filter="void" onclick="applyHistoryStatusFilter('void')"
               class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Void</button>
           </div>
@@ -1618,7 +1599,7 @@
           <option value="customer">Pelanggan</option>
           <option value="stock">Penyesuaian stok</option>
           <option value="user">Pengguna</option>
-          <option value="auth">Login / logout</option>
+          <option value="auth">Masuk / keluar</option>
         </select>
         <input id="activity-date-from" type="date" onchange="reloadActivity()" data-no-uppercase
           class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
@@ -1926,7 +1907,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button id="detail-item-print-btn" onclick="printMasterItemBarcode()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Cetak Barcode</button>
-              <button id="detail-item-edit-btn" onclick="enableMasterItemEdit()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Edit</button>
+              <button id="detail-item-edit-btn" onclick="enableMasterItemEdit()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Ubah</button>
               <button id="detail-item-delete-btn" onclick="handleDeleteMasterItem()" class="admin-only px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors">Hapus</button>
             </div>
           </div>
@@ -2632,7 +2613,7 @@ function applyRoleGating() {
   const label = document.getElementById("current-user-label");
   if (label) label.textContent = currentUser ? currentUser.username : "";
   const role = document.getElementById("current-user-role");
-  if (role) role.textContent = currentUser ? (isAdmin() ? "Admin" : "Staff") : "";
+  if (role) role.textContent = currentUser ? (isAdmin() ? "Admin" : "Staf") : "";
   const avatar = document.getElementById("current-user-avatar");
   if (avatar) avatar.textContent = currentUser ? currentUser.username.slice(0, 2).toUpperCase() : "";
 }
@@ -2790,7 +2771,7 @@ function closeDrawer() {
 // duplicated the sidebar submenu; each is now its own route with its own URL.
 const ROUTES = {
   "/scraper": { title: "Maps Scraper", page: "page-scraper" },
-  "/cashier": { title: "Cashier", page: "page-cashier" },
+  "/cashier": { title: "Kasir", page: "page-cashier" },
   "/preorder": { title: "Preorder", page: "page-preorder" },
   "/invoices": { title: "Riwayat Invoice", page: "page-invoices" },
   "/purchase-invoices": { title: "Faktur Pembelian", page: "page-purchase-invoices" },
@@ -2858,7 +2839,7 @@ function renderRoute() {
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
-  if (route === "/cashier") document.getElementById("scan-barcode-input")?.focus();
+  if (route === "/cashier") itemEntryInput()?.focus();
   if (route === "/dashboard") loadDashboardOverview();
   if (route === "/preorder") { backToPreorderList(); }
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
@@ -2898,7 +2879,7 @@ window.addEventListener("hashchange", renderRoute);
 // inventory-side pages are Bahasa Indonesia.
 const ROUTE_META = {
   "/scraper": {
-    subtitle: "Collect shop names, addresses and phone numbers from Google Maps.",
+    subtitle: "Kumpulkan nama toko, alamat, dan nomor telepon dari Google Maps.",
     icon: '<path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z"/><circle cx="12" cy="9.5" r="2.5"/>',
   },
   "/cashier": {
@@ -3039,7 +3020,7 @@ function toggleSelectAll() {
 function updateKecCount() {
   const total = document.querySelectorAll(".kec-cb").length;
   const selected = document.querySelectorAll(".kec-cb:checked").length;
-  document.getElementById("kec-count").textContent = selected > 0 ? `${selected}/${total} selected` : "";
+  document.getElementById("kec-count").textContent = selected > 0 ? `${selected}/${total} dipilih` : "";
   const allChecked = selected === total && total > 0;
   document.getElementById("select-all").checked = allChecked;
 }
@@ -3075,7 +3056,7 @@ async function startScrape() {
 
   if (!resp.ok) {
     const err = await resp.json();
-    showToast(`Error: ${err.detail}`);
+    showToast(`Gagal: ${err.detail}`);
     document.getElementById("scrape-btn").disabled = false;
     return;
   }
@@ -3085,7 +3066,7 @@ async function startScrape() {
 
   showPanel("progress");
   clearTerminal();
-  setProgress(0, "Starting…");
+  setProgress(0, "Memulai…");
 
   startSSE(job_id);
   pollJobStatus(job_id);
@@ -3127,7 +3108,7 @@ async function pollJobStatus(jobId) {
       return;
     }
     if (job.status === "failed") {
-      appendTerminal(`\n✗ Failed: ${job.error || "unknown error"}`);
+      appendTerminal(`\n✗ Gagal: ${job.error || "kesalahan tidak diketahui"}`);
       document.getElementById("scrape-btn").disabled = false;
       return;
     }
@@ -3148,7 +3129,7 @@ async function loadResults(jobId) {
 
   renderTable(allPlaces);
 
-  document.getElementById("results-count").textContent = `${allPlaces.length} places found`;
+  document.getElementById("results-count").textContent = `${allPlaces.length} tempat ditemukan`;
   document.getElementById("csv-btn").onclick = () => saveResultsCsv(jobId);
 
   showPanel("results");
@@ -3162,19 +3143,19 @@ async function saveResultsCsv(jobId) {
 
   try {
     const resp = await fetch(`/api/results/${jobId}/csv`);
-    if (!resp.ok) throw new Error("Download failed");
+    if (!resp.ok) throw new Error("Unduhan gagal");
     const blob = await resp.blob();
 
     if (window.showSaveFilePicker) {
       // Chromium browsers: native "Save As" dialog lets the user pick the destination folder.
       const handle = await window.showSaveFilePicker({
         suggestedName,
-        types: [{ description: "CSV file", accept: { "text/csv": [".csv"] } }],
+        types: [{ description: "File CSV", accept: { "text/csv": [".csv"] } }],
       });
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-      showToast("CSV saved.", "success");
+      showToast("CSV disimpan.", "success");
     } else {
       // Fallback (Firefox/Safari): trigger the browser's normal download flow.
       const url = URL.createObjectURL(blob);
@@ -3188,7 +3169,7 @@ async function saveResultsCsv(jobId) {
     }
   } catch (err) {
     if (err.name === "AbortError") return; // user cancelled the save dialog
-    showToast(`Could not save CSV: ${err.message}`);
+    showToast(`CSV tidak bisa disimpan: ${err.message}`);
   }
 }
 
@@ -3227,24 +3208,36 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("a.nav-link").forEach(el => el.addEventListener("click", closeDrawer));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeDrawer(); closeModal(); } });
 
-  document.getElementById("item-rows").addEventListener("input", (e) => {
+  const itemRows = document.getElementById("item-rows");
+  itemRows.addEventListener("input", (e) => {
     if (e.target.classList.contains("item-qty") || e.target.classList.contains("item-price")) {
       recomputeTotals();
     } else if (e.target.classList.contains("item-name")) {
       refreshItemRowMeta(e.target.closest(".item-row"));
       renderCashierSummary();
+      if (isSearchNameInput(e.target)) handleScanInput(e);
     }
+  });
+  // A line without a SKU searches Master Barang from its name box; a linked line is just a name.
+  itemRows.addEventListener("keydown", (e) => {
+    if (isSearchNameInput(e.target)) handleScanInputKeydown(e);
+  });
+  itemRows.addEventListener("focusout", (e) => {
+    if (isSearchNameInput(e.target)) onScanInputBlur();
+  });
+  // A hand-typed name in the blank row makes it a real line, so a new blank row follows it.
+  itemRows.addEventListener("change", (e) => {
+    if (e.target.classList.contains("item-name")) ensureTrailingEmptyRow();
   });
 
   // Marks the active Cashier tab dirty on any typed edit inside the form panel
   // (plate, discount, item name/qty/price/warranty) without editing every
-  // individual oninput handler. Excludes the barcode-scan box — typing a SKU
-  // there isn't itself a form edit until Enter is pressed (handleBarcodeScan);
-  // the same goes for the customer search box until someone is picked from it.
+  // individual oninput handler. Excludes the customer search box — typing there
+  // isn't itself a form edit until someone is picked from it.
   // Programmatic `.value =` assignments made by renderCashierForm() don't fire
   // "input" events, so this never falsely dirties a freshly-rendered tab.
   document.getElementById("receipt-form-panel").addEventListener("input", (e) => {
-    if (e.target.id === "scan-barcode-input" || e.target.id === "cashier-customer-search") return;
+    if (e.target.id === "cashier-customer-search") return;
     markActiveTabDirty();
     renderCashierSummary();
   });
@@ -3282,7 +3275,7 @@ function validatePlateRegion() {
     feedback.className = "text-xs text-muted mt-1.5";
   } else {
     input.classList.add("border-failed");
-    feedback.textContent = "Unknown region code";
+    feedback.textContent = "Kode wilayah tidak dikenal";
     feedback.className = "text-xs text-failed mt-1.5";
   }
 }
@@ -3381,7 +3374,7 @@ async function resolveItemRowImage(row, sku) {
 function addItemRow(prefill) {
   const container = document.getElementById("item-rows");
   const row = document.createElement("div");
-  row.className = "item-row grid grid-cols-[1.5rem_minmax(0,1fr)_2rem] lg:grid-cols-[1.5rem_minmax(0,1fr)_6rem_7.5rem_7rem_2rem] items-center gap-x-3 gap-y-3 px-4 sm:px-5 py-3";
+  row.className = "item-row grid grid-cols-[1.5rem_minmax(0,1fr)_2rem] lg:grid-cols-[1.5rem_3.5rem_minmax(0,1fr)_6rem_7.5rem_7rem_2rem] items-center gap-x-3 gap-y-3 px-4 sm:px-5 py-3";
   if (prefill && prefill.sku) row.dataset.sku = prefill.sku;
   // Garansi has no column any more; the stored date is carried on the row so an
   // edit to an existing receipt preserves it instead of clearing it.
@@ -3392,10 +3385,10 @@ function addItemRow(prefill) {
   if (knownImage) row.dataset.imageUrl = knownImage;
   row.innerHTML = `
     <span class="item-no text-sm text-muted tabular-nums" aria-hidden="true"></span>
-    <div class="min-w-0 flex items-center gap-3">
+    <div class="min-w-0 flex items-center gap-3 lg:contents">
       <span class="item-tile w-14 h-14 rounded-lg bg-bg2 border border-line text-muted grid place-items-center text-sm font-semibold shrink-0 overflow-hidden" aria-hidden="true"></span>
-      <div class="min-w-0 flex-1">
-        <input type="text" placeholder="Nama barang" aria-label="Nama barang"
+      <div class="item-name-wrap relative min-w-0 flex-1">
+        <input type="text" placeholder="Scan barcode / cari nama atau SKU…" aria-label="Nama barang" autocomplete="off"
           class="item-name block w-full min-w-0 bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-serif font-semibold text-ink placeholder:font-sans placeholder:font-normal placeholder:text-muted/70 placeholder-shown:border-line placeholder-shown:bg-white hover:border-line focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:text-ink disabled:cursor-default transition-colors" />
         <div class="item-meta text-[11px] text-muted leading-snug mt-0.5 px-[9px] truncate"></div>
       </div>
@@ -3421,7 +3414,7 @@ function addItemRow(prefill) {
       </div>
       <div class="item-subtotal text-right text-sm font-medium tabular-nums text-ink">Rp 0</div>
     </div>
-    ${iconButtonHtml("danger", "Hapus item", "this.closest('.item-row').remove(); recomputeTotals(); markActiveTabDirty();", "trash", "col-start-3 row-start-1 lg:col-start-auto lg:row-start-auto disabled:opacity-40 disabled:cursor-not-allowed")}
+    ${iconButtonHtml("danger", "Hapus item", "this.closest('.item-row').remove(); ensureTrailingEmptyRow(); recomputeTotals(); markActiveTabDirty();", "trash", "col-start-3 row-start-1 lg:col-start-auto lg:row-start-auto disabled:opacity-40 disabled:cursor-not-allowed")}
   `;
   row.querySelector(".item-name").value = prefill ? (prefill.name || "") : "";
   row.querySelector(".item-qty").value = prefill && prefill.qty != null && prefill.qty !== "" ? String(prefill.qty) : "1";
@@ -3443,6 +3436,7 @@ function refreshItemRowMeta(row) {
     ? esc(masterInitials(name))
     : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg>`);
   const meta = row.querySelector(".item-meta");
+  meta.classList.remove("text-failed");
   if (row.dataset.sku) {
     meta.innerHTML = `SKU: <span class="font-mono">${esc(row.dataset.sku)}</span>`;
   } else {
@@ -3459,6 +3453,39 @@ function stepItemQty(btn, delta) {
   input.value = Math.max(1, (parseInt(input.value, 10) || 0) + delta);
   recomputeTotals();
   markActiveTabDirty();
+}
+
+// ── Cashier: the blank entry row ─────────────────────────────────────────────
+// An editable receipt always ends in one blank line (no SKU, no name). Its name box is the
+// register's scan/search box; filling it, by scan, pick or typing, adds the next blank line.
+// Blank lines are never saved (collectReceiptPayload / captureFormIntoActiveTab skip them).
+function isBlankItemRow(row) {
+  return !row.dataset.sku && !row.querySelector(".item-name").value.trim();
+}
+
+function isCashierReadOnly() {
+  const tab = getActiveTab();
+  return !!tab && (tab.status === "void" || !!tab.locked);
+}
+
+function ensureTrailingEmptyRow() {
+  if (isCashierReadOnly()) return null;
+  const last = document.querySelector("#item-rows .item-row:last-child");
+  return last && isBlankItemRow(last) ? last : addItemRow();
+}
+
+function itemEntryInput() {
+  const last = document.querySelector("#item-rows .item-row:last-child");
+  return last && isBlankItemRow(last) ? last.querySelector(".item-name") : null;
+}
+
+function focusItemEntryRow() {
+  ensureTrailingEmptyRow()?.querySelector(".item-name").focus();
+}
+
+// Only a line not yet linked to Master Barang searches; renaming a linked line is a plain edit.
+function isSearchNameInput(el) {
+  return !!el && el.classList.contains("item-name") && !el.closest(".item-row")?.dataset.sku;
 }
 
 function findItemRowBySku(sku) {
@@ -3487,8 +3514,12 @@ function resetScanBurstState() {
   scanLooksMachine = false;
 }
 
+// The name box the scan/search code is currently serving (always a SKU-less row's).
+let scanInput = null;
+
 function handleScanInput(event) {
   const input = event.target;
+  if (scanInput !== input) { hideScanSuggest(); resetScanBurstState(); scanInput = input; }
   const now = performance.now();
   const gap = now - scanLastInputAt;
   const added = input.value.length - scanPrevLength;
@@ -3536,8 +3567,17 @@ let scanSuggestResults = [];
 let scanSuggestIndex = -1;
 let scanSuggestQuery = "";
 
+// One list for the whole register, moved under whichever row is searching.
 function scanSuggestDropdown() {
-  return document.getElementById("scan-suggest-dropdown");
+  let dd = document.getElementById("scan-suggest-dropdown");
+  if (!dd) {
+    dd = document.createElement("div");
+    dd.id = "scan-suggest-dropdown";
+    dd.className = "hidden absolute left-0 right-0 top-full mt-1 z-30 max-h-72 overflow-y-auto bg-white border border-line rounded-lg shadow-sm";
+  }
+  const wrap = scanInput?.closest(".item-name-wrap");
+  if (wrap && dd.parentElement !== wrap) wrap.appendChild(dd);
+  return dd;
 }
 
 function hideScanSuggest() {
@@ -3569,8 +3609,8 @@ async function runScanSuggest(query) {
     const resp = await fetch(`/api/inventory/master-items/autocomplete?query=${encodeURIComponent(query)}&limit=8`);
     if (resp.ok) results = await resp.json();
   } catch (_) {}
-  const input = document.getElementById("scan-barcode-input");
-  if (!input || input.value.trim() !== query) return;  // stale: they kept typing
+  const input = scanInput;
+  if (!input || !input.isConnected || input.value.trim() !== query) return;  // stale: they kept typing
   results.forEach(rememberItemImage);
   scanSuggestResults = results;
   scanSuggestIndex = -1;
@@ -3621,25 +3661,38 @@ function moveScanSuggestFocus(delta) {
 function chooseScanSuggestion(idx) {
   const item = scanSuggestResults[idx];
   if (!item) return;
-  addScannedItemToReceipt(item);
-  const input = document.getElementById("scan-barcode-input");
   hideScanSuggest();
-  if (input) { input.value = ""; input.focus(); }
   resetScanBurstState();
+  addScannedItemToReceipt(item, scanInput?.closest(".item-row"));
+  itemEntryInput()?.focus();
 }
 
 // Shared by the scan path and the suggestion path so both add a line the same
-// way: an existing row for the SKU gains a unit, otherwise a new row appears.
-function addScannedItemToReceipt(item) {
+// way: an existing row for the SKU gains a unit, otherwise the row being typed in
+// (or the blank entry row) becomes that product. Either way a blank row follows.
+function addScannedItemToReceipt(item, targetRow) {
   rememberItemImage(item);
   const existingRow = findItemRowBySku(item.sku);
   if (existingRow) {
     const qtyInput = existingRow.querySelector(".item-qty");
     qtyInput.value = (parseInt(qtyInput.value, 10) || 0) + 1;
+    if (targetRow && targetRow !== existingRow && !targetRow.dataset.sku) {
+      targetRow.querySelector(".item-name").value = "";
+      refreshItemRowMeta(targetRow);
+    }
   } else {
-    addItemRow({ sku: item.sku, name: item.name, price: item.sell_price, imageUrl: item.image_url || "" });
+    const row = targetRow && !targetRow.dataset.sku ? targetRow : (itemEntryInput()?.closest(".item-row") || addItemRow());
+    row.dataset.sku = item.sku;
+    if (item.image_url) row.dataset.imageUrl = item.image_url;
+    else delete row.dataset.imageUrl;
+    row.querySelector(".item-name").value = item.name;
+    row.querySelector(".item-qty").value = "1";
+    row.querySelector(".item-price").value = groupDigits(item.sell_price);
+    refreshItemRowMeta(row);
   }
+  ensureTrailingEmptyRow();
   recomputeTotals();
+  renderCashierSummary();
   markActiveTabDirty();
 }
 
@@ -3670,20 +3723,22 @@ function handleScanInputKeydown(event) {
 }
 
 async function handleBarcodeScan() {
-  const input = document.getElementById("scan-barcode-input");
-  const feedback = document.getElementById("scan-barcode-feedback");
+  const input = scanInput;
+  if (!input || !input.isConnected) return;
+  const row = input.closest(".item-row");
   const sku = input.value.trim();
   if (!sku || scanInFlight) return;
   scanInFlight = true;
 
-  feedback.textContent = "";
-  feedback.classList.remove("text-failed");
   input.disabled = true;
+  let added = false;
   try {
     const resp = await fetch(`/api/inventory/master-items/by-sku/${encodeURIComponent(sku)}`);
     if (!resp.ok) {
-      feedback.textContent = `SKU tidak ditemukan: ${sku}`;
-      feedback.classList.add("text-failed");
+      // The typed text stays: it may be a hand-written line, not a code.
+      const meta = row.querySelector(".item-meta");
+      meta.textContent = `SKU tidak ditemukan: ${sku}`;
+      meta.classList.add("text-failed");
       // Same dead-end as an empty search, so offer the same way out.
       scanSuggestResults = [];
       scanSuggestIndex = -1;
@@ -3691,13 +3746,11 @@ async function handleBarcodeScan() {
       renderScanSuggest();
       return;
     }
-    const item = await resp.json();
-    addScannedItemToReceipt(item);
-    feedback.textContent = `Ditambahkan: ${item.name}`;
+    addScannedItemToReceipt(await resp.json(), row);
+    added = true;
   } finally {
-    input.value = "";
     input.disabled = false;
-    input.focus();
+    (added ? itemEntryInput() : input)?.focus();
     scanInFlight = false;
     resetScanBurstState();
   }
@@ -3763,7 +3816,7 @@ function updateCashierStatusBadge(total, amountPaid) {
   // meaningless. Show the badge once there is a total or the receipt has been saved.
   const tint = { pending: "bg-pending/10", done: "bg-done/10", void: "bg-failed/10" }[status];
   const hide = total <= 0 && !(tab && tab.receiptId) && status !== "void";
-  badge.className = `ml-auto inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium text-ink ${tint} ${hide ? "hidden" : ""}`;
+  badge.className = `ml-auto inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-ink ${tint} ${hide ? "hidden" : ""}`;
 }
 
 function recomputeTotals() {
@@ -3865,11 +3918,22 @@ function renderCashierSummary() {
       : balValue.classList.contains("text-pending") ? "text-pending" : "text-muted");
 
   updateCashierSettleButtons();
+  // The tab label is the plate, so keep the active tab's plate in step with the form as it is typed.
+  const activeTab = getActiveTab();
+  if (activeTab) {
+    const plate = ["plate-region", "plate-number", "plate-suffix"].map(id => document.getElementById(id).value);
+    if (plate.join(" ") !== [activeTab.plateRegion, activeTab.plateNumber, activeTab.plateSuffix].join(" ")) {
+      [activeTab.plateRegion, activeTab.plateNumber, activeTab.plateSuffix] = plate;
+      renderCashierTabBar();
+    }
+  }
+  // Riwayat Nota lists the unsaved tabs too, and the active one changes with every edit.
+  renderReceiptHistory();
 }
 
 // ── Cashier: save / validate ──────────────────────────────────────────────────
 function collectReceiptPayload() {
-  const rows = [...document.querySelectorAll("#item-rows .item-row")];
+  const rows = [...document.querySelectorAll("#item-rows .item-row")].filter(row => !isBlankItemRow(row));
   const items = rows.map(row => ({
     product_name: row.querySelector(".item-name").value.trim(),
     quantity: parseInt(row.querySelector(".item-qty").value, 10) || 0,
@@ -4101,7 +4165,7 @@ function setActiveCashierTab(tabId) {
 function captureFormIntoActiveTab() {
   const tab = getActiveTab();
   if (!tab) return;
-  const rows = [...document.querySelectorAll("#item-rows .item-row")];
+  const rows = [...document.querySelectorAll("#item-rows .item-row")].filter(row => !isBlankItemRow(row));
   tab.items = rows.map(row => ({
     sku: row.dataset.sku || null,
     name: row.querySelector(".item-name").value,
@@ -4128,6 +4192,7 @@ function markActiveTabDirty() {
   tab.dirty = true;
   renderCashierTabBar();
   updateCashierSettleButtons();
+  renderReceiptHistory();  // the first edit turns a new tab into a draft
 }
 
 function renderCashierTabBar() {
@@ -4219,21 +4284,15 @@ function renderCashierForm() {
 
   renderCashierTimeFields();
 
-  document.getElementById("scan-barcode-input").value = "";
-  document.getElementById("scan-barcode-feedback").textContent = "";
   // Drops any auto-submit still pending, so a scan started on the tab being
   // left can't land on the one being opened.
   resetScanBurstState();
   hideScanSuggest();
-  // Keep focus on the scan box so a hardware barcode scanner (a keyboard-wedge
-  // device that just types the code + Enter) can be used without clicking in
-  // first, the way a grocery register works.
-  document.getElementById("scan-barcode-input").focus();
+  scanInput = null;
 
   const container = document.getElementById("item-rows");
   container.innerHTML = "";
-  const items = tab.items.length ? tab.items : [{ sku: null, name: "", qty: "1", price: "", warranty: "" }];
-  for (const item of items) addItemRow(item);
+  for (const item of tab.items) addItemRow(item);
 
   setPriceInput(document.getElementById("discount-input"), tab.discount || 0);
   setPriceInput(document.getElementById("amount-paid-input"), tab.amountPaid ?? 0);
@@ -4246,6 +4305,10 @@ function renderCashierForm() {
   document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId);
 
   applyCashierVoidLock(tab);
+  // Keep focus on the blank row so a hardware barcode scanner (a keyboard-wedge
+  // device that just types the code + Enter) can be used without clicking in
+  // first, the way a grocery register works.
+  itemEntryInput()?.focus();
 }
 
 // Void is sticky (no unvoid path) — once a receipt is voided the whole form
@@ -4262,15 +4325,19 @@ function applyCashierVoidLock(tab) {
   const lockIds = [
     "plate-region", "plate-number", "plate-suffix", "customer-phone", "customer-name",
     "cashier-customer-search", "cashier-customer-new-btn",
-    "scan-barcode-input", "add-item-btn", "discount-input", "amount-paid-input",
+    "add-item-btn", "discount-input", "amount-paid-input",
     "payment-method-select", "save-receipt-btn",
   ];
   lockIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = readOnly;
   });
-  // A read-only receipt takes no new lines, so the numbered entry row would only mislead.
-  document.getElementById("item-entry-row").classList.toggle("hidden", readOnly);
+  // A read-only receipt takes no new lines, so it loses its blank entry row; editing brings it back.
+  if (readOnly) {
+    document.querySelectorAll("#item-rows .item-row").forEach(row => { if (isBlankItemRow(row)) row.remove(); });
+  } else {
+    ensureTrailingEmptyRow();
+  }
 
   document.querySelectorAll("#item-rows .item-row").forEach(row => {
     row.querySelectorAll("input, button").forEach(el => { el.disabled = readOnly; });
@@ -4299,12 +4366,12 @@ function unlockActiveReceipt() {
 function confirmVoidActiveReceipt() {
   const tab = getActiveTab();
   if (!tab || !tab.receiptId || tab.status === "void") return;
-  openModal("Void Receipt", `
+  openModal("Void Nota", `
     <div class="space-y-3">
-      <p class="text-sm text-muted">Voiding this receipt cannot be undone — there is no way to un-void it afterward, and the form will lock for editing. Are you sure?</p>
+      <p class="text-sm text-muted">Void nota tidak bisa dibatalkan — nota tidak dapat dikembalikan setelahnya, dan form akan terkunci dari perubahan. Yakin ingin melanjutkan?</p>
       <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Cancel</button>
-        <button type="button" onclick="voidActiveReceiptConfirmed()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Confirm Void</button>
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="voidActiveReceiptConfirmed()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Void</button>
       </div>
     </div>
   `);
@@ -4319,7 +4386,7 @@ async function voidActiveReceiptConfirmed() {
     body: JSON.stringify({ status: "void" }),
   });
   if (!resp.ok) {
-    let message = "Could not void this receipt.";
+    let message = "Nota tidak bisa di-void.";
     try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
     closeModal();
     showToast(message);
@@ -4345,12 +4412,12 @@ function closeCashierTab(tabId) {
   if (tabId === activeCashierTabId) captureFormIntoActiveTab();
 
   if (tab.dirty) {
-    openModal("Unsaved changes", `
+    openModal("Perubahan Belum Disimpan", `
       <div class="space-y-3">
-        <p class="text-sm text-muted">This tab has unsaved changes. Close it anyway and discard them?</p>
+        <p class="text-sm text-muted">Tab ini punya perubahan yang belum disimpan. Tetap tutup dan buang perubahannya?</p>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Cancel</button>
-          <button type="button" onclick="closeModal(); discardAndCloseCashierTab('${tabId}');" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Discard &amp; Close</button>
+          <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+          <button type="button" onclick="closeModal(); discardAndCloseCashierTab('${tabId}');" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Buang &amp; Tutup</button>
         </div>
       </div>
     `);
@@ -4435,9 +4502,52 @@ function showCashierHistory() {
   (document.querySelector("#receipt-list button") || document.querySelector(".cashier-scope-btn.is-active"))?.focus({ preventScroll: true });
 }
 
+// Unsaved tabs (no receiptId yet) shown at the top of Riwayat Nota as drafts. The active tab is
+// read from the form, since its tab state is only written back on a switch or close.
+function cashierDraftEntries() {
+  const query = receiptHistoryQuery().toLowerCase();
+  // An untouched new tab is not a draft yet; the first edit (tab.dirty) makes it one.
+  return cashierTabs.filter(t => !t.receiptId && t.dirty).map(tab => {
+    const active = tab.tabId === activeCashierTabId;
+    const val = id => document.getElementById(id).value;
+    const plate = active
+      ? [val("plate-region"), val("plate-number"), val("plate-suffix")].filter(Boolean).join(" ")
+      : [tab.plateRegion, tab.plateNumber, tab.plateSuffix].filter(Boolean).join(" ");
+    const name = active ? val("customer-name").trim() : (tab.customerName || "");
+    const phone = active ? val("customer-phone").trim() : (tab.customerPhone || "");
+    let total = cashierLastTotal;
+    if (!active) {
+      const subtotal = tab.items.reduce((sum, it) => sum + (parseInt(it.qty, 10) || 0) * priceValue({ value: it.price }), 0);
+      total = Math.max(subtotal - priceValue({ value: tab.discount }), 0);
+    }
+    return { tab, active, plate, customer: [tab.customerFullName || name, phone].filter(Boolean), total };
+  }).filter(d => !query || [d.plate, ...d.customer].some(v => v.toLowerCase().includes(query)));
+}
+
+function cashierDraftsHtml() {
+  return cashierDraftEntries().map(d => `
+      <li>
+        <button type="button" onclick="setActiveCashierTab('${d.tab.tabId}')" ${d.active ? 'aria-current="true"' : ""}
+          class="w-full text-left rounded-lg px-3 py-2.5 ${d.active ? "bg-bg2" : "hover:bg-bg2/70"} transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          <div class="flex items-center gap-2 text-sm font-medium text-ink">
+            <span class="status-dot shrink-0 border border-muted"></span>
+            <span class="truncate">${esc(d.plate || "Nota baru")}</span>
+            <span class="shrink-0 inline-flex items-center rounded-full border border-line px-1.5 text-[10px] font-medium uppercase tracking-wider text-muted">Draft</span>
+            <span class="ml-auto shrink-0 text-xs font-normal text-muted tabular-nums">${esc(formatReceiptWhen(d.tab.startedAt, false))}</span>
+          </div>
+          <div class="mt-0.5 pl-[15px] flex items-baseline justify-between gap-2 text-xs">
+            <span class="truncate text-muted">${d.customer.map(esc).join(" &middot; ") || "Belum disimpan"}</span>
+            <span class="shrink-0 tabular-nums text-ink">${formatIDR(d.total)}</span>
+          </div>
+        </button>
+      </li>`).join("");
+}
+
 function renderReceiptHistory() {
   const ul = document.getElementById("receipt-list");
+  if (!ul || !getActiveTab()) return;
   const todayOnly = receiptHistoryScope === "today";
+  const drafts = cashierDraftsHtml();
   document.querySelectorAll(".cashier-scope-btn").forEach(btn => {
     const on = btn.dataset.scope === receiptHistoryScope;
     btn.classList.toggle("is-active", on);
@@ -4446,6 +4556,10 @@ function renderReceiptHistory() {
 
   const receipts = todayOnly ? receiptHistory.filter(r => isToday(r.created_at)) : receiptHistory;
   const query = receiptHistoryQuery();
+  if (receipts.length === 0 && drafts) {
+    ul.innerHTML = drafts;
+    return;
+  }
   if (query && receipts.length === 0) {
     // receiptHistory already holds only what matches the search, across every day, so a search with
     // nothing today but something older is worth offering the wider scope for.
@@ -4474,7 +4588,7 @@ function renderReceiptHistory() {
   // Surface remaining balance at a glance for partially-paid receipts only — for
   // status=done or an untouched pending (nothing paid yet), the plain total
   // already says everything the total-minus-nothing math would.
-  ul.innerHTML = receipts.map(r => {
+  ul.innerHTML = drafts + receipts.map(r => {
     const remaining = Math.max(r.total - r.amount_paid, 0);
     const partial = r.status === "pending" && r.amount_paid > 0 && remaining > 0;
     const customerBits = [r.customer_full_name || r.customer_name, r.customer_phone].filter(Boolean).map(esc).join(" &middot; ");
@@ -4527,9 +4641,9 @@ function openReceiptFromHistory(receiptId) {
 function confirmDeleteActiveReceipt() {
   const tab = getActiveTab();
   if (!tab || !tab.receiptId) return;
-  openModal("Hapus Receipt", `
+  openModal("Hapus Nota", `
     <div class="space-y-3">
-      <p class="text-sm text-muted">Yakin ingin menghapus receipt ini? Tindakan ini tidak dapat dibatalkan.</p>
+      <p class="text-sm text-muted">Yakin ingin menghapus nota ini? Tindakan ini tidak dapat dibatalkan.</p>
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
         <button type="button" onclick="deleteActiveReceiptConfirmed()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus</button>
@@ -4543,7 +4657,7 @@ async function deleteActiveReceiptConfirmed() {
   if (!tab || !tab.receiptId) { closeModal(); return; }
   const resp = await fetch(`/api/receipts/${tab.receiptId}`, { method: "DELETE" });
   if (!resp.ok) {
-    let message = "Gagal menghapus receipt.";
+    let message = "Gagal menghapus nota.";
     try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
     closeModal();
     showToast(message);
@@ -4803,7 +4917,7 @@ function cancelCashierCustomerReturn() {
 // Settling is the "they came back and paid the rest" shortcut: the server records the remaining
 // amount as paid (status becomes done) without touching items or stock. Both entry points,
 // the cashier's own buttons and the rows in Riwayat Invoice, end up in the same modal.
-const PAYMENT_METHOD_LABELS = { cash: "Cash", transfer: "Transfer", qris: "QRIS" };
+const PAYMENT_METHOD_LABELS = { cash: "Tunai", transfer: "Transfer", qris: "QRIS" };
 let settleContext = null;  // { id, plate, customer, remaining, method } for the open modal
 
 // Offered for a saved, pending receipt. Disabled while the tab has unsaved edits: the modal quotes
@@ -5111,8 +5225,8 @@ const debouncedHistorySearch = debounce((query) => searchReceiptHistory(query), 
 
 function statusLabel(status) {
   switch (status) {
-    case "pending": return "Pending";
-    case "done": return "Done";
+    case "pending": return "Belum Lunas";
+    case "done": return "Lunas";
     case "void": return "Void";
     default: return status || "—";
   }
@@ -5215,7 +5329,7 @@ async function loadJobHistory() {
   ul.innerHTML = "";
 
   if (jobs.length === 0) {
-    ul.innerHTML = '<li class="text-xs text-muted px-2 py-1">No past jobs</li>';
+    ul.innerHTML = '<li class="text-xs text-muted px-2 py-1">Belum ada riwayat scrape</li>';
     return;
   }
 
@@ -5226,7 +5340,7 @@ async function loadJobHistory() {
     const canDelete = job.status === "done" || job.status === "failed";
     const deleteBtn = canDelete ? `
       <button type="button" onclick="handleDeleteJobClick('${job.job_id}', this)" data-armed="false"
-        aria-label="Delete job"
+        aria-label="Hapus job"
         class="job-delete-btn absolute top-1.5 right-1.5 p-1 rounded-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted hover:bg-bg hover:text-failed transition-opacity">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0v12.5A1.5 1.5 0 0 1 15.5 21h-7A1.5 1.5 0 0 1 7 19.5V7h10Z"/>
@@ -5260,8 +5374,8 @@ function handleDeleteJobClick(jobId, btnEl) {
     btnEl.style.opacity = "1";
     btnEl.classList.remove("text-muted");
     btnEl.classList.add("text-failed");
-    btnEl.title = "Click again to confirm delete";
-    btnEl.setAttribute("aria-label", "Confirm delete job");
+    btnEl.title = "Klik lagi untuk konfirmasi hapus";
+    btnEl.setAttribute("aria-label", "Konfirmasi hapus job");
 
     btnEl._armTimer = setTimeout(() => {
       btnEl.dataset.armed = "false";
@@ -5269,7 +5383,7 @@ function handleDeleteJobClick(jobId, btnEl) {
       btnEl.classList.remove("text-failed");
       btnEl.classList.add("text-muted");
       btnEl.title = "";
-      btnEl.setAttribute("aria-label", "Delete job");
+      btnEl.setAttribute("aria-label", "Hapus job");
     }, 3000);
     return;
   }
@@ -5282,7 +5396,7 @@ async function deleteJob(jobId) {
   const resp = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
 
   if (!resp.ok) {
-    let message = "Could not delete this job.";
+    let message = "Job ini tidak bisa dihapus.";
     try {
       const err = await resp.json();
       if (err.detail) message = err.detail;
@@ -5321,7 +5435,7 @@ async function loadJobById(jobId) {
     showPanel("progress");
     clearTerminal();
     setProgress(job.progress, `${job.city} — ${job.keyword}`);
-    appendTerminal(`✗ Failed: ${job.error || "unknown error"}`);
+    appendTerminal(`✗ Gagal: ${job.error || "kesalahan tidak diketahui"}`);
   } else {
     showPanel("empty");
   }
@@ -5590,7 +5704,7 @@ function renderEntityListMeta(prefix, shown, total, query, noun) {
 function renderEntityRowHtml(type, item, isEditing) {
   const systemNote = type === "brand" ? "Brand sistem, tidak dapat diubah" : "Supplier sistem, tidak dapat diubah";
   const statusBadge = activePillHtml(item.is_active);
-  const sourceBadge = `<span class="inline-block border border-line rounded-md px-2 py-0.5 text-[11px] text-muted">${item.source === "master" ? "Master" : "Quick-add"}</span>`;
+  const sourceBadge = `<span class="inline-block border border-line rounded-md px-2 py-0.5 text-[11px] text-muted">${item.source === "master" ? "Master" : "Tambah cepat"}</span>`;
 
   const nameCell = isEditing
     ? `<input id="${type}-edit-name-${item.id}" type="text" class="w-full border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />`
@@ -5632,7 +5746,7 @@ function renderEntityRowHtml(type, item, isEditing) {
     actionsCell = `
       <div class="flex items-center justify-end gap-1.5">
         <button type="button" onclick="toggleEntityActive('${type}', ${item.id}, ${!item.is_active})" class="h-8 px-3 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${item.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-        ${iconButtonHtml("accent", "Edit", `startEntityEdit('${type}', ${item.id})`, "edit")}
+        ${iconButtonHtml("accent", "Ubah", `startEntityEdit('${type}', ${item.id})`, "edit")}
         ${isAdmin() ? iconButtonHtml("danger", "Hapus", `confirmDeleteEntity('${type}', ${item.id})`, "trash") : ""}
       </div>`;
   }
@@ -5827,7 +5941,7 @@ function renderUnitRowHtml(item, isEditing) {
     : `
       <div class="flex items-center justify-end gap-1.5">
         <button type="button" onclick="toggleUnitActive(${item.id}, ${!item.is_active})" class="h-8 px-3 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${item.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-        ${iconButtonHtml("accent", "Edit", `startUnitEdit(${item.id})`, "edit")}
+        ${iconButtonHtml("accent", "Ubah", `startUnitEdit(${item.id})`, "edit")}
         ${isAdmin() ? iconButtonHtml("danger", "Hapus", `confirmDeleteUnitEntity(${item.id})`, "trash") : ""}
       </div>`;
 
@@ -7223,7 +7337,7 @@ function renderMasterItemsTable(data) {
       <td class="px-2.5 py-3 text-right tabular-nums whitespace-nowrap ${margin >= 0 ? "text-done" : "text-failed"}">${formatIDR(margin)}</td>
       <td class="px-4 py-3" onclick="event.stopPropagation()">
         <div class="flex items-center justify-end gap-1.5">
-          ${iconButtonHtml("accent", "Edit barang", `editMasterItemFromRow(${item.id})`, "edit")}
+          ${iconButtonHtml("accent", "Ubah barang", `editMasterItemFromRow(${item.id})`, "edit")}
           ${iconButtonHtml("neutral", "Duplikat barang", `duplicateMasterItem(${item.id})`, "duplicate")}
           ${iconButtonHtml("danger", "Hapus barang", `deleteMasterItemFromRow(${item.id})`, "trash", "admin-only")}
         </div>
@@ -7739,7 +7853,7 @@ async function submitNewMasterItem() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ supplier_id: supplierId, brand_id: brandId, name, unit, sell_price: sellPrice, cost_price: costPrice, stock_qty: stockQty }),
     });
-    if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+    if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
     let item = await resp.json();
 
     // The item exists now. A photo that fails to upload must not undo that, so it is reported
@@ -7854,7 +7968,7 @@ async function saveMasterItemEdit() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, sell_price: sellPrice, unit }),
   });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   showToast("Barang diperbarui.", "success");
   backToMasterList();
 }
@@ -7879,7 +7993,7 @@ async function confirmDeleteMasterItem(id) {
   if (!resp.ok) {
     let detail = "Gagal menghapus barang.";
     try { detail = (await resp.json()).detail || detail; } catch (_) {}
-    showToast(`Error: ${detail}`);
+    showToast(`Gagal: ${detail}`);
     return;
   }
   closeModal();
@@ -7899,7 +8013,7 @@ async function submitStockAdjustment() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ master_item_id: currentMasterItemId, qty_delta: delta, reason }),
   });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const result = await resp.json();
   document.getElementById("adjust-qty-delta").value = "";
   document.getElementById("adjust-reason").value = "";
@@ -8506,13 +8620,13 @@ let pendingCashierItemReturn = null;
 function goAddMasterItemFromCashier() {
   const tab = getActiveTab();
   const typed = scanSuggestQuery;
+  // The search text is not a line of its own; clear it so the capture below skips that row.
+  if (scanInput && scanInput.isConnected && !scanInput.closest(".item-row").dataset.sku) scanInput.value = "";
   // Coming back re-renders the form from the tab, so what was typed since the last switch (plate,
   // phone, rows) has to be written to the tab before leaving.
   captureFormIntoActiveTab();
   pendingCashierItemReturn = tab ? tab.tabId : null;
   hideScanSuggest();
-  const input = document.getElementById("scan-barcode-input");
-  if (input) input.value = "";
   goAddMasterItem(typed);
 }
 
@@ -8579,7 +8693,7 @@ async function saveInboundDraft() {
   const resp = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   if (!resp.ok) {
     const err = await resp.json();
-    showToast(`Error: ${err.detail}`);
+    showToast(`Gagal: ${err.detail}`);
     btn.disabled = false;
     return;
   }
@@ -8624,7 +8738,7 @@ function handlePostDocClick(btnEl) {
 
 async function postInboundDocument(docId) {
   const resp = await fetch(`/api/inventory/inbound-documents/${docId}/post`, { method: "POST" });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const doc = await resp.json();
   showToast(`Dokumen ${doc.doc_number} berhasil diposting.`, "success");
   await loadInboundDocuments();
@@ -8672,7 +8786,7 @@ async function submitVoidDocument(docId) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const doc = await resp.json();
   closeModal();
   showToast(`Dokumen ${doc.doc_number} dibatalkan (void).`, "success");
@@ -9490,7 +9604,7 @@ async function savePurchaseInvoiceDraft() {
         body: JSON.stringify(payload),
       }
     );
-    if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+    if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
     const inv = await resp.json();
     showToast(`Faktur ${inv.invoice_number} tersimpan.`, "success");
     await openPurchaseInvoice(inv.id);
@@ -9542,7 +9656,7 @@ function handleDeletePurchaseInvoiceClick(btnEl) {
 async function postPurchaseInvoice() {
   if (!currentPurchaseInvoice) return;
   const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/post`, { method: "POST" });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const inv = await resp.json();
   showToast(`Faktur ${inv.invoice_number} diposting.`, "success");
   await openPurchaseInvoice(inv.id);
@@ -9575,7 +9689,7 @@ async function submitPurchaseInvoiceVoid() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),
   });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const inv = await resp.json();
   closeModal();
   showToast(`Faktur ${inv.invoice_number} di-void.`, "success");
@@ -9585,7 +9699,7 @@ async function submitPurchaseInvoiceVoid() {
 async function deletePurchaseInvoice() {
   if (!currentPurchaseInvoice) return;
   const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}`, { method: "DELETE" });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   showToast("Draft faktur dihapus.", "success");
   backToPurchaseInvoiceList();
 }
@@ -9599,7 +9713,7 @@ async function submitPurchaseInvoicePayment() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ amount }),
   });
-  if (!resp.ok) { const err = await resp.json(); showToast(`Error: ${err.detail}`); return; }
+  if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const inv = await resp.json();
   showToast(inv.payment_status === "lunas" ? "Faktur lunas." : "Pembayaran dicatat.", "success");
   await openPurchaseInvoice(inv.id);
@@ -10257,7 +10371,7 @@ function renderUserRowHtml(u) {
       <td class="px-3 py-2">
         <select onchange="changeUserRole(${u.id}, this.value)" ${isSelf ? "disabled" : ""}
           class="border border-line rounded-md px-2 py-1 text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors disabled:opacity-40">
-          <option value="staff" ${u.role === "staff" ? "selected" : ""}>Staff</option>
+          <option value="staff" ${u.role === "staff" ? "selected" : ""}>Staf</option>
           <option value="admin" ${u.role === "admin" ? "selected" : ""}>Admin</option>
         </select>
       </td>
@@ -10287,7 +10401,7 @@ function openAddUserModal() {
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Peran</label>
         <select id="new-user-role" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
-          <option value="staff" selected>Staff</option>
+          <option value="staff" selected>Staf</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -10390,7 +10504,7 @@ const activityState = { page: 1, pageSize: 50, total: 0, actorsLoaded: false };
 const ENTITY_LABELS = {
   receipt: "Nota penjualan", master_item: "Barang", inbound_document: "Barang masuk",
   purchase_invoice: "Faktur pembelian", preorder: "Preorder", supplier: "Supplier", brand: "Merek",
-  unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Login / logout",
+  unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Masuk / keluar",
   customer: "Pelanggan", scrape: "Scraper", job: "Job scraper",
 };
 

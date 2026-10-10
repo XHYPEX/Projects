@@ -30,7 +30,7 @@ def _row_to_user(row: dict) -> UserOut:
 
 def _raise_from_value_error(e: ValueError) -> None:
     msg = str(e)
-    if "not found" in msg:
+    if "tidak ditemukan" in msg:
         raise HTTPException(status_code=404, detail=msg)
     raise HTTPException(status_code=409, detail=msg)
 
@@ -45,9 +45,9 @@ async def list_all_users():
 @router.post("/users", response_model=UserOut, status_code=201)
 async def create_new_user(req: UserCreateRequest):
     if not req.username.strip():
-        raise HTTPException(status_code=422, detail="username must not be empty")
+        raise HTTPException(status_code=422, detail="Username wajib diisi.")
     if req.role not in _VALID_ROLES:
-        raise HTTPException(status_code=422, detail=f"role must be one of {sorted(_VALID_ROLES)}")
+        raise HTTPException(status_code=422, detail=f"Peran harus salah satu dari: {', '.join(sorted(_VALID_ROLES))}.")
     loop = asyncio.get_event_loop()
     password_hash = hash_password(req.password)
     try:
@@ -60,10 +60,10 @@ async def create_new_user(req: UserCreateRequest):
 @router.patch("/users/{user_id}", response_model=UserOut)
 async def patch_user(user_id: int, req: UserUpdateRequest):
     if req.role is not None and req.role not in _VALID_ROLES:
-        raise HTTPException(status_code=422, detail=f"role must be one of {sorted(_VALID_ROLES)}")
+        raise HTTPException(status_code=422, detail=f"Peran harus salah satu dari: {', '.join(sorted(_VALID_ROLES))}.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_user_by_id, user_id) is None:
-        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+        raise HTTPException(status_code=404, detail=f"Pengguna {user_id} tidak ditemukan.")
     try:
         row = None
         if req.role is not None:
@@ -81,6 +81,6 @@ async def patch_user(user_id: int, req: UserUpdateRequest):
 async def reset_password(user_id: int, req: PasswordResetRequest):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_user_by_id, user_id) is None:
-        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+        raise HTTPException(status_code=404, detail=f"Pengguna {user_id} tidak ditemukan.")
     password_hash = hash_password(req.new_password)
     await loop.run_in_executor(None, reset_user_password, user_id, password_hash)

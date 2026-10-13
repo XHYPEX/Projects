@@ -280,12 +280,14 @@ PO = [
     ("po-demo-005", "Hendra Gunawan", "081911100022", 500000, "Lunas, sudah diambil",
      [("Karung Plastik 50kg", "lusin", 5, 66000, "terpasang"), ("Tali Rafia Merah", "roll", 10, 9000, "terpasang")]),
 ]
+PO_PLATES = {"po-demo-001": "B 1234 ABC", "po-demo-002": "D 5678 DEF", "po-demo-003": "F 1122 GH",
+             "po-demo-004": "B 9876 KLM", "po-demo-005": "E 2468 XYZ"}
 for pid, cname, cphone, deposit, notes, lines in PO:
     db.create_preorder(
         pid, cname, cphone,
         [{"master_item_id": by_name[n]["id"], "product_name": n, "unit": u, "quantity": q, "unit_price": p, "status": st}
          for n, u, q, p, st in lines],
-        deposit, notes, "kasir",
+        deposit, notes, "kasir", PO_PLATES[pid],
     )
 
 # --- activity log (Log Aktivitas) ---------------------------------------------------------

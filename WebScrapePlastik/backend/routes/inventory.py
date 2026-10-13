@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from backend import product_images
-from backend.auth import require_admin
+from backend.auth import get_current_user, require_admin
 from backend.database import (
     autocomplete_master_items,
     create_brand,
@@ -35,12 +35,20 @@ from backend.database import (
     get_master_item,
     get_master_item_batch_history,
     get_master_item_by_code,
+    get_master_item_price_history,
+    get_master_item_purchases,
+    get_master_item_suppliers,
+    get_master_item_usage,
+    set_master_item_archived,
     get_master_items_for_export,
     get_stock_ledger,
     get_supplier,
     get_unit,
     get_unit_by_name,
     list_inbound_documents,
+    MASTER_SORTS,
+    MASTER_STOCK_CLAUSES,
+    get_master_items_summary,
     list_master_items,
     post_inbound_document,
     preview_brand_code,
@@ -75,6 +83,7 @@ from backend.schemas import (
     MasterItemListOut,
     MasterItemOut,
     MasterItemUpdateRequest,
+    MasterItemArchiveRequest,
     OpenPreorderOut,
     PendingInvoiceOut,
     SkuPreviewOut,
@@ -214,6 +223,13 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         created_at=row["created_at"],
         barcode=row.get("barcode"),
         image_url=product_images.image_url(row["id"], row.get("image_path")),
+        description=row.get("description"),
+        min_stock=row.get("min_stock") if row.get("min_stock") is not None else 5,
+        location=row.get("location"),
+        archived_reason=row.get("archived_reason"),
+        archived_note=row.get("archived_note"),
+        archived_at=row.get("archived_at"),
+        updated_at=row.get("updated_at"),
     )
 
 
@@ -284,6 +300,8 @@ def _row_to_ledger(row: dict) -> StockLedgerOut:
         ref_id=row["ref_id"],
         note=row["note"],
         created_at=row["created_at"],
+        created_by=row.get("created_by"),
+        ref_doc_number=row.get("ref_doc_number"),
     )
 
 
@@ -555,7 +573,7 @@ async def get_master_item_by_sku_route(sku: str):
 
 
 @router.post("/inventory/master-items", response_model=MasterItemOut, status_code=201)
-async def create_new_master_item(req: MasterItemCreateRequest):
+async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depends(get_current_user)):
     if not req.name.strip():
         raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     if not req.unit.strip():
@@ -566,6 +584,8 @@ async def create_new_master_item(req: MasterItemCreateRequest):
         raise HTTPException(status_code=422, detail="Harga modal tidak boleh negatif.")
     if req.stock_qty < 0:
         raise HTTPException(status_code=422, detail="Stok tidak boleh negatif.")
+    if req.min_stock < 0:
+        raise HTTPException(status_code=422, detail="Stok minimum tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
@@ -578,11 +598,19 @@ async def create_new_master_item(req: MasterItemCreateRequest):
     try:
         row = await loop.run_in_executor(
             None, create_master_item, req.supplier_id, req.brand_id, req.name.strip(), req.unit.strip(),
-            req.sell_price, req.cost_price, req.stock_qty,
+            req.sell_price, req.cost_price, req.stock_qty, req.description, req.min_stock, req.location,
+            user["username"],
         )
     except ValueError as e:
         _raise_from_value_error(e)
     return _row_to_master_item(row)
+
+
+@router.get("/inventory/master-items/summary")
+async def master_items_summary():
+    """Counts for the Master Barang header tiles. Declared before /master-items/{id}."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, get_master_items_summary)
 
 
 @router.get("/inventory/master-items", response_model=MasterItemListOut)
@@ -593,14 +621,28 @@ async def list_master_items_route(
     supplier_id: int | None = None,
     brand_id: int | None = None,
     is_active: bool | None = None,
+    stock_status: str | None = None,
+    stock_min: int | None = None,
+    stock_max: int | None = None,
+    no_price: bool = False,
+    sort: str = "newest",
 ):
+    if stock_status is not None and stock_status not in MASTER_STOCK_CLAUSES:
+        raise HTTPException(status_code=422, detail=f"stock_status harus salah satu dari: {', '.join(MASTER_STOCK_CLAUSES)}.")
+    if sort not in MASTER_SORTS:
+        raise HTTPException(status_code=422, detail=f"sort harus salah satu dari: {', '.join(MASTER_SORTS)}.")
+    if stock_min is not None and stock_max is not None and stock_min > stock_max:
+        raise HTTPException(status_code=422, detail="Stok minimum tidak boleh lebih besar dari stok maksimum.")
     if page < 1:
         raise HTTPException(status_code=422, detail="Halaman minimal 1.")
     if page_size < 1 or page_size > 200:
         raise HTTPException(status_code=422, detail="Ukuran halaman harus antara 1 dan 200.")
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
-        None, list_master_items, page, page_size, search, supplier_id, brand_id, is_active
+        None, lambda: list_master_items(
+            page, page_size, search, supplier_id, brand_id, is_active,
+            stock_status=stock_status, stock_min=stock_min, stock_max=stock_max, no_price=no_price, sort=sort,
+        ),
     )
     return MasterItemListOut(
         items=[_row_to_master_item(r) for r in result["items"]],
@@ -617,13 +659,13 @@ async def export_master_items_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(
-        ["SKU", "Nama Barang", "Supplier", "Brand", "Satuan", "Stok", "Harga Rata-rata", "Harga Beli Terakhir", "Harga Jual", "Aktif"]
+        ["SKU", "Nama Barang", "Supplier", "Brand", "Satuan", "Stok", "Stok Minimum", "Lokasi", "Deskripsi", "Harga Rata-rata", "Harga Beli Terakhir", "Harga Jual", "Aktif"]
     )
     for r in rows:
         writer.writerow(
             [
                 r["sku"], r["name"], r["supplier_name"], r["brand_name"], r["unit"], r["stock_qty"],
-                r["avg_cost_price"], r["last_cost_price"], r["sell_price"], "Ya" if r["is_active"] else "Tidak",
+                r["min_stock"], r["location"] or "", r["description"] or "", r["avg_cost_price"], r["last_cost_price"], r["sell_price"], "Ya" if r["is_active"] else "Tidak",
             ]
         )
     return Response(
@@ -645,13 +687,15 @@ async def get_master_item_detail(master_item_id: int):
 
 
 @router.patch("/inventory/master-items/{master_item_id}", response_model=MasterItemOut)
-async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest):
+async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, user: dict = Depends(get_current_user)):
     if req.name is not None and not req.name.strip():
         raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     if req.unit is not None and not req.unit.strip():
         raise HTTPException(status_code=422, detail="Satuan wajib diisi.")
     if req.sell_price is not None and req.sell_price < 0:
         raise HTTPException(status_code=422, detail="Harga jual tidak boleh negatif.")
+    if req.min_stock is not None and req.min_stock < 0:
+        raise HTTPException(status_code=422, detail="Stok minimum tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
@@ -659,10 +703,54 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest):
     if req.unit is not None and await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
         raise HTTPException(status_code=422, detail=f"Satuan '{req.unit}' tidak valid.")
     try:
-        row = await loop.run_in_executor(None, update_master_item, master_item_id, req.name, req.sell_price, req.unit)
+        row = await loop.run_in_executor(
+            None, update_master_item, master_item_id, req.name, req.sell_price, req.unit,
+            req.description, req.min_stock, req.location, user["username"], req.price_note,
+        )
     except ValueError as e:
         _raise_from_value_error(e)
     return _row_to_master_item(row)
+
+
+@router.post("/inventory/master-items/{master_item_id}/archive", response_model=MasterItemOut)
+async def archive_master_item(master_item_id: int, req: MasterItemArchiveRequest):
+    if not req.reason.strip():
+        raise HTTPException(status_code=422, detail="Alasan pengarsipan wajib dipilih.")
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    await loop.run_in_executor(None, set_master_item_archived, master_item_id, True, req.reason, req.note)
+    return _row_to_master_item(await loop.run_in_executor(None, get_master_item, master_item_id))
+
+
+@router.post("/inventory/master-items/{master_item_id}/restore", response_model=MasterItemOut)
+async def restore_master_item(master_item_id: int):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    await loop.run_in_executor(None, set_master_item_archived, master_item_id, False)
+    return _row_to_master_item(await loop.run_in_executor(None, get_master_item, master_item_id))
+
+
+@router.get("/inventory/master-items/{master_item_id}/usage")
+async def master_item_usage(master_item_id: int):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    return await loop.run_in_executor(None, get_master_item_usage, master_item_id)
+
+
+@router.get("/inventory/master-items/{master_item_id}/prices")
+async def master_item_prices(master_item_id: int):
+    """Price history, suppliers and recent purchases for the Riwayat Harga & Supplier page."""
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    return {
+        "history": await loop.run_in_executor(None, get_master_item_price_history, master_item_id),
+        "suppliers": await loop.run_in_executor(None, get_master_item_suppliers, master_item_id),
+        "purchases": await loop.run_in_executor(None, get_master_item_purchases, master_item_id),
+    }
 
 
 @router.get("/inventory/master-items/{master_item_id}/ledger", response_model=list[StockLedgerOut])
@@ -902,7 +990,7 @@ async def void_document(document_id: int, req: VoidRequest):
 
 
 @router.post("/inventory/stock-adjustments", response_model=StockAdjustmentResponse, status_code=201, dependencies=[Depends(require_admin)])
-async def create_new_stock_adjustment(req: StockAdjustmentRequest):
+async def create_new_stock_adjustment(req: StockAdjustmentRequest, user: dict = Depends(get_current_user)):
     if not req.reason.strip():
         raise HTTPException(status_code=422, detail="Alasan penyesuaian wajib diisi.")
     if req.qty_delta == 0:
@@ -914,7 +1002,7 @@ async def create_new_stock_adjustment(req: StockAdjustmentRequest):
 
     try:
         result = await loop.run_in_executor(
-            None, create_stock_adjustment, req.master_item_id, req.qty_delta, req.reason.strip()
+            None, create_stock_adjustment, req.master_item_id, req.qty_delta, req.reason.strip(), user["username"]
         )
     except ValueError as e:
         _raise_from_value_error(e)

@@ -7,12 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.auth import get_current_user
 from backend.database import (
     PREORDER_STATUSES,
+    add_preorder_payment,
     create_preorder,
     get_all_preorders,
     get_preorder,
     get_preorder_history,
     get_preorder_items,
+    get_preorder_payments,
+    parse_ymd,
     set_preorder_item_status,
+    set_preorder_status,
     update_preorder,
 )
 from backend.schemas import (
@@ -22,7 +26,10 @@ from backend.schemas import (
     PreorderItemRequest,
     PreorderItemStatusRequest,
     PreorderOut,
+    PreorderPaymentOut,
+    PreorderPaymentRequest,
     PreorderRequest,
+    PreorderStatusRequest,
     PreorderUpdateRequest,
 )
 
@@ -47,6 +54,21 @@ def _validate_phone(raw: str) -> str:
             detail="Nomor HP pelanggan harus 7-15 digit (boleh diawali tanda +).",
         )
     return phone
+
+
+def _validate_plate(raw: str) -> str:
+    # Stored upper-cased with single spaces, the way plates are read off a car.
+    plate = " ".join((raw or "").upper().split())
+    if not plate:
+        raise HTTPException(status_code=422, detail="Plat mobil wajib diisi.")
+    return plate
+
+
+def _validate_po_date(raw: str) -> str:
+    try:
+        return parse_ymd(raw).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Tanggal PO harus berformat YYYY-MM-DD.")
 
 
 def _validate_status(status: str) -> str:
@@ -96,10 +118,12 @@ async def _detail(preorder_id: str) -> PreorderDetail:
         raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
     items = await loop.run_in_executor(None, get_preorder_items, preorder_id)
     history = await loop.run_in_executor(None, get_preorder_history, preorder_id)
+    payments = await loop.run_in_executor(None, get_preorder_payments, preorder_id)
     return PreorderDetail(
         **row,
         items=[_row_to_item(i) for i in items],
         history=[PreorderHistoryOut(**h) for h in history],
+        payments=[PreorderPaymentOut(**p) for p in payments],
     )
 
 
@@ -109,19 +133,23 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
     if not customer_name:
         raise HTTPException(status_code=422, detail="Nama pelanggan wajib diisi.")
     customer_phone = _validate_phone(req.customer_phone)
+    plate_full = _validate_plate(req.plate_full)
+    po_date = _validate_po_date(req.po_date) if req.po_date else None
     if not req.items:
         raise HTTPException(status_code=422, detail="Minimal harus ada satu baris barang.")
     if req.deposit < 0:
         raise HTTPException(status_code=422, detail="Uang muka tidak boleh negatif.")
 
     items = _validate_items(req.items)
+    if req.deposit > sum(i["quantity"] * i["unit_price"] for i in items):
+        raise HTTPException(status_code=422, detail="Uang muka melebihi total pesanan.")
     notes = req.notes.strip() if req.notes else None
 
     preorder_id = str(uuid4())
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
         None, create_preorder, preorder_id, customer_name, customer_phone, items,
-        req.deposit, notes, user["username"],
+        req.deposit, notes, user["username"], plate_full, po_date, req.is_draft,
     )
     return await _detail(preorder_id)
 
@@ -154,8 +182,8 @@ async def update_preorder_route(
         if not customer_name:
             raise HTTPException(status_code=422, detail="Nama pelanggan wajib diisi.")
     customer_phone = _validate_phone(req.customer_phone) if req.customer_phone is not None else None
-    if req.deposit is not None and req.deposit < 0:
-        raise HTTPException(status_code=422, detail="Uang muka tidak boleh negatif.")
+    plate_full = _validate_plate(req.plate_full) if req.plate_full is not None else None
+    po_date = _validate_po_date(req.po_date) if req.po_date is not None else None
 
     items: list[dict] | None = None
     if req.items is not None:
@@ -169,8 +197,12 @@ async def update_preorder_route(
     notes = (req.notes.strip() if req.notes else None) if update_notes else None
 
     await loop.run_in_executor(
-        None, update_preorder, preorder_id, customer_name, customer_phone, items,
-        req.deposit, notes, update_notes, user["username"], req.is_draft,
+        None,
+        lambda: update_preorder(
+            preorder_id, customer_name=customer_name, customer_phone=customer_phone, items=items,
+            notes=notes, update_notes=update_notes, changed_by=user["username"],
+            is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
+        ),
     )
     return await _detail(preorder_id)
 
@@ -192,6 +224,39 @@ async def update_preorder_item_status(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    return await _detail(preorder_id)
+
+
+@router.patch("/preorders/{preorder_id}/status", response_model=PreorderDetail)
+async def update_preorder_status(
+    preorder_id: str, req: PreorderStatusRequest, user: dict = Depends(get_current_user)
+):
+    status = _validate_status(req.status)
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, set_preorder_status, preorder_id, status, user["username"])
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/payments", response_model=PreorderDetail, status_code=201)
+async def add_payment(
+    preorder_id: str, req: PreorderPaymentRequest, user: dict = Depends(get_current_user)
+):
+    if req.amount <= 0:
+        raise HTTPException(status_code=422, detail="Nominal pembayaran harus lebih dari 0.")
+    loop = asyncio.get_event_loop()
+    row = await loop.run_in_executor(None, get_preorder, preorder_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
+    if req.amount > row["remaining"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Pembayaran melebihi sisa tagihan (sisa Rp {row['remaining']:,}).".replace(",", "."),
+        )
+    note = req.note.strip() if req.note and req.note.strip() else None
+    await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"])
     return await _detail(preorder_id)
 
 

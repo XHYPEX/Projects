@@ -44,6 +44,8 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 
     (re.compile(r"^/api/receipts$"), "POST", "Buat nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+/settle$"), "POST", "Tandai nota selesai", "receipt"),
+    (re.compile(r"^/api/receipts/[^/]+/payments$"), "POST", "Catat pembayaran nota", "receipt"),
+    (re.compile(r"^/api/receipts/[^/]+/work-status$"), "POST", "Ubah status pengerjaan nota", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "PATCH", "Ubah nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "DELETE", "Hapus nota penjualan", "receipt"),
 
@@ -52,10 +54,23 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/customers$"), "POST", "Tambah pelanggan", "customer"),
 
     (re.compile(r"^/api/preorders/[^/]+/items/\d+/status$"), "PATCH", "Ubah status preorder", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+/status$"), "PATCH", "Ubah status preorder", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+/payments$"), "POST", "Catat pembayaran preorder", "preorder"),
     # No DELETE rule: there is no DELETE /preorders/{id} route (removed --
     # preorders are archived as drafts via PATCH is_draft, never deleted).
     (re.compile(r"^/api/preorders/[^/]+$"), "PATCH", "Ubah preorder", "preorder"),
     (re.compile(r"^/api/preorders$"), "POST", "Buat preorder", "preorder"),
+
+    (re.compile(r"^/api/supplier-pos/[^/]+/issue$"), "POST", "Terbitkan PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/receive$"), "POST", "Terima barang PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/cancel$"), "POST", "Batalkan PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/stage$"), "POST", "Ubah status order PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/tracking$"), "PUT", "Ubah info pengiriman PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/payments$"), "POST", "Catat pembayaran PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/items/\d+/cancel$"), "POST", "Batalkan item PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+/invoice$"), "PATCH", "Ubah faktur PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos/[^/]+$"), "PATCH", "Ubah PO supplier", "supplier_po"),
+    (re.compile(r"^/api/supplier-pos$"), "POST", "Buat PO supplier", "supplier_po"),
 
     (re.compile(r"^/api/suppliers/\d+$"), "PATCH", "Ubah supplier", "supplier"),
     (re.compile(r"^/api/suppliers/\d+$"), "DELETE", "Hapus supplier", "supplier"),
@@ -74,6 +89,8 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 
     (re.compile(r"^/api/inventory/master-items/\d+$"), "PATCH", "Ubah barang", "master_item"),
     (re.compile(r"^/api/inventory/master-items/\d+$"), "DELETE", "Hapus barang", "master_item"),
+    (re.compile(r"^/api/inventory/master-items/\d+/archive$"), "POST", "Arsipkan barang", "master_item"),
+    (re.compile(r"^/api/inventory/master-items/\d+/restore$"), "POST", "Aktifkan kembali barang", "master_item"),
     (re.compile(r"^/api/inventory/master-items/\d+/image$"), "PUT", "Ubah foto barang", "master_item"),
     (re.compile(r"^/api/inventory/master-items/\d+/image$"), "DELETE", "Hapus foto barang", "master_item"),
     (re.compile(r"^/api/inventory/master-items$"), "POST", "Tambah barang", "master_item"),

@@ -5,18 +5,26 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from backend.auth import require_admin
+from backend.auth import get_current_user, require_admin
 from backend.database import (
     PHONE_RE,
+    RECEIPT_PAYMENT_CLAUSES,
+    RECEIPT_SORTS,
+    RECEIPT_WORK_STATUSES,
     count_receipts,
     create_receipt,
     delete_receipt,
-    delete_transfer_sender,
-    list_transfer_senders,
+    delete_transfer_name,
+    list_transfer_names,
     get_all_receipts,
     get_customer,
     get_receipt,
+    add_receipt_payment,
+    change_receipt_work_status,
+    get_receipt_events,
     get_receipt_items,
+    get_receipt_payments,
+    get_receipt_summary,
     normalize_phone,
     parse_ymd,
     settle_receipt,
@@ -25,13 +33,18 @@ from backend.database import (
 from backend.schemas import (
     VALID_PAYMENT_METHODS,
     ReceiptDetail,
+    ReceiptEventOut,
+    ReceiptExtra,
     ReceiptItemOut,
     ReceiptItemRequest,
     ReceiptOut,
+    ReceiptPaymentOut,
+    ReceiptPaymentRequest,
     ReceiptRequest,
     ReceiptResponse,
     ReceiptSettleRequest,
     ReceiptUpdateRequest,
+    ReceiptWorkStatusRequest,
     TransferSenderOut,
 )
 from plate_codes import PLATE_CODES
@@ -62,6 +75,10 @@ def _validate_items(items: list[ReceiptItemRequest]) -> list[dict]:
             raise HTTPException(status_code=422, detail="Jumlah harus berupa bilangan bulat positif.")
         if item.unit_price < 0:
             raise HTTPException(status_code=422, detail="Harga satuan harus >= 0.")
+        if item.item_type not in ("barang", "jasa"):
+            raise HTTPException(status_code=422, detail="Jenis item harus barang atau jasa.")
+        if item.line_discount < 0 or item.line_discount > item.quantity * item.unit_price:
+            raise HTTPException(status_code=422, detail="Diskon item tidak boleh melebihi harga item.")
         if not item.product_name.strip():
             raise HTTPException(status_code=422, detail="Nama produk wajib diisi.")
         if item.warranty_date:
@@ -82,14 +99,44 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         warranty_date=row["warranty_date"],
         sku=row.get("sku"),
         unit=row.get("unit"),
+        item_type=row.get("item_type") or "barang",
+        line_discount=row.get("line_discount") or 0,
+        added_at=row.get("added_at"),
+        added_by=row.get("added_by"),
+        added_during_work=bool(row.get("added_during_work")),
     )
+
+
+EXTRA_MAX = {"work_notes": 1000, "cashier_name": 80, "estimated_finish_at": 40, "vehicle_make": 60,
+             "vehicle_model": 60, "vehicle_color": 40, "vehicle_year": 8}
+
+
+def _clean_extra(req: ReceiptExtra, only_sent: bool) -> dict:
+    """The work-order fields, trimmed and length-checked. On edit only the fields the client
+    actually sent are returned, so an omitted field is left alone while an explicit null clears it."""
+    out: dict = {}
+    for key, limit in EXTRA_MAX.items():
+        if only_sent and key not in req.model_fields_set:
+            continue
+        value = _clean_name(getattr(req, key))
+        if value and len(value) > limit:
+            raise HTTPException(status_code=422, detail=f"{key} maksimal {limit} karakter.")
+        out[key] = value
+    return out
 
 
 def _clean_sender(raw: str | None) -> str | None:
     name = " ".join((raw or "").split())
     if len(name) > 100:
-        raise HTTPException(status_code=422, detail="Nama pengirim maksimal 100 karakter.")
+        raise HTTPException(status_code=422, detail="Nama pengirim / rekening maksimal 100 karakter.")
     return name or None
+
+
+def _refuse_if_paid(receipt: dict) -> None:
+    """A paid (Lunas) nota is final: it has been printed and handed over, so it is never
+    edited, voided or deleted afterwards."""
+    if receipt["status"] == "done":
+        raise HTTPException(status_code=409, detail="Nota sudah lunas dan tidak bisa diubah lagi.")
 
 
 async def _require_customer(loop, customer_id: int, allow_inactive: bool = False) -> None:
@@ -104,7 +151,7 @@ async def _require_customer(loop, customer_id: int, allow_inactive: bool = False
 
 
 @router.post("/receipts", response_model=ReceiptResponse, status_code=201)
-async def create_new_receipt(req: ReceiptRequest):
+async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_current_user)):
     plate_region = req.plate_region.upper()
     plate_suffix = req.plate_suffix.upper()
 
@@ -123,6 +170,10 @@ async def create_new_receipt(req: ReceiptRequest):
         )
     if req.amount_paid < 0:
         raise HTTPException(status_code=422, detail="Jumlah dibayar harus >= 0.")
+    if req.work_status not in ("draft", "pengerjaan", "siap_bayar"):
+        raise HTTPException(status_code=422, detail="work_status harus draft, pengerjaan atau siap_bayar.")
+    if req.work_status == "draft" and req.amount_paid > 0:
+        raise HTTPException(status_code=422, detail="Nota Draft belum bisa menerima pembayaran.")
     if req.payment_method not in VALID_PAYMENT_METHODS:
         raise HTTPException(
             status_code=422, detail=f"Metode pembayaran harus salah satu dari: {', '.join(sorted(VALID_PAYMENT_METHODS))}."
@@ -145,22 +196,30 @@ async def create_new_receipt(req: ReceiptRequest):
     if req.discount < 0:
         raise HTTPException(status_code=422, detail="Diskon harus >= 0.")
 
-    subtotal = sum(i["quantity"] * i["unit_price"] for i in items)
+    subtotal = sum(i["quantity"] * i["unit_price"] - i["line_discount"] for i in items)
     if req.discount > subtotal:
         raise HTTPException(status_code=422, detail="Diskon tidak boleh melebihi subtotal.")
-    # New sales are paid in full at the register; there are no down payments.
-    if req.status != "void" and req.amount_paid != subtotal - req.discount:
-        raise HTTPException(status_code=422, detail="Jumlah dibayar harus sama dengan total.")
+    # A customer may pay in part: the rest is settled later with Tambah Pembayaran. What is
+    # paid now can be anything from nothing up to the total, never more.
+    if req.status != "void" and req.amount_paid > subtotal - req.discount:
+        raise HTTPException(status_code=422, detail="Jumlah dibayar tidak boleh melebihi total.")
+    if req.status != "void" and req.work_status != "siap_bayar" and req.amount_paid >= subtotal - req.discount and subtotal - req.discount > 0:
+        raise HTTPException(status_code=422, detail="Pelunasan baru bisa setelah pengerjaan selesai (Lanjut ke Pembayaran).")
     transfer_sender = _clean_sender(req.transfer_sender)
-    if req.payment_method == "transfer" and not transfer_sender:
+    transfer_account = _clean_sender(req.transfer_account)
+    takes_money_now = req.amount_paid > 0 and req.status != "void"
+    if req.payment_method == "transfer" and takes_money_now and not transfer_sender:
         raise HTTPException(status_code=422, detail="Nama pengirim transfer wajib diisi.")
+    if req.payment_method == "transfer" and takes_money_now and not transfer_account:
+        raise HTTPException(status_code=422, detail="Rekening penerima transfer wajib dipilih.")
 
     receipt_id = str(uuid4())
     try:
         result = await loop.run_in_executor(
             None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
-            req.customer_id, transfer_sender,
+            req.customer_id, transfer_sender, transfer_account, user["username"], req.work_status,
+            _clean_extra(req, False),
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -190,6 +249,10 @@ async def list_receipts(
     q: str | None = None,
     limit: int = DEFAULT_RECEIPT_LIMIT,
     tz_offset: int | None = None,
+    payment: str | None = None,
+    sort: str = "newest",
+    offset: int = 0,
+    work: str | None = None,
 ):
     """Newest first. Filters combine with AND; `q` alone is the one-box search
     (plate OR customer name OR phone). date_from/date_to are inclusive calendar
@@ -204,16 +267,42 @@ async def list_receipts(
         raise HTTPException(status_code=422, detail=f"limit harus antara 1 dan {MAX_RECEIPT_LIMIT}.")
     if tz_offset is not None and not -720 <= tz_offset <= 840:
         raise HTTPException(status_code=422, detail="tz_offset harus antara -720 dan 840 menit.")
+    if payment is not None and payment not in RECEIPT_PAYMENT_CLAUSES:
+        raise HTTPException(
+            status_code=422, detail=f"payment harus salah satu dari: {', '.join(RECEIPT_PAYMENT_CLAUSES)}."
+        )
+    if work is not None and work not in RECEIPT_WORK_STATUSES:
+        raise HTTPException(
+            status_code=422, detail=f"work harus salah satu dari: {', '.join(RECEIPT_WORK_STATUSES)}."
+        )
+    if sort not in RECEIPT_SORTS:
+        raise HTTPException(status_code=422, detail=f"sort harus salah satu dari: {', '.join(RECEIPT_SORTS)}.")
+    if offset < 0:
+        raise HTTPException(status_code=422, detail="offset tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(
-        None, get_all_receipts, plate, status, date_from, date_to, customer, q, limit, tz_offset
+        None,
+        lambda: get_all_receipts(
+            plate, status, date_from, date_to, customer, q, limit, tz_offset,
+            payment=payment, sort=sort, offset=offset, work=work,
+        ),
     )
     total = await loop.run_in_executor(
-        None, count_receipts, plate, status, date_from, date_to, customer, q, tz_offset
+        None, lambda: count_receipts(plate, status, date_from, date_to, customer, q, tz_offset, payment, work)
     )
     response.headers["X-Total-Count"] = str(total)
     return [ReceiptOut(**r) for r in rows]
+
+
+@router.get("/receipts/summary")
+async def receipt_summary(tz_offset: int | None = None):
+    """Counts for the Riwayat Invoice header tiles. Declared before /receipts/{receipt_id}
+    so "summary" is not read as a receipt id."""
+    if tz_offset is not None and not -720 <= tz_offset <= 840:
+        raise HTTPException(status_code=422, detail="tz_offset harus antara -720 dan 840 menit.")
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, get_receipt_summary, tz_offset)
 
 
 @router.get("/receipts/{receipt_id}", response_model=ReceiptDetail)
@@ -223,15 +312,18 @@ async def get_receipt_detail(receipt_id: str):
     if row is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
     items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
-    return ReceiptDetail(**row, item_count=len(items), items=[_row_to_item(i) for i in items])
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**row, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
 
 
 @router.patch("/receipts/{receipt_id}", response_model=ReceiptDetail)
-async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
+async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     existing = await loop.run_in_executor(None, get_receipt, receipt_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+    _refuse_if_paid(existing)
 
     plate_region: str | None = None
     plate_suffix: str | None = None
@@ -255,6 +347,8 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
         )
     if req.discount is not None and req.discount < 0:
         raise HTTPException(status_code=422, detail="Diskon harus >= 0.")
+    if existing["work_status"] == "draft" and (req.amount_paid or 0) > 0:
+        raise HTTPException(status_code=422, detail="Nota Draft belum bisa menerima pembayaran.")
     if req.amount_paid is not None and req.amount_paid < 0:
         raise HTTPException(status_code=422, detail="Jumlah dibayar harus >= 0.")
     if req.payment_method is not None and req.payment_method not in VALID_PAYMENT_METHODS:
@@ -283,10 +377,10 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
     items: list[dict] | None = None
     if req.items is not None:
         items = _validate_items(req.items)
-        effective_subtotal = sum(i["quantity"] * i["unit_price"] for i in items)
+        effective_subtotal = sum(i["quantity"] * i["unit_price"] - i["line_discount"] for i in items)
     elif req.discount is not None:
         existing_items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
-        effective_subtotal = sum(i["quantity"] * i["unit_price"] for i in existing_items)
+        effective_subtotal = sum(i["quantity"] * i["unit_price"] - (i.get("line_discount") or 0) for i in existing_items)
     else:
         effective_subtotal = None
 
@@ -301,6 +395,11 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
     effective_sender = transfer_sender if update_transfer_sender else existing.get("transfer_sender")
     if effective_method == "transfer" and req.status != "void" and not effective_sender:
         raise HTTPException(status_code=422, detail="Nama pengirim transfer wajib diisi.")
+    update_transfer_account = "transfer_account" in req.model_fields_set
+    transfer_account = _clean_sender(req.transfer_account) if update_transfer_account else None
+    effective_account = transfer_account if update_transfer_account else existing.get("transfer_account")
+    if effective_method == "transfer" and req.status != "void" and not effective_account:
+        raise HTTPException(status_code=422, detail="Rekening penerima transfer wajib dipilih.")
 
     try:
         updated = await loop.run_in_executor(
@@ -321,40 +420,129 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest):
             req.customer_id,
             transfer_sender,
             update_transfer_sender,
+            transfer_account,
+            update_transfer_account,
+            user["username"],
+            _clean_extra(req, True),
         )
     except ValueError as e:
-        # The customer was deleted between the check above and the save.
+        # The customer was deleted between the check above and the save, or the new total
+        # would drop below what has already been paid.
         raise HTTPException(status_code=422, detail=str(e))
     result_items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
-    return ReceiptDetail(**updated, item_count=len(result_items), items=[_row_to_item(i) for i in result_items])
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**updated, item_count=len(result_items), items=[_row_to_item(i) for i in result_items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
 
 
 @router.post("/receipts/{receipt_id}/settle", response_model=ReceiptDetail)
-async def settle_receipt_route(receipt_id: str, req: ReceiptSettleRequest | None = None):
+async def settle_receipt_route(receipt_id: str, req: ReceiptSettleRequest, user: dict = Depends(get_current_user)):
     """'Tandai Selesai': record the remaining balance of a pending receipt as paid.
     Only the payment columns change -- never items, totals or stock."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
-    payment_method = req.payment_method if req is not None else None
+    payment_method = req.payment_method
     if payment_method is not None and payment_method not in VALID_PAYMENT_METHODS:
         raise HTTPException(
             status_code=422, detail=f"Metode pembayaran harus salah satu dari: {', '.join(sorted(VALID_PAYMENT_METHODS))}."
         )
     try:
-        updated = await loop.run_in_executor(None, settle_receipt, receipt_id, payment_method)
+        updated = await loop.run_in_executor(None, settle_receipt, receipt_id, payment_method, req.amount, user["username"])
     except ValueError as e:
-        # Deleted between the check above and the settle -> 404; void/already done -> 409.
-        raise HTTPException(status_code=404 if "tidak ditemukan" in str(e) else 409, detail=str(e))
+        # Deleted between the check above and the settle -> 404; wrong amount -> 422;
+        # void/already done -> 409.
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith("Jumlah") else 409
+        raise HTTPException(status_code=status, detail=msg)
     items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
-    return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items])
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+@router.get("/receipts/{receipt_id}/payments", response_model=list[ReceiptPaymentOut])
+async def list_receipt_payments(receipt_id: str):
+    """Riwayat Pembayaran: every payment taken against the nota, oldest first."""
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
+        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+    return [ReceiptPaymentOut(**p) for p in await loop.run_in_executor(None, get_receipt_payments, receipt_id)]
+
+
+@router.post("/receipts/{receipt_id}/payments", response_model=ReceiptDetail, status_code=201)
+async def add_receipt_payment_route(
+    receipt_id: str, req: ReceiptPaymentRequest, user: dict = Depends(get_current_user)
+):
+    """'Pembayaran Nota': take a full or partial payment against a pending nota. Never
+    touches items, totals or stock."""
+    loop = asyncio.get_event_loop()
+    if req.method not in VALID_PAYMENT_METHODS:
+        raise HTTPException(
+            status_code=422, detail=f"Metode pembayaran harus salah satu dari: {', '.join(sorted(VALID_PAYMENT_METHODS))}."
+        )
+    note = _clean_name(req.note)
+    if note and len(note) > 200:
+        raise HTTPException(status_code=422, detail="Catatan pembayaran maksimal 200 karakter.")
+    sender = _clean_sender(req.transfer_sender)
+    account = _clean_sender(req.transfer_account)
+    if req.method == "transfer" and not sender:
+        raise HTTPException(status_code=422, detail="Nama pengirim transfer wajib diisi.")
+    if req.method == "transfer" and not account:
+        raise HTTPException(status_code=422, detail="Rekening penerima transfer wajib dipilih.")
+    try:
+        updated = await loop.run_in_executor(
+            None, add_receipt_payment, receipt_id, req.amount, req.method, note, sender, account, user["username"]
+        )
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith("Jumlah") else 409
+        raise HTTPException(status_code=status, detail=msg)
+    items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+@router.post("/receipts/{receipt_id}/work-status", response_model=ReceiptDetail)
+async def change_work_status_route(
+    receipt_id: str, req: ReceiptWorkStatusRequest, user: dict = Depends(get_current_user)
+):
+    """Move a nota to Dalam Pengerjaan or Siap Pembayaran. Leaving Draft takes the stock."""
+    loop = asyncio.get_event_loop()
+    note = _clean_name(req.note)
+    if note and len(note) > 200:
+        raise HTTPException(status_code=422, detail="Catatan maksimal 200 karakter.")
+    try:
+        updated = await loop.run_in_executor(
+            None, change_receipt_work_status, receipt_id, req.to, note, user["username"]
+        )
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Status tujuan")) else 409
+        raise HTTPException(status_code=status, detail=msg)
+    items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+@router.get("/receipts/{receipt_id}/events", response_model=list[ReceiptEventOut])
+async def list_receipt_events(receipt_id: str):
+    """Catatan & Riwayat: the nota's timeline (created, status moves, items added, void)."""
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
+        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+    return [ReceiptEventOut(**e) for e in await loop.run_in_executor(None, get_receipt_events, receipt_id)]
 
 
 @router.delete("/receipts/{receipt_id}", status_code=204, response_class=Response, dependencies=[Depends(require_admin)])
 async def delete_receipt_route(receipt_id: str):
     loop = asyncio.get_event_loop()
-    if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
+    existing = await loop.run_in_executor(None, get_receipt, receipt_id)
+    if existing is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+    _refuse_if_paid(existing)
     await loop.run_in_executor(None, delete_receipt, receipt_id)
     return Response(status_code=204)
 
@@ -367,14 +555,29 @@ async def get_plate_codes():
 @router.get("/transfer-senders", response_model=list[TransferSenderOut])
 async def get_transfer_senders():
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, list_transfer_senders)
+    return await loop.run_in_executor(None, list_transfer_names, "sender")
 
 
-@router.delete("/transfer-senders/{sender_id}", status_code=204, response_class=Response)
-async def remove_transfer_sender(sender_id: int):
+@router.get("/transfer-accounts", response_model=list[TransferSenderOut])
+async def get_transfer_accounts():
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, list_transfer_names, "account")
+
+
+async def _remove_transfer_name(kind: str, entry_id: int) -> Response:
     loop = asyncio.get_event_loop()
     try:
-        await loop.run_in_executor(None, delete_transfer_sender, sender_id)
+        await loop.run_in_executor(None, delete_transfer_name, kind, entry_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return Response(status_code=204)
+
+
+@router.delete("/transfer-senders/{entry_id}", status_code=204, response_class=Response)
+async def remove_transfer_sender(entry_id: int):
+    return await _remove_transfer_name("sender", entry_id)
+
+
+@router.delete("/transfer-accounts/{entry_id}", status_code=204, response_class=Response)
+async def remove_transfer_account(entry_id: int):
+    return await _remove_transfer_name("account", entry_id)

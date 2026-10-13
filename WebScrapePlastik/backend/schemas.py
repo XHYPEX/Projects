@@ -33,7 +33,7 @@ class PlaceOut(BaseModel):
 
 
 VALID_RECEIPT_STATUSES = {"pending", "done", "void"}
-VALID_PAYMENT_METHODS = {"cash", "transfer", "qris"}
+VALID_PAYMENT_METHODS = {"cash", "transfer", "qris", "debit"}
 
 
 class ReceiptItemRequest(BaseModel):
@@ -44,9 +44,23 @@ class ReceiptItemRequest(BaseModel):
     # Resolved server-side to master_items.id (backend.database._resolve_master_item_id).
     # An unknown/absent SKU is not an error — the line still saves, just unlinked.
     sku: str | None = None
+    id: int | None = None  # an existing line, echoed back on edit so its added-by/added-at survive
+    item_type: str = "barang"  # "barang" (stock item) or "jasa" (service: never moves stock)
+    line_discount: int = 0  # Rp off this line
 
 
-class ReceiptRequest(BaseModel):
+class ReceiptExtra(BaseModel):
+    """Work-order details a nota carries beyond the sale itself. Same on create and edit."""
+    work_notes: str | None = None
+    cashier_name: str | None = None
+    estimated_finish_at: str | None = None
+    vehicle_make: str | None = None
+    vehicle_model: str | None = None
+    vehicle_color: str | None = None
+    vehicle_year: str | None = None
+
+
+class ReceiptRequest(ReceiptExtra):
     plate_region: str
     plate_number: str
     plate_suffix: str
@@ -67,9 +81,12 @@ class ReceiptRequest(BaseModel):
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str = "cash"  # one of VALID_PAYMENT_METHODS
     transfer_sender: str | None = None  # required when payment_method is "transfer"
+    transfer_account: str | None = None  # the shop's account it was paid into; required for "transfer"
+    # Where the nota starts: draft (no stock taken, can't be paid), pengerjaan, or siap_bayar.
+    work_status: str = "siap_bayar"
 
 
-class ReceiptUpdateRequest(BaseModel):
+class ReceiptUpdateRequest(ReceiptExtra):
     plate_region: str | None = None
     plate_number: str | None = None
     plate_suffix: str | None = None
@@ -85,6 +102,7 @@ class ReceiptUpdateRequest(BaseModel):
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
     transfer_sender: str | None = None  # name on the sending account; kept only for "transfer"
+    transfer_account: str | None = None  # the shop's receiving account; kept only for "transfer"
 
 
 class ReceiptResponse(BaseModel):
@@ -101,6 +119,8 @@ class ReceiptResponse(BaseModel):
     customer_full_name: str | None = None
     receipt_no: str | None = None
     transfer_sender: str | None = None
+    transfer_account: str | None = None
+    work_status: str = "siap_bayar"
 
 
 class TransferSenderOut(BaseModel):
@@ -116,9 +136,14 @@ class ReceiptItemOut(BaseModel):
     warranty_date: str | None
     sku: str | None = None
     unit: str | None = None  # the linked master item's unit; None for a hand-typed line
+    item_type: str = "barang"
+    line_discount: int = 0
+    added_at: str | None = None
+    added_by: str | None = None
+    added_during_work: bool = False
 
 
-class ReceiptOut(BaseModel):
+class ReceiptOut(ReceiptExtra):
     id: str
     plate_region: str
     plate_number: str
@@ -142,15 +167,53 @@ class ReceiptOut(BaseModel):
     customer_full_name: str | None = None
     receipt_no: str | None = None  # printed nota number, PJSG/YY/MM/NNNN
     transfer_sender: str | None = None  # for a transfer: the name on the sending account
+    transfer_account: str | None = None  # for a transfer: the shop account it was paid into
+    work_status: str = "siap_bayar"  # draft | pengerjaan | siap_bayar | selesai
+    draft_saved_at: str | None = None
+
+
+class ReceiptEventOut(BaseModel):
+    id: int
+    at: str
+    by_user: str | None = None
+    kind: str
+    note: str | None = None
+
+
+class ReceiptWorkStatusRequest(BaseModel):
+    to: str  # pengerjaan | siap_bayar
+    note: str | None = None
+
+
+class ReceiptPaymentOut(BaseModel):
+    id: int
+    paid_at: str
+    amount: int  # negative only for an "adjustment" row written when an edit lowers the paid amount
+    method: str
+    transfer_sender: str | None = None
+    transfer_account: str | None = None
+    note: str | None = None
+    created_by: str | None = None
+
+
+class ReceiptPaymentRequest(BaseModel):
+    amount: int
+    method: str = "cash"  # one of VALID_PAYMENT_METHODS
+    note: str | None = None
+    transfer_sender: str | None = None  # required when method is "transfer"
+    transfer_account: str | None = None  # the shop's account it was paid into; required for "transfer"
 
 
 class ReceiptDetail(ReceiptOut):
     items: list[ReceiptItemOut]
+    payments: list[ReceiptPaymentOut] = []
 
 
 class ReceiptSettleRequest(BaseModel):
     # Optional: how the remaining balance was paid. Omitted keeps the receipt's own.
     payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
+    # What the customer paid now. Must be exactly the remaining balance (total - amount_paid).
+    amount: int
 
 
 class CustomerRequest(BaseModel):
@@ -338,6 +401,13 @@ class MasterItemOut(BaseModel):
     # shows a stale picture after a replace. Built from master_items.image_path,
     # which is deliberately not exposed.
     image_url: str | None = None
+    description: str | None = None
+    min_stock: int = 5
+    location: str | None = None
+    archived_reason: str | None = None
+    archived_note: str | None = None
+    archived_at: str | None = None
+    updated_at: str | None = None
 
 
 class DuplicateCheckOut(BaseModel):
@@ -354,12 +424,24 @@ class MasterItemCreateRequest(BaseModel):
     cost_price: int = 0
     # Opening stock counted at entry time; recorded in the stock ledger.
     stock_qty: int = 0
+    description: str | None = None
+    min_stock: int = 5
+    location: str | None = None
 
 
 class MasterItemUpdateRequest(BaseModel):
     name: str | None = None
     sell_price: int | None = None
     unit: str | None = None
+    description: str | None = None
+    min_stock: int | None = None
+    location: str | None = None
+    price_note: str | None = None
+
+
+class MasterItemArchiveRequest(BaseModel):
+    reason: str
+    note: str | None = None
 
 
 class MasterItemListOut(BaseModel):
@@ -552,6 +634,8 @@ class StockLedgerOut(BaseModel):
     ref_id: int | None
     note: str | None
     created_at: str
+    created_by: str | None = None
+    ref_doc_number: str | None = None
 
 
 class PendingInvoiceOut(BaseModel):
@@ -675,7 +759,15 @@ class PreorderItemRequest(BaseModel):
 class PreorderRequest(BaseModel):
     customer_name: str
     customer_phone: str
+    # Free-text car plate (e.g. "B 1234 ABC"); required on a new preorder.
+    plate_full: str
+    # YYYY-MM-DD; omitted means today on the shop's clock.
+    po_date: str | None = None
     items: list[PreorderItemRequest]
+    # Saved parked ("Simpan Draft") instead of onto the live list.
+    is_draft: bool = False
+    # A deposit given up front becomes the first payment ("DP awal"). Further
+    # payments go through POST /preorders/{id}/payments.
     deposit: int = 0
     notes: str | None = None
 
@@ -683,8 +775,9 @@ class PreorderRequest(BaseModel):
 class PreorderUpdateRequest(BaseModel):
     customer_name: str | None = None
     customer_phone: str | None = None
+    plate_full: str | None = None
+    po_date: str | None = None
     items: list[PreorderItemRequest] | None = None
-    deposit: int | None = None
     # Nullable, so "omitted" (leave as-is) and "sent as null" (clear it) are told
     # apart via fields_set in the route, same as ReceiptUpdateRequest.customer_name.
     notes: str | None = None
@@ -694,6 +787,24 @@ class PreorderUpdateRequest(BaseModel):
 
 class PreorderItemStatusRequest(BaseModel):
     status: str
+
+
+class PreorderStatusRequest(BaseModel):
+    """Moves every line of the order to this stage ("Ubah Status PO")."""
+    status: str
+
+
+class PreorderPaymentRequest(BaseModel):
+    amount: int
+    note: str | None = None
+
+
+class PreorderPaymentOut(BaseModel):
+    id: int
+    paid_at: str
+    amount: int
+    note: str | None = None
+    created_by: str | None = None
 
 
 class PreorderItemOut(BaseModel):
@@ -713,14 +824,21 @@ class PreorderHistoryOut(BaseModel):
     preorder_item_id: int
     product_name: str
     status: str
+    # Null for a line's first entry, when it had no previous stage.
+    old_status: str | None = None
     changed_at: str
     changed_by: str | None = None
 
 
 class PreorderOut(BaseModel):
     id: str
+    po_number: str
+    po_date: str
+    # Empty for orders created before the plate was captured.
+    plate_full: str
     customer_name: str
     customer_phone: str
+    # Sum of the order's payments.
     deposit: int
     notes: str | None = None
     total: int
@@ -737,3 +855,248 @@ class PreorderOut(BaseModel):
 class PreorderDetail(PreorderOut):
     items: list[PreorderItemOut]
     history: list[PreorderHistoryOut]
+    payments: list[PreorderPaymentOut]
+
+
+# ---------------------------------------------------------------------------
+# PO Supplier (purchase orders to a supplier, built from customer preorder lines)
+# ---------------------------------------------------------------------------
+
+
+class SupplierPoItemRequest(BaseModel):
+    # Set when the line comes from a customer preorder ("Ambil Barang dari PO Customer");
+    # omitted for a barang added by hand.
+    preorder_item_id: int | None = None
+    master_item_id: int | None = None
+    sku: str | None = None  # looked up in Master Barang when master_item_id is not given
+    product_name: str
+    unit: str | None = None
+    quantity: int
+    est_unit_price: int = 0
+    discount_pct: float = 0  # this line's discount, in percent
+
+
+class SupplierPoInvoiceFields(BaseModel):
+    """The purchase-invoice side of a PO. Nullable: omitted (leave as-is) and null (clear)
+    are told apart through fields_set where it matters."""
+    supplier_invoice_no: str | None = None
+    payment_terms_days: int | None = None  # NET 14 -> 14
+    due_date: str | None = None  # YYYY-MM-DD; filled from po_date + termin when left empty
+    est_arrival_date: str | None = None
+    discount_pct: float | None = None
+    shipping_cost: int | None = None
+    tax_rate: float | None = None  # PPN in percent, e.g. 11
+
+
+class SupplierPoRequest(SupplierPoInvoiceFields):
+    supplier_id: int
+    # YYYY-MM-DD; omitted means today on the shop's clock.
+    po_date: str | None = None
+    notes: str | None = None
+    items: list[SupplierPoItemRequest]
+    # False saves a draft ("Simpan Draft"); True issues it at once ("Simpan PO").
+    issue: bool = False
+    # "Sudah dibayar" typed on the form; only valid together with issue.
+    paid_amount: int = 0
+
+
+class SupplierPoUpdateRequest(SupplierPoInvoiceFields):
+    supplier_id: int | None = None
+    po_date: str | None = None
+    items: list[SupplierPoItemRequest] | None = None
+    # Nullable, so omitted (leave as-is) and null (clear it) are told apart via fields_set.
+    notes: str | None = None
+
+
+class SupplierPoReceiveLine(BaseModel):
+    item_id: int
+    quantity: int
+
+
+class SupplierPoReceiveRequest(BaseModel):
+    items: list[SupplierPoReceiveLine]
+    received_date: str | None = None
+    surat_jalan_no: str | None = None
+    warehouse_location: str | None = None
+    note: str | None = None
+    # Also open a draft Barang Masuk for the lines linked to a master item.
+    create_inbound: bool = False
+
+
+class SupplierPoStageRequest(BaseModel):
+    to: str  # menunggu_konfirmasi | dikonfirmasi | diproses | dalam_pengiriman
+    note: str
+
+
+class SupplierPoTrackingLine(BaseModel):
+    item_id: int
+    tracking_no: str | None = None
+    courier: str | None = None
+    eta_date: str | None = None
+
+
+class SupplierPoTrackingRequest(BaseModel):
+    items: list[SupplierPoTrackingLine]
+
+
+class SupplierPoPaymentRequest(BaseModel):
+    amount: int
+    method: str = "transfer"
+    note: str | None = None
+
+
+class SupplierPoCancelItemRequest(BaseModel):
+    quantity: int
+    reason: str
+    action: str  # kembali_ke_customer | simpan_stok_toko | retur_supplier | tidak_ada
+    note: str | None = None
+
+
+class SupplierPoItemOut(BaseModel):
+    id: int
+    preorder_item_id: int | None = None
+    master_item_id: int | None = None
+    sku: str | None = None
+    product_name: str
+    unit: str | None = None
+    quantity: int
+    est_unit_price: int
+    discount_pct: float = 0
+    qty_received: int
+    qty_cancelled: int = 0
+    tracking_no: str | None = None
+    courier: str | None = None
+    eta_date: str | None = None
+    # Which customer order the line serves; null for a barang added by hand.
+    customer_po_number: str | None = None
+    customer_name: str | None = None
+    plate_full: str | None = None
+
+
+class SupplierPoEventOut(BaseModel):
+    id: int
+    at: str
+    by_user: str | None = None
+    kind: str
+    note: str | None = None
+
+
+class SupplierPoPaymentOut(BaseModel):
+    id: int
+    paid_at: str
+    amount: int
+    method: str
+    note: str | None = None
+    created_by: str | None = None
+
+
+class SupplierPoReceiptLineOut(BaseModel):
+    item_id: int
+    product_name: str
+    quantity: int
+
+
+class SupplierPoReceiptOut(BaseModel):
+    id: int
+    received_date: str
+    surat_jalan_no: str | None = None
+    warehouse_location: str | None = None
+    note: str | None = None
+    inbound_document_id: int | None = None
+    created_by: str | None = None
+    created_at: str
+    lines: list[SupplierPoReceiptLineOut]
+
+
+class SupplierPoCancellationOut(BaseModel):
+    id: int
+    item_id: int
+    product_name: str
+    quantity: int
+    reason: str
+    action: str
+    note: str | None = None
+    cancelled_by: str | None = None
+    cancelled_at: str
+
+
+class SupplierPoOut(BaseModel):
+    id: str
+    po_number: str
+    po_date: str
+    supplier_id: int
+    supplier_name_snapshot: str
+    notes: str | None = None
+    status: str
+    # What the list shows: draft, the four stages while the PO is out, diterima_sebagian,
+    # diterima_lengkap or dibatalkan; and the payment state (null for a draft/cancelled PO).
+    order_status: str
+    payment_status: str | None = None
+    supplier_invoice_no: str | None = None
+    payment_terms_days: int | None = None
+    due_date: str | None = None
+    est_arrival_date: str | None = None
+    discount_pct: float = 0
+    shipping_cost: int = 0
+    tax_rate: float = 0
+    paid_amount: int = 0
+    created_by: str | None = None
+    created_at: str
+    updated_at: str
+    item_count: int
+    total_estimate: int
+    qty_total: int
+    qty_received: int
+    subtotal: int
+    discount_amount: int
+    tax_amount: int
+    grand_total: int
+    outstanding: int
+
+
+class SupplierPoDetail(SupplierPoOut):
+    items: list[SupplierPoItemOut]
+    events: list[SupplierPoEventOut] = []
+    payments: list[SupplierPoPaymentOut] = []
+    receipts: list[SupplierPoReceiptOut] = []
+    cancellations: list[SupplierPoCancellationOut] = []
+
+
+class SupplierPoSummary(BaseModel):
+    order_aktif: int
+    menunggu_konfirmasi: int
+    dalam_pengiriman: int
+    diterima_sebagian: int
+    faktur_belum_lunas: int
+    total_utang: int
+
+
+class SupplierPoCandidateOut(BaseModel):
+    """One customer preorder line that still has quantity nobody has ordered."""
+    preorder_item_id: int
+    preorder_id: str
+    customer_po_number: str
+    customer_name: str
+    plate_full: str
+    product_name: str
+    unit: str | None = None
+    master_item_id: int | None = None
+    qty_ordered_by_customer: int
+    qty_bought: int
+    qty_left: int
+    # From the linked Master Barang; null for a free-text line.
+    supplier_id: int | None = None
+    supplier_name: str | None = None
+    est_unit_price: int
+
+
+class SupplierPoCandidateCounts(BaseModel):
+    belum: int
+    sebagian: int
+    semua: int
+
+
+class SupplierPoCandidatePage(BaseModel):
+    rows: list[SupplierPoCandidateOut]
+    total: int
+    counts: SupplierPoCandidateCounts

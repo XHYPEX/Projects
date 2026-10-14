@@ -1240,3 +1240,77 @@ class CategoryItemsOut(BaseModel):
 
 class CategoryImportRequest(BaseModel):
     csv: str
+
+
+# ---------------------------------------------------------------------------
+# Stock Opname
+# ---------------------------------------------------------------------------
+
+
+class OpnameItemRequest(BaseModel):
+    master_item_id: int
+    counted_qty: int | None = None
+    reason: str | None = None
+    note: str | None = None
+
+
+class OpnameRequest(BaseModel):
+    officer: str
+    opname_at: str | None = None
+    location: str | None = None
+    note: str | None = None
+    items: list[OpnameItemRequest]
+    submit: bool = False
+
+
+class OpnameResolveRequest(BaseModel):
+    note: str | None = None
+    accept_moved: bool = False
+
+
+class OpnameActivityOut(BaseModel):
+    kasir_total: int = 0
+    kasir_terbuka: int = 0
+    po_customer_aktif: int = 0
+    po_supplier_aktif: int = 0
+
+
+class OpnameItemOut(BaseModel):
+    id: int
+    master_item_id: int
+    sku: str
+    name: str
+    unit: str | None = None
+    category_name: str | None = None
+    item_location: str | None = None
+    system_qty: int
+    current_qty: int
+    counted_qty: int | None = None
+    diff_qty: int | None = None
+    reason: str | None = None
+    note: str | None = None
+    applied_delta: int | None = None
+    activity: OpnameActivityOut
+
+
+class OpnameOut(BaseModel):
+    id: int
+    opname_no: str
+    opname_at: str
+    officer: str
+    location: str | None = None
+    kind: str
+    note: str | None = None
+    status: str
+    created_by: str | None = None
+    created_at: str
+    submitted_by: str | None = None
+    submitted_at: str | None = None
+    resolved_by: str | None = None
+    resolved_at: str | None = None
+    resolution_note: str | None = None
+    updated_at: str
+    item_count: int
+    total_diff: int
+    has_moved: bool
+    items: list[OpnameItemOut]

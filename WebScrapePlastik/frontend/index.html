@@ -462,6 +462,8 @@
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Satuan</a>
           <a href="#/master-kategori" data-route="/master-kategori"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Kategori</a>
+          <a href="#/stock-opname" data-route="/stock-opname"
+            class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Stock Opname</a>
           <a href="#/master-customer" data-route="/master-customer"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Customer</a>
         </div>
@@ -2449,6 +2451,95 @@
     </div>
   </div>
 
+  <!-- ===== STOCK OPNAME ===== -->
+  <div id="page-opname" class="hidden flex-1 overflow-auto p-3 sm:p-4">
+    <div class="max-w-[1680px] mx-auto">
+
+      <div id="op-list-panel">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" id="op-kpis"></div>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <input id="op-search" type="text" placeholder="Cari no. opname, petugas, lokasi, atau nama barang…" autocomplete="off" oninput="opDebouncedLoad()"
+            class="flex-1 min-w-[240px] border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          <select id="op-f-status" onchange="opLoad()" class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">
+            <option value="">Semua status</option><option value="draft">Draft</option><option value="menunggu_verifikasi">Menunggu verifikasi</option>
+            <option value="disetujui">Disetujui</option><option value="ditolak">Ditolak</option><option value="dibatalkan">Dibatalkan</option></select>
+          <button type="button" onclick="opNewForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Buka Stock Opname</button>
+        </div>
+        <div class="bg-white border border-line rounded-xl overflow-x-auto">
+          <table class="w-full text-[13px]">
+            <thead class="bg-bg2"><tr>
+              <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Opname</th>
+              <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+              <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Petugas</th>
+              <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Lokasi / Rak</th>
+              <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
+              <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Selisih</th>
+              <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+              <th class="px-3 py-2.5 border-b border-line"><span class="sr-only">Aksi</span></th></tr></thead>
+            <tbody id="op-tbody"></tbody>
+          </table>
+          <div id="op-empty" class="hidden text-center py-10 text-sm text-muted"></div>
+        </div>
+      </div>
+
+      <div id="op-form-panel" class="hidden">
+        <button type="button" onclick="opBack()" class="inline-flex items-center gap-1.5 mb-3 text-sm text-accent hover:text-accentDark font-medium">&larr; <span id="op-back-label">Kembali ke daftar</span></button>
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-11 h-11 rounded-xl bg-accent/10 text-accent grid place-items-center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg></span>
+          <div><h2 id="op-form-title" class="font-serif text-xl font-semibold text-ink">Buka Stock Opname</h2>
+            <p class="text-xs text-muted">Buat sesi stock opname untuk menghitung stok fisik barang tertentu.</p></div>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-4 items-start">
+          <section class="bg-white border border-line rounded-xl p-5">
+            <div class="font-serif font-semibold text-ink">Informasi Opname</div>
+            <p class="text-xs text-muted mb-4">Lengkapi informasi dasar untuk sesi stock opname ini.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label for="op-f-no" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nomor Opname</label>
+                <input id="op-f-no" type="text" disabled class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-muted font-mono">
+                <p class="text-xs text-muted mt-1">Nomor opname dibuat otomatis oleh sistem.</p></div>
+              <div class="grid grid-cols-2 gap-2"><div><label for="op-f-date" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Tanggal</label>
+                <input id="op-f-date" type="date" onchange="opRefreshNumber()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink"></div>
+                <div><label for="op-f-time" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Waktu</label>
+                <input id="op-f-time" type="time" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink"></div></div>
+              <div><label for="op-f-officer" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Petugas <span class="text-failed">*</span></label>
+                <input id="op-f-officer" type="text" maxlength="60" data-no-uppercase autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></div>
+              <div><label for="op-f-location" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Lokasi / Rak</label>
+                <input id="op-f-location" type="text" maxlength="60" autocomplete="off" placeholder="Contoh: RAK A-03" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+                <p class="text-xs text-muted mt-1">Lokasi di mana barang akan dihitung.</p></div>
+              <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jenis Opname</label>
+                <select disabled class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-muted"><option>Barang Tertentu</option></select>
+                <p class="text-xs text-muted mt-1">Stock opname untuk satu atau beberapa barang tertentu.</p></div>
+              <div><label for="op-f-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan Opname <span class="normal-case font-normal">(opsional)</span></label>
+                <textarea id="op-f-note" rows="2" maxlength="500" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-y"></textarea></div>
+            </div>
+          </section>
+          <aside id="op-warning" class="bg-pending/10 border border-pending/30 rounded-xl p-5"></aside>
+        </div>
+
+        <section class="bg-white border border-line rounded-xl p-5 mt-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div><div class="font-serif font-semibold text-ink">Detail Barang yang Akan Diopname</div>
+              <p class="text-xs text-muted">Periksa informasi barang dan masukkan hasil perhitungan stok fisik.</p></div>
+            <div class="relative w-full sm:w-80">
+              <input id="op-add-search" type="text" autocomplete="off" placeholder="+ Tambah barang: cari nama atau SKU…" oninput="opDebouncedSearch()" onfocus="opDebouncedSearch()"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+              <div id="op-add-results" class="hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
+            </div>
+          </div>
+          <div id="op-items" class="space-y-4"></div>
+        </section>
+
+        <div class="flex flex-wrap justify-end gap-2 mt-4">
+          <button type="button" onclick="opBack()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Batal</button>
+          <button type="button" onclick="opSave(false)" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Simpan Draft</button>
+          <button type="button" onclick="opSave(true)" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Kirim untuk Verifikasi</button>
+        </div>
+      </div>
+
+      <div id="op-detail-panel" class="hidden"></div>
+    </div>
+  </div>
+
   <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-6xl mx-auto">
 
@@ -3075,6 +3166,7 @@
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" onclick="openMasterStockHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Riwayat Stok</button>
               <button type="button" onclick="openMasterPriceHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Riwayat Harga</button>
+              <button type="button" onclick="openStockOpnameForItem(currentMasterItemId)" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Stock Opname</button>
               <button type="button" onclick="openStockAdjustModal(currentMasterItem)" class="admin-only inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Penyesuaian Stok</button>
               <button type="button" onclick="duplicateMasterItem(currentMasterItemId)" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Duplikasi</button>
               <button id="detail-item-edit-btn" type="button" onclick="editMasterItemFromRow(currentMasterItemId)" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Edit Barang</button>
@@ -4254,6 +4346,7 @@ const ROUTES = {
   "/master-supplier": { title: "Master Supplier", page: "page-inventory", section: "inv-tab-supplier", data: "supplier" },
   "/master-satuan": { title: "Master Satuan", page: "page-inventory", section: "inv-tab-unit", data: "unit" },
   "/master-kategori": { title: "Master Kategori", page: "page-kategori" },
+  "/stock-opname": { title: "Stock Opname", page: "page-opname" },
   "/master-customer": { title: "Master Customer", page: "page-inventory", section: "inv-tab-customer", data: "customer" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
   "/users": { title: "Pengguna", page: "page-users" },
@@ -4307,7 +4400,7 @@ function renderRoute() {
   document.querySelectorAll(".nav-link").forEach(el => {
     el.classList.toggle("is-active", el.dataset.route === route);
   });
-  if (INVENTORY_ROUTES.has(route) || route === "/master-kategori") {
+  if (INVENTORY_ROUTES.has(route) || route === "/master-kategori" || route === "/stock-opname") {
     // Keep the parent "Inventori" entry lit on every one of its child routes.
     document.querySelector('.nav-link[data-route="/inventory-group"]')?.classList.add("is-active");
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
@@ -4316,6 +4409,7 @@ function renderRoute() {
   if (route === "/cashier") itemEntryInput()?.focus();
   if (route === "/dashboard") loadDashboardOverview();
   if (route === "/master-kategori") katInit();
+  if (route === "/stock-opname") opInit();
   if (route === "/preorder") { backToPreorderList(); }
   if (route === "/supplier-po") { backToSupplierPoList(); }
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
@@ -4401,6 +4495,10 @@ const ROUTE_META = {
   "/master-kategori": {
     subtitle: "Kelola kategori dan subkategori produk agar pencarian, filter, dan klasifikasi barang lebih rapi.",
     icon: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+  },
+  "/stock-opname": {
+    subtitle: "Hitung stok fisik barang. Stok baru berubah setelah admin menyetujui hasilnya.",
+    icon: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 13 2 2 4-4"/>',
   },
   "/master-customer": {
     subtitle: "Daftar pelanggan, kontak, dan jumlah nota mereka.",
@@ -10792,6 +10890,7 @@ function ledgerDescription(e) {
   if (k === "masuk") return `Barang ini masuk ${Math.abs(e.qty)} ${currentMasterItem?.unit || ""} dari pembelian supplier.`;
   if (k === "jual") return `Barang ini terjual ${Math.abs(e.qty)} ${currentMasterItem?.unit || ""} melalui transaksi kasir.`;
   if (k === "retur") return e.ref_type === "receipt" ? "Stok kembali karena nota diubah atau di-void." : "Dokumen barang masuk di-void.";
+  if (e.ref_type === "stock_opname") return `Hasil stock opname ${e.ref_doc_number || ""}: ${(e.note || "").replace(/^Stock opname:\s*/, "") || "sesuai hitung"}.`;
   return e.note || "Penyesuaian stok manual.";
 }
 
@@ -14456,6 +14555,347 @@ async function katImportCsv(input) {
     if (result.errors.length) openModal("Baris yang gagal diimpor", `<ul class="text-sm space-y-1 max-h-64 overflow-y-auto">${result.errors.slice(0, 50).map(e => `<li><span class="text-muted">Baris ${e.line}:</span> ${esc(e.message)}</li>`).join("")}</ul><p class="text-xs text-muted mt-3">Format kolom: kode, nama, induk_kode, status, deskripsi. Baris induk harus ada sebelum subkategorinya.</p>`);
   } catch (e) { katError(e); }
 }
+
+// ── Stock Opname ─────────────────────────────────────────────────────────────
+// A counting session: draft -> menunggu verifikasi -> disetujui / ditolak. Stock only changes when an admin
+// approves, and then through the stock ledger (ref = the opname number).
+const OP_STATUS = {
+  draft: ["Draft", "bg-bg2 text-muted"],
+  menunggu_verifikasi: ["Menunggu Verifikasi", "bg-pending/10 text-pending"],
+  disetujui: ["Disetujui", "bg-done/10 text-done"],
+  ditolak: ["Ditolak", "bg-failed/10 text-failed"],
+  dibatalkan: ["Dibatalkan", "bg-bg2 text-muted"],
+};
+const OP_REASONS = ["Susut / Hilang", "Rusak", "Salah catat / input", "Ditemukan lebih", "Retur belum tercatat", "Lainnya"];
+const OP_PANELS = ["op-list-panel", "op-form-panel", "op-detail-panel"];
+let opList = [], opForm = { id: null, items: [] }, opDetail = null, opPendingItem = null, opOrigin = "list";
+let opLoadTimer = null, opSearchTimer = null, opReady = false;
+
+function opPill(status) {
+  const s = OP_STATUS[status] || [status, "bg-bg2 text-muted"];
+  return `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${s[1]}">${esc(s[0])}</span>`;
+}
+function opShow(id) { for (const p of OP_PANELS) document.getElementById(p).classList.toggle("hidden", p !== id); }
+function opErr(e) { showToast(e && e.message ? e.message : "Terjadi kesalahan."); }
+async function opJson(resp, fallback) {
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(typeof data.detail === "string" ? data.detail : fallback);
+  return data;
+}
+function opDiffChip(diff) {
+  if (diff === null || diff === undefined) return `<span class="text-muted">-</span>`;
+  if (diff === 0) return `<span class="px-2 py-0.5 rounded-full text-xs bg-done/10 text-done">Sesuai</span>`;
+  return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums ${diff < 0 ? "bg-failed/10 text-failed" : "bg-done/10 text-done"}">${diff > 0 ? "+" : ""}${diff}</span>`;
+}
+
+async function opInit() {
+  opReady = true;
+  const pending = opPendingItem; opPendingItem = null;
+  if (pending) { opOrigin = "detail"; await opNewForm(pending); return; }
+  opShow("op-list-panel");
+  await opLoad();
+}
+function opDebouncedLoad() { clearTimeout(opLoadTimer); opLoadTimer = setTimeout(opLoad, 300); }
+async function opLoad() {
+  try {
+    const qs = new URLSearchParams();
+    const st = document.getElementById("op-f-status").value, q = document.getElementById("op-search").value.trim();
+    if (st) qs.set("status", st); if (q) qs.set("q", q);
+    const [list, sum] = await Promise.all([
+      fetch(`/api/stock-opnames?${qs}`).then(r => opJson(r, "Gagal memuat stock opname.")),
+      fetch("/api/stock-opnames/summary").then(r => opJson(r, "Gagal memuat ringkasan.")),
+    ]);
+    opList = list;
+    const tile = (label, v, sub, cls = "text-ink") => `<div class="border border-line rounded-xl bg-bg2 px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">${label}</div><div class="font-sans text-2xl font-semibold tabular-nums ${cls}">${v}</div><div class="text-xs text-muted mt-0.5">${sub}</div></div>`;
+    document.getElementById("op-kpis").innerHTML =
+      tile("Draft", sum.draft, "belum dikirim") +
+      tile("Menunggu Verifikasi", sum.menunggu_verifikasi, "perlu keputusan admin", sum.menunggu_verifikasi ? "text-pending" : "text-ink") +
+      tile("Disetujui Bulan Ini", sum.disetujui_bulan_ini, `${sum.disetujui} sepanjang waktu`, "text-done") +
+      tile("Ditolak", sum.ditolak, "tidak mengubah stok");
+    opRenderList();
+  } catch (e) { opErr(e); }
+}
+function opRenderList() {
+  const empty = document.getElementById("op-empty");
+  empty.classList.toggle("hidden", opList.length > 0);
+  empty.textContent = "Belum ada stock opname. Klik “Buka Stock Opname” untuk memulai.";
+  document.getElementById("op-tbody").innerHTML = opList.map(o => {
+    const names = o.items.slice(0, 2).map(i => esc(i.name)).join(", ") + (o.items.length > 2 ? ` +${o.items.length - 2}` : "");
+    return `<tr class="border-b border-line last:border-b-0 hover:bg-bg2/50 cursor-pointer" onclick="opOpenDetail(${o.id})">
+      <td class="px-3 py-2.5 font-mono text-xs text-ink whitespace-nowrap">${esc(o.opname_no)}</td>
+      <td class="px-3 py-2.5 text-muted tabular-nums whitespace-nowrap">${esc(formatMasterDateTime(o.opname_at))}</td>
+      <td class="px-3 py-2.5 text-ink">${esc(o.officer)}</td>
+      <td class="px-3 py-2.5 text-muted">${esc(o.location || "-")}</td>
+      <td class="px-3 py-2.5 text-ink"><div class="max-w-[22rem] truncate">${names}</div><div class="text-xs text-muted">${o.item_count} barang</div></td>
+      <td class="px-3 py-2.5 text-right">${opDiffChip(o.status === "draft" && o.items.every(i => i.counted_qty === null) ? null : o.total_diff)}</td>
+      <td class="px-3 py-2.5">${opPill(o.status)}${o.has_moved ? '<div class="text-[11px] text-pending mt-0.5">stok berubah</div>' : ""}</td>
+      <td class="px-3 py-2.5 text-right"><span class="text-accent text-xs font-medium">Detail &rsaquo;</span></td></tr>`;
+  }).join("");
+}
+
+// ── Form ─────────────────────────────────────────────────────────────────────
+function opBack() { if (opOrigin === "detail" && currentMasterItemId) { location.hash = "/master-barang"; setTimeout(() => viewMasterItem(currentMasterItemId), 50); opOrigin = "list"; return; } opOrigin = "list"; opShow("op-list-panel"); opLoad(); }
+
+async function opItemFromMaster(id) {
+  const [it, act] = await Promise.all([
+    fetch(`/api/inventory/master-items/${id}`).then(r => opJson(r, "Barang tidak ditemukan.")),
+    fetch(`/api/stock-opnames/item-activity/${id}`).then(r => opJson(r, "")).catch(() => ({})),
+  ]);
+  return { master_item_id: it.id, sku: it.sku, name: it.name, unit: it.unit, brand: it.brand_name, is_active: it.is_active,
+    category: it.category_parent_name ? `${it.category_parent_name} › ${it.category_name}` : (it.category_name || "-"),
+    location: it.location, system_qty: it.stock_qty, counted: "", reason: "", note: "", activity: act, image_url: it.image_url };
+}
+
+async function opNewForm(itemId) {
+  opForm = { id: null, items: [] };
+  const now = new Date(), pad = n => String(n).padStart(2, "0");
+  const g = id => document.getElementById(id);
+  g("op-form-title").textContent = "Buka Stock Opname";
+  g("op-f-date").value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  g("op-f-time").value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  g("op-f-officer").value = (currentUser && currentUser.username) || "";
+  g("op-f-location").value = ""; g("op-f-note").value = "";
+  g("op-back-label").textContent = typeof itemId === "number" && opOrigin === "detail" ? "Kembali ke detail barang" : "Kembali ke daftar";
+  try {
+    if (typeof itemId === "number") {
+      const item = await opItemFromMaster(itemId);
+      opForm.items.push(item);
+      g("op-f-location").value = item.location || "";
+    }
+  } catch (e) { opErr(e); }
+  opRefreshNumber(); opRenderItems(); opShow("op-form-panel");
+}
+
+async function opEditDraft(id) {
+  try {
+    const o = await fetch(`/api/stock-opnames/${id}`).then(r => opJson(r, "Gagal memuat opname."));
+    const g = i => document.getElementById(i);
+    opForm = { id: o.id, items: o.items.map(i => ({ master_item_id: i.master_item_id, sku: i.sku, name: i.name, unit: i.unit, brand: "",
+      category: i.category_name || "-", location: i.item_location, system_qty: i.current_qty, counted: i.counted_qty === null ? "" : String(i.counted_qty),
+      reason: i.reason || "", note: i.note || "", activity: i.activity, is_active: true })) };
+    g("op-form-title").textContent = `Ubah Draft ${o.opname_no}`;
+    g("op-f-no").value = o.opname_no;
+    g("op-f-date").value = o.opname_at.slice(0, 10); g("op-f-time").value = (o.opname_at.slice(11, 16) || "00:00");
+    g("op-f-officer").value = o.officer; g("op-f-location").value = o.location || ""; g("op-f-note").value = o.note || "";
+    g("op-back-label").textContent = "Kembali ke daftar"; opOrigin = "list";
+    opRenderItems(); opShow("op-form-panel");
+  } catch (e) { opErr(e); }
+}
+
+async function opRefreshNumber() {
+  if (opForm.id) return;
+  const day = document.getElementById("op-f-date").value;
+  if (!day) return;
+  try { document.getElementById("op-f-no").value = (await fetch(`/api/stock-opnames/number-preview?day=${day}`).then(r => opJson(r, ""))).opname_no; } catch (_) {}
+}
+
+function opDebouncedSearch() { clearTimeout(opSearchTimer); opSearchTimer = setTimeout(opSearchItems, 250); }
+async function opSearchItems() {
+  const q = document.getElementById("op-add-search").value.trim();
+  const box = document.getElementById("op-add-results");
+  if (q.length < 2) { box.classList.add("hidden"); return; }
+  try {
+    const { items } = await fetch(`/api/inventory/master-items?search=${encodeURIComponent(q)}&page_size=8&is_active=true`).then(r => opJson(r, ""));
+    const fresh = items.filter(i => !opForm.items.some(x => x.master_item_id === i.id));
+    box.innerHTML = fresh.length ? fresh.map(i => `<button type="button" onclick="opAddItem(${i.id})" class="block w-full text-left px-3 py-2 text-sm hover:bg-bg2"><span class="text-ink">${esc(i.name)}</span> <span class="font-mono text-[11px] text-muted">${esc(i.sku)}</span> <span class="text-xs text-muted">stok ${i.stock_qty}</span></button>`).join("")
+      : `<div class="px-3 py-2 text-sm text-muted">Tidak ada barang yang cocok.</div>`;
+    box.classList.remove("hidden");
+  } catch (_) { box.classList.add("hidden"); }
+}
+async function opAddItem(id) {
+  document.getElementById("op-add-results").classList.add("hidden");
+  document.getElementById("op-add-search").value = "";
+  try { opForm.items.push(await opItemFromMaster(id)); opRenderItems(); } catch (e) { opErr(e); }
+}
+function opRemoveItem(idx) { opForm.items.splice(idx, 1); opRenderItems(); }
+function opSetField(idx, field, value) { opForm.items[idx][field] = value; opUpdateRow(idx); opRenderWarning(); }
+
+function opUpdateRow(idx) {
+  const it = opForm.items[idx];
+  const counted = it.counted === "" ? null : parseInt(it.counted, 10);
+  const diff = counted === null || Number.isNaN(counted) ? null : counted - it.system_qty;
+  const box = document.getElementById(`op-diff-${idx}`);
+  if (!box) return;
+  box.className = "rounded-lg px-3 py-2 text-center " + (diff === null ? "bg-bg2 text-muted" : diff === 0 ? "bg-done/10 text-done" : diff < 0 ? "bg-failed/10 text-failed" : "bg-done/10 text-done");
+  box.innerHTML = diff === null ? `<div class="text-sm font-semibold">-</div><div class="text-[11px]">belum dihitung</div>`
+    : `<div class="text-sm font-semibold tabular-nums">${diff > 0 ? "+" : ""}${diff} ${esc(it.unit || "")}</div><div class="text-[11px]">${diff === 0 ? "sesuai sistem" : diff < 0 ? "lebih sedikit dari sistem" : "lebih banyak dari sistem"}</div>`;
+  document.getElementById(`op-reason-wrap-${idx}`).classList.toggle("hidden", diff === 0);
+}
+
+function opRenderItems() {
+  const box = document.getElementById("op-items");
+  if (!opForm.items.length) {
+    box.innerHTML = `<div class="text-center text-sm text-muted py-8 border border-dashed border-line rounded-xl">Belum ada barang. Cari barang di kolom “Tambah barang” untuk mulai menghitung.</div>`;
+    opRenderWarning(); return;
+  }
+  const inp = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent";
+  const lbl = "block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5";
+  box.innerHTML = opForm.items.map((it, idx) => `
+    <div class="border border-line rounded-xl p-4">
+      <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] gap-4">
+        <div class="flex gap-4">
+          <span class="w-20 h-20 rounded-xl bg-bg2 border border-line text-muted grid place-items-center text-sm font-semibold shrink-0 overflow-hidden">${esc(masterInitials(it.name))}</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2"><span class="font-serif font-semibold text-ink">${esc(it.name)}</span>${it.is_active === false ? '<span class="px-2 py-0.5 rounded-full text-[11px] bg-bg2 text-muted">Nonaktif</span>' : '<span class="px-2 py-0.5 rounded-full text-[11px] bg-done/10 text-done">Aktif</span>'}</div>
+            <dl class="text-xs mt-1.5 space-y-0.5">
+              <div class="flex gap-2"><dt class="w-16 text-muted">SKU</dt><dd class="font-mono text-ink">${esc(it.sku)}</dd></div>
+              ${it.brand ? `<div class="flex gap-2"><dt class="w-16 text-muted">Merek</dt><dd class="text-ink">${esc(it.brand)}</dd></div>` : ""}
+              <div class="flex gap-2"><dt class="w-16 text-muted">Kategori</dt><dd class="text-ink">${esc(it.category)}</dd></div>
+              <div class="flex gap-2"><dt class="w-16 text-muted">Satuan</dt><dd class="text-ink">${esc(it.unit || "-")}</dd></div>
+              <div class="flex gap-2"><dt class="w-16 text-muted">Lokasi</dt><dd class="text-ink">${esc(it.location || "-")}</dd></div></dl></div>
+          <div class="rounded-xl bg-accent/5 border border-accent/20 px-4 py-3 text-center self-start shrink-0"><div class="text-[11px] text-muted">Stok Sistem</div><div class="text-xl font-semibold tabular-nums text-ink">${it.system_qty} ${esc(it.unit || "")}</div><div class="text-[11px] text-muted">saldo saat ini</div></div>
+        </div>
+        <div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label class="${lbl}" for="op-counted-${idx}">Stok Fisik <span class="text-failed">*</span></label>
+              <div class="flex"><input id="op-counted-${idx}" type="text" inputmode="numeric" value="${esc(it.counted)}" data-no-uppercase oninput="this.value=this.value.replace(/\\D/g,''); opSetField(${idx}, 'counted', this.value)" class="${inp} rounded-r-none text-right tabular-nums"><span class="px-3 grid place-items-center border border-l-0 border-line bg-bg2 rounded-r-lg text-xs text-muted">${esc(it.unit || "")}</span></div>
+              <p class="text-[11px] text-muted mt-1">Hasil hitung fisik di lapangan.</p></div>
+            <div><div class="${lbl}">Selisih</div><div id="op-diff-${idx}"></div></div>
+            <div id="op-reason-wrap-${idx}"><label class="${lbl}" for="op-reason-${idx}">Alasan Selisih <span class="text-failed">*</span></label>
+              <select id="op-reason-${idx}" onchange="opSetField(${idx}, 'reason', this.value)" class="${inp}"><option value="">Pilih alasan</option>${OP_REASONS.map(r => `<option ${r === it.reason ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></div>
+          </div>
+          <div class="mt-3"><label class="${lbl}" for="op-note-${idx}">Catatan Item <span class="normal-case font-normal">(opsional)</span></label>
+            <textarea id="op-note-${idx}" rows="2" maxlength="500" data-no-uppercase oninput="opForm.items[${idx}].note=this.value" class="${inp} resize-y">${esc(it.note)}</textarea></div>
+        </div>
+      </div>
+      ${opForm.items.length > 1 ? `<div class="text-right mt-2"><button type="button" onclick="opRemoveItem(${idx})" class="text-xs text-failed hover:underline">Hapus barang ini dari opname</button></div>` : ""}
+    </div>`).join("");
+  opForm.items.forEach((_, i) => opUpdateRow(i));
+  opRenderWarning();
+}
+
+function opRenderWarning() {
+  const sum = k => opForm.items.reduce((a, i) => a + ((i.activity && i.activity[k]) || 0), 0);
+  const kasir = sum("kasir_total"), poc = sum("po_customer_aktif"), pos = sum("po_supplier_aktif");
+  const row = (color, label, text, n, unit) => `<div class="flex items-center gap-3 bg-white/70 rounded-lg px-3 py-2.5 mb-2"><div class="flex-1 min-w-0"><div class="text-sm font-medium text-ink">${label}</div><div class="text-xs text-muted">${text}</div></div><div class="text-center rounded-lg px-3 py-1.5 ${color}"><div class="text-lg font-semibold tabular-nums">${n}</div><div class="text-[10px]">${unit}</div></div></div>`;
+  document.getElementById("op-warning").innerHTML = `
+    <div class="flex items-start gap-2.5 mb-3"><svg class="text-pending shrink-0 mt-0.5" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
+      <div><div class="font-serif font-semibold text-ink">Perhatian Sebelum Melanjutkan</div>
+      <p class="text-xs text-muted">Barang yang dipilih punya transaksi yang masih berjalan. Saat disetujui, sistem memeriksa mutasi stok terbaru agar hasil hitung tetap akurat.</p></div></div>
+    ${opForm.items.length ? row("bg-failed/10 text-failed", "Digunakan di Invoice Kasir", "Pernah dipakai di transaksi kasir.", kasir, "transaksi") +
+      row("bg-accent/10 text-accentDark", "Terkait PO Customer Aktif", "Termasuk pesanan pelanggan yang masih aktif.", poc, "PO aktif") +
+      row("bg-pending/20 text-pending", "Terkait PO Supplier Aktif", "Termasuk pembelian supplier yang masih aktif.", pos, "PO aktif")
+      : `<p class="text-sm text-muted">Pilih barang untuk melihat transaksi terkait.</p>`}
+    <div class="text-xs text-ink bg-white/60 rounded-lg px-3 py-2">Stok baru berubah setelah admin menyetujui. Jika ada mutasi (penjualan, barang masuk) sejak dikirim, admin akan diminta memeriksa stok terbaru dulu.</div>`;
+}
+
+async function opSave(submit) {
+  const g = id => document.getElementById(id);
+  if (!opForm.items.length) { showToast("Pilih minimal satu barang untuk dihitung."); return; }
+  const officer = g("op-f-officer").value.trim();
+  if (!officer) { showToast("Petugas wajib diisi."); g("op-f-officer").focus(); return; }
+  const items = [];
+  for (const it of opForm.items) {
+    const counted = it.counted === "" ? null : parseInt(it.counted, 10);
+    if (submit && counted === null) { showToast(`Isi stok fisik untuk ${it.sku} sebelum dikirim.`); return; }
+    if (submit && counted !== it.system_qty && !it.reason) { showToast(`Pilih alasan selisih untuk ${it.sku}.`); return; }
+    items.push({ master_item_id: it.master_item_id, counted_qty: counted, reason: it.reason || null, note: it.note || null });
+  }
+  const body = { officer, opname_at: `${g("op-f-date").value}T${g("op-f-time").value || "00:00"}:00`, location: g("op-f-location").value.trim() || null,
+    note: g("op-f-note").value.trim() || null, items, submit };
+  try {
+    const resp = await fetch(opForm.id ? `/api/stock-opnames/${opForm.id}` : "/api/stock-opnames", { method: opForm.id ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const saved = await opJson(resp, "Gagal menyimpan stock opname.");
+    showToast(submit ? `${saved.opname_no} dikirim untuk verifikasi.` : `Draft ${saved.opname_no} disimpan.`, "success");
+    opOrigin = "list"; await opOpenDetail(saved.id);
+  } catch (e) { opErr(e); }
+}
+
+// ── Detail & verifikasi ──────────────────────────────────────────────────────
+async function opOpenDetail(id) {
+  try { opDetail = await fetch(`/api/stock-opnames/${id}`).then(r => opJson(r, "Gagal memuat opname.")); } catch (e) { opErr(e); return; }
+  opRenderDetail(); opShow("op-detail-panel");
+}
+function opRenderDetail() {
+  const o = opDetail, admin = isAdmin();
+  const btn = (label, onclick, cls) => `<button type="button" onclick="${onclick}" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${cls}">${label}</button>`;
+  const GHOST = "border border-line bg-white text-ink hover:bg-bg2", PRIMARY = "bg-accent text-bg hover:bg-accentDark", DANGER = "border border-failed/40 bg-white text-failed hover:bg-failed/10";
+  const actions = [
+    o.status === "draft" ? btn("Lanjutkan Edit", `opEditDraft(${o.id})`, PRIMARY) + btn("Kirim untuk Verifikasi", `opSubmitDraft(${o.id})`, GHOST) : "",
+    o.status === "menunggu_verifikasi" && admin ? btn("Setujui", "opConfirmApprove()", PRIMARY) + btn("Tolak", "opConfirmReject()", DANGER) : "",
+    o.status === "draft" || o.status === "menunggu_verifikasi" ? btn("Batalkan Opname", "opConfirmCancel()", GHOST) : "",
+  ].join("");
+  const info = (k, v) => `<div class="flex gap-3"><dt class="w-32 shrink-0 text-muted">${k}</dt><dd class="text-ink">${v}</dd></div>`;
+  document.getElementById("op-detail-panel").innerHTML = `
+    <button type="button" onclick="opBack()" class="inline-flex items-center gap-1.5 mb-3 text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div><div class="flex flex-wrap items-center gap-2"><h2 class="font-serif text-xl font-semibold text-ink font-mono">${esc(o.opname_no)}</h2>${opPill(o.status)}</div>
+        <p class="text-xs text-muted mt-1">Stock opname barang tertentu. ${o.status === "menunggu_verifikasi" ? "Menunggu keputusan admin." : ""}</p></div>
+      <div class="flex flex-wrap gap-2">${actions}</div></div>
+    ${o.has_moved ? `<p class="mb-4 bg-pending/10 border border-pending/30 rounded-lg px-4 py-2.5 text-sm text-ink">Stok sebagian barang berubah sejak opname dikirim (lihat kolom “Stok Sekarang”). Periksa dulu sebelum menyetujui.</p>` : ""}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <section class="bg-white border border-line rounded-xl p-5"><dl class="text-sm space-y-1.5">
+        ${info("Tanggal & Waktu", esc(formatMasterDateTime(o.opname_at)))}${info("Petugas", esc(o.officer))}${info("Lokasi / Rak", esc(o.location || "-"))}${info("Catatan", esc(o.note || "-"))}</dl></section>
+      <section class="bg-white border border-line rounded-xl p-5"><dl class="text-sm space-y-1.5">
+        ${info("Dibuat oleh", esc(o.created_by || "-") + " &middot; " + esc(formatMasterDateTime(o.created_at)))}
+        ${info("Dikirim", o.submitted_at ? esc(o.submitted_by || "-") + " &middot; " + esc(formatMasterDateTime(o.submitted_at)) : "-")}
+        ${info("Keputusan", o.resolved_at ? esc(o.resolved_by || "-") + " &middot; " + esc(formatMasterDateTime(o.resolved_at)) : "-")}
+        ${o.resolution_note ? info("Catatan keputusan", esc(o.resolution_note)) : ""}</dl></section></div>
+    <section class="bg-white border border-line rounded-xl overflow-x-auto"><table class="w-full text-[13px]"><thead class="bg-bg2"><tr>
+      ${["Barang", "Stok Sistem", "Stok Sekarang", "Stok Fisik", "Selisih", "Alasan", "Catatan"].map((h, i) => `<th class="px-3 py-2.5 text-[11px] uppercase tracking-wider text-muted font-medium border-b border-line ${i >= 1 && i <= 4 ? "text-right" : "text-left"}">${h}</th>`).join("")}</tr></thead><tbody>
+      ${o.items.map(i => `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2.5"><div class="text-ink font-medium">${esc(i.name)}</div><div class="font-mono text-[11px] text-muted">${esc(i.sku)}</div></td>
+        <td class="px-3 py-2.5 text-right tabular-nums">${i.system_qty}</td>
+        <td class="px-3 py-2.5 text-right tabular-nums ${o.status === "menunggu_verifikasi" && i.current_qty !== i.system_qty ? "text-pending font-semibold" : ""}">${i.current_qty}</td>
+        <td class="px-3 py-2.5 text-right tabular-nums font-medium">${i.counted_qty === null ? "-" : i.counted_qty}</td>
+        <td class="px-3 py-2.5 text-right">${opDiffChip(i.counted_qty === null ? null : (o.status === "disetujui" ? i.applied_delta : i.diff_qty))}</td>
+        <td class="px-3 py-2.5 text-ink">${esc(i.reason || "-")}</td><td class="px-3 py-2.5 text-muted">${esc(i.note || "-")}</td></tr>`).join("")}
+    </tbody></table></section>`;
+}
+
+async function opSubmitDraft(id) {
+  try { const o = await fetch(`/api/stock-opnames/${id}/submit`, { method: "POST" }).then(r => opJson(r, "Gagal mengirim opname.")); showToast(`${o.opname_no} dikirim untuk verifikasi.`, "success"); await opOpenDetail(id); }
+  catch (e) { opErr(e); }
+}
+function opModalButtons(label, onclick, danger) {
+  return `<div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+    <button type="button" onclick="${onclick}" class="px-4 py-1.5 ${danger ? "bg-failed hover:bg-failed/90" : "bg-accent hover:bg-accentDark"} text-bg rounded-lg text-sm font-medium">${label}</button></div>`;
+}
+function opConfirmApprove() {
+  const o = opDetail, changes = o.items.filter(i => i.counted_qty !== i.current_qty);
+  openModal("Setujui stock opname?", `<div class="space-y-3 text-sm">
+    <p class="text-ink">Stok akan disesuaikan ke hasil hitung dan tercatat di riwayat stok dengan referensi <span class="font-mono">${esc(o.opname_no)}</span>.</p>
+    <ul class="rounded-lg bg-bg2 px-3 py-2 space-y-1">${changes.length ? changes.map(i => `<li class="flex justify-between gap-3"><span>${esc(i.name)}</span><span class="tabular-nums">${i.current_qty} → <b>${i.counted_qty}</b></span></li>`).join("") : "<li>Semua barang sesuai, tidak ada perubahan stok.</li>"}</ul>
+    ${o.has_moved ? `<label class="flex items-start gap-2 text-pending"><input id="op-accept-moved" type="checkbox" class="mt-1 accent-[#D97757]"><span>Stok berubah sejak opname dikirim. Saya sudah memeriksa stok terbaru dan hasil hitung masih berlaku.</span></label>` : ""}
+    <div><label for="op-resolve-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Catatan <span class="normal-case font-normal">(opsional)</span></label>
+      <textarea id="op-resolve-note" rows="2" maxlength="300" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm"></textarea></div>
+    ${opModalButtons("Setujui & Sesuaikan Stok", "opApprove()", false)}</div>`);
+}
+async function opApprove() {
+  const moved = document.getElementById("op-accept-moved");
+  if (opDetail.has_moved && !(moved && moved.checked)) { showToast("Centang konfirmasi stok terbaru dulu."); return; }
+  try {
+    const o = await fetch(`/api/stock-opnames/${opDetail.id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accept_moved: Boolean(moved && moved.checked), note: document.getElementById("op-resolve-note").value.trim() || null }) }).then(r => opJson(r, "Gagal menyetujui."));
+    closeModal(); showToast(`${o.opname_no} disetujui. Stok disesuaikan.`, "success"); await opOpenDetail(o.id);
+  } catch (e) { opErr(e); }
+}
+function opConfirmReject() {
+  openModal("Tolak stock opname?", `<div class="space-y-3"><p class="text-sm text-ink">Stok tidak berubah. Petugas perlu menghitung ulang.</p>
+    <div><label for="op-resolve-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Alasan penolakan <span class="text-failed">*</span></label>
+      <textarea id="op-resolve-note" rows="2" maxlength="300" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm"></textarea></div>
+    ${opModalButtons("Tolak Opname", "opReject()", true)}</div>`);
+}
+async function opReject() {
+  const note = document.getElementById("op-resolve-note").value.trim();
+  if (!note) { showToast("Alasan penolakan wajib diisi."); return; }
+  try {
+    const o = await fetch(`/api/stock-opnames/${opDetail.id}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) }).then(r => opJson(r, "Gagal menolak."));
+    closeModal(); showToast(`${o.opname_no} ditolak.`, "success"); await opOpenDetail(o.id);
+  } catch (e) { opErr(e); }
+}
+function opConfirmCancel() {
+  openModal("Batalkan stock opname?", `<div class="space-y-3"><p class="text-sm text-ink">Opname ${esc(opDetail.opname_no)} dibatalkan dan tidak bisa dilanjutkan. Stok tidak berubah.</p>${opModalButtons("Batalkan Opname", "opCancel()", true)}</div>`);
+}
+async function opCancel() {
+  try {
+    const o = await fetch(`/api/stock-opnames/${opDetail.id}/cancel`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => opJson(r, "Gagal membatalkan."));
+    closeModal(); showToast(`${o.opname_no} dibatalkan.`, "success"); await opOpenDetail(o.id);
+  } catch (e) { opErr(e); }
+}
+
+// From the item detail page: open an opname for this item.
+function openStockOpnameForItem(itemId) { opPendingItem = itemId; opOrigin = "detail"; if (currentRoute() === "/stock-opname") opInit(); else location.hash = "/stock-opname"; }
 
 // ── Preorder: Buat Nota Penjualan (PO Customer -> nota, DP dialokasikan sekali) ──
 function openPoConvertModal() {

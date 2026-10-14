@@ -315,6 +315,41 @@ def init_db() -> None:
                 UNIQUE(parent_id, name_normalized)
             );
             CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
+            -- Stock Opname: a counted-stock session that only changes stock once an admin approves it.
+            -- Draft -> menunggu_verifikasi -> disetujui / ditolak (or dibatalkan). Nothing is deleted.
+            CREATE TABLE IF NOT EXISTS stock_opnames (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                opname_no TEXT NOT NULL UNIQUE,
+                opname_at TEXT NOT NULL,
+                officer TEXT NOT NULL,
+                location TEXT,
+                kind TEXT NOT NULL DEFAULT 'barang_tertentu',
+                note TEXT,
+                status TEXT NOT NULL DEFAULT 'draft'
+                    CHECK (status IN ('draft','menunggu_verifikasi','disetujui','ditolak','dibatalkan')),
+                created_by TEXT,
+                created_at TEXT NOT NULL,
+                submitted_by TEXT,
+                submitted_at TEXT,
+                resolved_by TEXT,
+                resolved_at TEXT,
+                resolution_note TEXT,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_stock_opnames_status ON stock_opnames(status);
+            CREATE TABLE IF NOT EXISTS stock_opname_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                opname_id INTEGER NOT NULL REFERENCES stock_opnames(id),
+                master_item_id INTEGER NOT NULL REFERENCES master_items(id),
+                system_qty INTEGER NOT NULL,
+                counted_qty INTEGER,
+                diff_qty INTEGER,
+                reason TEXT,
+                note TEXT,
+                applied_delta INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_stock_opname_items_opname ON stock_opname_items(opname_id);
+            CREATE INDEX IF NOT EXISTS idx_stock_opname_items_item ON stock_opname_items(master_item_id);
             CREATE INDEX IF NOT EXISTS idx_master_items_sku_prefix ON master_items(sku_prefix);
             CREATE INDEX IF NOT EXISTS idx_master_items_name_normalized ON master_items(name_normalized);
             CREATE TABLE IF NOT EXISTS inbound_documents (
@@ -3740,12 +3775,13 @@ def create_stock_adjustment(master_item_id: int, qty_delta: int, reason: str, cr
 def get_stock_ledger(master_item_id: int) -> list[dict]:
     with _conn() as con:
         rows = con.execute(
-            """SELECT sl.*, COALESCE(d.doc_number, r.receipt_no) AS ref_doc_number,
+            """SELECT sl.*, COALESCE(d.doc_number, r.receipt_no, so.opname_no) AS ref_doc_number,
                       COALESCE(sl.created_by, r.cashier_name) AS actor,
                       CASE WHEN sl.ref_type='receipt' THEN sl.note END AS ref_receipt_id
                FROM stock_ledger sl
                LEFT JOIN inbound_documents d ON sl.ref_type='inbound_document' AND d.id = sl.ref_id
                LEFT JOIN receipts r ON sl.ref_type='receipt' AND r.id = sl.note
+               LEFT JOIN stock_opnames so ON sl.ref_type='stock_opname' AND so.id = sl.ref_id
                WHERE sl.master_item_id=? ORDER BY sl.id ASC""", (master_item_id,)
         ).fetchall()
         return [dict(r) for r in rows]

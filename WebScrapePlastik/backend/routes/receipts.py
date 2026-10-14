@@ -13,6 +13,7 @@ from backend.database import (
     RECEIPT_WORK_STATUSES,
     count_receipts,
     create_receipt,
+    find_archived_skus,
     delete_receipt,
     delete_transfer_name,
     list_transfer_names,
@@ -88,6 +89,14 @@ def _validate_items(items: list[ReceiptItemRequest]) -> list[dict]:
                 raise HTTPException(status_code=422, detail="Tanggal garansi tidak valid, gunakan format YYYY-MM-DD.")
         validated.append(item.model_dump())
     return validated
+
+
+async def _reject_archived(loop, items: list[dict], only_new: bool) -> None:
+    """A product that has been archived stays on old notas but cannot be sold again."""
+    skus = {i["sku"] for i in items if i.get("sku") and i.get("item_type") != "jasa" and not (only_new and i.get("id"))}
+    bad = await loop.run_in_executor(None, find_archived_skus, sorted(skus)) if skus else []
+    if bad:
+        raise HTTPException(status_code=422, detail=f"Barang {', '.join(bad)} sudah diarsipkan dan tidak bisa dijual. Aktifkan kembali di Master Barang.")
 
 
 def _row_to_item(row: dict) -> ReceiptItemOut:
@@ -192,6 +201,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
         await _require_customer(loop, req.customer_id)
 
     items = _validate_items(req.items)
+    await _reject_archived(loop, items, only_new=False)
 
     if req.discount < 0:
         raise HTTPException(status_code=422, detail="Diskon harus >= 0.")
@@ -323,7 +333,23 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     existing = await loop.run_in_executor(None, get_receipt, receipt_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
-    _refuse_if_paid(existing)
+    if req.expected_revision and existing.get("revision") and req.expected_revision != existing["revision"]:
+        raise HTTPException(
+            status_code=409,
+            detail="Nota ini baru saja diubah oleh pengguna lain. Muat ulang nota lalu ulangi perubahan Anda.",
+        )
+    void_reason = (req.void_reason or "").strip()
+    if req.status == "void":
+        # Cancelling a nota is audited: a reason is always required, and once money has been taken
+        # (including a Lunas nota that was already handed over) only an admin may do it. The payment
+        # is reversed on the record and the event log keeps who, when, why and how much to give back.
+        if existing["status"] != "void":
+            if len(void_reason) < 3:
+                raise HTTPException(status_code=422, detail="Alasan void wajib diisi (minimal 3 karakter).")
+            if (existing["amount_paid"] or 0) > 0 and user.get("role") != "admin":
+                raise HTTPException(status_code=403, detail="Hanya admin yang boleh membatalkan nota yang sudah ada pembayarannya.")
+    else:
+        _refuse_if_paid(existing)
 
     plate_region: str | None = None
     plate_suffix: str | None = None
@@ -377,6 +403,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     items: list[dict] | None = None
     if req.items is not None:
         items = _validate_items(req.items)
+        await _reject_archived(loop, items, only_new=True)
         effective_subtotal = sum(i["quantity"] * i["unit_price"] - i["line_discount"] for i in items)
     elif req.discount is not None:
         existing_items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
@@ -424,6 +451,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             update_transfer_account,
             user["username"],
             _clean_extra(req, True),
+            void_reason or None,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save, or the new total

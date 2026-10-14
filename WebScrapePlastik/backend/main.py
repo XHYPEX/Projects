@@ -8,9 +8,11 @@ from fastapi.staticfiles import StaticFiles
 from backend.activity import ActivityLogMiddleware
 from backend.auth import get_current_user, require_admin
 from backend.config import SCRAPER_ENABLED
+from backend.idempotency import IdempotencyMiddleware
 from backend.database import fail_orphaned_jobs, init_db, purge_expired_sessions
 from backend.routes.activity import router as activity_router
 from backend.routes.auth import router as auth_router
+from backend.routes.categories import router as categories_router
 from backend.routes.customers import router as customers_router
 from backend.routes.inventory import router as inventory_router
 from backend.routes.preorders import router as preorders_router
@@ -46,6 +48,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Outermost: a replayed POST is answered from storage before anything (including the activity
+# log) sees it, so a double click is neither executed nor logged twice.
+app.add_middleware(IdempotencyMiddleware)
+
 
 @app.get("/api/config")
 async def get_app_config():
@@ -59,6 +65,7 @@ app.include_router(users_router, prefix="/api", dependencies=[Depends(require_ad
 app.include_router(activity_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(customers_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(inventory_router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(categories_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(preorders_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(supplier_pos_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(purchase_invoices_router, prefix="/api", dependencies=[Depends(get_current_user)])

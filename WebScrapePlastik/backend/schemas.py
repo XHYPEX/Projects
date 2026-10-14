@@ -87,6 +87,10 @@ class ReceiptRequest(ReceiptExtra):
 
 
 class ReceiptUpdateRequest(ReceiptExtra):
+    # Optimistic locking: the `revision` the client loaded; a mismatch means someone else changed the nota.
+    expected_revision: str | None = None
+    # Required (by the route) when status='void': why the nota is being cancelled.
+    void_reason: str | None = None
     plate_region: str | None = None
     plate_number: str | None = None
     plate_suffix: str | None = None
@@ -144,6 +148,7 @@ class ReceiptItemOut(BaseModel):
 
 
 class ReceiptOut(ReceiptExtra):
+    revision: str | None = None
     id: str
     plate_region: str
     plate_number: str
@@ -408,6 +413,8 @@ class MasterItemOut(BaseModel):
     archived_note: str | None = None
     archived_at: str | None = None
     updated_at: str | None = None
+    category_id: int | None = None
+    category_name: str | None = None
 
 
 class DuplicateCheckOut(BaseModel):
@@ -427,9 +434,11 @@ class MasterItemCreateRequest(BaseModel):
     description: str | None = None
     min_stock: int = 5
     location: str | None = None
+    category_id: int | None = None
 
 
 class MasterItemUpdateRequest(BaseModel):
+    expected_updated_at: str | None = None
     name: str | None = None
     sell_price: int | None = None
     unit: str | None = None
@@ -437,6 +446,8 @@ class MasterItemUpdateRequest(BaseModel):
     min_stock: int | None = None
     location: str | None = None
     price_note: str | None = None
+    # Send null to clear the category; leave the field out to keep it.
+    category_id: int | None = None
 
 
 class MasterItemArchiveRequest(BaseModel):
@@ -773,6 +784,7 @@ class PreorderRequest(BaseModel):
 
 
 class PreorderUpdateRequest(BaseModel):
+    expected_updated_at: str | None = None
     customer_name: str | None = None
     customer_phone: str | None = None
     plate_full: str | None = None
@@ -807,7 +819,42 @@ class PreorderPaymentOut(BaseModel):
     created_by: str | None = None
 
 
+class PreorderAllocationOut(BaseModel):
+    id: int
+    receipt_id: str
+    receipt_no: str | None = None
+    amount: int
+    allocated_at: str
+    allocated_by: str | None = None
+
+
+class PreorderConvertRequest(BaseModel):
+    # Omit to take every line that has arrived and is not on a nota yet.
+    item_ids: list[int] | None = None
+    # Omit to use the plate saved on the preorder.
+    plate_region: str | None = None
+    plate_number: str | None = None
+    plate_suffix: str | None = None
+
+
+class PreorderConvertResponse(BaseModel):
+    receipt_id: str
+    receipt_no: str | None = None
+    total: int
+    dp_applied: int
+    amount_due: int
+
+
+class PreorderItemSupplierPo(BaseModel):
+    supplier_po_id: str
+    po_number: str
+    po_status: str
+    qty_ordered: int
+    qty_received: int
+
+
 class PreorderItemOut(BaseModel):
+    supplier_pos: list[PreorderItemSupplierPo] = []
     id: int
     master_item_id: int | None = None
     # SKU of the linked master item, null for a free-text line.
@@ -817,6 +864,8 @@ class PreorderItemOut(BaseModel):
     quantity: int
     unit_price: int
     status: str
+    # Set once the line is on a nota (PO Customer -> nota).
+    receipt_id: str | None = None
 
 
 class PreorderHistoryOut(BaseModel):
@@ -856,6 +905,9 @@ class PreorderDetail(PreorderOut):
     items: list[PreorderItemOut]
     history: list[PreorderHistoryOut]
     payments: list[PreorderPaymentOut]
+    allocations: list[PreorderAllocationOut] = []
+    # DP still free to apply to a nota.
+    dp_unallocated: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -901,6 +953,7 @@ class SupplierPoRequest(SupplierPoInvoiceFields):
 
 
 class SupplierPoUpdateRequest(SupplierPoInvoiceFields):
+    expected_updated_at: str | None = None
     supplier_id: int | None = None
     po_date: str | None = None
     items: list[SupplierPoItemRequest] | None = None
@@ -1018,6 +1071,16 @@ class SupplierPoCancellationOut(BaseModel):
     note: str | None = None
     cancelled_by: str | None = None
     cancelled_at: str
+    # menunggu_persetujuan (asked, supplier has not answered) | disetujui | ditolak
+    status: str = "disetujui"
+    resolved_by: str | None = None
+    resolved_at: str | None = None
+    resolution_note: str | None = None
+
+
+class SupplierPoResolveCancelRequest(BaseModel):
+    approved: bool
+    note: str | None = None
 
 
 class SupplierPoOut(BaseModel):
@@ -1100,3 +1163,71 @@ class SupplierPoCandidatePage(BaseModel):
     rows: list[SupplierPoCandidateOut]
     total: int
     counts: SupplierPoCandidateCounts
+
+
+# ---------------------------------------------------------------------------
+# Master Kategori
+# ---------------------------------------------------------------------------
+
+
+class CategoryCreateRequest(BaseModel):
+    name: str
+    code: str | None = None  # blank = generated
+    parent_id: int | None = None
+    status: str = "aktif"
+    icon: str | None = None
+    description: str | None = None
+
+
+class CategoryUpdateRequest(BaseModel):
+    expected_updated_at: str | None = None
+    name: str | None = None
+    parent_id: int | None = None  # send null to make it a main category; omit to keep
+    status: str | None = None
+    icon: str | None = None
+    description: str | None = None
+
+
+class CategoryOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    parent_id: int | None = None
+    parent_name: str | None = None
+    parent_code: str | None = None
+    status: str
+    icon: str | None = None
+    description: str | None = None
+    created_by: str | None = None
+    created_at: str
+    updated_by: str | None = None
+    updated_at: str
+    product_count: int = 0
+    own_product_count: int = 0
+    active_product_count: int = 0
+    out_of_stock_count: int = 0
+    child_count: int = 0
+
+
+class CategoryDetailOut(CategoryOut):
+    subcategories: list[CategoryOut] = []
+
+
+class CategoryItemOut(BaseModel):
+    id: int
+    sku: str
+    name: str
+    stock_qty: int
+    min_stock: int
+    sell_price: int
+    is_active: bool
+    category_name: str
+
+
+class CategoryItemsOut(BaseModel):
+    total: int
+    items: list[CategoryItemOut]
+
+
+class CategoryImportRequest(BaseModel):
+    csv: str

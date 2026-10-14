@@ -11,6 +11,7 @@ from backend.database import (
     add_supplier_po_payment,
     cancel_supplier_po,
     cancel_supplier_po_item,
+    resolve_spo_cancellation,
     create_supplier_po,
     get_all_supplier_pos,
     get_supplier_po,
@@ -26,6 +27,7 @@ from backend.database import (
 )
 from backend.schemas import (
     SupplierPoCancelItemRequest,
+    SupplierPoResolveCancelRequest,
     SupplierPoCandidatePage,
     SupplierPoDetail,
     SupplierPoInvoiceFields,
@@ -155,6 +157,10 @@ async def update_supplier_po_route(
     supplier_po_id: str, req: SupplierPoUpdateRequest, user: dict = Depends(get_current_user)
 ):
     update_notes = "notes" in req.model_fields_set
+    if req.expected_updated_at:
+        current = await _run(get_supplier_po, supplier_po_id)
+        if current and req.expected_updated_at != current["updated_at"]:
+            raise HTTPException(status_code=409, detail="Data ini baru saja diubah oleh pengguna lain. Muat ulang halaman lalu ulangi perubahan Anda.")
     return await _run(
         update_supplier_po, supplier_po_id, supplier_id=req.supplier_id,
         po_date=_validate_po_date(req.po_date) if req.po_date is not None else None,
@@ -217,6 +223,14 @@ async def cancel_item_route(
         cancel_supplier_po_item, supplier_po_id, item_id, req.quantity, req.reason, req.action,
         _text(req.note), user["username"],
     )
+
+
+@router.post("/supplier-pos/{supplier_po_id}/cancellations/{cancellation_id}/resolve", response_model=SupplierPoDetail)
+async def resolve_cancellation_route(
+    supplier_po_id: str, cancellation_id: int, req: SupplierPoResolveCancelRequest, user: dict = Depends(get_current_user)
+):
+    """Records the supplier's answer to a pending cancellation request."""
+    return await _run(resolve_spo_cancellation, supplier_po_id, cancellation_id, req.approved, _text(req.note), user["username"])
 
 
 @router.post("/supplier-pos/{supplier_po_id}/cancel", response_model=SupplierPoDetail)

@@ -8,6 +8,12 @@ from backend.auth import get_current_user
 from backend.database import (
     PREORDER_STATUSES,
     add_preorder_payment,
+    apply_preorder_dp,
+    create_receipt,
+    get_preorder_allocations,
+    preorder_convertible_items,
+    preorder_unallocated_dp,
+    _conn,
     create_preorder,
     get_all_preorders,
     get_preorder,
@@ -20,6 +26,9 @@ from backend.database import (
     update_preorder,
 )
 from backend.schemas import (
+    PreorderAllocationOut,
+    PreorderConvertRequest,
+    PreorderConvertResponse,
     PreorderDetail,
     PreorderHistoryOut,
     PreorderItemOut,
@@ -108,6 +117,8 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         quantity=row["quantity"],
         unit_price=row["unit_price"],
         status=row["status"],
+        receipt_id=row.get("receipt_id"),
+        supplier_pos=row.get("supplier_pos") or [],
     )
 
 
@@ -119,8 +130,15 @@ async def _detail(preorder_id: str) -> PreorderDetail:
     items = await loop.run_in_executor(None, get_preorder_items, preorder_id)
     history = await loop.run_in_executor(None, get_preorder_history, preorder_id)
     payments = await loop.run_in_executor(None, get_preorder_payments, preorder_id)
+    allocations = await loop.run_in_executor(None, get_preorder_allocations, preorder_id)
+    def _free() -> int:
+        with _conn() as con:
+            return preorder_unallocated_dp(con, preorder_id)
+    dp_free = await loop.run_in_executor(None, _free)
     return PreorderDetail(
         **row,
+        allocations=[PreorderAllocationOut(**a) for a in allocations],
+        dp_unallocated=dp_free,
         items=[_row_to_item(i) for i in items],
         history=[PreorderHistoryOut(**h) for h in history],
         payments=[PreorderPaymentOut(**p) for p in payments],
@@ -173,8 +191,11 @@ async def update_preorder_route(
     preorder_id: str, req: PreorderUpdateRequest, user: dict = Depends(get_current_user)
 ):
     loop = asyncio.get_event_loop()
-    if await loop.run_in_executor(None, get_preorder, preorder_id) is None:
+    current = await loop.run_in_executor(None, get_preorder, preorder_id)
+    if current is None:
         raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
+    if req.expected_updated_at and current.get("updated_at") and req.expected_updated_at != current["updated_at"]:
+        raise HTTPException(status_code=409, detail="Data ini baru saja diubah oleh pengguna lain. Muat ulang halaman lalu ulangi perubahan Anda.")
 
     customer_name: str | None = None
     if req.customer_name is not None:
@@ -258,6 +279,54 @@ async def add_payment(
     note = req.note.strip() if req.note and req.note.strip() else None
     await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"])
     return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/convert", response_model=PreorderConvertResponse, status_code=201)
+async def convert_to_receipt(
+    preorder_id: str, req: PreorderConvertRequest, user: dict = Depends(get_current_user)
+):
+    """PO Customer -> nota. Takes the lines that have arrived, opens a nota (Siap Pembayaran)
+    and applies the PO's unallocated DP to it once, through the allocation ledger."""
+    loop = asyncio.get_event_loop()
+    po = await loop.run_in_executor(None, get_preorder, preorder_id)
+    if po is None:
+        raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
+    lines = await loop.run_in_executor(None, preorder_convertible_items, preorder_id, req.item_ids)
+    if req.item_ids is not None and len(lines) != len(set(req.item_ids)):
+        raise HTTPException(status_code=409, detail="Ada item yang belum sampai di toko atau sudah masuk nota.")
+    if not lines:
+        raise HTTPException(status_code=409, detail="Belum ada item PO yang sampai di toko dan belum masuk nota.")
+
+    parts = (po["plate_full"] or "").split()
+    region = (req.plate_region or (parts[0] if len(parts) == 3 else "")).upper()
+    number = req.plate_number or (parts[1] if len(parts) == 3 else "")
+    suffix = (req.plate_suffix or (parts[2] if len(parts) == 3 else "")).upper()
+    if not (region and number and suffix):
+        raise HTTPException(status_code=422, detail="Plat nomor belum ada di PO ini. Isi plat untuk membuat nota.")
+    from backend.routes.receipts import NUMBER_RE, PLATE_CODES, SUFFIX_RE
+    if region not in PLATE_CODES or not NUMBER_RE.match(number) or not SUFFIX_RE.match(suffix):
+        raise HTTPException(status_code=422, detail="Plat nomor tidak valid.")
+
+    items = [{
+        "product_name": l["product_name"], "quantity": l["quantity"], "unit_price": l["unit_price"],
+        "sku": l.get("sku"), "item_type": "barang", "line_discount": 0, "warranty_date": None,
+    } for l in lines]
+    receipt_id = str(uuid4())
+    try:
+        result = await loop.run_in_executor(
+            None, create_receipt, receipt_id, region, number, suffix, items, 0, 0, None,
+            po["customer_phone"], po["customer_name"], None, "cash", None, None, None,
+            user["username"], "siap_bayar", None,
+        )
+        dp = await loop.run_in_executor(
+            None, apply_preorder_dp, preorder_id, receipt_id, [l["id"] for l in lines], user["username"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return PreorderConvertResponse(
+        receipt_id=receipt_id, receipt_no=result["receipt_no"], total=result["total"],
+        dp_applied=dp, amount_due=max(result["total"] - dp, 0),
+    )
 
 
 # There is deliberately no DELETE /preorders/{preorder_id} route. A preorder

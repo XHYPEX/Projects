@@ -9,6 +9,8 @@ from fastapi.responses import FileResponse
 from backend import product_images
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    category_subtree_ids,
+    get_category_row,
     autocomplete_master_items,
     create_brand,
     create_inbound_document,
@@ -230,6 +232,8 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         archived_note=row.get("archived_note"),
         archived_at=row.get("archived_at"),
         updated_at=row.get("updated_at"),
+        category_id=row.get("category_id"),
+        category_name=row.get("category_name"),
     )
 
 
@@ -572,6 +576,17 @@ async def get_master_item_by_sku_route(sku: str):
 # --- master items --------------------------------------------------------
 
 
+async def _require_assignable_category(loop, category_id: int | None) -> None:
+    """A product may only be put in an existing, active category (not archived/nonaktif)."""
+    if category_id is None:
+        return
+    cat = await loop.run_in_executor(None, get_category_row, category_id)
+    if cat is None:
+        raise HTTPException(status_code=422, detail=f"Kategori dengan ID {category_id} tidak ditemukan.")
+    if cat["status"] != "aktif":
+        raise HTTPException(status_code=422, detail=f"Kategori '{cat['name']}' tidak aktif, pilih kategori lain.")
+
+
 @router.post("/inventory/master-items", response_model=MasterItemOut, status_code=201)
 async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depends(get_current_user)):
     if not req.name.strip():
@@ -588,6 +603,7 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
         raise HTTPException(status_code=422, detail="Stok minimum tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
+    await _require_assignable_category(loop, req.category_id)
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
         raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
     if await loop.run_in_executor(None, get_brand, req.brand_id) is None:
@@ -599,7 +615,7 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
         row = await loop.run_in_executor(
             None, create_master_item, req.supplier_id, req.brand_id, req.name.strip(), req.unit.strip(),
             req.sell_price, req.cost_price, req.stock_qty, req.description, req.min_stock, req.location,
-            user["username"],
+            user["username"], req.category_id,
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -626,6 +642,7 @@ async def list_master_items_route(
     stock_max: int | None = None,
     no_price: bool = False,
     sort: str = "newest",
+    category_id: int | None = None,
 ):
     if stock_status is not None and stock_status not in MASTER_STOCK_CLAUSES:
         raise HTTPException(status_code=422, detail=f"stock_status harus salah satu dari: {', '.join(MASTER_STOCK_CLAUSES)}.")
@@ -642,6 +659,7 @@ async def list_master_items_route(
         None, lambda: list_master_items(
             page, page_size, search, supplier_id, brand_id, is_active,
             stock_status=stock_status, stock_min=stock_min, stock_max=stock_max, no_price=no_price, sort=sort,
+            category_ids=(category_subtree_ids(category_id) if category_id is not None else None),
         ),
     )
     return MasterItemListOut(
@@ -698,14 +716,23 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
         raise HTTPException(status_code=422, detail="Stok minimum tidak boleh negatif.")
 
     loop = asyncio.get_event_loop()
-    if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
+    current = await loop.run_in_executor(None, get_master_item, master_item_id)
+    if current is None:
         raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    if req.expected_updated_at and current.get("updated_at") and req.expected_updated_at != current["updated_at"]:
+        raise HTTPException(status_code=409, detail="Data ini baru saja diubah oleh pengguna lain. Muat ulang halaman lalu ulangi perubahan Anda.")
     if req.unit is not None and await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
         raise HTTPException(status_code=422, detail=f"Satuan '{req.unit}' tidak valid.")
+    set_category = "category_id" in req.model_fields_set
+    if set_category and req.category_id != current.get("category_id"):
+        await _require_assignable_category(loop, req.category_id)
     try:
         row = await loop.run_in_executor(
-            None, update_master_item, master_item_id, req.name, req.sell_price, req.unit,
-            req.description, req.min_stock, req.location, user["username"], req.price_note,
+            None, lambda: update_master_item(
+                master_item_id, req.name, req.sell_price, req.unit, req.description, req.min_stock,
+                req.location, user["username"], req.price_note,
+                set_category=set_category, category_id=req.category_id,
+            ),
         )
     except ValueError as e:
         _raise_from_value_error(e)

@@ -128,6 +128,8 @@
     .po-pill.is-solid.is-spo-pay-sebagian { background: #4B6C6F; }
     .po-pill.is-solid.is-spo-pay-lunas { background: #5B7A5B; }
     .po-pill.is-solid.is-spo-pay-lewat_jatuh_tempo { background: #A83B3B; }
+    /* the soft is-spo-* rules above set a dark text colour later in the sheet than .is-solid; keep solid pills light-on-colour */
+    .po-pill.is-solid[class*="is-spo-"] { color: #FAF9F5; }
 
     ::selection { background: #D97757; color: #FAF9F5; }
 
@@ -458,6 +460,8 @@
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Supplier</a>
           <a href="#/master-satuan" data-route="/master-satuan"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Satuan</a>
+          <a href="#/master-kategori" data-route="/master-kategori"
+            class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Kategori</a>
           <a href="#/master-customer" data-route="/master-customer"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Customer</a>
         </div>
@@ -554,6 +558,7 @@
   </div>
 
   <!-- MODAL (generic — used by the Barang Masuk module for quick-add-supplier, quick-add-brand, and void-reason input; no native prompt()/confirm() anywhere) -->
+  <div id="master-row-menu" class="hidden fixed z-40 min-w-[190px] bg-bg border border-line rounded-lg shadow-sm py-1" role="menu"></div>
   <div id="modal-backdrop" onclick="closeModal()" class="hidden fixed inset-0 bg-ink/40 z-50"></div>
   <div id="modal-panel" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
     <div id="modal-card" class="bg-bg border border-line rounded-xl max-w-md w-full max-h-[85vh] overflow-y-auto p-5 pointer-events-auto">
@@ -1311,20 +1316,20 @@
           </label>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[1100px] text-sm">
+          <table class="w-full min-w-[960px] text-[13px]">
             <thead class="bg-bg2">
               <tr>
-                <th class="text-left pl-4 pr-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Invoice</th>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
-                <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Item</th>
-                <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
-                <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dibayar</th>
-                <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Nota</th>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pembayaran</th>
-                <th class="text-right pl-3 pr-4 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
+                <th class="text-left pl-4 pr-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Invoice</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+                <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Item</th>
+                <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
+                <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dibayar</th>
+                <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Nota</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pembayaran</th>
+                <th class="text-right pl-2 pr-4 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
               </tr>
             </thead>
             <tbody id="history-tbody"></tbody>
@@ -1756,6 +1761,7 @@
             <div class="relative">
               <button onclick="togglePoMenu(event)" aria-label="Aksi lainnya" class="px-2.5 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">&middot;&middot;&middot;</button>
               <div id="po-menu" class="hidden absolute right-0 mt-1 z-20 min-w-[170px] bg-bg border border-line rounded-lg shadow-sm py-1">
+                <button onclick="openPoConvertModal()" class="w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg2 transition-colors">Buat Nota Penjualan</button>
                 <button id="po-menu-draft" onclick="togglePreorderDraft()" class="admin-only w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg2 transition-colors">Jadikan Draft</button>
               </div>
             </div>
@@ -1813,6 +1819,15 @@
             <div class="flex items-center justify-between"><span class="text-muted">Total Dibayar</span><span id="po-detail-paid" class="font-semibold text-done tabular-nums"></span></div>
             <div class="flex items-center justify-between border-t border-line pt-2"><span class="text-muted">Sisa Tagihan</span><span id="po-detail-remaining" class="font-serif text-base font-semibold text-failed tabular-nums"></span></div>
           </div>
+        </div>
+
+        <div id="po-detail-nota-card" class="bg-white border border-line rounded-xl p-4 mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Nota &amp; Alokasi DP</div>
+            <button type="button" id="po-convert-btn" onclick="openPoConvertModal()" class="px-3 py-1.5 border border-line rounded-lg text-xs font-medium text-ink hover:bg-bg2 transition-colors">Buat Nota Penjualan</button>
+          </div>
+          <div id="po-detail-nota-info" class="mt-2 text-sm text-muted"></div>
+          <div id="po-detail-allocs" class="mt-2 space-y-1.5"></div>
         </div>
 
         <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Riwayat Perubahan Status</div>
@@ -2290,6 +2305,150 @@
   </div>
 
   <!-- PAGE: DASHBOARD (Ringkasan — moved here from the Inventori tab bar) -->
+  <!-- ===== MASTER KATEGORI ===== -->
+  <div id="page-kategori" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
+
+      <!-- LIST + STRUKTUR -->
+      <div id="kat-list-panel">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5" id="kat-kpis" aria-live="polite"></div>
+
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <input id="kat-search" type="text" placeholder="Cari kategori atau kode…" autocomplete="off" oninput="katOnFilterChange()"
+            class="flex-1 min-w-[220px] border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+          <button type="button" onclick="katPickCsv()" class="admin-only px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Import CSV</button>
+          <input id="kat-csv-file" type="file" accept=".csv,text/csv" class="hidden" onchange="katImportCsv(this)" />
+          <a href="/api/categories/export.csv" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Unduh CSV</a>
+          <button type="button" onclick="katOpenMainModal()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Tambah Kategori Utama</button>
+          <button type="button" onclick="katNewForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Tambah Kategori</button>
+        </div>
+        <div class="flex flex-wrap items-end gap-3 mb-4">
+          <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Status
+            <select id="kat-f-status" onchange="katOnFilterChange()" class="mt-1 block border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink normal-case tracking-normal font-normal">
+              <option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option><option value="arsip">Arsip</option></select></label>
+          <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Tipe
+            <select id="kat-f-type" onchange="katOnFilterChange()" class="mt-1 block border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink normal-case tracking-normal font-normal">
+              <option value="">Semua tipe</option><option value="utama">Kategori utama</option><option value="sub">Subkategori</option></select></label>
+          <label class="text-[11px] font-medium text-muted uppercase tracking-wider">Produk
+            <select id="kat-f-empty" onchange="katOnFilterChange()" class="mt-1 block border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink normal-case tracking-normal font-normal">
+              <option value="">Semua kategori</option><option value="1">Tanpa produk</option></select></label>
+          <button type="button" onclick="katResetFilters()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Reset</button>
+          <label class="text-[11px] font-medium text-muted uppercase tracking-wider ml-auto">Urutkan
+            <select id="kat-f-sort" onchange="katOnFilterChange()" class="mt-1 block border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink normal-case tracking-normal font-normal">
+              <option value="name_asc">Nama A - Z</option><option value="name_desc">Nama Z - A</option><option value="products">Produk terbanyak</option><option value="updated">Terakhir diubah</option></select></label>
+          <div class="inline-flex border border-line rounded-lg overflow-hidden bg-white" role="group" aria-label="Tampilan">
+            <button type="button" id="kat-view-list" onclick="katSetView('list')" class="px-3 py-2 text-sm">Daftar</button>
+            <button type="button" id="kat-view-tree" onclick="katSetView('tree')" class="px-3 py-2 text-sm border-l border-line">Struktur</button>
+          </div>
+        </div>
+
+        <!-- Daftar -->
+        <div id="kat-table-wrap">
+          <div class="bg-white border border-line rounded-xl overflow-x-auto">
+            <table class="w-full min-w-[860px] text-sm">
+              <thead class="bg-bg2"><tr>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Kode</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Kategori</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Induk Kategori</th>
+                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jumlah Produk</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Terakhir Diubah</th>
+                <th class="px-3 py-2 border-b border-line w-12"><span class="sr-only">Aksi</span></th>
+              </tr></thead>
+              <tbody id="kat-tbody"></tbody>
+            </table>
+            <div id="kat-empty" class="hidden text-center py-10 text-sm text-muted"></div>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mt-3 text-sm text-muted">
+            <span id="kat-count-label"></span>
+            <div class="flex items-center gap-2">
+              <select id="kat-page-size" onchange="katPage = 1; katRenderList()" class="border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink">
+                <option value="10">10 / halaman</option><option value="25">25 / halaman</option><option value="50">50 / halaman</option></select>
+              <button type="button" id="kat-prev" onclick="katGoPage(-1)" class="px-3 py-1.5 border border-line rounded-lg bg-white hover:bg-bg2 text-ink transition-colors">&lsaquo;</button>
+              <span id="kat-page-label" class="tabular-nums"></span>
+              <button type="button" id="kat-next" onclick="katGoPage(1)" class="px-3 py-1.5 border border-line rounded-lg bg-white hover:bg-bg2 text-ink transition-colors">&rsaquo;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Struktur -->
+        <div id="kat-tree-wrap" class="hidden grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-4">
+          <div class="bg-white border border-line rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Daftar Kategori</div>
+              <div class="flex gap-1.5">
+                <button type="button" onclick="katExpandAll(true)" class="px-2 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 whitespace-nowrap">Expand Semua</button>
+                <button type="button" onclick="katExpandAll(false)" class="px-2 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 whitespace-nowrap">Collapse Semua</button>
+              </div>
+            </div>
+            <div id="kat-tree" role="tree" class="space-y-0.5"></div>
+          </div>
+          <div id="kat-tree-detail" class="bg-white border border-line rounded-xl p-4 sm:p-5 min-h-[200px]"></div>
+        </div>
+      </div>
+
+      <!-- FORM (tambah / edit) -->
+      <div id="kat-form-panel" class="hidden">
+        <button type="button" onclick="katBackToList()" class="text-sm text-accent hover:underline mb-3">&larr; Kembali ke Daftar Kategori</button>
+        <h2 id="kat-form-title" class="font-serif text-2xl font-semibold text-ink"></h2>
+        <p id="kat-form-sub" class="text-sm text-muted mb-4"></p>
+        <p id="kat-form-lock-warn" class="hidden mb-4 bg-pending/10 border border-pending/30 rounded-lg px-4 py-2.5 text-sm text-ink">Perubahan nama atau induk memengaruhi filter dan tampilan di Master Barang. Kode kategori tidak bisa diubah.</p>
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+          <div class="bg-white border border-line rounded-xl p-4 sm:p-5 space-y-4">
+            <div class="font-serif font-semibold text-ink">Informasi Kategori</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="kat-f-name" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Kategori <span class="text-failed">*</span></label>
+                <input id="kat-f-name" type="text" maxlength="80" autocomplete="off" data-no-uppercase oninput="katOnNameInput()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              </div>
+              <div>
+                <label for="kat-f-code" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kode Kategori <span class="text-failed">*</span></label>
+                <div class="flex gap-2">
+                  <input id="kat-f-code" type="text" maxlength="30" autocomplete="off" data-no-uppercase class="flex-1 min-w-0 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink font-mono uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors" />
+                  <button type="button" id="kat-f-gen" onclick="katGenerateCode()" class="px-3 py-2 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 whitespace-nowrap">Generate Otomatis</button>
+                </div>
+                <p id="kat-f-code-hint" class="text-xs text-muted mt-1.5">Kode unik, huruf besar, tanpa spasi. Contoh: SUB-WIP-DEP.</p>
+              </div>
+            </div>
+            <p id="kat-f-name-note" class="hidden bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-xs text-ink"></p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="kat-f-parent" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kategori Induk <span class="normal-case font-normal">(opsional)</span></label>
+                <select id="kat-f-parent" onchange="katOnParentChange()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+                <p class="text-xs text-muted mt-1.5">Pilih induk bila ini subkategori. Kosongkan untuk kategori utama.</p>
+              </div>
+              <div>
+                <label for="kat-f-status-sel" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Status</label>
+                <select id="kat-f-status-sel" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                  <option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select>
+                <p class="text-xs text-muted mt-1.5">Kategori nonaktif tidak bisa dipilih untuk barang baru.</p>
+              </div>
+            </div>
+            <div>
+              <div class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Ikon Kategori <span class="normal-case font-normal">(opsional)</span></div>
+              <div id="kat-f-icons" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div>
+              <label for="kat-f-desc" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Deskripsi <span class="normal-case font-normal">(opsional)</span></label>
+              <textarea id="kat-f-desc" rows="3" maxlength="500" data-no-uppercase oninput="katUpdateDescCount()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors resize-y"></textarea>
+              <div id="kat-f-desc-count" class="text-xs text-muted text-right mt-1 tabular-nums">0/500</div>
+            </div>
+          </div>
+          <div id="kat-form-aside" class="bg-white border border-line rounded-xl p-4 sm:p-5 text-sm self-start"></div>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2 mt-4">
+          <button type="button" onclick="katBackToList()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Batal</button>
+          <button type="button" id="kat-save-again" onclick="katSaveForm(true)" class="px-4 py-2 border border-accent text-accent rounded-lg text-sm font-medium bg-white hover:bg-bg2 transition-colors">Simpan &amp; Tambah Lagi</button>
+          <button type="button" id="kat-save" onclick="katSaveForm(false)" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Simpan Kategori</button>
+        </div>
+      </div>
+
+      <!-- DETAIL -->
+      <div id="kat-detail-panel" class="hidden"></div>
+
+    </div>
+  </div>
+
   <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-6xl mx-auto">
 
@@ -2853,15 +3012,14 @@
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Foto</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Barang</th>
-                    <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek</th>
-                    <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Satuan</th>
+                    <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek / Supplier</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Produk</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Persediaan</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal Rata-rata</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Margin</th>
-                    <th class="text-right px-4 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
+                    <th class="sticky right-0 bg-bg2 text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line shadow-[-6px_0_6px_-6px_rgba(20,20,19,0.12)]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="master-items-tbody"></tbody>
@@ -3333,6 +3491,11 @@
                   </div>
                   <p id="new-item-stock-hint" class="text-xs text-muted mt-1.5">Isi jumlah yang ada sekarang. Kosongkan atau 0 jika belum ada stok.</p>
                 </div>
+                <div>
+                  <label for="new-item-category" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kategori <span class="normal-case font-normal">(opsional)</span></label>
+                  <select id="new-item-category" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+                  <p class="text-xs text-muted mt-1.5">Pilih subkategori bila ada. Kelola daftar di Inventori &rsaquo; Master Kategori.</p>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label for="new-item-min-stock" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Stok Minimum <span class="text-failed">*</span></label>
@@ -3776,6 +3939,49 @@
 
 <script>
 const API = "";
+// ── Idempotency ──────────────────────────────────────────────────────────────
+// Every POST that creates a nota, takes a payment, receives goods or moves stock carries an
+// Idempotency-Key, so a double click or a slow-network retry is answered by the server from the first
+// request instead of creating a second nota / payment / stock movement. Identical requests (same URL
+// and body) share one key while the first is in flight and for a few seconds after; a failed request
+// forgets its key so the corrected retry is a new one.
+(() => {
+  const NEEDS_KEY = /^\/api\/(receipts(\/[^/]+\/payments)?|preorders(\/[^/]+\/(payments|convert))?|supplier-pos(\/[^/]+\/(payments|receive|items\/\d+\/cancel))?|inventory\/(stock-adjustments|master-items|inbound-documents(\/\d+\/post)?))$/;
+  const recent = new Map();   // fingerprint -> { key, until }
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const method = String(init.method || (input && input.method) || "GET").toUpperCase();
+    const rawUrl = typeof input === "string" ? input : (input && input.url) || "";
+    let path = rawUrl;
+    try { path = new URL(rawUrl, location.href).pathname; } catch (_) {}
+    if (method !== "POST" || !NEEDS_KEY.test(path)) return nativeFetch(input, init);
+    const fingerprint = path + "|" + (typeof init.body === "string" ? init.body : "");
+    let entry = recent.get(fingerprint);
+    if (!entry || entry.until < Date.now()) {
+      entry = { key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), until: Infinity };
+      recent.set(fingerprint, entry);
+    }
+    const headers = new Headers(init.headers || {});
+    if (!headers.has("Idempotency-Key")) headers.set("Idempotency-Key", entry.key);
+    const mine = entry;
+    // 409 "masih diproses" means the first copy of this request is still running: wait for it and
+    // ask again with the same key, which then returns the first one's result.
+    const attempt = async (tries) => {
+      const resp = await nativeFetch(input, { ...init, headers });
+      if (resp.status === 409 && tries > 0) {
+        let busy = false;
+        try { busy = String((await resp.clone().json()).detail || "").startsWith("Permintaan yang sama masih diproses"); } catch (_) {}
+        if (busy) { await new Promise(r => setTimeout(r, 700)); return attempt(tries - 1); }
+      }
+      return resp;
+    };
+    return attempt(6).then(resp => {
+      if (resp.ok) mine.until = Date.now() + 8000; else recent.delete(fingerprint);
+      return resp;
+    }, err => { mine.until = Date.now() + 8000; throw err; });
+  };
+})();
+
 let currentUser = null;
 // Populated from /api/config before the first render; the optimistic default
 // only matters if that fetch fails.
@@ -4033,6 +4239,7 @@ const ROUTES = {
   "/master-brand": { title: "Master Brand", page: "page-inventory", section: "inv-tab-brand", data: "brand" },
   "/master-supplier": { title: "Master Supplier", page: "page-inventory", section: "inv-tab-supplier", data: "supplier" },
   "/master-satuan": { title: "Master Satuan", page: "page-inventory", section: "inv-tab-unit", data: "unit" },
+  "/master-kategori": { title: "Master Kategori", page: "page-kategori" },
   "/master-customer": { title: "Master Customer", page: "page-inventory", section: "inv-tab-customer", data: "customer" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
   "/users": { title: "Pengguna", page: "page-users" },
@@ -4086,7 +4293,7 @@ function renderRoute() {
   document.querySelectorAll(".nav-link").forEach(el => {
     el.classList.toggle("is-active", el.dataset.route === route);
   });
-  if (INVENTORY_ROUTES.has(route)) {
+  if (INVENTORY_ROUTES.has(route) || route === "/master-kategori") {
     // Keep the parent "Inventori" entry lit on every one of its child routes.
     document.querySelector('.nav-link[data-route="/inventory-group"]')?.classList.add("is-active");
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
@@ -4094,6 +4301,7 @@ function renderRoute() {
   }
   if (route === "/cashier") itemEntryInput()?.focus();
   if (route === "/dashboard") loadDashboardOverview();
+  if (route === "/master-kategori") katInit();
   if (route === "/preorder") { backToPreorderList(); }
   if (route === "/supplier-po") { backToSupplierPoList(); }
   if (route === "/purchase-invoices") { backToPurchaseInvoiceList(); }
@@ -4175,6 +4383,10 @@ const ROUTE_META = {
   "/master-satuan": {
     subtitle: "Satuan yang bisa dipilih saat menambah barang.",
     icon: '<path d="M12 3l9 5-9 5-9-5 9-5Z"/><path d="M3 13l9 5 9-5"/>',
+  },
+  "/master-kategori": {
+    subtitle: "Kelola kategori dan subkategori produk agar pencarian, filter, dan klasifikasi barang lebih rapi.",
+    icon: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
   },
   "/master-customer": {
     subtitle: "Daftar pelanggan, kontak, dan jumlah nota mereka.",
@@ -5519,6 +5731,7 @@ async function saveReceipt(mode = "save") {
       tab.receiptId = (await resp.json()).receipt_id;
     } else {
       if (tab.dirty) {
+        if (tab.revision) payload.expected_revision = tab.revision;   // refused (409) if someone else changed the nota meanwhile
         const resp = await fetch(`/api/receipts/${tab.receiptId}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
         if (!resp.ok) { showToast(await responseErrorDetail(resp, "Nota tidak bisa disimpan.")); return; }
       }
@@ -5707,6 +5920,7 @@ function tabStateFromReceipt(tabId, r) {
   return {
     tabId,
     receiptId: r.id,
+    revision: r.revision || null,
     plateRegion: r.plate_region,
     plateNumber: r.plate_number,
     plateSuffix: r.plate_suffix,
@@ -6010,7 +6224,7 @@ function applyCashierVoidLock(tab) {
 
   // Void itself can't be undone, and there's nothing left to void once a
   // receipt has no persisted id yet — hide the button in both cases.
-  document.getElementById("cashier-void-btn").classList.toggle("hidden", !tab.receiptId || isVoid || isPaid);
+  document.getElementById("cashier-void-btn").classList.toggle("hidden", !tab.receiptId || isVoid || (isPaid && currentUser?.role !== "admin"));
   // Reprint any saved nota; a void one is no longer a sale to hand to a customer.
   document.getElementById("cashier-print-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
 
@@ -6030,7 +6244,12 @@ function confirmVoidActiveReceipt() {
   if (!tab || !tab.receiptId || tab.status === "void") return;
   openModal("Void Nota", `
     <div class="space-y-3">
-      <p class="text-sm text-muted">Void nota tidak bisa dibatalkan — nota tidak dapat dikembalikan setelahnya, dan form akan terkunci dari perubahan. Yakin ingin melanjutkan?</p>
+      <p class="text-sm text-muted">Void nota tidak bisa dibatalkan — nota tidak dapat dikembalikan setelahnya, dan form akan terkunci dari perubahan. Stok barang dikembalikan.</p>
+      <div>
+        <label for="void-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan Void <span class="text-failed">*</span></label>
+        <textarea id="void-reason" rows="2" maxlength="200" data-no-uppercase placeholder="Contoh: salah input nota, pelanggan batal…" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"></textarea>
+      </div>
+      ${Number(tab.amountPaid || 0) > 0 ? `<p class="text-xs bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-ink">Nota ini sudah dibayar ${formatIDR(Number(tab.amountPaid))}. Pembayaran dibalik dan dicatat; uangnya harus dikembalikan ke pelanggan. Hanya admin yang bisa melakukannya.</p>` : ""}
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
         <button type="button" onclick="voidActiveReceiptConfirmed()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Void</button>
@@ -6042,10 +6261,11 @@ function confirmVoidActiveReceipt() {
 async function voidActiveReceiptConfirmed() {
   const tab = getActiveTab();
   if (!tab || !tab.receiptId) { closeModal(); return; }
+  if ((document.getElementById("void-reason")?.value || "").trim().length < 3) { showToast("Alasan void wajib diisi."); return; }
   const resp = await fetch(`/api/receipts/${tab.receiptId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "void" }),
+    body: JSON.stringify({ status: "void", void_reason: (document.getElementById("void-reason")?.value || "").trim() }),
   });
   if (!resp.ok) {
     let message = "Nota tidak bisa di-void.";
@@ -7305,7 +7525,12 @@ function confirmVoidHistoryRow(receiptId) {
         <div class="font-serif font-semibold text-ink">${esc(r.plate_full)}</div>
         <div class="text-xs text-muted mt-0.5">${esc(r.receipt_no || "")} &middot; ${formatIDR(r.total)}</div>
       </div>
-      <p class="text-sm text-muted">Void nota tidak bisa dibatalkan — nota tidak dapat dikembalikan setelahnya. Yakin ingin melanjutkan?</p>
+      <p class="text-sm text-muted">Void nota tidak bisa dibatalkan — nota tidak dapat dikembalikan setelahnya. Stok barang dikembalikan.</p>
+      <div>
+        <label for="void-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan Void <span class="text-failed">*</span></label>
+        <textarea id="void-reason" rows="2" maxlength="200" data-no-uppercase placeholder="Contoh: salah input nota, pelanggan batal…" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"></textarea>
+      </div>
+      ${r.amount_paid > 0 ? `<p class="text-xs bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-ink">Nota ini sudah dibayar ${formatIDR(r.amount_paid)}. Pembayaran dibalik dan dicatat; uangnya harus dikembalikan ke pelanggan. Hanya admin yang bisa melakukannya.</p>` : ""}
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
         <button type="button" onclick="voidHistoryRowConfirmed('${esc(receiptId)}')" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Void</button>
@@ -7315,12 +7540,14 @@ function confirmVoidHistoryRow(receiptId) {
 }
 
 async function voidHistoryRowConfirmed(receiptId) {
+  const reason = (document.getElementById("void-reason")?.value || "").trim();
+  if (reason.length < 3) { showToast("Alasan void wajib diisi."); return; }
   let resp;
   try {
     resp = await fetch(`/api/receipts/${encodeURIComponent(receiptId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "void" }),
+      body: JSON.stringify({ status: "void", void_reason: reason }),
     });
   } catch (_) {
     showToast("Tidak bisa terhubung ke server.");
@@ -7365,28 +7592,28 @@ function renderHistoryTable(receipts, total) {
     const tr = document.createElement("tr");
     tr.className = "border-b border-line last:border-b-0 hover:bg-bg2/50 cursor-pointer transition-colors";
     tr.innerHTML = `
-      <td class="pl-4 pr-3 py-3 whitespace-nowrap font-medium text-ink tabular-nums">${esc(r.receipt_no || "—")}</td>
-      <td class="px-3 py-3 whitespace-nowrap">
+      <td class="pl-4 pr-2 py-3 whitespace-nowrap font-medium text-ink tabular-nums">${esc(r.receipt_no || "—")}</td>
+      <td class="px-2 py-3 whitespace-nowrap">
         <button type="button" onclick="event.stopPropagation(); openReceiptFromHistory('${r.id}')"
           class="font-serif font-semibold text-ink hover:text-accentDark rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors">${esc(r.plate_full)}</button>
       </td>
-      <td class="px-3 py-3">
+      <td class="px-2 py-3">
         <div class="min-w-[9rem]">
           <div class="text-ink">${esc(who || r.customer_phone) || "&mdash;"}</div>
           ${who && r.customer_phone ? `<div class="text-xs text-muted tabular-nums">${esc(r.customer_phone)}</div>` : ""}
         </div>
       </td>
-      <td class="px-3 py-3 whitespace-nowrap tabular-nums">
+      <td class="px-2 py-3 whitespace-nowrap tabular-nums">
         <div class="text-ink">${esc(formatNotaDate(r.created_at))}</div>
         <div class="text-xs text-muted">${isNaN(created) ? "" : `${pad2(created.getHours())}:${pad2(created.getMinutes())}`}</div>
       </td>
-      <td class="px-3 py-3 text-right text-muted tabular-nums">${r.item_count}</td>
-      <td class="px-3 py-3 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(r.total)}</td>
-      <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap ${r.status === "void" ? "text-muted" : "text-done"}">${r.status === "void" ? "&mdash;" : formatIDR(r.amount_paid)}</td>
-      <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap ${remaining > 0 ? "text-failed" : "text-muted"}">${r.status === "void" ? "&mdash;" : formatIDR(remaining)}</td>
-      <td class="px-3 py-3">${workBadge(r.work_status, r.status) || esc(statusLabel(r.status))}</td>
-      <td class="px-3 py-3">${historyPaymentHtml(r)}</td>
-      <td class="pl-3 pr-4 py-3 text-right">
+      <td class="px-2 py-3 text-right text-muted tabular-nums">${r.item_count}</td>
+      <td class="px-2 py-3 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(r.total)}</td>
+      <td class="px-2 py-3 text-right tabular-nums whitespace-nowrap ${r.status === "void" ? "text-muted" : "text-done"}">${r.status === "void" ? "&mdash;" : formatIDR(r.amount_paid)}</td>
+      <td class="px-2 py-3 text-right tabular-nums whitespace-nowrap ${remaining > 0 ? "text-failed" : "text-muted"}">${r.status === "void" ? "&mdash;" : formatIDR(remaining)}</td>
+      <td class="px-2 py-3">${workBadge(r.work_status, r.status) || esc(statusLabel(r.status))}</td>
+      <td class="px-2 py-3">${historyPaymentHtml(r)}</td>
+      <td class="pl-2 pr-4 py-3 text-right">
         <button type="button" onclick="openHistoryRowMenu(event, '${r.id}')" aria-label="Aksi nota" aria-haspopup="menu"
           class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
@@ -7631,6 +7858,7 @@ function closeModal() {
 
 // ── Inventory: bootstrap / tabs ──────────────────────────────────────────────
 let suppliersCache = [];
+let categoriesCache = [];
 let brandsCache = [];
 let inboundRowSeq = 0;
 let inboundAutocompleteCache = {};
@@ -9572,32 +9800,33 @@ function renderMasterItemsTable(data) {
         <span class="inline-flex items-center gap-1">
           <span class="font-mono text-xs text-ink">${esc(item.sku)}</span>
           <button type="button" onclick="copyMasterSku(event, ${item.id})" aria-label="Salin SKU" title="Salin SKU"
-            class="p-1 rounded-md text-muted hover:text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${svgIcon("copy", 13)}</button>
+            class="p-0.5 rounded-md text-muted hover:text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${svgIcon("copy", 12)}</button>
         </span>
       </td>
       <td class="px-2.5 py-3">
-        <div class="min-w-[12rem]">
+        <div class="min-w-[9rem]">
           <button type="button" onclick="event.stopPropagation(); viewMasterItem(${item.id})"
             class="block text-left font-serif font-semibold text-ink hover:text-accentDark line-clamp-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors">${esc(item.name)}</button>
-          <div class="text-xs text-muted mt-0.5 leading-snug">${esc(item.supplier_name || "-")}</div>
         </div>
       </td>
-      <td class="px-2.5 py-3 text-ink">${esc(item.brand_name || "-")}</td>
-      <td class="px-2.5 py-3 text-ink">${esc(item.unit || "")}</td>
+      <td class="px-2.5 py-3">
+        <div class="text-ink leading-snug">${esc(item.brand_name || "-")}</div>
+        <div class="text-xs text-muted leading-snug">${esc(item.supplier_name || "-")}</div>
+      </td>
       <td class="px-2.5 py-3">${activePillHtml(item.is_active)}</td>
       <td class="px-2.5 py-3">${statusPillHtml(stock.dot, stock.label, stock.tint)}</td>
-      <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}</td>
+      <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}<div class="text-[11px] font-normal text-muted">${esc(item.unit || "")}</div></td>
       <td class="px-2.5 py-3 text-right tabular-nums whitespace-nowrap">${item.avg_cost_price > 0
         ? `<span class="text-muted">${formatIDR(item.avg_cost_price)}</span>`
         : '<span class="text-xs text-muted">Belum dapat dihitung</span>'}</td>
       <td class="px-2.5 py-3 text-right tabular-nums text-ink whitespace-nowrap">${item.sell_price > 0 ? formatIDR(item.sell_price) : '<span class="text-xs text-muted">Belum ada</span>'}</td>
       <td class="px-2.5 py-3 text-right tabular-nums whitespace-nowrap ${margin === null ? "text-muted" : margin >= 0 ? "text-done" : "text-failed"}">${margin === null ? "-" : margin.toFixed(2) + "%"}</td>
-      <td class="px-4 py-3" onclick="event.stopPropagation()">
-        <div class="flex items-center justify-end gap-1.5">
-          ${iconButtonHtml("accent", "Ubah barang", `editMasterItemFromRow(${item.id})`, "edit")}
-          ${iconButtonHtml("neutral", "Duplikat barang", `duplicateMasterItem(${item.id})`, "duplicate")}
-          ${iconButtonHtml("neutral", item.is_active ? "Arsipkan barang" : "Aktifkan kembali", `archiveMasterItemFromRow(${item.id})`, "archive")}
-          ${iconButtonHtml("danger", "Hapus barang", `deleteMasterItemFromRow(${item.id})`, "trash", "admin-only")}
+      <td class="sticky right-0 bg-white px-3 py-3 shadow-[-6px_0_6px_-6px_rgba(20,20,19,0.12)]" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-end">
+          <button type="button" onclick="openMasterRowMenu(event, ${item.id})" aria-label="Aksi barang" aria-haspopup="menu" title="Aksi"
+            class="w-8 h-8 grid place-items-center rounded-lg border border-line bg-white text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
         </div>
       </td>
     `;
@@ -9757,6 +9986,39 @@ function duplicateMasterItem(id) {
   if (!item) return;
   openMasterForm("duplicate", item);
 }
+
+function closeMasterRowMenu() {
+  document.getElementById("master-row-menu")?.classList.add("hidden");
+}
+
+// One "⋯" button per row opens this menu (same pattern as the Riwayat Invoice row menu).
+function openMasterRowMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
+  const item = findMasterListItem(id);
+  if (!item) return;
+  const open = !menu.classList.contains("hidden") && menu.dataset.itemId === String(id);
+  closeMasterRowMenu();
+  if (open) return;
+  const mi = (icon, label, onclick, extra = "text-ink") => `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}"
+    class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${extra}">${svgIcon(icon, 15)}${esc(label)}</button>`;
+  menu.innerHTML = [
+    mi("edit", "Lihat Detail", `viewMasterItem(${id})`),
+    mi("edit", "Edit Barang", `editMasterItemFromRow(${id})`),
+    mi("duplicate", "Duplikasi", `duplicateMasterItem(${id})`),
+    mi("archive", item.is_active ? "Arsipkan" : "Aktifkan Kembali", `archiveMasterItemFromRow(${id})`),
+    `<div class="admin-only my-1 border-t border-line"></div><div class="admin-only">${mi("trash", "Hapus", `deleteMasterItemFromRow(${id})`, "text-failed")}</div>`,
+  ].join("");
+  menu.dataset.itemId = String(id);
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect();
+  const height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
+}
+document.addEventListener("click", closeMasterRowMenu);
+window.addEventListener("resize", closeMasterRowMenu);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMasterRowMenu(); });
 
 let archiveFromList = false;
 
@@ -10040,6 +10302,37 @@ function formatMasterDateTime(iso) {
   return d.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(/\./g, ":").replace(",", "");
 }
 
+// Category picker on the item form: active categories only (grouped by main category), plus the
+// item's current one even if it has since been switched off, so editing never silently drops it.
+async function fillItemCategorySelect(selectedId, selectedName) {
+  const el = document.getElementById("new-item-category");
+  const render = cats => {
+    const live = cats.filter(c => c.status === "aktif");
+    const mains = live.filter(c => c.parent_id === null);
+    let html = `<option value="">Tanpa kategori</option>`;
+    for (const m of mains) {
+      const subs = live.filter(c => c.parent_id === m.id);
+      html += `<optgroup label="${esc(m.name)}"><option value="${m.id}">${esc(m.name)} (umum)</option>` +
+        subs.map(sc => `<option value="${sc.id}">${esc(sc.name)}</option>`).join("") + `</optgroup>`;
+    }
+    if (selectedId && !live.some(c => c.id === selectedId)) {
+      html += `<option value="${selectedId}">${esc(selectedName || "Kategori lama")} (tidak aktif)</option>`;
+    }
+    el.innerHTML = html;
+    el.value = selectedId ? String(selectedId) : "";
+  };
+  render(categoriesCache);
+  try {
+    const resp = await fetch("/api/categories");
+    if (resp.ok) { categoriesCache = await resp.json(); render(categoriesCache); }
+  } catch (_) { /* keep the cached options */ }
+}
+
+function selectedItemCategoryId() {
+  const v = document.getElementById("new-item-category").value;
+  return v ? parseInt(v, 10) : null;
+}
+
 function openMasterForm(mode, item, prefillName) {
   masterFormMode = mode;
   masterFormItem = item || null;
@@ -10074,6 +10367,7 @@ function openMasterForm(mode, item, prefillName) {
   g("new-item-stock-label").textContent = isEdit ? "Stok Saat Ini" : "Stok Awal";
   g("new-item-description").value = item ? (item.description || "") : "";
   g("new-item-min-stock").value = item ? String(item.min_stock ?? 5) : "5";
+  fillItemCategorySelect(item ? item.category_id : null, item ? item.category_name : null);
   g("new-item-location").value = item ? (item.location || "") : "";
   g("new-item-sku-badge").textContent = "";
   g("new-item-duplicate-note").classList.add("hidden");
@@ -10237,9 +10531,10 @@ async function submitMasterFormEdit() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name, unit, sell_price: sellPrice, min_stock: minStock,
+        name, unit, sell_price: sellPrice, min_stock: minStock, expected_updated_at: item.updated_at || undefined,
         description: document.getElementById("new-item-description").value,
         location: document.getElementById("new-item-location").value,
+        category_id: selectedItemCategoryId(),
         price_note: "Ubah harga jual lewat Edit Barang",
       }),
     });
@@ -10293,6 +10588,7 @@ async function submitNewMasterItem(keepAdding) {
         supplier_id: supplierId, brand_id: brandId, name, unit, sell_price: sellPrice, cost_price: costPrice, stock_qty: stockQty,
         description: document.getElementById("new-item-description").value, min_stock: minStock,
         location: document.getElementById("new-item-location").value,
+        category_id: selectedItemCategoryId(),
       }),
     });
     if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
@@ -10368,7 +10664,7 @@ function renderMasterItemDetail(item) {
   const row = (k, v, mono) => `<div class="flex gap-3"><dt class="w-32 shrink-0 text-muted">${esc(k)}</dt><dd class="min-w-0 break-words text-ink ${mono ? "font-mono text-[13px]" : ""}">${v ? esc(v) : "-"}</dd></div>`;
   g("detail-item-info").innerHTML =
     `<div class="space-y-1.5">${row("SKU / Kode Barang", item.sku, true)}${row("Barcode", item.barcode, true)}${row("Merek", item.brand_name)}${row("Supplier Utama", item.supplier_name)}</div>` +
-    `<div class="space-y-1.5">${row("Satuan", item.unit)}${row("Lokasi Rak / Gudang", item.location)}${row("Deskripsi Singkat", item.description)}</div>`;
+    `<div class="space-y-1.5">${row("Kategori", item.category_name)}${row("Satuan", item.unit)}${row("Lokasi Rak / Gudang", item.location)}${row("Deskripsi Singkat", item.description)}</div>`;
   g("dt-stock").textContent = formatInt(item.stock_qty);
   g("dt-stock-sub").textContent = `${item.unit} di gudang`;
   g("dt-min").textContent = formatInt(item.min_stock ?? 5);
@@ -12581,7 +12877,8 @@ function receiptNotaHtml(r, customer) {
     </tr>`;
 
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:132mm;display:flex;flex-direction:column;">
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:132mm;display:flex;flex-direction:column;position:relative;">
+    ${r.status !== "void" && r.work_status === "draft" ? `<div aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:64pt;font-weight:bold;letter-spacing:0.15em;color:rgba(0,0,0,0.12);transform:rotate(-22deg);">DRAFT</span></div>` : ""}
     <div style="display:flex;justify-content:space-between;gap:16px;">
       <div style="display:flex;gap:12px;align-items:center;">
         ${SHOP_PROFILE.logo ? `
@@ -12590,7 +12887,7 @@ function receiptNotaHtml(r, customer) {
           ${SHOP_PROFILE.tagline ? `<div style="font-size:5.5pt;font-weight:bold;letter-spacing:0.08em;margin-top:1px;">${esc(SHOP_PROFILE.tagline)}</div>` : ""}
         </div>` : ""}
         <div>
-          <div style="font-size:12pt;">Nota Penjualan${r.status === "void" ? " &mdash; <b>VOID</b>" : ""}</div>
+          <div style="font-size:12pt;">Nota Penjualan${r.status === "void" ? " &mdash; <b>VOID</b>" : r.work_status === "draft" ? " &mdash; <b>DRAFT</b>" : r.work_status === "pengerjaan" ? " &mdash; dalam pengerjaan" : ""}</div>
           <div style="font-size:14pt;font-weight:bold;letter-spacing:0.02em;">${esc(SHOP_PROFILE.notaName || SHOP_PROFILE.name)}</div>
           ${shopContact.length ? `<div style="font-size:8pt;">${shopContact.map(esc).join(" &middot; ")}</div>` : ""}
         </div>
@@ -13084,7 +13381,7 @@ function addPreorderRow(prefill) {
     div.querySelector(".po-row-qty").value = prefill.quantity;
     setPriceInput(div.querySelector(".po-row-price"), prefill.unit_price);
     div.querySelector(".po-row-status").value = prefill.status;
-    setPoRowMeta(div, prefill.sku);
+    setPoRowMeta(div, prefill.sku, prefill.supplier_pos);
   }
   updatePreorderTotals();
   return div;
@@ -13095,10 +13392,12 @@ function removePreorderRow(btnEl) {
   updatePreorderTotals();
 }
 
-function setPoRowMeta(rowEl, sku) {
+function setPoRowMeta(rowEl, sku, supplierPos) {
   const meta = rowEl.querySelector(".po-row-meta");
-  if (sku) {
-    meta.innerHTML = `<span class="font-mono text-done">${esc(sku)}</span> · tertaut ke Master Barang`;
+  const pos = (supplierPos || []).map(p =>
+    `<span class="px-1.5 py-0.5 rounded bg-bg2 border border-line text-ink">${esc(p.po_number)} · dipesan ${p.qty_ordered}, diterima ${p.qty_received}</span>`).join(" ");
+  if (sku || pos) {
+    meta.innerHTML = [sku ? `<span class="font-mono text-done">${esc(sku)}</span> · tertaut ke Master Barang` : "", pos ? `PO Supplier: ${pos}` : ""].filter(Boolean).join(" &nbsp;|&nbsp; ");
     meta.classList.remove("hidden");
   } else {
     meta.textContent = "";
@@ -13278,6 +13577,7 @@ async function savePreorder(asDraft = false) {
   buttons.forEach(b => { b.disabled = true; });
   try {
     const editing = Boolean(currentPreorder);
+    if (editing && currentPreorder.updated_at) payload.expected_updated_at = currentPreorder.updated_at;
     const resp = await fetch(editing ? `/api/preorders/${currentPreorder.id}` : "/api/preorders", {
       method: editing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -13362,6 +13662,18 @@ function renderPreorderDetail(detail) {
   remainingEl.classList.toggle("text-failed", detail.remaining > 0);
   remainingEl.classList.toggle("text-done", detail.remaining === 0);
 
+  const poReady = detail.items.filter(i => !i.receipt_id && (i.status === "sampai_di_toko" || i.status === "terpasang"));
+  const poOnNota = detail.items.filter(i => i.receipt_id).length;
+  document.getElementById("po-convert-btn").disabled = poReady.length === 0;
+  document.getElementById("po-convert-btn").classList.toggle("opacity-50", poReady.length === 0);
+  document.getElementById("po-detail-nota-info").innerHTML =
+    `${poReady.length} item siap dibuat nota &middot; ${poOnNota} item sudah masuk nota &middot; DP belum dialokasikan <span class="text-ink tabular-nums">${formatIDR(detail.dp_unallocated || 0)}</span>`;
+  document.getElementById("po-detail-allocs").innerHTML = (detail.allocations || []).map(a => `
+    <div class="flex flex-wrap items-center justify-between gap-2 border border-line rounded-lg px-3 py-2 text-sm">
+      <span class="text-ink">DP ${formatIDR(a.amount)} dipakai di nota <button type="button" class="underline tabular-nums" onclick="openReceiptFromHistory('${esc(a.receipt_id)}')">${esc(a.receipt_no || "nota")}</button></span>
+      <span class="text-xs text-muted tabular-nums">${esc(formatDateTimeSeconds(a.allocated_at).slice(0, 16))}${a.allocated_by ? " &middot; " + esc(a.allocated_by) : ""}</span>
+    </div>`).join("");
+
   document.getElementById("po-detail-history").innerHTML = detail.history.length === 0
     ? `<tr><td colspan="5" class="px-3 py-6 text-center text-sm text-muted">Belum ada perubahan status.</td></tr>`
     : detail.history.map(h => `
@@ -13443,6 +13755,660 @@ async function removePoItem(itemId) {
     closeModal();
     renderPreorderDetail(await resp.json());
     showToast("Barang dihapus.", "success");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+// ── Master Kategori ──────────────────────────────────────────────────────────
+// Two levels: kategori utama -> subkategori. Categories are never deleted, only archived. The code is
+// fixed once created. Products point at a category (Master Barang form), and a main category's product
+// count includes its subcategories.
+const KAT_ICONS = {
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3Z"/>',
+  audio: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',
+  car: '<path d="M3 13l2-6h14l2 6v4H3v-4Z"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/>',
+  seat: '<path d="M8 3h3l1 8h5l2 6H8L6 6l2-3Z"/><path d="M6 21h14"/>',
+  wheel: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>',
+  battery: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2M7 12h4M9 10v4"/>',
+  wiper: '<path d="M3 17a12 12 0 0 1 18 0"/><path d="M12 17 17 8"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/>',
+  box: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/>',
+};
+const KAT_STATUS = {
+  aktif: ["Aktif", "bg-done/10 text-done"],
+  nonaktif: ["Nonaktif", "bg-pending/10 text-pending"],
+  arsip: ["Arsip", "bg-bg2 text-muted"],
+};
+const KAT_PANELS = ["kat-list-panel", "kat-form-panel", "kat-detail-panel"];
+let katAll = [], katSummary = null, katView = "list", katPage = 1, katSelectedId = null;
+let katExpanded = new Set(), katEditing = null, katCodeTouched = false, katNameTimer = null;
+let katIconSel = {}, katDetail = null, katDetailItems = [], katDetailTotal = 0, katReady = false;
+
+function katIconSvg(key, size = 16) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KAT_ICONS[key] || KAT_ICONS.box}</svg>`;
+}
+function katPill(status) {
+  const s = KAT_STATUS[status] || [status, "bg-bg2 text-muted"];
+  return `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium ${s[1]}">${esc(s[0])}</span>`;
+}
+function katById(id) { return katAll.find(c => c.id === id); }
+function katShowPanel(id) {
+  for (const p of KAT_PANELS) document.getElementById(p).classList.toggle("hidden", p !== id);
+}
+function katError(e) { showToast(e && e.message ? e.message : "Terjadi kesalahan."); }
+async function katJson(resp, fallback) {
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.detail || fallback);
+  return data;
+}
+
+async function katInit() {
+  if (!katReady) {
+    katReady = true;
+    document.getElementById("kat-f-code").addEventListener("input", () => { katCodeTouched = true; });
+  }
+  katShowPanel("kat-list-panel");
+  katSetView(katView, true);
+  await katReload();
+}
+
+async function katReload() {
+  try {
+    const [a, b] = await Promise.all([fetch("/api/categories"), fetch("/api/categories/summary")]);
+    katAll = await katJson(a, "Gagal memuat kategori.");
+    katSummary = await katJson(b, "Gagal memuat ringkasan.");
+    categoriesCache = katAll;
+  } catch (e) { katError(e); }
+  katRenderKpis();
+  katRender();
+}
+
+function katRenderKpis() {
+  const s = katSummary || { total: 0, total_utama: 0, aktif: 0, subkategori: 0, tanpa_produk: 0, diarsipkan: 0 };
+  const pct = n => s.total ? `${(n / s.total * 100).toFixed(1)}% dari total` : "0% dari total";
+  const tile = (label, value, sub, cls = "text-ink") => `
+    <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+      <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">${label}</div>
+      <div class="font-sans text-2xl font-semibold tabular-nums ${cls}">${value}</div>
+      <div class="text-xs text-muted mt-0.5">${sub}</div></div>`;
+  document.getElementById("kat-kpis").innerHTML =
+    tile("Total Kategori", s.total, `${s.total_utama} kategori utama`) +
+    tile("Kategori Aktif", s.aktif, pct(s.aktif), "text-done") +
+    tile("Subkategori", s.subkategori, s.total_utama ? `${(s.subkategori / s.total_utama).toFixed(1)} sub per kategori` : "belum ada") +
+    tile("Tanpa Produk", s.tanpa_produk, pct(s.tanpa_produk), s.tanpa_produk ? "text-pending" : "text-ink") +
+    tile("Diarsipkan", s.diarsipkan, pct(s.diarsipkan));
+}
+
+function katFilters() {
+  const g = id => document.getElementById(id);
+  return { q: g("kat-search").value.trim(), status: g("kat-f-status").value, type: g("kat-f-type").value,
+           empty: g("kat-f-empty").value === "1", sort: g("kat-f-sort").value };
+}
+function katOnFilterChange() { katPage = 1; katRender(); }
+function katResetFilters() {
+  document.getElementById("kat-search").value = "";
+  for (const id of ["kat-f-status", "kat-f-type", "kat-f-empty"]) document.getElementById(id).value = "";
+  document.getElementById("kat-f-sort").value = "name_asc";
+  katOnFilterChange();
+}
+function katSetView(v, silent) {
+  katView = v;
+  document.getElementById("kat-table-wrap").classList.toggle("hidden", v !== "list");
+  document.getElementById("kat-tree-wrap").classList.toggle("hidden", v !== "tree");
+  for (const [id, key] of [["kat-view-list", "list"], ["kat-view-tree", "tree"]]) {
+    const b = document.getElementById(id);
+    b.className = "px-3 py-2 text-sm " + (id === "kat-view-tree" ? "border-l border-line " : "") +
+      (key === v ? "bg-accent/10 text-accent font-medium" : "text-ink hover:bg-bg2");
+    b.setAttribute("aria-pressed", key === v ? "true" : "false");
+  }
+  if (!silent) katRender();
+}
+
+// Which rows to show: a main category appears if it passes the filters, or if any of its subcategories do
+// (then it is only shown as context). Sorting applies to each level separately.
+function katCompute() {
+  const f = katFilters(), q = f.q.toLowerCase();
+  const passes = c => (!f.status || c.status === f.status) && (!f.empty || (c.product_count === 0 && c.status !== "arsip"))
+    && (!q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+  const cmp = {
+    name_asc: (a, b) => a.name.localeCompare(b.name, "id"),
+    name_desc: (a, b) => b.name.localeCompare(a.name, "id"),
+    products: (a, b) => b.product_count - a.product_count || a.name.localeCompare(b.name, "id"),
+    updated: (a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""),
+  }[f.sort];
+  const rows = [];
+  for (const m of katAll.filter(c => c.parent_id === null)) {
+    const subs = f.type === "utama" ? [] : katAll.filter(c => c.parent_id === m.id && passes(c)).sort(cmp);
+    const own = f.type !== "sub" && passes(m);
+    if (own || subs.length) rows.push({ main: m, subs, context: !own });
+  }
+  rows.sort((a, b) => cmp(a.main, b.main));
+  return { rows, auto: Boolean(q || f.status || f.empty || f.type === "sub") };
+}
+
+function katRender() { if (katView === "tree") katRenderTree(); else katRenderList(); }
+
+function katMenuBtn(id) {
+  return `<button type="button" onclick="katRowMenu(event, ${id})" aria-label="Aksi" class="px-2 py-1 rounded-lg border border-line text-ink hover:bg-bg2 transition-colors">&middot;&middot;&middot;</button>`;
+}
+function katChevron(open) {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="transition-transform ${open ? "rotate-90" : ""}"><path d="M9 6l6 6-6 6"/></svg>`;
+}
+function katToggle(id) {
+  if (katExpanded.has(id)) katExpanded.delete(id); else katExpanded.add(id);
+  katRender();
+}
+function katExpandAll(open) {
+  katExpanded = open ? new Set(katAll.filter(c => c.parent_id === null).map(c => c.id)) : new Set();
+  katRender();
+}
+
+function katRenderList() {
+  const { rows, auto } = katCompute();
+  const size = parseInt(document.getElementById("kat-page-size").value, 10) || 10;
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  katPage = Math.min(katPage, pages);
+  const slice = rows.slice((katPage - 1) * size, katPage * size);
+  const cell = "px-3 py-2";
+  let html = "";
+  for (const r of slice) {
+    const m = r.main, open = katExpanded.has(m.id) || (auto && r.subs.length > 0);
+    html += `<tr class="border-b border-line ${r.context ? "opacity-70" : ""}">
+      <td class="${cell} font-mono text-[12px] text-muted whitespace-nowrap">${esc(m.code)}</td>
+      <td class="${cell}"><div class="flex items-center gap-2">
+        ${r.subs.length ? `<button type="button" onclick="katToggle(${m.id})" aria-expanded="${open}" aria-label="Buka subkategori" class="p-0.5 text-muted">${katChevron(open)}</button>` : `<span class="w-[18px]"></span>`}
+        <span class="text-accent">${katIconSvg(m.icon, 16)}</span>
+        <button type="button" onclick="katOpenDetail(${m.id})" class="font-medium text-ink hover:underline text-left">${esc(m.name)}</button></div></td>
+      <td class="${cell} text-muted">-</td>
+      <td class="${cell} text-right tabular-nums text-ink">${formatInt(m.product_count)}</td>
+      <td class="${cell}">${katPill(m.status)}</td>
+      <td class="${cell} text-muted tabular-nums whitespace-nowrap">${esc(formatMasterDateTime(m.updated_at))}</td>
+      <td class="${cell} text-right">${katMenuBtn(m.id)}</td></tr>`;
+    if (open) for (const c of r.subs) {
+      html += `<tr class="border-b border-line bg-bg2/40">
+        <td class="${cell} font-mono text-[12px] text-muted whitespace-nowrap">${esc(c.code)}</td>
+        <td class="${cell}"><div class="flex items-center gap-2 pl-9"><span class="text-muted">${katIconSvg(c.icon || "box", 14)}</span>
+          <button type="button" onclick="katOpenDetail(${c.id})" class="text-ink hover:underline text-left">${esc(c.name)}</button></div></td>
+        <td class="${cell} text-muted">${esc(c.parent_name || "")}</td>
+        <td class="${cell} text-right tabular-nums text-ink">${formatInt(c.product_count)}</td>
+        <td class="${cell}">${katPill(c.status)}</td>
+        <td class="${cell} text-muted tabular-nums whitespace-nowrap">${esc(formatMasterDateTime(c.updated_at))}</td>
+        <td class="${cell} text-right">${katMenuBtn(c.id)}</td></tr>`;
+    }
+  }
+  document.getElementById("kat-tbody").innerHTML = html;
+  const empty = document.getElementById("kat-empty");
+  empty.classList.toggle("hidden", rows.length > 0);
+  empty.textContent = katAll.length ? "Tidak ada kategori yang cocok dengan filter." : "Belum ada kategori. Mulai dengan Tambah Kategori Utama.";
+  document.getElementById("kat-count-label").textContent = rows.length
+    ? `Menampilkan ${slice.length} dari ${rows.length} kategori utama (total ${katAll.length} kategori)` : "";
+  document.getElementById("kat-page-label").textContent = `${katPage} / ${pages}`;
+  document.getElementById("kat-prev").disabled = katPage <= 1;
+  document.getElementById("kat-next").disabled = katPage >= pages;
+}
+function katGoPage(d) { katPage += d; katRenderList(); }
+
+function katRenderTree() {
+  const { rows, auto } = katCompute();
+  if (!katSelectedId || !katById(katSelectedId)) katSelectedId = rows.length ? rows[0].main.id : null;
+  const line = (c, depth, open, hasKids) => `
+    <div role="treeitem" class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 cursor-pointer hover:bg-bg2 ${c.id === katSelectedId ? "bg-accent/10" : ""}" style="padding-left:${8 + depth * 22}px" onclick="katSelectTree(${c.id})">
+      ${hasKids ? `<button type="button" onclick="event.stopPropagation(); katToggle(${c.id})" aria-label="Buka subkategori" class="p-0.5 text-muted">${katChevron(open)}</button>` : `<span class="w-[18px]"></span>`}
+      <span class="${depth ? "text-muted" : "text-accent"}">${katIconSvg(c.icon || (depth ? "box" : "box"), 15)}</span>
+      <span class="flex-1 min-w-0 truncate text-sm ${depth ? "text-ink" : "font-medium text-ink"}">${esc(c.name)}</span>
+      <span class="text-xs text-muted tabular-nums">${formatInt(c.product_count)}</span>
+      ${c.status === "aktif" ? "" : katPill(c.status)}</div>`;
+  let html = "";
+  for (const r of rows) {
+    const open = katExpanded.has(r.main.id) || (auto && r.subs.length > 0);
+    html += line(r.main, 0, open, r.subs.length > 0);
+    if (open) for (const c of r.subs) html += line(c, 1, false, false);
+  }
+  document.getElementById("kat-tree").innerHTML = html || `<div class="text-sm text-muted text-center py-8">Tidak ada kategori yang cocok.</div>`;
+  katRenderTreeDetail();
+}
+function katSelectTree(id) { katSelectedId = id; katRenderTree(); }
+
+function katRenderTreeDetail() {
+  const box = document.getElementById("kat-tree-detail");
+  const c = katById(katSelectedId);
+  if (!c) { box.innerHTML = `<div class="text-sm text-muted">Pilih kategori di kiri untuk melihat detailnya.</div>`; return; }
+  const subs = katAll.filter(x => x.parent_id === c.id);
+  const stat = (label, value, sub) => `<div class="border border-line rounded-xl bg-bg2 px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">${label}</div><div class="text-xl font-semibold tabular-nums text-ink">${value}</div><div class="text-xs text-muted">${sub}</div></div>`;
+  const btn = (label, onclick, cls = "text-ink") => `<button type="button" onclick="${onclick}" class="px-3 py-1.5 border border-line rounded-lg text-xs font-medium bg-white hover:bg-bg2 transition-colors ${cls}">${label}</button>`;
+  const archived = c.status === "arsip";
+  box.innerHTML = `
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0"><span class="w-11 h-11 rounded-xl bg-accent/10 text-accent grid place-items-center shrink-0">${katIconSvg(c.icon, 22)}</span>
+        <div class="min-w-0"><h3 class="font-serif text-xl font-semibold text-ink truncate">${esc(c.name)}</h3>
+          <div class="text-xs text-muted">Kode: <span class="font-mono">${esc(c.code)}</span> &middot; Terakhir diubah ${esc(formatMasterDateTime(c.updated_at))}</div></div></div>
+      ${katPill(c.status)}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+      ${stat("Jumlah Produk", formatInt(c.product_count), c.parent_id ? "di subkategori ini" : "dari seluruh subkategori")}
+      ${stat("Subkategori", formatInt(c.child_count), c.parent_id ? `induk: ${esc(c.parent_name || "-")}` : "dalam kategori ini")}
+      ${stat("Status", esc((KAT_STATUS[c.status] || [c.status])[0]), archived ? "tidak bisa dipilih" : "tampil di transaksi")}</div>
+    <div class="mt-4"><div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-1">Deskripsi</div>
+      <p class="text-sm text-ink">${c.description ? esc(c.description) : '<span class="text-muted">Belum ada deskripsi.</span>'}</p></div>
+    <div class="flex flex-wrap gap-2 mt-4">
+      ${!c.parent_id && !archived ? btn("+ Tambah Subkategori", `katNewForm(${c.id})`, "text-accent") : ""}
+      ${archived ? "" : btn("Ubah Nama", `katEditForm(${c.id})`)}
+      ${btn("Lihat Detail", `katOpenDetail(${c.id})`)}
+      ${archived ? `<span class="admin-only">${btn("Pulihkan", `katRestore(${c.id})`)}</span>` : `<span class="admin-only">${btn("Arsipkan", `katConfirmArchive(${c.id})`, "text-failed")}</span>`}</div>
+    ${!c.parent_id ? `<div class="mt-5"><div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Daftar Subkategori dalam ${esc(c.name)}</div>
+      ${subs.length ? `<div class="border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[480px] text-sm"><tbody>${subs.map(s => `<tr class="border-b border-line last:border-b-0 cursor-pointer hover:bg-bg2" onclick="katSelectTree(${s.id})">
+        <td class="px-3 py-2 font-mono text-[12px] text-muted">${esc(s.code)}</td><td class="px-3 py-2 text-ink">${esc(s.name)}</td>
+        <td class="px-3 py-2 text-right tabular-nums">${formatInt(s.product_count)}</td><td class="px-3 py-2">${katPill(s.status)}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="text-sm text-muted">Belum ada subkategori.</p>`}</div>` : ""}`;
+}
+
+// ── Row menu ─────────────────────────────────────────────────────────────────
+function katRowMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
+  const c = katById(id);
+  if (!c) return;
+  const open = !menu.classList.contains("hidden") && menu.dataset.katId === String(id);
+  closeMasterRowMenu();
+  if (open) return;
+  const archived = c.status === "arsip";
+  const mi = (label, onclick, extra = "text-ink") => `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}"
+    class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${extra}">${esc(label)}</button>`;
+  menu.innerHTML = [
+    mi("Lihat Detail", `katOpenDetail(${id})`),
+    archived ? "" : mi("Edit Kategori", `katEditForm(${id})`),
+    !c.parent_id && !archived ? mi("Tambah Subkategori", `katNewForm(${id})`) : "",
+    `<div class="admin-only">${archived ? mi("Pulihkan", `katRestore(${id})`) : mi("Arsipkan", `katConfirmArchive(${id})`, "text-failed")}</div>`,
+  ].join("");
+  menu.dataset.itemId = ""; menu.dataset.katId = String(id);
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect();
+  const height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
+}
+
+// ── Detail ───────────────────────────────────────────────────────────────────
+async function katOpenDetail(id) {
+  try {
+    katDetail = await katJson(await fetch(`/api/categories/${id}`), "Gagal memuat kategori.");
+    const items = await katJson(await fetch(`/api/categories/${id}/items?limit=20`), "Gagal memuat barang.");
+    katDetailItems = items.items; katDetailTotal = items.total;
+  } catch (e) { katError(e); return; }
+  katRenderDetail();
+  katShowPanel("kat-detail-panel");
+}
+
+function katRenderDetail() {
+  const c = katDetail, archived = c.status === "arsip";
+  const stat = (label, value, sub, cls = "text-ink") => `<div class="border border-line rounded-xl bg-white px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">${label}</div><div class="text-xl font-semibold tabular-nums ${cls}">${value}</div><div class="text-xs text-muted">${sub}</div></div>`;
+  const pctTxt = (n, d) => d ? `${(n / d * 100).toFixed(1)}% dari total` : "belum ada produk";
+  const info = (k, v) => `<div class="flex gap-3"><dt class="w-32 shrink-0 text-muted">${k}</dt><dd class="text-ink">${v}</dd></div>`;
+  document.getElementById("kat-detail-panel").innerHTML = `
+    <button type="button" onclick="katBackToList()" class="text-sm text-accent hover:underline mb-3">&larr; Kembali ke Daftar Kategori</button>
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <h2 class="font-serif text-2xl font-semibold text-ink">Detail Kategori</h2>
+      <div class="flex flex-wrap gap-2">
+        ${archived ? "" : `<button type="button" onclick="katEditForm(${c.id})" class="px-3.5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Edit Kategori</button>`}
+        <span class="admin-only">${archived
+          ? `<button type="button" onclick="katRestore(${c.id})" class="px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2">Pulihkan</button>`
+          : `<button type="button" onclick="katConfirmArchive(${c.id})" class="px-3.5 py-2 border border-failed/40 rounded-lg text-sm text-failed bg-white hover:bg-failed/10">Arsipkan</button>`}</span>
+      </div></div>
+    <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
+      <div class="flex flex-wrap justify-between gap-4">
+        <div class="flex items-start gap-4 min-w-0"><span class="w-16 h-16 rounded-2xl bg-accent/10 text-accent grid place-items-center shrink-0">${katIconSvg(c.icon, 30)}</span>
+          <div class="min-w-0"><div class="text-[11px] text-muted uppercase tracking-wider">Kode Kategori</div>
+            <div class="font-mono text-sm text-ink">${esc(c.code)}</div>
+            <h3 class="font-serif text-xl font-semibold text-ink mt-0.5">${esc(c.name)}</h3>
+            <p class="text-sm text-muted mt-1 max-w-xl">${c.description ? esc(c.description) : "Belum ada deskripsi."}</p>
+            <div class="mt-2">${katPill(c.status)}</div></div></div>
+        <dl class="text-sm space-y-1.5">
+          ${info("Induk", esc(c.parent_name || "— (kategori utama)"))}${info("Jumlah Subkategori", formatInt(c.child_count))}${info("Jumlah Produk", formatInt(c.product_count))}
+          ${info("Tanggal Dibuat", esc(formatMasterDateTime(c.created_at)))}${info("Terakhir Diperbarui", esc(formatMasterDateTime(c.updated_at)))}${info("Diubah oleh", esc(c.updated_by || c.created_by || "-"))}</dl></div></div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      ${stat("Subkategori", formatInt(c.child_count), "dalam kategori ini")}
+      ${stat("Total Produk", formatInt(c.product_count), "produk dalam kategori")}
+      ${stat("Produk Aktif", formatInt(c.active_product_count), pctTxt(c.active_product_count, c.product_count), "text-done")}
+      ${stat("Produk Stok Habis", formatInt(c.out_of_stock_count), pctTxt(c.out_of_stock_count, c.product_count), c.out_of_stock_count ? "text-failed" : "text-ink")}</div>
+    ${!c.parent_id ? `<div class="bg-white border border-line rounded-xl p-4 mb-4">
+      <div class="flex items-center justify-between gap-2 mb-2"><div><div class="font-serif font-semibold text-ink">Daftar Subkategori</div><div class="text-xs text-muted">Subkategori yang terdapat dalam kategori ini</div></div>
+        ${archived ? "" : `<button type="button" onclick="katNewForm(${c.id})" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark">+ Tambah Subkategori</button>`}</div>
+      ${c.subcategories.length ? `<div class="overflow-x-auto"><table class="w-full min-w-[520px] text-sm"><thead class="bg-bg2"><tr>
+        <th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Nama Subkategori</th><th class="text-right px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Jumlah Produk</th>
+        <th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Status</th><th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Terakhir Diperbarui</th><th class="w-12"></th></tr></thead><tbody>
+        ${c.subcategories.map(s => `<tr class="border-t border-line"><td class="px-3 py-2"><button type="button" onclick="katOpenDetail(${s.id})" class="text-ink hover:underline text-left">${esc(s.name)}</button> <span class="font-mono text-[11px] text-muted">${esc(s.code)}</span></td>
+          <td class="px-3 py-2 text-right tabular-nums">${formatInt(s.product_count)}</td><td class="px-3 py-2">${katPill(s.status)}</td>
+          <td class="px-3 py-2 text-muted tabular-nums">${esc(formatMasterDateTime(s.updated_at))}</td><td class="px-3 py-2 text-right">${katMenuBtn(s.id)}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="text-sm text-muted py-3">Belum ada subkategori.</p>`}</div>` : ""}
+    <div class="bg-white border border-line rounded-xl p-4">
+      <div class="font-serif font-semibold text-ink">Daftar Barang dalam Kategori Ini</div>
+      <div class="text-xs text-muted mb-2">${formatInt(katDetailTotal)} barang${c.parent_id ? "" : " (termasuk subkategori)"}</div>
+      ${katDetailItems.length ? `<div class="overflow-x-auto"><table class="w-full min-w-[620px] text-sm"><thead class="bg-bg2"><tr>
+        <th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">SKU</th><th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Nama Produk</th>
+        <th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Subkategori</th><th class="text-right px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Stok</th>
+        <th class="text-right px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Harga Jual</th><th class="text-left px-3 py-2 text-[11px] uppercase tracking-wider text-muted font-medium">Status</th></tr></thead><tbody>
+        ${katDetailItems.map(i => `<tr class="border-t border-line cursor-pointer hover:bg-bg2" onclick="goToInventoryRoute('/master-barang', () => viewMasterItem(${i.id}))">
+          <td class="px-3 py-2 font-mono text-[12px] text-muted">${esc(i.sku)}</td><td class="px-3 py-2 text-ink">${esc(i.name)}</td><td class="px-3 py-2 text-muted">${esc(i.category_name)}</td>
+          <td class="px-3 py-2 text-right tabular-nums ${i.stock_qty <= 0 ? "text-failed" : i.stock_qty <= i.min_stock ? "text-pending" : "text-ink"}">${formatInt(i.stock_qty)}</td>
+          <td class="px-3 py-2 text-right tabular-nums">${formatIDR(i.sell_price)}</td>
+          <td class="px-3 py-2">${i.is_active ? (i.stock_qty <= 0 ? '<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-pending/10 text-pending">Stok Habis</span>' : '<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-done/10 text-done">Aktif</span>') : '<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-bg2 text-muted">Diarsipkan</span>'}</td></tr>`).join("")}</tbody></table></div>
+        ${katDetailItems.length < katDetailTotal ? `<div class="text-center mt-3"><button type="button" onclick="katMoreItems()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink hover:bg-bg2">Muat lebih banyak</button></div>` : ""}`
+        : `<p class="text-sm text-muted py-3">Belum ada barang di kategori ini. Pilih kategori ini saat menambah atau mengedit barang di Master Barang.</p>`}</div>`;
+}
+async function katMoreItems() {
+  try {
+    const r = await katJson(await fetch(`/api/categories/${katDetail.id}/items?limit=20&offset=${katDetailItems.length}`), "Gagal memuat barang.");
+    katDetailItems = katDetailItems.concat(r.items); katDetailTotal = r.total;
+    katRenderDetail();
+  } catch (e) { katError(e); }
+}
+
+function katBackToList() { katShowPanel("kat-list-panel"); katReload(); }
+
+// ── Form (tambah / edit) ─────────────────────────────────────────────────────
+function katRenderIconPicker(containerId, selected) {
+  katIconSel[containerId] = selected || "";
+  document.getElementById(containerId).innerHTML = Object.keys(KAT_ICONS).map(k => `
+    <button type="button" aria-pressed="${k === selected}" aria-label="Ikon ${k}" onclick="katPickIcon('${containerId}', '${k}')"
+      class="w-10 h-10 rounded-lg border grid place-items-center transition-colors ${k === selected ? "border-accent bg-accent/10 text-accent" : "border-line text-muted hover:bg-bg2"}">${katIconSvg(k, 18)}</button>`).join("");
+}
+function katPickIcon(containerId, key) {
+  katRenderIconPicker(containerId, katIconSel[containerId] === key ? "" : key);
+}
+function katParentOptions(selected, excludeId) {
+  const mains = katAll.filter(c => c.parent_id === null && c.status !== "arsip" && c.id !== excludeId);
+  return `<option value="">— Kategori utama (tanpa induk) —</option>` +
+    mains.map(m => `<option value="${m.id}" ${m.id === selected ? "selected" : ""}>${esc(m.name)}</option>`).join("");
+}
+function katUpdateDescCount() {
+  document.getElementById("kat-f-desc-count").textContent = `${document.getElementById("kat-f-desc").value.length}/500`;
+}
+
+async function katEnsureLoaded() { if (!katAll.length) await katReload(); }
+
+async function katNewForm(parentId = null) {
+  await katEnsureLoaded();
+  katEditing = null; katCodeTouched = false;
+  const g = id => document.getElementById(id);
+  g("kat-form-title").textContent = parentId ? "Tambah Subkategori" : "Tambah Kategori Baru";
+  g("kat-form-sub").textContent = "Buat kategori baru untuk mengelompokkan produk di inventori. Lengkapi informasi berikut dengan benar.";
+  g("kat-form-lock-warn").classList.add("hidden");
+  g("kat-f-name").value = ""; g("kat-f-code").value = ""; g("kat-f-code").disabled = false;
+  g("kat-f-gen").classList.remove("hidden");
+  g("kat-f-code-hint").textContent = "Kode unik, huruf besar, tanpa spasi. Contoh: SUB-WIP-DEP.";
+  g("kat-f-parent").innerHTML = katParentOptions(parentId, null); g("kat-f-parent").disabled = false;
+  g("kat-f-status-sel").value = "aktif"; g("kat-f-desc").value = ""; katUpdateDescCount();
+  g("kat-f-name-note").classList.add("hidden");
+  g("kat-save-again").classList.remove("hidden");
+  katRenderIconPicker("kat-f-icons", "");
+  katRenderFormAside();
+  katShowPanel("kat-form-panel");
+  g("kat-f-name").focus();
+}
+
+async function katEditForm(id) {
+  await katEnsureLoaded();
+  const c = katById(id);
+  if (!c) return;
+  katEditing = c; katCodeTouched = true;
+  const g = id2 => document.getElementById(id2);
+  g("kat-form-title").textContent = "Edit Kategori";
+  g("kat-form-sub").innerHTML = `${esc(c.name)} &bull; Kode: <span class="font-mono">${esc(c.code)}</span>`;
+  g("kat-form-lock-warn").classList.remove("hidden");
+  g("kat-f-name").value = c.name; g("kat-f-code").value = c.code; g("kat-f-code").disabled = true;
+  g("kat-f-gen").classList.add("hidden");
+  g("kat-f-code-hint").textContent = "Kode sudah dipakai di filter dan laporan, sehingga tidak bisa diubah.";
+  g("kat-f-parent").innerHTML = katParentOptions(c.parent_id, c.id);
+  g("kat-f-parent").disabled = c.child_count > 0;
+  g("kat-f-status-sel").value = c.status === "nonaktif" ? "nonaktif" : "aktif";
+  g("kat-f-desc").value = c.description || ""; katUpdateDescCount();
+  g("kat-f-name-note").classList.add("hidden");
+  g("kat-save-again").classList.add("hidden");
+  katRenderIconPicker("kat-f-icons", c.icon || "");
+  katRenderFormAside();
+  katShowPanel("kat-form-panel");
+}
+
+function katRenderFormAside() {
+  const aside = document.getElementById("kat-form-aside");
+  const name = document.getElementById("kat-f-name").value.trim();
+  const parentId = parseInt(document.getElementById("kat-f-parent").value, 10) || null;
+  const parent = parentId ? katById(parentId) : null;
+  if (katEditing) {
+    const c = katEditing;
+    const row = (k, v) => `<div class="py-2 border-b border-line last:border-b-0"><div class="text-[11px] text-muted uppercase tracking-wider">${k}</div><div class="text-ink">${v}</div></div>`;
+    aside.innerHTML = `<div class="font-serif font-semibold text-ink mb-1">Informasi Kategori</div>` +
+      row("Jumlah Produk Terdampak", `${formatInt(c.product_count)} <span class="text-muted text-xs">produk menggunakan kategori ini</span>`) +
+      row("Induk Kategori", esc(c.parent_name || "— (kategori utama)")) +
+      row("Terakhir Diubah", esc(formatMasterDateTime(c.updated_at))) +
+      row("Diubah Oleh", esc(c.updated_by || c.created_by || "-"));
+    return;
+  }
+  aside.innerHTML = `
+    <div class="font-serif font-semibold text-ink mb-2">Panduan &amp; Contoh</div>
+    <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Preview Hierarki</div>
+    <div class="rounded-lg bg-bg2 px-3 py-2 text-sm text-ink mb-3">${parent ? `${esc(parent.name)} <span class="text-muted">&rsaquo;</span> ` : ""}<span class="font-medium text-accent">${esc(name || "Nama kategori")}</span></div>
+    <p class="text-xs text-muted mb-3">${name ? (parent ? `"${esc(name)}" akan menjadi subkategori dari "${esc(parent.name)}".` : `"${esc(name)}" akan menjadi kategori utama.`) : "Isi nama untuk melihat posisinya di struktur."}</p>
+    <div class="rounded-lg border border-line px-3 py-2 text-xs text-muted space-y-1">
+      <div class="font-medium text-ink">Tips</div>
+      <div>&bull; Gunakan nama kategori yang jelas dan mudah dipahami.</div>
+      <div>&bull; Pastikan kode kategori unik.</div>
+      <div>&bull; Pilih kategori induk yang sesuai agar hierarki rapi.</div>
+      <div>&bull; Struktur hanya dua tingkat: kategori utama dan subkategori.</div></div>`;
+}
+
+function katOnNameInput() {
+  katRenderFormAside();
+  clearTimeout(katNameTimer);
+  katNameTimer = setTimeout(() => { katCheckName(); if (!katEditing && !katCodeTouched) katGenerateCode(true); }, 350);
+}
+function katOnParentChange() {
+  katRenderFormAside();
+  if (!katEditing && !katCodeTouched) katGenerateCode(true);
+  katCheckName();
+}
+async function katCheckName() {
+  const note = document.getElementById("kat-f-name-note");
+  const name = document.getElementById("kat-f-name").value.trim();
+  const parent = document.getElementById("kat-f-parent").value;
+  if (name.length < 3) { note.classList.add("hidden"); return; }
+  try {
+    const qs = new URLSearchParams({ name, ...(parent ? { parent_id: parent } : {}), ...(katEditing ? { exclude_id: katEditing.id } : {}) });
+    const { matches } = await katJson(await fetch(`/api/categories/check-name?${qs}`), "");
+    if (document.getElementById("kat-f-name").value.trim() !== name) return;
+    const exact = matches.find(m => m.exact && m.same_parent);
+    if (exact) note.textContent = `Nama ini sudah dipakai di tingkat yang sama: ${exact.name}.`;
+    else if (matches.length) note.textContent = `Nama mirip ditemukan: ${matches.map(m => m.name).join(", ")}.`;
+    note.classList.toggle("hidden", !matches.length);
+  } catch (_) { note.classList.add("hidden"); }
+}
+async function katGenerateCode(quiet) {
+  const name = document.getElementById("kat-f-name").value.trim();
+  if (!name) { if (!quiet) showToast("Isi nama kategori dulu."); return; }
+  const parent = document.getElementById("kat-f-parent").value;
+  try {
+    const qs = new URLSearchParams({ name, ...(parent ? { parent_id: parent } : {}) });
+    const { code } = await katJson(await fetch(`/api/categories/code-preview?${qs}`), "Gagal membuat kode.");
+    document.getElementById("kat-f-code").value = code;
+    katCodeTouched = false;
+  } catch (e) { if (!quiet) katError(e); }
+}
+
+async function katSaveForm(again) {
+  const g = id => document.getElementById(id);
+  const name = g("kat-f-name").value.trim();
+  if (!name) { showToast("Nama kategori wajib diisi."); g("kat-f-name").focus(); return; }
+  const parent = g("kat-f-parent").value ? parseInt(g("kat-f-parent").value, 10) : null;
+  const body = { name, parent_id: parent, status: g("kat-f-status-sel").value,
+                 icon: katIconSel["kat-f-icons"] || null, description: g("kat-f-desc").value.trim() || null };
+  try {
+    let resp;
+    if (katEditing) {
+      resp = await fetch(`/api/categories/${katEditing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, expected_updated_at: katEditing.updated_at }) });
+    } else {
+      const code = g("kat-f-code").value.trim();
+      if (!code) { showToast("Kode kategori wajib diisi (klik Generate Otomatis)."); return; }
+      resp = await fetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, code }) });
+    }
+    const saved = await katJson(resp, "Gagal menyimpan kategori.");
+    showToast(katEditing ? "Perubahan kategori disimpan." : `Kategori ${saved.name} ditambahkan.`, "success");
+    if (again && !katEditing) {
+      await katReload();
+      katNewForm(parent);
+    } else {
+      katShowPanel("kat-list-panel");
+      await katReload();
+    }
+  } catch (e) { katError(e); }
+}
+
+// ── Pop-up: Tambah Kategori Utama ────────────────────────────────────────────
+function katOpenMainModal() {
+  const radio = (v, label, hint, checked) => `<label class="flex items-start gap-2 cursor-pointer"><input type="radio" name="kat-m-status" value="${v}" ${checked ? "checked" : ""} class="mt-1 accent-[#D97757]"><span><span class="text-sm text-ink">${label}</span><span class="block text-xs text-muted">${hint}</span></span></label>`;
+  openModal("Tambah Kategori Utama", `
+    <div class="space-y-3">
+      <p class="text-xs text-muted -mt-2">Buat kategori utama untuk mengelompokkan produk variasi mobil.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div><label for="kat-m-name" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nama Kategori Utama <span class="text-failed">*</span></label>
+          <input id="kat-m-name" type="text" maxlength="80" autocomplete="off" data-no-uppercase oninput="katModalNameInput()" placeholder="Contoh: Lampu &amp; Penerangan" class="${KAT_INPUT}"></div>
+        <div><label for="kat-m-code" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Kode Kategori <span class="text-failed">*</span></label>
+          <div class="flex gap-2"><input id="kat-m-code" type="text" maxlength="30" autocomplete="off" data-no-uppercase placeholder="KAT-LMP" class="${KAT_INPUT} font-mono uppercase">
+            <button type="button" onclick="katModalGenerate()" class="px-2.5 py-2 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 whitespace-nowrap">Generate Kode</button></div></div>
+      </div>
+      <div><div class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Ikon Kategori <span class="normal-case font-normal">(opsional)</span></div><div id="kat-m-icons" class="flex flex-wrap gap-2"></div></div>
+      <div><label for="kat-m-desc" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Deskripsi <span class="normal-case font-normal">(opsional)</span></label>
+        <textarea id="kat-m-desc" rows="3" maxlength="500" data-no-uppercase class="${KAT_INPUT} resize-y"></textarea></div>
+      <div><div class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Status Kategori</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${radio("aktif", "Aktif", "Kategori dapat digunakan dan ditampilkan.", true)}${radio("nonaktif", "Nonaktif", "Tidak bisa dipilih, tetapi data tetap tersimpan.", false)}</div></div>
+      <div class="rounded-lg bg-accent/5 border border-accent/20 px-3 py-2 text-xs text-ink">Kategori utama tidak memiliki kategori induk. Setelah disimpan, Anda dapat menambahkan subkategori ke dalam kategori ini.</div>
+      <div class="flex flex-wrap justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+        <button type="button" onclick="katSaveMain(true)" class="px-4 py-1.5 border border-accent text-accent rounded-lg text-sm font-medium hover:bg-bg2">Simpan &amp; Tambah Lagi</button>
+        <button type="button" onclick="katSaveMain(false)" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">Simpan Kategori</button></div>
+    </div>`, { lg: true });
+  katRenderIconPicker("kat-m-icons", "");
+  katCodeTouched = false;
+  document.getElementById("kat-m-code").addEventListener("input", () => { katCodeTouched = true; });
+  document.getElementById("kat-m-name").focus();
+}
+const KAT_INPUT = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
+function katModalNameInput() {
+  clearTimeout(katNameTimer);
+  katNameTimer = setTimeout(() => { if (!katCodeTouched) katModalGenerate(true); }, 350);
+}
+async function katModalGenerate(quiet) {
+  const name = document.getElementById("kat-m-name")?.value.trim();
+  if (!name) { if (!quiet) showToast("Isi nama kategori dulu."); return; }
+  try {
+    const { code } = await katJson(await fetch(`/api/categories/code-preview?${new URLSearchParams({ name })}`), "Gagal membuat kode.");
+    const el = document.getElementById("kat-m-code");
+    if (el) { el.value = code; katCodeTouched = false; }
+  } catch (e) { if (!quiet) katError(e); }
+}
+async function katSaveMain(again) {
+  const name = document.getElementById("kat-m-name").value.trim();
+  if (!name) { showToast("Nama kategori utama wajib diisi."); return; }
+  const code = document.getElementById("kat-m-code").value.trim();
+  if (!code) { showToast("Kode kategori wajib diisi (klik Generate Kode)."); return; }
+  const body = { name, code, parent_id: null, icon: katIconSel["kat-m-icons"] || null,
+    description: document.getElementById("kat-m-desc").value.trim() || null,
+    status: document.querySelector('input[name="kat-m-status"]:checked').value };
+  try {
+    const saved = await katJson(await fetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), "Gagal menyimpan kategori.");
+    showToast(`Kategori utama ${saved.name} ditambahkan.`, "success");
+    closeModal();
+    await katReload();
+    if (again) katOpenMainModal();
+  } catch (e) { katError(e); }
+}
+
+// ── Arsip / pulihkan ─────────────────────────────────────────────────────────
+function katConfirmArchive(id) {
+  const c = katById(id);
+  if (!c) return;
+  openModal("Arsipkan kategori?", `
+    <div class="space-y-4">
+      <p class="text-sm text-ink">“${esc(c.name)}” akan diarsipkan${c.product_count ? ` dan ${formatInt(c.product_count)} barang di dalamnya tetap tersimpan` : ""}. Kategori arsip tidak bisa dipilih untuk barang baru, tetapi bisa dipulihkan kapan saja.</p>
+      ${c.child_count ? `<p class="text-xs text-pending">Kategori ini punya ${c.child_count} subkategori. Arsipkan subkategorinya lebih dulu.</p>` : ""}
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+        <button type="button" onclick="katArchive(${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90">Arsipkan</button></div></div>`);
+}
+async function katArchive(id) {
+  try {
+    await katJson(await fetch(`/api/categories/${id}/archive`, { method: "POST" }), "Gagal mengarsipkan kategori.");
+    closeModal(); showToast("Kategori diarsipkan.", "success");
+    katShowPanel("kat-list-panel"); await katReload();
+  } catch (e) { closeModal(); katError(e); }
+}
+async function katRestore(id) {
+  try {
+    await katJson(await fetch(`/api/categories/${id}/restore`, { method: "POST" }), "Gagal memulihkan kategori.");
+    showToast("Kategori dipulihkan.", "success");
+    katShowPanel("kat-list-panel"); await katReload();
+  } catch (e) { katError(e); }
+}
+
+// ── CSV ──────────────────────────────────────────────────────────────────────
+function katPickCsv() { document.getElementById("kat-csv-file").click(); }
+async function katImportCsv(input) {
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const result = await katJson(await fetch("/api/categories/import", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv: await file.text() }) }), "Gagal mengimpor CSV.");
+    showToast(`Import selesai: ${result.created} dibuat, ${result.skipped} dilewati, ${result.errors.length} gagal.`, result.errors.length ? "error" : "success");
+    await katReload();
+    if (result.errors.length) openModal("Baris yang gagal diimpor", `<ul class="text-sm space-y-1 max-h-64 overflow-y-auto">${result.errors.slice(0, 50).map(e => `<li><span class="text-muted">Baris ${e.line}:</span> ${esc(e.message)}</li>`).join("")}</ul><p class="text-xs text-muted mt-3">Format kolom: kode, nama, induk_kode, status, deskripsi. Baris induk harus ada sebelum subkategorinya.</p>`);
+  } catch (e) { katError(e); }
+}
+
+// ── Preorder: Buat Nota Penjualan (PO Customer -> nota, DP dialokasikan sekali) ──
+function openPoConvertModal() {
+  const po = currentPreorder;
+  if (!po) return;
+  const ready = po.items.filter(i => !i.receipt_id && (i.status === "sampai_di_toko" || i.status === "terpasang"));
+  if (!ready.length) { showToast("Belum ada item yang sampai di toko dan belum masuk nota."); return; }
+  const total = ready.reduce((a, i) => a + i.quantity * i.unit_price, 0);
+  const dp = Math.min(po.dp_unallocated || 0, total);
+  const needPlate = !(po.plate_full || "").trim();
+  openModal("Buat Nota Penjualan", `
+    <div class="space-y-3">
+      <div class="rounded-lg bg-bg2 px-3 py-2.5 text-sm space-y-1">
+        ${ready.map(i => `<div class="flex justify-between gap-3"><span class="text-ink">${esc(i.product_name)} <span class="text-muted tabular-nums">&times; ${i.quantity}</span></span><span class="tabular-nums">${formatIDR(i.quantity * i.unit_price)}</span></div>`).join("")}
+        <div class="flex justify-between border-t border-line pt-1"><span class="text-muted">Total nota</span><span class="font-semibold tabular-nums">${formatIDR(total)}</span></div>
+        <div class="flex justify-between"><span class="text-muted">DP dipakai (sekali)</span><span class="tabular-nums text-done">${formatIDR(dp)}</span></div>
+        <div class="flex justify-between"><span class="text-muted">Sisa dibayar di kasir</span><span class="font-semibold tabular-nums">${formatIDR(total - dp)}</span></div>
+      </div>
+      ${needPlate ? `<div class="grid grid-cols-3 gap-2">
+        <input id="po-cv-region" maxlength="2" placeholder="Wilayah" class="${SPO_INPUT}" aria-label="Kode wilayah plat">
+        <input id="po-cv-number" maxlength="4" inputmode="numeric" placeholder="Nomor" class="${SPO_INPUT}" aria-label="Nomor plat">
+        <input id="po-cv-suffix" maxlength="3" placeholder="Huruf" class="${SPO_INPUT}" aria-label="Huruf belakang plat"></div>` : `<p class="text-xs text-muted">Plat: ${esc(po.plate_full)}</p>`}
+      ${spoModalButtons("Buat Nota", "submitPoConvert()", false)}
+    </div>`);
+}
+
+async function submitPoConvert() {
+  const po = currentPreorder;
+  const body = {};
+  if (document.getElementById("po-cv-region")) {
+    body.plate_region = document.getElementById("po-cv-region").value.trim();
+    body.plate_number = document.getElementById("po-cv-number").value.trim();
+    body.plate_suffix = document.getElementById("po-cv-suffix").value.trim();
+  }
+  try {
+    const resp = await fetch(`/api/preorders/${po.id}/convert`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || "Gagal membuat nota.");
+    closeModal();
+    showToast(`Nota ${data.receipt_no || ""} dibuat. DP ${formatIDR(data.dp_applied)} dipakai, sisa ${formatIDR(data.amount_due)}.`, "success");
+    const r = await fetch(`/api/preorders/${po.id}`);
+    if (r.ok) renderPreorderDetail(await r.json());
   } catch (e) {
     showToast(e.message);
   }
@@ -14086,12 +15052,22 @@ function renderSupplierPoDetail(po) {
     : '<p class="text-muted">Belum ada penerimaan.</p>';
 
   document.getElementById("spo-cancel-card").classList.toggle("hidden", po.cancellations.length === 0);
-  document.getElementById("spo-detail-cancels").innerHTML = po.cancellations.map(c => `
-    <div class="flex flex-wrap items-baseline justify-between gap-2 border border-line rounded-lg px-3 py-2">
+  document.getElementById("spo-detail-cancels").innerHTML = po.cancellations.map(c => {
+    const st = SPO_CANCEL_STATUS[c.status] || [c.status, "bg-bg2 text-muted"];
+    return `
+    <div class="flex flex-wrap items-start justify-between gap-2 border border-line rounded-lg px-3 py-2">
       <div><span class="text-ink">${esc(c.product_name)}</span> <span class="tabular-nums text-muted">&times; ${c.quantity}</span>
-        <div class="text-xs text-muted">${esc(c.reason)} &middot; ${esc((SPO_CANCEL_ACTIONS.find(a => a.key === c.action) || {}).label || c.action)}${c.note ? " &middot; " + esc(c.note) : ""}</div></div>
-      <div class="text-xs text-muted tabular-nums">${esc(formatReceiptWhen(c.cancelled_at, true))}${c.cancelled_by ? " &middot; " + esc(c.cancelled_by) : ""}</div>
-    </div>`).join("");
+        <span class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${st[1]}">${esc(st[0])}</span>
+        <div class="text-xs text-muted">${esc(c.reason)} &middot; ${esc((SPO_CANCEL_ACTIONS.find(a => a.key === c.action) || {}).label || c.action)}${c.note ? " &middot; " + esc(c.note) : ""}</div>
+        ${c.resolved_at ? `<div class="text-xs text-muted">Diputuskan ${esc(formatReceiptWhen(c.resolved_at, true))}${c.resolved_by ? " oleh " + esc(c.resolved_by) : ""}${c.resolution_note ? " &middot; " + esc(c.resolution_note) : ""}</div>` : ""}</div>
+      <div class="text-right">
+        <div class="text-xs text-muted tabular-nums">${esc(formatReceiptWhen(c.cancelled_at, true))}${c.cancelled_by ? " &middot; " + esc(c.cancelled_by) : ""}</div>
+        ${c.status === "menunggu_persetujuan" ? `<div class="flex gap-1.5 justify-end mt-1.5">
+          <button type="button" onclick="openSpoResolveCancelModal(${c.id}, true)" class="px-2.5 py-1 border border-line rounded-lg text-xs font-medium text-ink hover:bg-bg2 transition-colors">Supplier Setuju</button>
+          <button type="button" onclick="openSpoResolveCancelModal(${c.id}, false)" class="px-2.5 py-1 border border-line rounded-lg text-xs font-medium text-failed hover:bg-failed/10 transition-colors">Supplier Menolak</button></div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
   document.getElementById("spo-detail-events").innerHTML = spoEventsHtml(po.events);
   showSpoPanel("spo-detail-panel");
 }
@@ -14328,9 +15304,11 @@ function openSpoCancelItemModal(itemId) {
   const po = currentSpo;
   const item = po && po.items.find(i => i.id === itemId);
   if (!item) return;
-  const left = spoItemLeft(item);
+  const pending = po.cancellations.filter(c => c.item_id === itemId && c.status === "menunggu_persetujuan").reduce((a, c) => a + c.quantity, 0);
+  const left = spoItemLeft(item) - pending;
+  if (left <= 0) { showToast(pending ? "Semua sisa item ini sudah diajukan pembatalannya dan menunggu persetujuan supplier." : "Tidak ada sisa item yang bisa dibatalkan."); return; }
   const past = po.cancellations.filter(c => c.item_id === itemId);
-  openModal("Batalkan Item PO Supplier", `
+  openModal("Ajukan Pembatalan Item PO Supplier", `
     <div class="space-y-4" data-cancel-item="${item.id}" data-left="${left}">
       <div class="border border-line rounded-lg px-3 py-2.5">
         <div class="text-sm font-medium text-ink">${esc(item.product_name)}</div>
@@ -14352,9 +15330,10 @@ function openSpoCancelItemModal(itemId) {
         </div>
       </div>
       <div><label for="spo-cx-note" class="${SPO_LABEL}">Catatan Admin</label><textarea id="spo-cx-note" rows="2" maxlength="300" data-no-uppercase class="${SPO_INPUT}"></textarea></div>
+      <div class="text-xs bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-ink">PO ini sudah dikirim ke supplier, jadi ini hanya <b>permintaan</b>: item tetap dipesan dan tagihan tidak berubah sampai supplier setuju. Catat jawaban supplier di kartu Pembatalan Item.${pending ? ` ${pending} lagi sudah diajukan dan menunggu.` : ""}</div>
       <div id="spo-cx-impact" class="rounded-lg bg-bg2 px-3 py-2.5 text-sm space-y-1"></div>
-      ${past.length ? `<div><div class="${SPO_LABEL}">Log Pembatalan Item Ini</div>${past.map(c => `<div class="text-xs text-muted">${esc(formatReceiptWhen(c.cancelled_at, true))} &middot; ${c.quantity} pcs &middot; ${esc(c.reason)}${c.cancelled_by ? " &middot; " + esc(c.cancelled_by) : ""}</div>`).join("")}</div>` : ""}
-      ${spoModalButtons("Batalkan Item", "submitSpoCancelItem()", true)}
+      ${past.length ? `<div><div class="${SPO_LABEL}">Log Pembatalan Item Ini</div>${past.map(c => `<div class="text-xs text-muted">${esc(formatReceiptWhen(c.cancelled_at, true))} &middot; ${c.quantity} pcs &middot; ${esc(c.reason)} &middot; ${esc(SPO_CANCEL_STATUS[c.status]?.[0] || c.status)}${c.cancelled_by ? " &middot; " + esc(c.cancelled_by) : ""}</div>`).join("")}</div>` : ""}
+      ${spoModalButtons("Ajukan Pembatalan", "submitSpoCancelItem()", true)}
     </div>`, { wide: true });
   updateSpoCancelImpact();
 }
@@ -14374,7 +15353,7 @@ function updateSpoCancelImpact() {
   const remainingLeft = left - qty;
   const allGone = po.items.every(i => spoItemLeft(i) - (i.id === item.id ? qty : 0) <= 0);
   document.getElementById("spo-cx-impact").innerHTML = `
-    <div class="text-[11px] font-medium text-muted uppercase tracking-wider">Dampak Pembatalan</div>
+    <div class="text-[11px] font-medium text-muted uppercase tracking-wider">Dampak jika supplier menyetujui</div>
     <div class="flex justify-between"><span class="text-muted">Total faktur</span><span class="tabular-nums">${formatIDR(before.total)} &rarr; <strong>${formatIDR(after.total)}</strong></span></div>
     <div class="flex justify-between"><span class="text-muted">Sisa item ini yang ditunggu</span><span class="tabular-nums">${left} &rarr; <strong>${remainingLeft}</strong></span></div>
     ${after.total < po.paid_amount ? `<div class="text-xs text-failed">Total faktur jadi lebih kecil dari yang sudah dibayar (${formatIDR(po.paid_amount)}). Selesaikan selisihnya dengan supplier.</div>` : ""}
@@ -14392,7 +15371,33 @@ function submitSpoCancelItem() {
   spoSend(`items/${box.dataset.cancelItem}/cancel`, {
     quantity, reason, action: document.querySelector('input[name="spo-cx-action"]:checked').value,
     note: document.getElementById("spo-cx-note").value.trim() || null,
-  }, "Item dibatalkan.");
+  }, "Permintaan pembatalan diajukan. Menunggu persetujuan supplier.");
+}
+
+const SPO_CANCEL_STATUS = {
+  menunggu_persetujuan: ["Menunggu persetujuan supplier", "bg-pending/10 text-pending"],
+  disetujui: ["Disetujui supplier", "bg-done/10 text-done"],
+  ditolak: ["Ditolak supplier", "bg-failed/10 text-failed"],
+};
+
+function openSpoResolveCancelModal(cancellationId, approved) {
+  const c = currentSpo.cancellations.find(x => x.id === cancellationId);
+  if (!c) return;
+  openModal(approved ? "Supplier Menyetujui Pembatalan" : "Supplier Menolak Pembatalan", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink">${esc(c.product_name)} <span class="tabular-nums text-muted">&times; ${c.quantity}</span></p>
+      <p class="text-sm text-muted">${approved
+        ? "Jumlah ini dikeluarkan dari PO dan tagihan menyusut. Tindakan lanjutan yang dipilih: " + esc((SPO_CANCEL_ACTIONS.find(a => a.key === c.action) || {}).label || c.action) + "."
+        : "Permintaan ditutup dan item tetap dipesan seperti semula."}</p>
+      <div><label for="spo-rc-note" class="${SPO_LABEL}">Catatan <span class="normal-case font-normal">(opsional)</span></label>
+        <textarea id="spo-rc-note" rows="2" maxlength="300" data-no-uppercase class="${SPO_INPUT}"></textarea></div>
+      ${spoModalButtons(approved ? "Catat Persetujuan" : "Catat Penolakan", `submitSpoResolveCancel(${cancellationId}, ${approved})`, !approved)}
+    </div>`);
+}
+
+function submitSpoResolveCancel(cancellationId, approved) {
+  spoSend(`cancellations/${cancellationId}/resolve`, { approved, note: document.getElementById("spo-rc-note").value.trim() || null },
+    approved ? "Pembatalan disetujui supplier dan diterapkan." : "Penolakan supplier dicatat. Item tetap dipesan.");
 }
 
 // ── PO Supplier: form ────────────────────────────────────────────────────────
@@ -14599,6 +15604,7 @@ async function saveSupplierPo(issue) {
     })),
   };
   const editing = Boolean(spoEditingId);
+  if (editing && currentSpo && currentSpo.id === spoEditingId) body.expected_updated_at = currentSpo.updated_at;
   if (!editing) {
     body.issue = issue;
     body.paid_amount = issue ? priceValue(document.getElementById("spo-f-paid")) : 0;

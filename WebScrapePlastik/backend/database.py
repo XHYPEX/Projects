@@ -209,6 +209,19 @@ def init_db() -> None:
                 created_by TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_preorder_payments_preorder_id ON preorder_payments(preorder_id);
+            -- Ledger of how much of a PO Customer's down payment was applied to which
+            -- final nota. Unallocated DP = SUM(preorder_payments) - SUM(this table), so a
+            -- DP can never be used twice.
+            CREATE TABLE IF NOT EXISTS preorder_payment_allocations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                preorder_id TEXT NOT NULL REFERENCES preorders(id),
+                receipt_id TEXT NOT NULL REFERENCES receipts(id),
+                amount INTEGER NOT NULL,
+                allocated_at TEXT NOT NULL,
+                allocated_by TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_ppa_preorder_id ON preorder_payment_allocations(preorder_id);
+            CREATE INDEX IF NOT EXISTS idx_ppa_receipt_id ON preorder_payment_allocations(receipt_id);
 
             -- PO Supplier: purchase orders to a supplier, built from customer preorder
             -- lines. Like preorders they never touch stock; see the Supplier POs section.
@@ -284,6 +297,24 @@ def init_db() -> None:
                 image_path TEXT,
                 UNIQUE(supplier_id, brand_id, name_normalized)
             );
+            -- Master Kategori: two levels (kategori utama -> subkategori). Never deleted, only
+            -- archived, so a product always keeps pointing at a real row.
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                name_normalized TEXT NOT NULL,
+                parent_id INTEGER REFERENCES categories(id),
+                status TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif','nonaktif','arsip')),
+                icon TEXT,
+                description TEXT,
+                created_by TEXT,
+                created_at TEXT NOT NULL,
+                updated_by TEXT,
+                updated_at TEXT NOT NULL,
+                UNIQUE(parent_id, name_normalized)
+            );
+            CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
             CREATE INDEX IF NOT EXISTS idx_master_items_sku_prefix ON master_items(sku_prefix);
             CREATE INDEX IF NOT EXISTS idx_master_items_name_normalized ON master_items(name_normalized);
             CREATE TABLE IF NOT EXISTS inbound_documents (
@@ -592,6 +623,9 @@ def init_db() -> None:
                SELECT id, created_at, deposit, 'DP awal', NULL FROM preorders
                WHERE deposit > 0 AND id NOT IN (SELECT preorder_id FROM preorder_payments)"""
         )
+        poi_cols = {row["name"] for row in con.execute("PRAGMA table_info(preorder_items)").fetchall()}
+        if "receipt_id" not in poi_cols:
+            con.execute("ALTER TABLE preorder_items ADD COLUMN receipt_id TEXT")
         history_cols = {row["name"] for row in con.execute("PRAGMA table_info(preorder_status_history)").fetchall()}
         if "old_status" not in history_cols:
             con.execute("ALTER TABLE preorder_status_history ADD COLUMN old_status TEXT")
@@ -756,9 +790,31 @@ def init_db() -> None:
             ("archived_note", "TEXT"),
             ("archived_at", "TEXT"),
             ("updated_at", "TEXT"),
+            ("category_id", "INTEGER REFERENCES categories(id)"),
         ):
             if col not in master_item_cols:
                 con.execute(f"ALTER TABLE master_items ADD COLUMN {col} {ddl}")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_master_items_category_id ON master_items(category_id)")
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS idempotency_keys (
+                   scope TEXT PRIMARY KEY,
+                   status INTEGER,
+                   content_type TEXT,
+                   body BLOB,
+                   created_at TEXT NOT NULL
+               )"""
+        )
+        cancel_cols = {row["name"] for row in con.execute("PRAGMA table_info(spo_cancellations)").fetchall()}
+        # A cancellation of an issued PO is a REQUEST until the supplier agrees. Rows from before this
+        # existed were applied on the spot, so they default to 'disetujui'.
+        for col, ddl in (("status", "TEXT NOT NULL DEFAULT 'disetujui'"), ("resolved_by", "TEXT"),
+                         ("resolved_at", "TEXT"), ("resolution_note", "TEXT")):
+            if col not in cancel_cols:
+                con.execute(f"ALTER TABLE spo_cancellations ADD COLUMN {col} {ddl}")
+        receipt_cols_v = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
+        for col in ("void_reason", "voided_by", "voided_at"):
+            if col not in receipt_cols_v:
+                con.execute(f"ALTER TABLE receipts ADD COLUMN {col} TEXT")
         ledger_cols = {row["name"] for row in con.execute("PRAGMA table_info(stock_ledger)").fetchall()}
         if "created_by" not in ledger_cols:
             con.execute("ALTER TABLE stock_ledger ADD COLUMN created_by TEXT")
@@ -1221,8 +1277,19 @@ def _resolve_receipt_customer(
 # Name shown for a receipt's customer: the master's name when linked, else the
 # receipt's own snapshot. Kept in SQL so list, detail and search share one rule.
 _CUSTOMER_FULL_NAME_SQL = "TRIM(c.first_name || ' ' || COALESCE(c.last_name, ''))"
+# `revision` is a cheap fingerprint of everything a second cashier could change under you (money, status,
+# lines, payments, timeline). A save that sends the revision it was loaded with is refused (409) when it
+# no longer matches, instead of silently overwriting the other person's edit.
+_RECEIPT_REVISION_SQL = """
+    (SELECT COUNT(*) FROM receipt_events e WHERE e.receipt_id = r.id) || '-' || r.total || '-' || r.amount_paid
+    || '-' || r.work_status || '-' || r.status || '-' || r.discount || '-'
+    || COALESCE((SELECT SUM(ri.id * 7 + ri.quantity * 131 + ri.unit_price + ri.line_discount * 3)
+                 FROM receipt_items ri WHERE ri.receipt_id = r.id), 0) || '-'
+    || (SELECT COUNT(*) FROM receipt_payments p WHERE p.receipt_id = r.id)"""
+
 _RECEIPT_SELECT = f"""SELECT r.*,
-        CASE WHEN c.id IS NOT NULL THEN {_CUSTOMER_FULL_NAME_SQL} ELSE r.customer_name END AS customer_full_name
+        CASE WHEN c.id IS NOT NULL THEN {_CUSTOMER_FULL_NAME_SQL} ELSE r.customer_name END AS customer_full_name,
+        {_RECEIPT_REVISION_SQL} AS revision
     FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id"""
 
 
@@ -1673,6 +1740,7 @@ def update_receipt(
     update_transfer_account: bool = False,
     changed_by: str | None = None,
     extra: dict | None = None,
+    void_reason: str | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -1845,7 +1913,16 @@ def update_receipt(
         )
         _apply_receipt_stock_delta(con, receipt_id, before_holdings, after_holdings)
         if new_status == "void" and existing["status"] != "void":
-            _log_receipt_event(con, receipt_id, "void", "Nota dibatalkan", changed_by)
+            reason = (void_reason or "").strip() or None
+            refund = existing["amount_paid"] or 0
+            note = "Nota dibatalkan" + (f": {reason}" if reason else "")
+            if refund > 0:
+                note += f". Pembayaran {refund:,} dibalik; kembalikan ke pelanggan.".replace(",", ".")
+            con.execute(
+                "UPDATE receipts SET void_reason=?, voided_by=?, voided_at=? WHERE id=?",
+                (reason, changed_by, _now(), receipt_id),
+            )
+            _log_receipt_event(con, receipt_id, "void", note, changed_by)
 
         updated = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
         return dict(updated)
@@ -2724,7 +2801,7 @@ def _generate_barcode_for_id(master_item_id: int) -> str:
 def create_master_item(
     supplier_id: int, brand_id: int, name: str, unit: str, sell_price: int = 0, cost_price: int = 0,
     stock_qty: int = 0, description: str | None = None, min_stock: int = LOW_STOCK_THRESHOLD,
-    location: str | None = None, created_by: str | None = None,
+    location: str | None = None, created_by: str | None = None, category_id: int | None = None,
 ) -> dict:
     name_normalized = _normalize_name(name)
     with _conn() as con:
@@ -2745,12 +2822,13 @@ def create_master_item(
             """INSERT INTO master_items
                (sku, sku_prefix, sku_seq, supplier_id, brand_id, name, name_normalized, unit,
                 last_cost_price, avg_cost_price, sell_price, stock_qty, first_received_date, is_active, created_at,
-                description, min_stock, location, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?)""",
+                description, min_stock, location, updated_at, category_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?, ?)""",
             (
                 sku, prefix, seq, supplier_id, brand_id, name, name_normalized, unit,
                 cost_price, cost_price, sell_price, stock_qty, created_at,
                 (description or "").strip() or None, min_stock, (location or "").strip() or None, created_at,
+                category_id,
             ),
         )
         # The row id isn't known until after INSERT, so the barcode is generated
@@ -2779,6 +2857,7 @@ def update_master_item(
     master_item_id: int, name: str | None = None, sell_price: int | None = None, unit: str | None = None,
     description: str | None = None, min_stock: int | None = None, location: str | None = None,
     changed_by: str | None = None, price_note: str | None = None,
+    set_category: bool = False, category_id: int | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
@@ -2795,9 +2874,9 @@ def update_master_item(
         try:
             con.execute(
                 """UPDATE master_items SET name=?, name_normalized=?, sell_price=?, unit=?,
-                          description=?, min_stock=?, location=?, updated_at=? WHERE id=?""",
+                          description=?, min_stock=?, location=?, updated_at=?, category_id=? WHERE id=?""",
                 (new_name, new_name_normalized, new_sell_price, new_unit, new_desc, new_min, new_loc, now,
-                 master_item_id),
+                 category_id if set_category else row["category_id"], master_item_id),
             )
         except sqlite3.IntegrityError:
             raise ValueError(
@@ -2972,13 +3051,27 @@ def set_master_item_image_path(master_item_id: int, image_path: str | None) -> s
 def get_master_item(master_item_id: int) -> dict | None:
     with _conn() as con:
         row = con.execute(
-            """SELECT mi.*, s.name AS supplier_name, b.name AS brand_name FROM master_items mi
+            """SELECT mi.*, s.name AS supplier_name, b.name AS brand_name, c.name AS category_name
+               FROM master_items mi
                JOIN suppliers s ON s.id = mi.supplier_id
                JOIN brands b ON b.id = mi.brand_id
+               LEFT JOIN categories c ON c.id = mi.category_id
                WHERE mi.id=?""",
             (master_item_id,),
         ).fetchone()
         return dict(row) if row is not None else None
+
+
+def find_archived_skus(skus: list[str]) -> list[str]:
+    """Of these SKUs, the ones that belong to an archived (is_active=0) product."""
+    if not skus:
+        return []
+    with _conn() as con:
+        marks = ",".join("?" * len(skus))
+        rows = con.execute(
+            f"SELECT sku FROM master_items WHERE is_active=0 AND sku IN ({marks})", [s.strip().upper() for s in skus]
+        ).fetchall()
+        return [r["sku"] for r in rows]
 
 
 def get_master_item_by_sku(sku: str) -> dict | None:
@@ -3069,6 +3162,7 @@ def list_master_items(
     stock_max: int | None = None,
     no_price: bool = False,
     sort: str = "newest",
+    category_ids: list[int] | None = None,
 ) -> dict:
     offset = (page - 1) * page_size
     where_clauses = []
@@ -3096,16 +3190,20 @@ def list_master_items(
         params.append(stock_max)
     if no_price:
         where_clauses.append("mi.sell_price <= 0")
+    if category_ids is not None:
+        where_clauses.append(f"mi.category_id IN ({','.join('?' * len(category_ids)) or 'NULL'})")
+        params.extend(category_ids)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     with _conn() as con:
         total_row = con.execute(f"SELECT COUNT(*) AS c FROM master_items mi {where_sql}", params).fetchone()
         total = total_row["c"]
         rows = con.execute(
-            f"""SELECT mi.*, s.name AS supplier_name, b.name AS brand_name
+            f"""SELECT mi.*, s.name AS supplier_name, b.name AS brand_name, c.name AS category_name
                 FROM master_items mi
                 JOIN suppliers s ON s.id = mi.supplier_id
                 JOIN brands b ON b.id = mi.brand_id
+                LEFT JOIN categories c ON c.id = mi.category_id
                 {where_sql}
                 ORDER BY {MASTER_SORTS[sort]}
                 LIMIT ? OFFSET ?""",
@@ -4375,7 +4473,19 @@ def get_preorder_items(preorder_id: str) -> list[dict]:
                WHERE preorder_id=? ORDER BY position ASC, preorder_items.id ASC""",
             (preorder_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        items = [dict(r) for r in rows]
+        # Two-way reference: which supplier orders carry each line (and how much of it has arrived).
+        for it in items:
+            links = con.execute(
+                """SELECT sp.id AS supplier_po_id, sp.po_number, sp.status AS po_status, spi.quantity - spi.qty_cancelled AS qty_ordered,
+                          spi.qty_received
+                   FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+                   WHERE spi.preorder_item_id=? AND sp.status != 'batal' AND spi.quantity - spi.qty_cancelled > 0
+                   ORDER BY sp.created_at ASC""",
+                (it["id"],),
+            ).fetchall()
+            it["supplier_pos"] = [dict(l) for l in links]
+        return items
 
 
 def get_preorder_history(preorder_id: str) -> list[dict]:
@@ -4410,6 +4520,77 @@ def add_preorder_payment(
         )
         con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
         return dict(con.execute("SELECT * FROM preorder_payments WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def get_preorder_allocations(preorder_id: str) -> list[dict]:
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT a.*, r.receipt_no, r.total AS receipt_total, r.status AS receipt_status
+               FROM preorder_payment_allocations a LEFT JOIN receipts r ON r.id = a.receipt_id
+               WHERE a.preorder_id=? ORDER BY a.id ASC""", (preorder_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def preorder_unallocated_dp(con: sqlite3.Connection, preorder_id: str) -> int:
+    paid = con.execute(
+        "SELECT COALESCE(SUM(amount),0) AS n FROM preorder_payments WHERE preorder_id=?", (preorder_id,)
+    ).fetchone()["n"]
+    used = con.execute(
+        "SELECT COALESCE(SUM(a.amount),0) AS n FROM preorder_payment_allocations a "
+        "LEFT JOIN receipts r ON r.id = a.receipt_id WHERE a.preorder_id=? AND COALESCE(r.status,'') <> 'void'",
+        (preorder_id,),
+    ).fetchone()["n"]
+    return max(paid - used, 0)
+
+
+def preorder_convertible_items(preorder_id: str, item_ids: list[int] | None = None) -> list[dict]:
+    """Lines that have arrived (or been fitted) and are not on a nota yet."""
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            """SELECT pi.*, mi.sku AS sku FROM preorder_items pi
+               LEFT JOIN master_items mi ON mi.id = pi.master_item_id
+               WHERE pi.preorder_id=? ORDER BY pi.position ASC, pi.id ASC""", (preorder_id,)
+        ).fetchall()]
+    rows = [r for r in rows if r.get("receipt_id") is None and r["status"] in ("sampai_di_toko", "terpasang")]
+    if item_ids is not None:
+        rows = [r for r in rows if r["id"] in set(item_ids)]
+    return rows
+
+
+def apply_preorder_dp(preorder_id: str, receipt_id: str, item_ids: list[int], by: str | None) -> int:
+    """One transaction: link the lines to the nota, allocate the unallocated DP (capped at the
+    nota's total) and book it as a payment on the nota. Returns the Rp applied."""
+    now = _now()
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        rec = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        po = con.execute("SELECT po_number FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        marked = 0
+        for iid in item_ids:
+            marked += con.execute(
+                "UPDATE preorder_items SET receipt_id=? WHERE id=? AND preorder_id=? AND receipt_id IS NULL",
+                (receipt_id, iid, preorder_id),
+            ).rowcount
+        if marked != len(item_ids):
+            raise ValueError("Item PO ini baru saja dipakai di nota lain. Muat ulang lalu coba lagi.")
+        amount = min(preorder_unallocated_dp(con, preorder_id), rec["total"])
+        if amount > 0:
+            con.execute(
+                "INSERT INTO preorder_payment_allocations (preorder_id, receipt_id, amount, allocated_at, allocated_by) "
+                "VALUES (?, ?, ?, ?, ?)", (preorder_id, receipt_id, amount, now, by),
+            )
+            new_paid = rec["amount_paid"] + amount
+            new_status = _compute_receipt_status(rec["total"], new_paid, None)
+            con.execute(
+                "UPDATE receipts SET amount_paid=?, status=?, payment_method='cash' WHERE id=?",
+                (new_paid, new_status, receipt_id),
+            )
+            _insert_receipt_payment(con, receipt_id, amount, "cash", f"DP dari {po['po_number']}", by)
+        _log_receipt_event(con, receipt_id, "created",
+                           f"Dibuat dari {po['po_number']}" + (f"; DP Rp {amount:,} dialokasikan".replace(",", ".") if amount else ""), by)
+        con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
+        return amount
 
 
 def get_all_preorders(query: str | None = None, status: str | None = None, draft: bool = False) -> list[dict]:
@@ -5254,21 +5435,65 @@ def cancel_supplier_po_item(
         ).fetchone()
         if item is None:
             raise ValueError(f"Baris {item_id} tidak ada di PO ini.")
-        left = item["quantity"] - item["qty_cancelled"] - item["qty_received"]
+        pending = con.execute(
+            "SELECT COALESCE(SUM(quantity), 0) AS q FROM spo_cancellations WHERE item_id=? AND status='menunggu_persetujuan'",
+            (item_id,),
+        ).fetchone()["q"]
+        left = item["quantity"] - item["qty_cancelled"] - item["qty_received"] - pending
         if quantity <= 0:
             raise ValueError("Jumlah yang dibatalkan harus lebih dari 0.")
         if quantity > left:
-            raise ValueError(f"Jumlah dibatalkan melebihi sisa yang belum diterima ({left}).")
-        con.execute("UPDATE supplier_po_items SET qty_cancelled = qty_cancelled + ? WHERE id=?", (quantity, item_id))
+            raise ValueError(
+                f"Jumlah dibatalkan melebihi sisa yang belum diterima ({left})"
+                + (f", {pending} lagi sedang menunggu persetujuan supplier." if pending else ".")
+            )
+        # The supplier has not agreed yet, so nothing changes on the PO: the request is recorded and
+        # the other lines (and other customers' allocations) stay exactly as they were.
         con.execute(
             """INSERT INTO spo_cancellations (supplier_po_id, item_id, product_name, quantity, reason, action, note,
-                                              cancelled_by, cancelled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                              cancelled_by, cancelled_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'menunggu_persetujuan')""",
             (supplier_po_id, item_id, item["product_name"], quantity, reason.strip(), action,
              (note or "").strip() or None, by, now),
         )
-        _spo_event(con, supplier_po_id, "cancel_item",
-                   f"Item dibatalkan: {item['product_name']} x{quantity} — {reason.strip()}", by)
-        _spo_finish_if_settled(con, supplier_po_id)
+        _spo_event(con, supplier_po_id, "cancel_request",
+                   f"Pembatalan diajukan, menunggu persetujuan supplier: {item['product_name']} x{quantity} — {reason.strip()}", by)
+    return get_supplier_po(supplier_po_id)
+
+
+def resolve_spo_cancellation(
+    supplier_po_id: str, cancellation_id: int, approved: bool, note: str | None = None, by: str | None = None
+) -> dict:
+    """The supplier's answer to a cancellation request. Approved: the quantity is dropped from the line
+    (the bill shrinks, the PO may finish). Rejected: the request is closed and the line is untouched."""
+    now = _now()
+    with _conn() as con:
+        c = con.execute(
+            "SELECT * FROM spo_cancellations WHERE id=? AND supplier_po_id=?", (cancellation_id, supplier_po_id)
+        ).fetchone()
+        if c is None:
+            raise LookupError("Permintaan pembatalan tidak ditemukan.")
+        if c["status"] != "menunggu_persetujuan":
+            raise ValueError("Permintaan pembatalan ini sudah diputuskan.")
+        item = con.execute("SELECT * FROM supplier_po_items WHERE id=?", (c["item_id"],)).fetchone()
+        if approved:
+            left = item["quantity"] - item["qty_cancelled"] - item["qty_received"]
+            if c["quantity"] > left:
+                raise ValueError(
+                    f"Barang sudah datang sebagian: sisa yang belum diterima hanya {left}, tidak bisa dibatalkan {c['quantity']}. "
+                    "Tolak permintaan ini atau ajukan jumlah yang lebih kecil."
+                )
+            con.execute("UPDATE supplier_po_items SET qty_cancelled = qty_cancelled + ? WHERE id=?", (c["quantity"], c["item_id"]))
+        con.execute(
+            "UPDATE spo_cancellations SET status=?, resolved_by=?, resolved_at=?, resolution_note=? WHERE id=?",
+            ("disetujui" if approved else "ditolak", by, now, (note or "").strip() or None, cancellation_id),
+        )
+        _spo_event(
+            con, supplier_po_id, "cancel_item" if approved else "cancel_rejected",
+            (f"Pembatalan disetujui supplier: {c['product_name']} x{c['quantity']}" if approved
+             else f"Pembatalan ditolak supplier: {c['product_name']} x{c['quantity']} tetap dipesan")
+            + (f" — {note.strip()}" if note and note.strip() else ""), by)
+        if approved:
+            _spo_finish_if_settled(con, supplier_po_id)
     return get_supplier_po(supplier_po_id)
 
 
@@ -5292,3 +5517,313 @@ def cancel_supplier_po(supplier_po_id: str, by: str | None = None) -> dict:
         con.execute("UPDATE supplier_pos SET status='batal', updated_at=? WHERE id=?", (now, supplier_po_id))
         _spo_event(con, supplier_po_id, "cancel", "PO dibatalkan", by)
     return get_supplier_po(supplier_po_id)
+
+
+# --- Idempotency keys ---------------------------------------------------------
+# A POST that carries an Idempotency-Key header runs at most once: the first request claims the key,
+# runs, and its response is stored; a repeat (double click, slow-network retry) gets that stored
+# response back instead of creating a second nota / payment / stock movement. See backend/idempotency.py.
+
+
+def claim_idempotency_key(scope: str) -> tuple[str, dict | None]:
+    """('new', None) when this request owns the key, ('done', stored) when an earlier one finished,
+    ('busy', None) when an earlier one is still running."""
+    with _conn() as con:
+        con.execute(
+            "DELETE FROM idempotency_keys WHERE created_at < ?",
+            ((datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),),
+        )
+        try:
+            con.execute("INSERT INTO idempotency_keys (scope, created_at) VALUES (?, ?)", (scope, _now()))
+            return "new", None
+        except sqlite3.IntegrityError:
+            row = con.execute(
+                "SELECT status, content_type, body FROM idempotency_keys WHERE scope=?", (scope,)
+            ).fetchone()
+            if row is None or row["status"] is None:
+                return "busy", None
+            return "done", dict(row)
+
+
+def finish_idempotency_key(scope: str, status: int, content_type: str | None, body: bytes) -> None:
+    with _conn() as con:
+        con.execute(
+            "UPDATE idempotency_keys SET status=?, content_type=?, body=? WHERE scope=?",
+            (status, content_type, body, scope),
+        )
+
+
+def release_idempotency_key(scope: str) -> None:
+    """A failed attempt must not block the corrected retry."""
+    with _conn() as con:
+        con.execute("DELETE FROM idempotency_keys WHERE scope=? AND status IS NULL", (scope,))
+
+
+# ---------------------------------------------------------------------------
+# Master Kategori: kategori utama -> subkategori (two levels, never deleted)
+# ---------------------------------------------------------------------------
+
+CATEGORY_STATUSES = ("aktif", "nonaktif", "arsip")
+_CATEGORY_CODE_RE = re.compile(r"^[A-Z0-9]+(-[A-Z0-9]+)*$")
+
+
+def _category_name_key(name: str) -> str:
+    """Case/space-insensitive key; unlike _normalize_name it keeps every word."""
+    return " ".join(re.sub(r"[^A-Z0-9 ]", "", name.upper()).split())
+
+
+def get_category_row(category_id: int) -> dict | None:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def category_subtree_ids(category_id: int) -> list[int]:
+    with _conn() as con:
+        rows = con.execute("SELECT id FROM categories WHERE parent_id=?", (category_id,)).fetchall()
+    return [category_id] + [r["id"] for r in rows]
+
+
+def list_categories_with_stats() -> list[dict]:
+    """Every category with its own product count and a rolled-up total (a parent counts its
+    subcategories' products too). Small table, so one pass in Python is simplest."""
+    with _conn() as con:
+        cats = [dict(r) for r in con.execute(
+            """SELECT c.*, p.name AS parent_name, p.code AS parent_code FROM categories c
+               LEFT JOIN categories p ON p.id = c.parent_id ORDER BY c.name_normalized ASC, c.id ASC"""
+        ).fetchall()]
+        counts = {r["category_id"]: dict(r) for r in con.execute(
+            """SELECT category_id, COUNT(*) AS n,
+                      SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) AS active_n,
+                      SUM(CASE WHEN stock_qty <= 0 THEN 1 ELSE 0 END) AS out_n
+               FROM master_items WHERE category_id IS NOT NULL GROUP BY category_id"""
+        ).fetchall()}
+    by_parent: dict[int, list[dict]] = {}
+    for c in cats:
+        by_parent.setdefault(c["parent_id"] or 0, []).append(c)
+    for c in cats:
+        own = counts.get(c["id"], {"n": 0, "active_n": 0, "out_n": 0})
+        subs = by_parent.get(c["id"], [])
+        c["own_product_count"] = own["n"]
+        c["product_count"] = own["n"] + sum(counts.get(s["id"], {}).get("n", 0) for s in subs)
+        c["active_product_count"] = (own["active_n"] or 0) + sum(counts.get(s["id"], {}).get("active_n", 0) or 0 for s in subs)
+        c["out_of_stock_count"] = (own["out_n"] or 0) + sum(counts.get(s["id"], {}).get("out_n", 0) or 0 for s in subs)
+        c["child_count"] = len(subs)
+    return cats
+
+
+def get_categories_summary() -> dict:
+    cats = list_categories_with_stats()
+    mains = [c for c in cats if c["parent_id"] is None]
+    subs = [c for c in cats if c["parent_id"] is not None]
+    return {
+        "total": len(cats),
+        "total_utama": len(mains),
+        "aktif": sum(1 for c in cats if c["status"] == "aktif"),
+        "subkategori": len(subs),
+        "tanpa_produk": sum(1 for c in cats if c["product_count"] == 0 and c["status"] != "arsip"),
+        "diarsipkan": sum(1 for c in cats if c["status"] == "arsip"),
+    }
+
+
+def _letters_for_code(name: str, n: int = 3) -> str:
+    letters = re.sub(r"[^A-Z0-9]", "", name.upper())
+    consonants = re.sub(r"[AEIOU]", "", letters)
+    base = (letters[:1] + consonants[1:] if consonants else letters) or "KAT"
+    return (base + "XXX")[:n]
+
+
+def category_code_preview(name: str, parent_id: int | None) -> str:
+    with _conn() as con:
+        if parent_id is None:
+            prefix = "KAT-"
+        else:
+            parent = con.execute("SELECT code FROM categories WHERE id=?", (parent_id,)).fetchone()
+            if parent is None:
+                raise ValueError("Kategori induk tidak ditemukan.")
+            prefix = "SUB-" + parent["code"].split("-", 1)[-1] + "-"
+        base = prefix + _letters_for_code(name)
+        code, n = base, 1
+        while con.execute("SELECT 1 FROM categories WHERE code=?", (code,)).fetchone():
+            n += 1
+            code = f"{base}{n}"
+        return code
+
+
+def find_similar_categories(name: str, parent_id: int | None = None, exclude_id: int | None = None) -> list[dict]:
+    """Soft warning for the form: same name elsewhere, or one name containing the other."""
+    key = _category_name_key(name)
+    if len(key) < 3:
+        return []
+    out = []
+    for c in list_categories_with_stats():
+        if c["id"] == exclude_id or c["status"] == "arsip":
+            continue
+        other = _category_name_key(c["name"])
+        if other == key or key in other or other in key:
+            out.append({"id": c["id"], "name": c["name"], "code": c["code"], "parent_name": c["parent_name"],
+                        "same_parent": c["parent_id"] == parent_id, "exact": other == key})
+    return out[:5]
+
+
+def _validate_category_fields(con: sqlite3.Connection, name: str, parent_id: int | None, exclude_id: int | None) -> None:
+    if not name.strip():
+        raise ValueError("Nama kategori wajib diisi.")
+    if len(name.strip()) > 80:
+        raise ValueError("Nama kategori maksimal 80 karakter.")
+    if parent_id is not None:
+        parent = con.execute("SELECT * FROM categories WHERE id=?", (parent_id,)).fetchone()
+        if parent is None:
+            raise ValueError("Kategori induk tidak ditemukan.")
+        if parent["parent_id"] is not None:
+            raise ValueError("Struktur kategori hanya dua tingkat: pilih kategori utama sebagai induk.")
+        if parent["status"] == "arsip":
+            raise ValueError("Kategori induk sudah diarsipkan, pilih induk lain.")
+        if exclude_id is not None and parent_id == exclude_id:
+            raise ValueError("Kategori tidak bisa menjadi induk bagi dirinya sendiri.")
+    key = _category_name_key(name)
+    for r in con.execute(
+        "SELECT id, name FROM categories WHERE parent_id IS ? AND id IS NOT ?", (parent_id, exclude_id)
+    ).fetchall():
+        if _category_name_key(r["name"]) == key:
+            raise ValueError(f"Sudah ada kategori bernama '{r['name']}' di tingkat yang sama.")
+
+
+def create_category(
+    name: str, code: str | None, parent_id: int | None, status: str, icon: str | None,
+    description: str | None, created_by: str | None,
+) -> dict:
+    if status not in ("aktif", "nonaktif"):
+        raise ValueError("Status baru harus aktif atau nonaktif.")
+    name = " ".join(name.split())
+    now = _now()
+    with _conn() as con:
+        _validate_category_fields(con, name, parent_id, None)
+        code = (code or "").strip().upper()
+    if not code:
+        code = category_code_preview(name, parent_id)
+    if not _CATEGORY_CODE_RE.match(code) or len(code) > 30:
+        raise ValueError("Kode hanya boleh huruf besar, angka dan tanda hubung (maks 30 karakter), contoh: KAT-LMP.")
+    with _conn() as con:
+        if con.execute("SELECT 1 FROM categories WHERE code=?", (code,)).fetchone():
+            raise ValueError(f"Kode {code} sudah dipakai kategori lain.")
+        cur = con.execute(
+            """INSERT INTO categories (code, name, name_normalized, parent_id, status, icon, description,
+                                       created_by, created_at, updated_by, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (code, name, _category_name_key(name), parent_id, status, (icon or "").strip() or None,
+             (description or "").strip() or None, created_by, now, created_by, now),
+        )
+        return dict(con.execute("SELECT * FROM categories WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def update_category(
+    category_id: int, name: str | None, parent_id: int | None, set_parent: bool, status: str | None,
+    icon: str | None, set_icon: bool, description: str | None, set_description: bool,
+    updated_by: str | None, expected_updated_at: str | None = None,
+) -> dict:
+    """The code is deliberately not editable: filters, CSV imports and reports refer to it."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone()
+        if row is None:
+            raise ValueError("Kategori tidak ditemukan.")
+        if expected_updated_at and expected_updated_at != row["updated_at"]:
+            raise ValueError("Data ini baru saja diubah oleh pengguna lain. Muat ulang halaman lalu ulangi perubahan Anda.")
+        if row["status"] == "arsip":
+            raise ValueError("Kategori ini diarsipkan. Pulihkan dulu sebelum mengubahnya.")
+        new_name = " ".join((name if name is not None else row["name"]).split())
+        new_parent = parent_id if set_parent else row["parent_id"]
+        if set_parent and new_parent is not None:
+            if con.execute("SELECT 1 FROM categories WHERE parent_id=?", (category_id,)).fetchone():
+                raise ValueError("Kategori yang punya subkategori tidak bisa dijadikan subkategori.")
+        _validate_category_fields(con, new_name, new_parent, category_id)
+        new_status = status if status is not None else row["status"]
+        if new_status not in ("aktif", "nonaktif"):
+            raise ValueError("Status hanya bisa aktif atau nonaktif. Gunakan Arsipkan untuk mengarsipkan.")
+        now = _now()
+        con.execute(
+            """UPDATE categories SET name=?, name_normalized=?, parent_id=?, status=?, icon=?, description=?,
+                      updated_by=?, updated_at=? WHERE id=?""",
+            (new_name, _category_name_key(new_name), new_parent, new_status,
+             ((icon or "").strip() or None) if set_icon else row["icon"],
+             ((description or "").strip() or None) if set_description else row["description"],
+             updated_by, now, category_id),
+        )
+        return dict(con.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone())
+
+
+def set_category_archived(category_id: int, archived: bool, by: str | None) -> dict:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone()
+        if row is None:
+            raise ValueError("Kategori tidak ditemukan.")
+        now = _now()
+        if archived:
+            if row["status"] == "arsip":
+                raise ValueError("Kategori ini sudah diarsipkan.")
+            live = con.execute(
+                "SELECT COUNT(*) AS n FROM categories WHERE parent_id=? AND status<>'arsip'", (category_id,)
+            ).fetchone()["n"]
+            if live:
+                raise ValueError(f"Masih ada {live} subkategori yang belum diarsipkan. Arsipkan subkategorinya dulu.")
+            con.execute("UPDATE categories SET status='arsip', updated_by=?, updated_at=? WHERE id=?", (by, now, category_id))
+        else:
+            if row["status"] != "arsip":
+                raise ValueError("Kategori ini tidak sedang diarsipkan.")
+            if row["parent_id"] is not None:
+                parent = con.execute("SELECT status FROM categories WHERE id=?", (row["parent_id"],)).fetchone()
+                if parent and parent["status"] == "arsip":
+                    raise ValueError("Kategori induk masih diarsipkan. Pulihkan induknya dulu.")
+            con.execute("UPDATE categories SET status='aktif', updated_by=?, updated_at=? WHERE id=?", (by, now, category_id))
+        return dict(con.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone())
+
+
+def list_category_items(category_id: int, limit: int = 20, offset: int = 0) -> dict:
+    ids = category_subtree_ids(category_id)
+    marks = ",".join("?" * len(ids))
+    with _conn() as con:
+        total = con.execute(f"SELECT COUNT(*) AS n FROM master_items WHERE category_id IN ({marks})", ids).fetchone()["n"]
+        rows = con.execute(
+            f"""SELECT mi.id, mi.sku, mi.name, mi.stock_qty, mi.min_stock, mi.sell_price, mi.is_active, c.name AS category_name
+                FROM master_items mi JOIN categories c ON c.id = mi.category_id
+                WHERE mi.category_id IN ({marks}) ORDER BY mi.name ASC LIMIT ? OFFSET ?""",
+            ids + [limit, offset],
+        ).fetchall()
+    return {"total": total, "items": [dict(r) for r in rows]}
+
+
+def get_categories_for_export() -> list[dict]:
+    return [
+        {"code": c["code"], "name": c["name"], "parent_code": c["parent_code"] or "", "status": c["status"],
+         "description": c["description"] or "", "product_count": c["product_count"]}
+        for c in list_categories_with_stats()
+    ]
+
+
+def import_categories(rows: list[dict], by: str | None) -> dict:
+    """rows: kode (optional), nama, induk_kode (optional), status, deskripsi. A parent row must come
+    before its children or already exist. Each row succeeds or fails on its own."""
+    created, skipped, errors = 0, 0, []
+    for i, r in enumerate(rows, start=2):  # line 1 is the header
+        name = (r.get("nama") or "").strip()
+        if not name:
+            errors.append({"line": i, "message": "Nama kosong."}); continue
+        parent_code = (r.get("induk_kode") or "").strip().upper()
+        parent_id = None
+        if parent_code:
+            with _conn() as con:
+                p = con.execute("SELECT id FROM categories WHERE code=?", (parent_code,)).fetchone()
+            if p is None:
+                errors.append({"line": i, "message": f"Kode induk {parent_code} tidak ditemukan."}); continue
+            parent_id = p["id"]
+        status = (r.get("status") or "aktif").strip().lower()
+        try:
+            create_category(name, (r.get("kode") or "").strip() or None, parent_id,
+                            status if status in ("aktif", "nonaktif") else "aktif", None, r.get("deskripsi"), by)
+            created += 1
+        except ValueError as e:
+            if "Sudah ada" in str(e) or "sudah dipakai" in str(e):
+                skipped += 1
+            else:
+                errors.append({"line": i, "message": str(e)})
+    return {"created": created, "skipped": skipped, "errors": errors}

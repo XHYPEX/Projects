@@ -1127,8 +1127,8 @@
        refetches /api/receipts with the matching params. renderRoute() and the history JS read
        #history-search-input, #history-tbody, #history-empty* and the .history-status-btn chips by
        name, so those ids and classes stay. -->
-  <div id="page-invoices" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+  <div id="page-invoices" class="hidden flex-1 overflow-auto p-3 sm:p-4">
+    <div class="max-w-none mx-auto">
 
       <!-- Summary tiles. The second row is the work stage; each tile filters the list to it. -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
@@ -3201,7 +3201,7 @@
               <div class="flex items-center justify-between mb-2">
                 <h4 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Aktivitas Terbaru</h4>
                 <label class="text-xs text-muted flex items-center gap-2">Urutkan
-                  <select id="dt-activity-sort" onchange="renderMasterActivity()" class="select-chevron border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink"><option value="desc">Terbaru</option><option value="asc">Terlama</option></select>
+                  <select id="dt-activity-sort" onchange="renderMasterActivity(true)" class="select-chevron border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink"><option value="desc">Terbaru</option><option value="asc">Terlama</option></select>
                 </label>
               </div>
               <div class="border border-line rounded-xl overflow-hidden overflow-x-auto">
@@ -3212,6 +3212,7 @@
                   <tbody id="dt-activity-tbody"></tbody>
                 </table>
               </div>
+              <div class="text-center mt-3"><button id="dt-activity-more" type="button" onclick="masterActivityMore()" class="hidden px-3 py-1.5 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors"></button></div>
             </div>
             <div id="dt-pane-perubahan" class="hidden p-4">
               <h4 class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Riwayat Perubahan Harga</h4>
@@ -10707,7 +10708,7 @@ async function loadMasterDetailExtras(id) {
   g("dt-use-posup-sub").textContent = "pembelian dari supplier";
   g("dt-use-masuk").textContent = u.barang_masuk ?? "-";
   g("dt-use-masuk-sub").textContent = "dokumen barang masuk";
-  renderMasterActivity();
+  renderMasterActivity(true);
   renderMasterChangeHistory();
 }
 
@@ -10755,25 +10756,76 @@ function ledgerDescription(e) {
   return e.note || "Penyesuaian stok manual.";
 }
 
-function renderMasterActivity() {
+const ACT_ICON = {
+  dibuat: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/>',
+  awal: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/>',
+  jual: '<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.2a1 1 0 0 0 1-.8L19 8H6"/><circle cx="9" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/>',
+  masuk: '<path d="M3 13l2-8h14l2 8"/><path d="M3 13v6a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-6h-5l-1.5 2h-5L8 13H3Z"/>',
+  retur: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  adj: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/>',
+  harga: '<path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.8 2.8 4 3 4 1.3 4 3-1.8 3-4 3-4-1.3-4-3"/>',
+  arsip: '<path d="M3 5h18v4H3zM5 9v10h14V9M10 13h4"/>',
+  pulih: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+};
+const ACT_META = {
+  dibuat: ["Barang dibuat", "text-muted"], awal: ["Saldo awal", "text-muted"], jual: ["Terjual di Kasir", "text-failed"],
+  masuk: ["Masuk dari Supplier", "text-done"], retur: ["Retur / Void", "text-pending"], adj: ["Penyesuaian stok", "text-accentDark"],
+  harga: ["Perubahan harga", "text-accentDark"], arsip: ["Barang diarsipkan", "text-muted"], pulih: ["Barang diaktifkan", "text-done"],
+};
+let masterActivityShown = 15;
+
+function activityRefHtml(r) {
+  if (!r.ref) return "-";
+  if (r.receiptId) return `<button type="button" onclick="openReceiptFromHistory('${esc(r.receiptId)}')" class="text-accent hover:underline font-mono text-xs">${esc(r.ref)}</button>`;
+  if (r.docId) return `<button type="button" onclick="jumpToInboundDocument(${r.docId})" class="text-accent hover:underline font-mono text-xs">${esc(r.ref)}</button>`;
+  return `<span class="font-mono text-xs text-muted">${esc(r.ref)}</span>`;
+}
+
+// One timeline from every source we keep: the stock ledger (sales, receiving, adjustments, returns),
+// the price history, and the archive state of the item itself.
+function renderMasterActivity(resetCount) {
+  if (resetCount === true) masterActivityShown = 15;
   const tbody = document.getElementById("dt-activity-tbody");
   const item = currentMasterItem;
   if (!item) return;
   const ledger = masterDetailExtra.ledger || [];
-  const rows = ledger.map(e => ({
-    at: e.created_at, kind: ledgerKind(e), text: ledgerDescription(e), by: e.created_by || "-", ref: e.ref_doc_number || "",
-  }));
-  rows.push({ at: item.created_at, kind: "dibuat", text: `Data barang ${item.name} ditambahkan.`, by: "-", ref: "" });
+  const hist = (masterDetailExtra.prices?.history || []).slice().sort((a, b) => a.id - b.id);
+  const unit = item.unit || "";
+  const rows = ledger.map(e => {
+    const kind = ledgerKind(e);
+    let text = ledgerDescription(e);
+    if (kind === "masuk" && e.ref_doc_number) text = `Barang ini masuk ${Math.abs(e.qty)} ${unit} melalui dokumen ${e.ref_doc_number}.`;
+    return { at: e.created_at, kind, text, by: e.actor || e.created_by || "-", ref: e.ref_doc_number || "",
+             receiptId: e.ref_receipt_id || null, docId: e.ref_type === "inbound_document" ? e.ref_id : null };
+  });
+  const first = hist[0];
+  rows.push({ at: item.created_at, kind: "dibuat", text: `Data barang ${item.name} berhasil ditambahkan.`, by: (first && first.changed_by) || "-", ref: "" });
+  hist.slice(1).forEach((h, i) => {
+    const prev = hist[i];
+    const parts = [];
+    if (prev.sell_price !== h.sell_price) parts.push(`harga jual ${formatIDR(prev.sell_price)} → ${formatIDR(h.sell_price)}`);
+    if (prev.cost_price !== h.cost_price) parts.push(`modal ${formatIDR(prev.cost_price)} → ${formatIDR(h.cost_price)}`);
+    if (!parts.length) return;
+    rows.push({ at: h.created_at, kind: "harga", text: `Perubahan ${parts.join(", ")}.${h.note ? " " + h.note : ""}`, by: h.changed_by || "-", ref: "" });
+  });
+  if (item.archived_at) {
+    rows.push({ at: item.archived_at, kind: "arsip", text: `Barang diarsipkan${item.archived_reason ? ": " + item.archived_reason : ""}${item.archived_note ? " (" + item.archived_note + ")" : ""}.`, by: "-", ref: "" });
+  }
   const dir = document.getElementById("dt-activity-sort").value === "asc" ? 1 : -1;
   rows.sort((a, b) => a.at < b.at ? -dir : a.at > b.at ? dir : 0);
-  tbody.innerHTML = rows.map(r => {
-    const meta = r.kind === "dibuat" ? ["Barang dibuat", "bg-bg2 text-muted"] : KIND_META[r.kind];
-    return `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2 text-muted whitespace-nowrap">${esc(formatMasterDateTime(r.at))}</td>
-      <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-[11px] font-medium ${meta[1]}">${meta[0]}</span></td>
-      <td class="px-3 py-2 text-ink">${esc(r.text)}</td><td class="px-3 py-2 text-muted">${esc(r.by)}</td>
-      <td class="px-3 py-2 font-mono text-xs text-muted">${r.ref ? esc(r.ref) : "-"}</td></tr>`;
-  }).join("");
+  const shown = rows.slice(0, masterActivityShown);
+  tbody.innerHTML = shown.map(r => {
+    const meta = ACT_META[r.kind] || ["Aktivitas", "text-muted"];
+    return `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatMasterDateTime(r.at))}</td>
+      <td class="px-3 py-2 whitespace-nowrap"><span class="inline-flex items-center gap-2 font-medium text-ink"><span class="${meta[1]}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ACT_ICON[r.kind] || ACT_ICON.adj}</svg></span>${esc(meta[0])}</span></td>
+      <td class="px-3 py-2 text-ink">${esc(r.text)}</td><td class="px-3 py-2 text-muted whitespace-nowrap">${esc(r.by)}</td>
+      <td class="px-3 py-2">${activityRefHtml(r)}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="px-3 py-6 text-center text-muted">Belum ada aktivitas.</td></tr>`;
+  const more = document.getElementById("dt-activity-more");
+  more.classList.toggle("hidden", rows.length <= masterActivityShown);
+  more.textContent = `Tampilkan lebih banyak (${rows.length - masterActivityShown} lagi)`;
 }
+function masterActivityMore() { masterActivityShown += 20; renderMasterActivity(); }
 
 function renderMasterChangeHistory() {
   const hist = masterDetailExtra.prices?.history || [];

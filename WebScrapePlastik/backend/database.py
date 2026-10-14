@@ -3733,7 +3733,10 @@ def create_stock_adjustment(master_item_id: int, qty_delta: int, reason: str, cr
 def get_stock_ledger(master_item_id: int) -> list[dict]:
     with _conn() as con:
         rows = con.execute(
-            """SELECT sl.*, COALESCE(d.doc_number, r.receipt_no) AS ref_doc_number FROM stock_ledger sl
+            """SELECT sl.*, COALESCE(d.doc_number, r.receipt_no) AS ref_doc_number,
+                      COALESCE(sl.created_by, r.cashier_name) AS actor,
+                      CASE WHEN sl.ref_type='receipt' THEN sl.note END AS ref_receipt_id
+               FROM stock_ledger sl
                LEFT JOIN inbound_documents d ON sl.ref_type='inbound_document' AND d.id = sl.ref_id
                LEFT JOIN receipts r ON sl.ref_type='receipt' AND r.id = sl.note
                WHERE sl.master_item_id=? ORDER BY sl.id ASC""", (master_item_id,)

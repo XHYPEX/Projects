@@ -647,6 +647,10 @@ class StockLedgerOut(BaseModel):
     created_at: str
     created_by: str | None = None
     ref_doc_number: str | None = None
+    # Who did it (the cashier for a sale) and the nota id behind a receipt movement, for the
+    # activity timeline's name and link.
+    actor: str | None = None
+    ref_receipt_id: str | None = None
 
 
 class PendingInvoiceOut(BaseModel):

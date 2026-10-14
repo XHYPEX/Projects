@@ -306,6 +306,8 @@ def _row_to_ledger(row: dict) -> StockLedgerOut:
         created_at=row["created_at"],
         created_by=row.get("created_by"),
         ref_doc_number=row.get("ref_doc_number"),
+        actor=row.get("actor"),
+        ref_receipt_id=row.get("ref_receipt_id"),
     )
 
 

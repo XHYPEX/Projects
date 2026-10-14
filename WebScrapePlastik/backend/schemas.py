@@ -82,8 +82,8 @@ class ReceiptRequest(ReceiptExtra):
     payment_method: str = "cash"  # one of VALID_PAYMENT_METHODS
     transfer_sender: str | None = None  # required when payment_method is "transfer"
     transfer_account: str | None = None  # the shop's account it was paid into; required for "transfer"
-    # Where the nota starts: draft (no stock taken, can't be paid), pengerjaan, or siap_bayar.
-    work_status: str = "siap_bayar"
+    # Where the nota starts: draft (no stock taken, can't be paid), belum, pengerjaan or selesai.
+    work_status: str = "belum"
 
 
 class ReceiptUpdateRequest(ReceiptExtra):
@@ -124,7 +124,7 @@ class ReceiptResponse(BaseModel):
     receipt_no: str | None = None
     transfer_sender: str | None = None
     transfer_account: str | None = None
-    work_status: str = "siap_bayar"
+    work_status: str = "belum"
 
 
 class TransferSenderOut(BaseModel):
@@ -173,7 +173,10 @@ class ReceiptOut(ReceiptExtra):
     receipt_no: str | None = None  # printed nota number, PJSG/YY/MM/NNNN
     transfer_sender: str | None = None  # for a transfer: the name on the sending account
     transfer_account: str | None = None  # for a transfer: the shop account it was paid into
-    work_status: str = "siap_bayar"  # draft | pengerjaan | siap_bayar | selesai
+    work_status: str = "belum"  # draft | belum | pengerjaan | selesai
+    void_reason: str | None = None
+    voided_by: str | None = None
+    voided_at: str | None = None
     draft_saved_at: str | None = None
 
 
@@ -186,7 +189,7 @@ class ReceiptEventOut(BaseModel):
 
 
 class ReceiptWorkStatusRequest(BaseModel):
-    to: str  # pengerjaan | siap_bayar
+    to: str  # belum | pengerjaan | selesai
     note: str | None = None
 
 

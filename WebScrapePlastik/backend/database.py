@@ -684,11 +684,11 @@ def init_db() -> None:
         # --- Additive migration: nota workflow (Kasir) ---
         # receipts.status stays the payment/void state (pending/done/void) that every list
         # and total reads; work_status is the shop-floor stage on top of it:
-        # draft -> pengerjaan -> siap_bayar -> selesai. A draft holds no stock; stock is
-        # taken when the nota leaves draft. Legacy rows: paid -> selesai, the rest siap_bayar.
+        # draft -> belum -> pengerjaan -> selesai (independent of payment). A draft holds no stock;
+        # stock is taken when the nota leaves draft. Legacy rows: paid -> selesai, the rest selesai.
         receipt_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipts)").fetchall()}
         for col, ddl in (
-            ("work_status", "TEXT NOT NULL DEFAULT 'siap_bayar'"),
+            ("work_status", "TEXT NOT NULL DEFAULT 'belum'"),
             ("work_notes", "TEXT"),
             ("cashier_name", "TEXT"),
             ("estimated_finish_at", "TEXT"),
@@ -702,6 +702,10 @@ def init_db() -> None:
                 con.execute(f"ALTER TABLE receipts ADD COLUMN {col} {ddl}")
                 if col == "work_status":
                     con.execute("UPDATE receipts SET work_status='selesai' WHERE status='done'")
+        # Payment and work are separate statuses now (Belum Bayar / Sebagian / Lunas, and
+        # Belum Dikerjakan / Dalam Pengerjaan / Pengerjaan Selesai). The old "siap_bayar" stage meant
+        # "work done, waiting to be paid", which is exactly Pengerjaan Selesai.
+        con.execute("UPDATE receipts SET work_status='selesai' WHERE work_status='siap_bayar'")
         item_cols = {row["name"] for row in con.execute("PRAGMA table_info(receipt_items)").fetchall()}
         for col, ddl in (
             ("item_type", "TEXT NOT NULL DEFAULT 'barang'"),
@@ -1227,13 +1231,21 @@ def _resolve_master_item_id(con: sqlite3.Connection, sku: str | None) -> int | N
     return row["id"] if row is not None else None
 
 
-RECEIPT_WORK_STATUSES = ("draft", "pengerjaan", "siap_bayar", "selesai")
-# Where a nota may be moved by hand; "selesai" is only ever reached by paying in full.
+# Work stage, independent of payment: draft (parked, no stock, no money) -> belum (Belum Dikerjakan)
+# -> pengerjaan (Dalam Pengerjaan) -> selesai (Pengerjaan Selesai). Payment status is derived from
+# amount_paid vs total and lives in receipts.status (pending / done / void).
+RECEIPT_WORK_STATUSES = ("draft", "belum", "pengerjaan", "selesai")
 _WORK_TRANSITIONS = {
-    "draft": {"pengerjaan", "siap_bayar"},
-    "pengerjaan": {"siap_bayar"},
-    "siap_bayar": {"pengerjaan"},
+    "draft": {"belum", "pengerjaan", "selesai"},
+    "belum": {"pengerjaan", "selesai"},
+    "pengerjaan": {"belum", "selesai"},
+    "selesai": {"pengerjaan"},
 }
+
+
+def _is_closed(row) -> bool:
+    """Lunas and Pengerjaan Selesai: the transaction is closed and read-only."""
+    return row["status"] == "done" and row["work_status"] == "selesai"
 
 
 def _holds_stock(status: str, work_status: str) -> bool:
@@ -1493,10 +1505,9 @@ def reverse_receipt_payment(receipt_id: str, payment_id: int, reason: str, by: s
             raise ValueError("Total pembayaran nota lebih kecil dari pembayaran ini, tidak bisa dibatalkan.")
         new_paid = row["amount_paid"] - pay["amount"]
         new_status = _compute_receipt_status(row["total"], new_paid, None)
-        work = "siap_bayar" if (row["status"] == "done" and new_status == "pending" and row["work_status"] == "selesai") else row["work_status"]
         cur = con.execute(
-            "UPDATE receipts SET amount_paid=?, status=?, work_status=? WHERE id=? AND amount_paid=?",
-            (new_paid, new_status, work, receipt_id, row["amount_paid"]),
+            "UPDATE receipts SET amount_paid=?, status=? WHERE id=? AND amount_paid=?",
+            (new_paid, new_status, receipt_id, row["amount_paid"]),
         )
         if cur.rowcount == 0:
             raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
@@ -1528,22 +1539,20 @@ def add_receipt_payment(
         if row["status"] == "done":
             raise ValueError("Nota ini sudah lunas, tidak ada sisa pembayaran.")
         if row["work_status"] == "draft":
-            raise ValueError("Nota masih Draft. Mulai pengerjaan atau lanjut ke pembayaran dulu.")
+            raise ValueError("Nota masih Draft. Simpan sebagai Belum Dikerjakan atau mulai pengerjaan dulu.")
         remaining = max(row["total"] - row["amount_paid"], 0)
         if amount <= 0:
             raise ValueError("Jumlah pembayaran harus lebih dari 0.")
         if amount > remaining:
             raise ValueError(f"Jumlah pembayaran melebihi sisa tagihan (Rp {remaining:,}).".replace(",", "."))
         new_paid = row["amount_paid"] + amount
-        if new_paid >= row["total"] and row["work_status"] != "siap_bayar":
-            raise ValueError("Pengerjaan belum selesai. Pilih Lanjut ke Pembayaran sebelum melunasi nota.")
         if method != "transfer":
             transfer_sender = transfer_account = None
         new_status = _compute_receipt_status(row["total"], new_paid, None)
         cur = con.execute(
             """UPDATE receipts SET amount_paid=?, status=?, work_status=?, payment_method=?, transfer_sender=?,
                transfer_account=? WHERE id=? AND status='pending' AND amount_paid=?""",
-            (new_paid, new_status, "selesai" if new_status == "done" else row["work_status"], method,
+            (new_paid, new_status, row["work_status"], method,
              transfer_sender, transfer_account, receipt_id, row["amount_paid"]),
         )
         if cur.rowcount == 0:
@@ -1571,7 +1580,7 @@ def create_receipt(
     transfer_sender: str | None = None,
     transfer_account: str | None = None,
     created_by: str | None = None,
-    work_status: str = "siap_bayar",
+    work_status: str = "belum",
     extra: dict | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
@@ -1584,8 +1593,6 @@ def create_receipt(
         final_status = "pending"
     else:
         final_status = _compute_receipt_status(total, amount_paid, status)
-    if final_status == "done":
-        work_status = "selesai"
     extra = extra or {}
     created_at = _now()
     started_at = _sanitize_started_at(started_at, created_at)
@@ -1641,6 +1648,7 @@ def create_receipt(
         _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings)
         _log_receipt_event(con, receipt_id, "created", {
             "draft": "Draft dibuat", "pengerjaan": "Nota dibuat, pengerjaan dimulai",
+            "belum": "Nota dibuat, belum dikerjakan", "selesai": "Nota dibuat, pengerjaan selesai",
         }.get(work_status, "Nota dibuat"), created_by)
 
         customer_full_name = con.execute(
@@ -1856,7 +1864,8 @@ def get_receipt_summary(tz_offset_minutes: int | None = None) -> dict:
                  COALESCE(SUM(CASE WHEN status = 'pending' AND work_status != 'draft' THEN MAX(total - amount_paid, 0) END), 0) AS pending_outstanding,
                  COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'draft' THEN 1 END), 0) AS draft_count,
                  COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'pengerjaan' THEN 1 END), 0) AS pengerjaan_count,
-                 COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'siap_bayar' THEN 1 END), 0) AS siap_bayar_count,
+                 COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'belum' THEN 1 END), 0) AS belum_count,
+                 COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'selesai' THEN 1 END), 0) AS selesai_count,
                  COALESCE(SUM(CASE WHEN created_at >= ? AND created_at < ? AND status = 'void' THEN 1 END), 0) AS void_today
                FROM receipts""",
             (start, end, start, end, start, end),
@@ -1966,9 +1975,25 @@ def update_receipt(
             during_work = 0 if is_draft else 1
             con.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
             added_names: list[str] = []
+            changed_notes: list[str] = []
+            kept_ids = {item.get("id") for item in resolved_items if item.get("id") in old_by_id}
+            for old_id, old_row in old_by_id.items():
+                if old_id not in kept_ids:
+                    changed_notes.append(f"{old_row['product_name']} dihapus")
             for item in resolved_items:
                 old = old_by_id.get(item.get("id"))
                 if old is not None:
+                    bits = []
+                    if old["product_name"] != item["product_name"]:
+                        bits.append(f"nama {old['product_name']} -> {item['product_name']}")
+                    if old["quantity"] != item["quantity"]:
+                        bits.append(f"qty {old['quantity']} -> {item['quantity']}")
+                    if old["unit_price"] != item["unit_price"]:
+                        bits.append(f"harga {old['unit_price']:,} -> {item['unit_price']:,}".replace(",", "."))
+                    if (old["line_discount"] or 0) != (item.get("line_discount") or 0):
+                        bits.append(f"diskon {(old['line_discount'] or 0):,} -> {(item.get('line_discount') or 0):,}".replace(",", "."))
+                    if bits:
+                        changed_notes.append(f"{item['product_name']}: " + ", ".join(bits))
                     con.execute(
                         """INSERT INTO receipt_items (id, receipt_id, product_name, quantity, unit_price, warranty_date,
                                master_item_id, item_type, line_discount, added_at, added_by, added_during_work)
@@ -1989,6 +2014,8 @@ def update_receipt(
                     added_names.append(item["product_name"])
             if added_names and not is_draft:
                 _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added_names), changed_by)
+            if changed_notes and not is_draft:
+                _log_receipt_event(con, receipt_id, "item_changed", "Item diubah: " + "; ".join(changed_notes), changed_by)
             effective_items = [
                 dict(r) for r in con.execute(
                     "SELECT * FROM receipt_items WHERE receipt_id=? ORDER BY id ASC", (receipt_id,)
@@ -2009,6 +2036,11 @@ def update_receipt(
             new_discount = existing["discount"]
             new_total = existing["total"]
 
+        if discount is not None and discount != existing["discount"] and not is_draft and status != "void":
+            _log_receipt_event(
+                con, receipt_id, "item_changed",
+                f"Diskon nota Rp {existing['discount']:,} -> Rp {discount:,}".replace(",", "."), changed_by,
+            )
         # Void is sticky and has no unvoid path — once a receipt is voided, only
         # a fresh explicit status="void" request is honored (a no-op); editing
         # amount_paid or items afterward must not accidentally revive it to a
@@ -2019,9 +2051,7 @@ def update_receipt(
             new_status = "pending"
         else:
             new_status = _compute_receipt_status(new_total, new_amount_paid, status)
-        new_work_status = "selesai" if new_status == "done" else existing["work_status"]
-        if new_status == "done" and existing["work_status"] != "siap_bayar":
-            raise ValueError("Pengerjaan belum selesai. Pilih Lanjut ke Pembayaran sebelum melunasi nota.")
+        new_work_status = existing["work_status"]
         # Payments already taken are real money: an edit that does not restate the paid
         # amount may not shrink the nota below what has come in.
         if amount_paid is None and existing["status"] != "void" and status != "void" and new_total < new_amount_paid:
@@ -2095,8 +2125,8 @@ def settle_receipt(
             raise ValueError("Struk sudah dibatalkan (void), jadi tidak bisa ditandai selesai.")
         if row["status"] == "done":
             raise ValueError("Struk ini sudah selesai (lunas), tidak ada sisa pembayaran.")
-        if row["work_status"] != "siap_bayar":
-            raise ValueError("Nota belum siap dibayar. Pilih Lanjut ke Pembayaran dulu.")
+        if row["work_status"] == "draft":
+            raise ValueError("Nota masih Draft. Simpan sebagai Belum Dikerjakan atau mulai pengerjaan dulu.")
         remaining = max(row["total"] - row["amount_paid"], 0)
         if amount is not None and amount != remaining:
             raise ValueError(f"Jumlah dibayar harus sama dengan sisa pembayaran (Rp {remaining:,}).".replace(",", "."))
@@ -2126,11 +2156,11 @@ def settle_receipt(
 def change_receipt_work_status(
     receipt_id: str, to_status: str, note: str | None = None, changed_by: str | None = None
 ) -> dict:
-    """Moves a nota between Draft / Dalam Pengerjaan / Siap Pembayaran. Leaving Draft is the
-    moment stock is taken off the shelf (and an oversell is refused here, rolling the move
-    back). 'Selesai' is never set by hand: paying a siap_bayar nota in full does that.
+    """Moves a nota between Belum Dikerjakan / Dalam Pengerjaan / Pengerjaan Selesai, whatever its
+    payment state. Leaving Draft is the moment stock is taken off the shelf (and an oversell is
+    refused here, rolling the move back). A closed nota (Lunas + Pengerjaan Selesai) is read-only.
     Messages: 'tidak ditemukan' -> 404, 'Stok' -> 422, the rest -> 409."""
-    if to_status not in RECEIPT_WORK_STATUSES or to_status in ("draft", "selesai"):
+    if to_status not in RECEIPT_WORK_STATUSES or to_status == "draft":
         raise ValueError("Status tujuan tidak valid.")
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -2138,8 +2168,8 @@ def change_receipt_work_status(
             raise ValueError("Nota tidak ditemukan.")
         if row["status"] == "void":
             raise ValueError("Nota sudah dibatalkan (void).")
-        if row["status"] == "done":
-            raise ValueError("Nota sudah lunas dan tidak bisa diubah lagi.")
+        if _is_closed(row):
+            raise ValueError("Nota sudah lunas dan selesai (ditutup), tidak bisa diubah lagi.")
         current = row["work_status"]
         if to_status == current:
             raise ValueError("Nota sudah berstatus itu.")
@@ -2158,7 +2188,7 @@ def change_receipt_work_status(
         )
         if cur.rowcount == 0:
             raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
-        labels = {"pengerjaan": "Dalam Pengerjaan", "siap_bayar": "Siap Pembayaran"}
+        labels = {"belum": "Belum Dikerjakan", "pengerjaan": "Dalam Pengerjaan", "selesai": "Pengerjaan Selesai"}
         text = f"Status: {labels[to_status]}" + (f" — {note}" if note else "")
         _log_receipt_event(con, receipt_id, "status", text, changed_by)
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())

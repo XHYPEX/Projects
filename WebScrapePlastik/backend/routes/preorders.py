@@ -326,7 +326,7 @@ async def convert_to_receipt(
         result = await loop.run_in_executor(
             None, create_receipt, receipt_id, region, number, suffix, items, 0, 0, None,
             po["customer_phone"], po["customer_name"], None, "cash", None, None, None,
-            user["username"], "siap_bayar", None,
+            user["username"], "belum", None,
         )
         dp = await loop.run_in_executor(
             None, apply_preorder_dp, preorder_id, receipt_id, [l["id"] for l in lines], user["username"]

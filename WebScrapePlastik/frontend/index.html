@@ -1064,8 +1064,8 @@
         </section>
 
         <!-- ACTION BAR: pinned under the form. Which buttons show follows the nota's stage (see
-             renderCashierWorkUi). Lanjut ke Pembayaran saves, moves the nota to Siap Pembayaran and opens the
-             Pembayaran Nota pop-up. Tutup Nota closes the open tab (asking first if it has unsaved
+             renderCashierWorkUi). Lanjut ke Pembayaran saves (a new nota or Draft becomes Belum Dikerjakan) and
+             opens the Pembayaran Nota pop-up. Tutup Nota closes the open tab (asking first if it has unsaved
              changes), so on a fresh tab it doubles as "start over". -->
         <div class="cashier-bar">
           <div class="cashier-inner py-3 flex items-center gap-3">
@@ -1076,6 +1076,7 @@
             </button>
 <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
               <button id="cashier-draft-btn" type="button" onclick="saveReceipt('draft')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Draft</button>
+              <button id="cashier-belum-btn" type="button" onclick="saveReceipt('belum')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan (Belum Dikerjakan)</button>
               <button id="cashier-start-btn" type="button" onclick="saveReceipt('start')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-accent/60 bg-white text-ink hover:bg-accent/10">Simpan &amp; Mulai Pengerjaan</button>
               <button id="cashier-save-btn" type="button" onclick="saveReceipt('save')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Perubahan</button>
               <button id="cashier-status-btn" type="button" onclick="openWorkStatusModal()" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Ubah Status</button>
@@ -1276,14 +1277,14 @@
             <div class="text-[11px] text-muted">Mobil sedang dikerjakan</div>
           </div>
         </button>
-        <button type="button" onclick="applyHistoryWorkFilter('siap_bayar')" class="text-left flex items-center gap-3 bg-white border border-line rounded-xl px-4 py-3 hover:bg-bg2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+        <button type="button" onclick="applyHistoryWorkFilter('belum')" class="text-left flex items-center gap-3 bg-white border border-line rounded-xl px-4 py-3 hover:bg-bg2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           <span class="shrink-0 grid place-items-center w-10 h-10 rounded-lg bg-accent/10 text-accentDark" aria-hidden="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
           </span>
           <div class="min-w-0">
-            <div class="text-xs text-muted">Siap Pembayaran</div>
-            <div id="hist-sum-siap_bayar" class="font-sans text-2xl font-semibold text-ink leading-tight tabular-nums">0</div>
-            <div class="text-[11px] text-muted">Menunggu pelunasan</div>
+            <div class="text-xs text-muted">Belum Dikerjakan</div>
+            <div id="hist-sum-belum" class="font-sans text-2xl font-semibold text-ink leading-tight tabular-nums">0</div>
+            <div class="text-[11px] text-muted">Nota aktif, belum mulai</div>
           </div>
         </button>
       </div>
@@ -1343,9 +1344,9 @@
               <button type="button" data-status-filter="" onclick="applyHistoryStatusFilter('')"
                 class="history-status-btn is-active px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Semua</button>
               <button type="button" data-status-filter="pending" onclick="applyHistoryStatusFilter('pending')"
-                class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Belum Selesai</button>
+                class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Belum Lunas</button>
               <button type="button" data-status-filter="done" onclick="applyHistoryStatusFilter('done')"
-                class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Selesai</button>
+                class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Lunas</button>
               <button type="button" data-status-filter="void" onclick="applyHistoryStatusFilter('void')"
                 class="history-status-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Void</button>
             </div>
@@ -1357,12 +1358,12 @@
                 class="history-work-btn is-active px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Semua</button>
               <button type="button" data-work-filter="draft" onclick="applyHistoryWorkFilter('draft')"
                 class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Draft</button>
+              <button type="button" data-work-filter="belum" onclick="applyHistoryWorkFilter('belum')"
+                class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Belum Dikerjakan</button>
               <button type="button" data-work-filter="pengerjaan" onclick="applyHistoryWorkFilter('pengerjaan')"
                 class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Dalam Pengerjaan</button>
-              <button type="button" data-work-filter="siap_bayar" onclick="applyHistoryWorkFilter('siap_bayar')"
-                class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Siap Pembayaran</button>
               <button type="button" data-work-filter="selesai" onclick="applyHistoryWorkFilter('selesai')"
-                class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Selesai</button>
+                class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Pengerjaan Selesai</button>
             </div>
           </div>
           <div>
@@ -1408,7 +1409,7 @@
                 <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
                 <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dibayar</th>
                 <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
-                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Nota</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Pengerjaan</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pembayaran</th>
                 <th class="text-right pl-2 pr-4 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
               </tr>
@@ -5188,7 +5189,7 @@ function refreshItemRowMeta(row) {
 // True for a saved nota that is already being worked on or waiting for payment.
 function isWorkedOnTab() {
   const t = getActiveTab();
-  return !!t && !!t.receiptId && (t.workStatus === "pengerjaan" || t.workStatus === "siap_bayar");
+  return !!t && !!t.receiptId && t.workStatus !== "draft";
 }
 
 // Adds a service line. It is never "blank", so it survives the blank-row clean-up and is saved
@@ -5643,8 +5644,9 @@ function updateCashierStatusBadge(total, amountPaid) {
   if (!badge || !dot || !label) return;
   const tab = getActiveTab();
   const status = (tab && tab.status === "void") ? "void" : (amountPaid >= total ? "done" : "pending");
+  const payKey = paymentKey(total, amountPaid, status);
   dot.className = `status-dot is-${status}`;
-  label.textContent = statusLabel(status);
+  label.textContent = status === "void" ? statusLabel(status) : PAYMENT_STATUS_LABELS[payKey];
   // A blank new receipt has 0 paid against a 0 total, which would read as "Done" -- true but
   // meaningless. Show the badge once there is a total or the receipt has been saved.
   const tint = { pending: "bg-pending/10", done: "bg-done/10", void: "bg-failed/10" }[status];
@@ -5883,12 +5885,24 @@ function validateReceiptForm(payload) {
 }
 
 // ── Cashier: nota workflow ───────────────────────────────────────────────────
-// A nota moves Draft -> Dalam Pengerjaan -> Siap Pembayaran -> Selesai. A draft is only a note to
-// self: it takes no stock and no payment. Leaving draft takes the stock; paying a Siap Pembayaran
-// nota in full makes it Selesai. Payments are taken in Pembayaran Nota (openReceiptPaymentModal).
-const WORK_STATUS_LABELS = { draft: "Draft", pengerjaan: "Dalam Pengerjaan", siap_bayar: "Siap Pembayaran", selesai: "Selesai" };
+// Pengerjaan: Draft (a note to self: no stock, no payment) -> Belum Dikerjakan -> Dalam Pengerjaan ->
+// Pengerjaan Selesai. Leaving draft takes the stock. Pembayaran is separate (Belum Bayar / Sebagian /
+// Lunas) and never moves the work stage. Payments are taken in Pembayaran Nota (openReceiptPaymentModal).
+const WORK_STATUS_LABELS = { draft: "Draft", belum: "Belum Dikerjakan", pengerjaan: "Dalam Pengerjaan", selesai: "Pengerjaan Selesai" };
+// Two independent statuses on every nota: Pembayaran (from amount paid vs total) and Pengerjaan (the stage).
+const PAYMENT_STATUS_LABELS = { belum: "Belum Bayar", sebagian: "Sebagian", lunas: "Lunas" };
+const PAYMENT_STATUS_TINTS = { belum: "bg-failed/10 text-failed", sebagian: "bg-pending/10 text-ink", lunas: "bg-done/10 text-ink" };
+function paymentKey(total, paid, status) {
+  if (status === "void") return "";
+  const t = Number(total) || 0, p = Number(paid) || 0;
+  return p <= 0 ? "belum" : p < t ? "sebagian" : "lunas";
+}
+function paymentBadge(total, paid, status) {
+  const key = paymentKey(total, paid, status);
+  return key ? `<span class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${PAYMENT_STATUS_TINTS[key]}">${PAYMENT_STATUS_LABELS[key]}</span>` : "";
+}
 const WORK_STATUS_TINTS = {
-  draft: "bg-bg2 text-muted", pengerjaan: "bg-pending/10 text-ink", siap_bayar: "bg-accent/10 text-accentDark",
+  draft: "bg-bg2 text-muted", belum: "bg-bg2 text-ink", pengerjaan: "bg-pending/10 text-ink",
   selesai: "bg-done/10 text-ink", void: "bg-failed/10 text-failed",
 };
 
@@ -5908,7 +5922,8 @@ function renderCashierWorkUi() {
   const saved = !!tab.receiptId;
   const ws = saved ? tab.workStatus : null;
   const isVoid = tab.status === "void";
-  const isDone = saved && tab.status === "done";
+  // Closed = Lunas and Pengerjaan Selesai. A paid nota still being worked on stays editable.
+  const isDone = saved && tab.status === "done" && ws === "selesai";
   const badge = saved ? workBadge(ws, tab.status) : UNSAVED_BADGE;
   document.getElementById("cashier-work-badge").innerHTML = badge;
   document.getElementById("cashier-work-pill").innerHTML = badge;
@@ -5926,17 +5941,18 @@ function renderCashierWorkUi() {
   show("cashier-start-btn", editable && draftish);
   show("cashier-save-btn", editable && !draftish);
   show("cashier-status-btn", saved && !isVoid && !isDone && !draftish);
-  show("cashier-pay-btn", !isVoid && !isDone);
-  document.getElementById("cashier-pay-label").textContent = ws === "siap_bayar" ? "Pembayaran" : "Lanjut ke Pembayaran";
+  show("cashier-pay-btn", !isVoid && !isDone && !(saved && tab.status === "done"));
+  show("cashier-belum-btn", editable && draftish);
+  document.getElementById("cashier-pay-label").textContent = saved && !draftish ? "Pembayaran" : "Lanjut ke Pembayaran";
   document.getElementById("cashier-save-btn").disabled = !tab.dirty;
   document.getElementById("cashier-status-btn").disabled = tab.dirty;
   document.getElementById("cashier-status-btn").title = tab.dirty ? "Simpan perubahan nota dulu" : "";
 }
 
-const SAVE_MODE_TARGET = { draft: "draft", start: "pengerjaan", pay: "siap_bayar" };
+const SAVE_MODE_TARGET = { draft: "draft", belum: "belum", start: "pengerjaan", pay: "belum" };
 
 function setCashierBarDisabled(on) {
-  ["cashier-draft-btn", "cashier-start-btn", "cashier-save-btn", "cashier-status-btn", "cashier-pay-btn"].forEach(id => {
+  ["cashier-draft-btn", "cashier-belum-btn", "cashier-start-btn", "cashier-save-btn", "cashier-status-btn", "cashier-pay-btn"].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.disabled = on;
   });
@@ -5953,16 +5969,18 @@ async function reloadTabFromServer(tab) {
   renderCashierForm();
 }
 
-// mode: "draft" saves as Draft; "start" saves and starts pengerjaan; "save" saves edits to a nota
-// already in progress; "pay" saves, moves the nota to Siap Pembayaran and opens Pembayaran Nota.
+// mode: "draft" saves as Draft; "belum" saves as Belum Dikerjakan; "start" saves and starts pengerjaan;
+// "save" saves edits to a saved nota; "pay" saves (a new nota or Draft becomes Belum Dikerjakan) and opens
+// Pembayaran Nota without touching the work stage.
 async function saveReceipt(mode = "save") {
   const tab = getActiveTab();
   if (!tab || tab.status === "void") return;
   const payload = collectReceiptPayload();
   if (!validateReceiptForm(payload)) return;
 
-  const target = SAVE_MODE_TARGET[mode] || null;
   const isUpdate = !!tab.receiptId;
+  // Paying never changes the work stage: only a new nota or a Draft is moved on (to Belum Dikerjakan).
+  const target = mode === "pay" && isUpdate && tab.workStatus !== "draft" ? null : (SAVE_MODE_TARGET[mode] || null);
   const headers = { "Content-Type": "application/json" };
   let moveError = null;
   setCashierBarDisabled(true);
@@ -5997,40 +6015,45 @@ async function saveReceipt(mode = "save") {
   }
   showToast({
     draft: "Draft disimpan.",
+    belum: "Nota disimpan, belum dikerjakan.",
     start: "Nota disimpan, pengerjaan dimulai.",
     save: "Perubahan disimpan.",
   }[mode], "success");
 }
 
-// "Ubah Status": Dalam Pengerjaan <-> Siap Pembayaran, with an optional note for the timeline.
+// "Ubah Status Pengerjaan": Belum Dikerjakan / Dalam Pengerjaan / Pengerjaan Selesai, whatever the payment is.
 function openWorkStatusModal() {
   const tab = getActiveTab();
   if (!tab || !tab.receiptId) return;
   if (tab.dirty) { showToast("Simpan perubahan nota dulu sebelum mengubah status."); return; }
-  const to = tab.workStatus === "pengerjaan" ? "siap_bayar" : tab.workStatus === "siap_bayar" ? "pengerjaan" : null;
-  if (!to) return;
-  openModal("Ubah Status", `
+  if (tab.workStatus === "draft") return;
+  const hints = { belum: "Pekerjaan belum dimulai.", pengerjaan: "Mobil sedang dikerjakan.", selesai: "Pekerjaan sudah selesai dan siap diserahkan." };
+  openModal("Ubah Status Pengerjaan", `
     <div class="space-y-3">
-      <div class="flex items-center gap-2 text-sm">${workBadge(tab.workStatus, tab.status)}<span class="text-muted" aria-hidden="true">&rarr;</span>${workBadge(to, tab.status)}</div>
-      <p class="text-sm text-muted">${to === "siap_bayar"
-        ? "Pengerjaan sudah selesai? Nota akan siap menerima pelunasan."
-        : "Nota dikembalikan ke pengerjaan, mis. ada tambahan atau perbaikan."}</p>
+      <div class="flex flex-wrap items-center gap-2 text-sm"><span class="text-muted">Pembayaran</span>${paymentBadge(tab.total, tab.amountPaid, tab.status)}</div>
+      <div class="space-y-1.5" role="radiogroup" aria-label="Status pengerjaan">
+        ${["belum", "pengerjaan", "selesai"].map(k => `<label class="flex items-center gap-3 border rounded-lg px-3 py-2.5 text-sm cursor-pointer ${k === tab.workStatus ? "border-accent bg-accent/5" : "border-line hover:bg-bg2"}">
+          <input type="radio" name="ws-to" value="${k}" ${k === tab.workStatus ? "checked" : ""} class="accent-[#D97757]" />
+          <span class="min-w-0"><span class="block font-medium text-ink">${WORK_STATUS_LABELS[k]}</span><span class="block text-xs text-muted">${hints[k]}</span></span></label>`).join("")}
+      </div>
       <div>
         <label for="ws-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan <span class="normal-case text-muted/60">(opsional)</span></label>
         <textarea id="ws-note" rows="2" maxlength="200" data-no-uppercase
           class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea>
       </div>
+      <p class="text-xs text-muted">Nota yang sudah Lunas dan Pengerjaan Selesai ditutup dan tidak bisa diubah lagi.</p>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" id="ws-submit" onclick="submitWorkStatus('${to}')" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 transition-colors">Ubah ke ${WORK_STATUS_LABELS[to]}</button>
+        <button type="button" id="ws-submit" onclick="submitWorkStatus()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 transition-colors">Simpan Status</button>
       </div>
     </div>`);
-  document.getElementById("ws-note").focus();
 }
 
-async function submitWorkStatus(to) {
+async function submitWorkStatus() {
   const tab = getActiveTab();
   if (!tab || !tab.receiptId) { closeModal(); return; }
+  const to = document.querySelector("input[name=ws-to]:checked")?.value;
+  if (!to || to === tab.workStatus) { closeModal(); return; }
   const btn = document.getElementById("ws-submit");
   if (btn) btn.disabled = true;
   const note = document.getElementById("ws-note")?.value.trim() || null;
@@ -6101,7 +6124,7 @@ function cashierTlGroups() {
   const { events, payments, preorders } = cashierTlData;
   return [
     ["catatan", "Catatan Kasir", tab && tab.workNotes ? 1 : 0],
-    ["item", "Riwayat Item", events.filter(e => e.kind === "created" || e.kind === "item_added").length],
+    ["item", "Riwayat Item", events.filter(e => e.kind === "created" || e.kind === "item_added" || e.kind === "item_changed").length],
     ["bayar", "Riwayat Pembayaran", payments.length],
     ["status", "Riwayat Status", events.filter(e => e.kind === "status" || e.kind === "void").length],
     ["po", "Terkait PO Customer", preorders.length],
@@ -6164,8 +6187,8 @@ function renderCashierTimeline() {
       : `<p class="text-xs text-muted">Belum ada catatan.</p>`;
   } else if (cashierTlTab === "item") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
-      events.filter(e => e.kind === "created" || e.kind === "item_added").sort(byTimeDesc)
-        .map(evRow(e => e.kind === "created" ? "Nota dibuat" : "Item ditambahkan")));
+      events.filter(e => e.kind === "created" || e.kind === "item_added" || e.kind === "item_changed").sort(byTimeDesc)
+        .map(evRow(e => e.kind === "created" ? "Nota dibuat" : e.kind === "item_changed" ? "Item diubah" : "Item ditambahkan")));
   } else if (cashierTlTab === "bayar") {
     html = table(["Waktu", "Metode", "Nominal", "Catatan", "Dilakukan Oleh"],
       [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : ""), "tabular-nums font-medium")}${td(esc(pay.note || ""))}${td(esc(pay.created_by || "-"))}</tr>`));
@@ -6283,7 +6306,8 @@ function tabStateFromReceipt(tabId, r) {
       addedBy: it.added_by || "",
       addedDuringWork: !!it.added_during_work,
     })),
-    workStatus: r.work_status || "siap_bayar",
+    workStatus: r.work_status || "belum",
+    voidReason: r.void_reason || "", voidedBy: r.voided_by || "", voidedAt: r.voided_at || "",
     receiptNo: r.receipt_no || "",
     workNotes: r.work_notes || "",
     cashierName: r.cashier_name || "",
@@ -6521,15 +6545,16 @@ function renderCashierForm() {
 function applyCashierVoidLock(tab) {
   const isVoid = tab.status === "void";
   // A paid (Lunas) nota is final, like a void one: printed and handed over, never changed again.
-  const isPaid = tab.receiptId && tab.status === "done";
+  const isPaid = tab.receiptId && tab.status === "done" && tab.workStatus === "selesai";
   // Three reasons a form is read-only: voided or paid (both permanent), or a saved receipt
   // nobody has pressed Ubah on yet (liftable).
   const readOnly = isVoid || isPaid || tab.locked;
 
   const banner = document.getElementById("cashier-void-banner");
   banner.textContent = isPaid
-    ? "Nota ini sudah lunas dan tidak bisa diubah lagi."
-    : "Nota ini sudah di-void dan tidak bisa diubah lagi.";
+    ? "Nota ini sudah lunas dan pengerjaan selesai (ditutup), tidak bisa diubah lagi."
+    : "Nota ini sudah di-void dan tidak bisa diubah lagi." + (tab.voidReason
+        ? ` Alasan: ${tab.voidReason}.` : "") + (tab.voidedBy ? ` Oleh ${tab.voidedBy}${tab.voidedAt ? ", " + formatDateTimeSeconds(tab.voidedAt) : ""}.` : "");
   banner.classList.toggle("hidden", !(isVoid || isPaid));
 
   const lockIds = [
@@ -6560,7 +6585,7 @@ function applyCashierVoidLock(tab) {
     "hidden", !(tab.receiptId && tab.locked && !isVoid && !isPaid)
   );
   // Only Cetak Nota is left on a paid nota; the bottom bar's Pembayaran has nothing to do.
-  document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId || isPaid);
+  document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId || tab.status === "done");
   document.getElementById("cashier-copy-btn").classList.toggle("hidden", !tab.receiptId);
 
   // Void itself can't be undone, and there's nothing left to void once a
@@ -6822,7 +6847,7 @@ function renderReceiptHistory() {
           <div class="flex items-center gap-2 text-sm font-medium text-ink">
             <span class="status-dot is-${r.status} shrink-0"></span>
             <span class="truncate">${esc(r.plate_full)}</span>
-            ${r.status === "pending" && (r.work_status === "draft" || r.work_status === "pengerjaan") ? workBadge(r.work_status, r.status) : ""}
+            ${workBadge(r.work_status, r.status)}${r.work_status === "draft" ? "" : paymentBadge(r.total, r.amount_paid, r.status)}
             <span class="ml-auto shrink-0 text-xs font-normal text-muted tabular-nums">${esc(formatReceiptWhen(r.created_at, !todayOnly))}</span>
           </div>
           <div class="mt-0.5 pl-[15px] flex items-baseline justify-between gap-2 text-xs">
@@ -7501,7 +7526,7 @@ function debounce(fn, wait) {
 let historyReceipts = [];     // the rows on screen, so a row's menu can read it by id
 let historyRequestSeq = 0;    // a slow response must not overwrite a newer one
 let historyPaymentFilter = ""; // Status Pembayaran chip: "", belum, sebagian or lunas
-let historyWorkFilter = "";    // Status Pengerjaan chip: "", draft, pengerjaan, siap_bayar or selesai
+let historyWorkFilter = "";    // Status Pengerjaan chip: "", draft, belum, pengerjaan or selesai
 let historyPage = 1;
 let historyPageSize = 10;
 let historyTotal = 0;
@@ -7731,7 +7756,7 @@ async function loadHistorySummary() {
     document.getElementById("hist-sum-pending").textContent = s.pending_count;
     document.getElementById("hist-sum-draft").textContent = s.draft_count;
     document.getElementById("hist-sum-pengerjaan").textContent = s.pengerjaan_count;
-    document.getElementById("hist-sum-siap_bayar").textContent = s.siap_bayar_count;
+    document.getElementById("hist-sum-belum").textContent = s.belum_count;
     document.getElementById("hist-sum-outstanding").textContent = formatIDR(s.pending_outstanding);
   } catch (_) { /* the tiles keep their last values; the list below is what matters */ }
 }

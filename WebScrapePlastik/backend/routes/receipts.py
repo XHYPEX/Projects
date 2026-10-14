@@ -151,6 +151,13 @@ def _refuse_if_paid(receipt: dict) -> None:
         raise HTTPException(status_code=409, detail="Nota sudah lunas dan tidak bisa diubah lagi.")
 
 
+def _refuse_if_closed(receipt: dict) -> None:
+    """Lunas + Pengerjaan Selesai closes the transaction. A nota that is paid but still being
+    worked on (or worked on but unpaid) stays editable, so extras can still be added."""
+    if receipt["status"] == "done" and receipt["work_status"] == "selesai":
+        raise HTTPException(status_code=409, detail="Nota sudah lunas dan selesai (ditutup), tidak bisa diubah lagi.")
+
+
 async def _require_customer(loop, customer_id: int, allow_inactive: bool = False) -> None:
     customer = await loop.run_in_executor(None, get_customer, customer_id)
     if customer is None:
@@ -182,8 +189,8 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
         )
     if req.amount_paid < 0:
         raise HTTPException(status_code=422, detail="Jumlah dibayar harus >= 0.")
-    if req.work_status not in ("draft", "pengerjaan", "siap_bayar"):
-        raise HTTPException(status_code=422, detail="work_status harus draft, pengerjaan atau siap_bayar.")
+    if req.work_status not in ("draft", "belum", "pengerjaan", "selesai"):
+        raise HTTPException(status_code=422, detail="work_status harus draft, belum, pengerjaan atau selesai.")
     if req.work_status == "draft" and req.amount_paid > 0:
         raise HTTPException(status_code=422, detail="Nota Draft belum bisa menerima pembayaran.")
     if req.payment_method not in VALID_PAYMENT_METHODS:
@@ -216,8 +223,6 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     # paid now can be anything from nothing up to the total, never more.
     if req.status != "void" and req.amount_paid > subtotal - req.discount:
         raise HTTPException(status_code=422, detail="Jumlah dibayar tidak boleh melebihi total.")
-    if req.status != "void" and req.work_status != "siap_bayar" and req.amount_paid >= subtotal - req.discount and subtotal - req.discount > 0:
-        raise HTTPException(status_code=422, detail="Pelunasan baru bisa setelah pengerjaan selesai (Lanjut ke Pembayaran).")
     transfer_sender = _clean_sender(req.transfer_sender)
     transfer_account = _clean_sender(req.transfer_account)
     takes_money_now = req.amount_paid > 0 and req.status != "void"
@@ -352,7 +357,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             if (existing["amount_paid"] or 0) > 0 and user.get("role") != "admin":
                 raise HTTPException(status_code=403, detail="Hanya admin yang boleh membatalkan nota yang sudah ada pembayarannya.")
     else:
-        _refuse_if_paid(existing)
+        _refuse_if_closed(existing)
 
     plate_region: str | None = None
     plate_suffix: str | None = None
@@ -539,7 +544,7 @@ async def add_receipt_payment_route(
 async def change_work_status_route(
     receipt_id: str, req: ReceiptWorkStatusRequest, user: dict = Depends(get_current_user)
 ):
-    """Move a nota to Dalam Pengerjaan or Siap Pembayaran. Leaving Draft takes the stock."""
+    """Move a nota to Belum Dikerjakan, Dalam Pengerjaan or Pengerjaan Selesai. Leaving Draft takes the stock."""
     loop = asyncio.get_event_loop()
     note = _clean_name(req.note)
     if note and len(note) > 200:

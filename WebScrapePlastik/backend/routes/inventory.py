@@ -20,7 +20,6 @@ from backend.database import (
     create_unit,
     delete_all_brands,
     delete_all_suppliers,
-    delete_all_units,
     delete_brand,
     delete_master_item,
     delete_supplier,
@@ -235,8 +234,13 @@ def _row_to_unit(row: dict) -> UnitOut:
     return UnitOut(
         id=row["id"],
         name=row["name"],
+        description=row.get("description"),
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
+        deactivated_reason=row.get("deactivated_reason"),
+        product_count=row.get("product_count", 0),
+        active_product_count=row.get("active_product_count", 0),
+        in_use=bool(row.get("in_use", False)),
     )
 
 
@@ -529,7 +533,7 @@ async def create_new_unit(req: UnitRequest):
         raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     loop = asyncio.get_event_loop()
     try:
-        row = await loop.run_in_executor(None, create_unit, req.name.strip())
+        row = await loop.run_in_executor(None, create_unit, req.name.strip(), req.description)
     except ValueError as e:
         _raise_from_value_error(e)
     return _row_to_unit(row)
@@ -550,17 +554,12 @@ async def patch_unit(unit_id: int, req: UnitUpdateRequest):
     if await loop.run_in_executor(None, get_unit, unit_id) is None:
         raise HTTPException(status_code=404, detail=f"Satuan {unit_id} tidak ditemukan.")
     try:
-        row = await loop.run_in_executor(None, update_unit, unit_id, req.name, req.is_active)
+        row = await loop.run_in_executor(
+            None, lambda: update_unit(unit_id, req.name, req.is_active, req.description, req.reason, req.confirm_rename,
+                                      fields_set=set(req.model_fields_set)))
     except ValueError as e:
         _raise_from_value_error(e)
     return _row_to_unit(row)
-
-
-@router.delete("/units", response_model=BulkDeleteOut, dependencies=[Depends(require_admin)])
-async def delete_all_units_route():
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, delete_all_units)
-    return BulkDeleteOut(**result)
 
 
 @router.delete("/units/{unit_id}", status_code=204, response_class=Response, dependencies=[Depends(require_admin)])

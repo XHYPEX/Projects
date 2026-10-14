@@ -354,18 +354,27 @@ class BrandOut(BaseModel):
 
 class UnitRequest(BaseModel):
     name: str
+    description: str | None = None  # "Pieces" for PCS; shown next to the name in dropdowns
 
 
 class UnitUpdateRequest(BaseModel):
     name: str | None = None
+    description: str | None = None
     is_active: bool | None = None
+    reason: str | None = None  # optional note when deactivating
+    confirm_rename: bool = False  # required when renaming a unit that products already use
 
 
 class UnitOut(BaseModel):
     id: int
     name: str
+    description: str | None = None
     is_active: bool
     created_at: str
+    deactivated_reason: str | None = None
+    product_count: int = 0
+    active_product_count: int = 0
+    in_use: bool = False
 
 
 class CodePreviewOut(BaseModel):

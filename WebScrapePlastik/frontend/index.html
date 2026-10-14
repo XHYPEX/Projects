@@ -3887,18 +3887,19 @@
             <div class="flex-1 min-w-[14rem]">
               <label for="unit-search-input" class="sr-only">Cari</label>
               <div class="relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                <input id="unit-search-input" type="text" placeholder="Cari nama satuan…" autocomplete="off" oninput="onUnitSearchInput()"
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                <input id="unit-search-input" type="text" placeholder="Cari kode atau nama satuan…" autocomplete="off" oninput="onUnitSearchInput()"
                   class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
               </div>
             </div>
-            <div class="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-              <button onclick="confirmDeleteAllUnits()" class="admin-only flex-1 sm:flex-none px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-failed/30">Hapus Semua</button>
-              <button onclick="openAddUnitModal()" class="flex-1 sm:flex-none justify-center inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                Tambah Satuan
-              </button>
-            </div>
+            <label for="unit-filter-status" class="sr-only">Status</label>
+            <select id="unit-filter-status" onchange="renderUnitTable()" class="border border-line rounded-lg px-2.5 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+              <option value="">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option>
+            </select>
+            <button onclick="openUnitModal()" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Tambah Satuan
+            </button>
           </div>
         </div>
 
@@ -3909,9 +3910,11 @@
             <table class="w-full text-sm">
               <thead class="bg-bg2">
                 <tr>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
+                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Satuan</th>
+                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
+                <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jumlah Produk</th>
                 <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
-                <th class="text-right px-4 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
+                <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
                 </tr>
               </thead>
               <tbody id="unit-list-tbody"></tbody>
@@ -3921,6 +3924,7 @@
             <p class="text-sm text-muted">Tidak ada satuan yang cocok.</p>
           </div>
         </div>
+        <p class="text-xs text-muted mt-3 px-1">Master Satuan hanya daftar acuan. Menambah, mengubah, atau menonaktifkan satuan tidak mengubah stok maupun jumlah barang.</p>
       </section>
 
       <!-- TAB: MASTER CUSTOMER. Same shape as Master Barang: a filter card, a count line, a paged
@@ -8215,7 +8219,6 @@ let lastMasterItemsResponse = { items: [], total: 0, page: 1, page_size: 20 };
 let currentInventoryTab = "master";
 let brandListState = { editingId: null };
 let supplierListState = { editingId: null };
-let unitListState = { editingId: null };
 let unitsCache = [];
 
 async function initInventory() {
@@ -8343,7 +8346,7 @@ function populateUnitSelect(selectEl, placeholder) {
     if (!u.is_active) continue;
     const opt = document.createElement("option");
     opt.value = u.name;
-    opt.textContent = u.name;
+    opt.textContent = u.description ? `${u.name} — ${u.description}` : u.name;
     selectEl.appendChild(opt);
   }
   setUnitSelectValue(selectEl, keepValue);
@@ -8606,10 +8609,10 @@ async function deleteAllEntities(type) {
   showToast(`${result.deleted_count} ${label} dihapus${result.skipped_count > 0 ? `, ${result.skipped_count} dilewati (sistem/masih dipakai)` : ""}.`, "success");
 }
 
-// ── Inventory: Master Satuan — list, inline edit, status ─────────────────────
-// Kept separate from the brand/supplier entity helpers above rather than
-// folded in: units have no code/source/is_system columns, so the shared row
-// markup and branching wouldn't actually simplify anything here.
+// ── Inventory: Master Satuan ─────────────────────────────────────────────────
+// The unit's name doubles as its code (PCS, SET, METER): products and documents store that text, and a
+// separate code would only be a second thing to keep in step. "Keterangan" is the optional long form.
+// One mechanism only: Nonaktif. A unit nothing ever used can also be deleted; one with history cannot.
 function onUnitSearchInput() { renderUnitTable(); }
 
 function renderUnitTable() {
@@ -8617,188 +8620,189 @@ function renderUnitTable() {
   const emptyEl = document.getElementById("unit-list-empty");
   if (!tbody) return;
   const query = document.getElementById("unit-search-input").value.trim().toLowerCase();
-  const items = unitsCache.filter(u => !query || u.name.toLowerCase().includes(query));
-  tbody.innerHTML = "";
-  renderEntityListMeta("unit", items.length, unitsCache.length, query, "satuan");
-  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
+  const st = document.getElementById("unit-filter-status").value;
+  const items = unitsCache.filter(u =>
+    (!query || u.name.toLowerCase().includes(query) || (u.description || "").toLowerCase().includes(query))
+    && (!st || (st === "active") === Boolean(u.is_active)));
+  renderEntityListMeta("unit", items.length, unitsCache.length, query || st, "satuan");
+  if (items.length === 0) { tbody.innerHTML = ""; emptyEl.classList.remove("hidden"); return; }
   emptyEl.classList.add("hidden");
-  tbody.innerHTML = items.map(item => renderUnitRowHtml(item, unitListState.editingId === item.id)).join("");
+  tbody.innerHTML = items.map(item => `
+    <tr id="unit-row-${item.id}" class="border-b border-line last:border-b-0 hover:bg-bg2 transition-colors ${item.is_active ? "" : "opacity-70"}">
+      <td class="px-3 py-3"><span class="font-serif font-semibold text-ink">${esc(item.name)}</span></td>
+      <td class="px-3 py-3 text-muted">${esc(item.description || "—")}${!item.is_active && item.deactivated_reason ? `<div class="text-[11px]">Nonaktif: ${esc(item.deactivated_reason)}</div>` : ""}</td>
+      <td class="px-3 py-3 text-right tabular-nums text-ink">${formatInt(item.product_count)}</td>
+      <td class="px-3 py-3">${activePillHtml(item.is_active)}</td>
+      <td class="px-3 py-3 text-right"><button type="button" onclick="openUnitRowMenu(event, ${item.id})" aria-label="Aksi ${esc(item.name)}" class="h-8 w-8 inline-grid place-items-center border border-line rounded-lg text-muted hover:text-ink hover:bg-bg2 bg-white">&#8943;</button></td>
+    </tr>`).join("");
 }
 
-function renderUnitRowHtml(item, isEditing) {
-  const statusBadge = activePillHtml(item.is_active);
-
-  const nameCell = isEditing
-    ? `<input id="unit-edit-name-${item.id}" type="text" class="w-full border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />`
-    : `<span class="font-serif font-medium text-ink">${esc(item.name)}</span>`;
-
-  const actionsCell = isEditing
-    ? `
-      <div class="flex items-center justify-end gap-1.5">
-        <button type="button" onclick="cancelUnitEdit()" class="px-2.5 py-1 border border-line rounded-md text-[11px] text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" onclick="saveUnitEdit(${item.id})" class="px-2.5 py-1 bg-accent text-bg rounded-md text-[11px] font-medium hover:bg-accentDark transition-colors">Simpan</button>
-      </div>`
-    : `
-      <div class="flex items-center justify-end gap-1.5">
-        <button type="button" onclick="toggleUnitActive(${item.id}, ${!item.is_active})" class="h-8 px-3 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${item.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-        ${iconButtonHtml("accent", "Ubah", `startUnitEdit(${item.id})`, "edit")}
-        ${isAdmin() ? iconButtonHtml("danger", "Hapus", `confirmDeleteUnitEntity(${item.id})`, "trash") : ""}
-      </div>`;
-
-  return `
-    <tr id="unit-row-${item.id}" class="border-b border-line last:border-b-0 hover:bg-bg2 transition-colors">
-      <td class="px-3 py-3">${nameCell}</td>
-      <td class="px-3 py-3">${statusBadge}</td>
-      <td class="px-4 py-3 text-right">${actionsCell}</td>
-    </tr>`;
-}
-
-function startUnitEdit(id) {
-  unitListState.editingId = id;
-  renderUnitTable();
+function openUnitRowMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
   const item = unitsCache.find(u => u.id === id);
-  const input = document.getElementById(`unit-edit-name-${id}`);
-  if (input) {
-    input.value = item ? item.name : "";
-    input.focus();
-    input.select();
-  }
+  if (!item) return;
+  const open = !menu.classList.contains("hidden") && menu.dataset.itemId === `unit-${id}`;
+  closeMasterRowMenu();
+  if (open) return;
+  const mi = (icon, label, onclick, extra = "text-ink", disabled = false) => `<button type="button" role="menuitem" ${disabled ? "disabled" : `onclick="closeMasterRowMenu(); ${onclick}"`}
+    class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm ${disabled ? "text-muted/60 cursor-not-allowed" : "hover:bg-bg2"} transition-colors ${extra}">${svgIcon(icon, 15)}${esc(label)}</button>`;
+  menu.innerHTML = [
+    mi("edit", "Lihat Informasi", `openUnitInfo(${id})`),
+    mi("edit", "Edit Satuan", `openUnitModal(${id})`),
+    item.is_active ? mi("archive", "Nonaktifkan", `openUnitDeactivateModal(${id})`) : mi("archive", "Aktifkan Kembali", `reactivateUnit(${id})`),
+    `<div class="admin-only my-1 border-t border-line"></div><div class="admin-only">${item.in_use ? mi("trash", "Hapus (sudah dipakai)", "", "text-muted", true) : mi("trash", "Hapus", `openUnitDeleteModal(${id})`, "text-failed")}</div>`,
+  ].join("");
+  menu.dataset.itemId = `unit-${id}`;
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect();
+  const height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
 }
 
-function cancelUnitEdit() {
-  unitListState.editingId = null;
-  renderUnitTable();
+const UNIT_INPUT = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
+const UNIT_LABEL = "block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5";
+
+function unitFormError(msg) {
+  const el = document.getElementById("unit-form-error");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
 }
 
-async function saveUnitEdit(id) {
-  const input = document.getElementById(`unit-edit-name-${id}`);
-  const name = input.value.trim();
-  if (!name) { showToast("Nama satuan tidak boleh kosong."); return; }
-  const resp = await fetch(`/api/units/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (!resp.ok) {
-    let message = "Gagal memperbarui satuan.";
-    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
-    showToast(message);
-    return;
-  }
-  unitListState.editingId = null;
-  await loadUnits();
-  showToast("Satuan diperbarui.", "success");
+async function unitApiError(resp, fallback) {
+  try { const err = await resp.json(); if (typeof err.detail === "string") return err.detail; } catch (_) {}
+  return fallback;
 }
 
-async function toggleUnitActive(id, nextActive) {
-  const resp = await fetch(`/api/units/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ is_active: nextActive }),
-  });
-  if (!resp.ok) {
-    let message = "Gagal memperbarui status satuan.";
-    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
-    showToast(message);
-    return;
-  }
-  await loadUnits();
-  showToast(nextActive ? "Satuan diaktifkan." : "Satuan dinonaktifkan.", "success");
-}
-
-function confirmDeleteUnitEntity(id) {
-  const item = unitsCache.find(u => u.id === id);
-  const name = item ? esc(item.name) : "";
-  openModal("Hapus Satuan", `
+// One modal for Tambah and Edit so the two look and behave the same.
+function openUnitModal(id) {
+  const item = id ? unitsCache.find(u => u.id === id) : null;
+  const used = item ? item.product_count : 0;
+  openModal(item ? `Edit Satuan — ${item.name}` : "Tambah Satuan Baru", `
     <div class="space-y-3">
-      <p class="text-sm text-muted">Yakin ingin menghapus satuan <strong class="text-ink">${name}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" onclick="deleteUnitEntity(${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus</button>
+      <div>
+        <label for="unit-f-name" class="${UNIT_LABEL}">Nama Satuan <span class="text-failed">*</span></label>
+        <input id="unit-f-name" type="text" maxlength="30" autocomplete="off" placeholder="mis. PCS, SET, METER, ROLL" value="${esc(item ? item.name : "")}"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitUnitForm(${id || 0});}" class="${UNIT_INPUT}" />
+        <p class="text-[11px] text-muted mt-1">Nama ini juga dipakai sebagai kode. PCS dan pcs dianggap sama.</p>
       </div>
-    </div>
-  `);
+      <div>
+        <label for="unit-f-desc" class="${UNIT_LABEL}">Keterangan <span class="normal-case font-normal">(opsional)</span></label>
+        <input id="unit-f-desc" type="text" maxlength="60" data-no-uppercase autocomplete="off" placeholder="mis. Pieces, Gulungan" value="${esc(item ? item.description || "" : "")}"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitUnitForm(${id || 0});}" class="${UNIT_INPUT}" />
+      </div>
+      <div>
+        <div class="${UNIT_LABEL}">Status</div>
+        ${item ? `<div class="flex items-center gap-2">${activePillHtml(item.is_active)}<span class="text-[11px] text-muted">Ubah lewat menu Nonaktifkan / Aktifkan Kembali.</span></div>`
+          : '<div class="flex items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-done/10 text-ink">Aktif</span><span class="text-[11px] text-muted">Satuan baru langsung bisa dipilih di Master Barang.</span></div>'}
+      </div>
+      ${used > 0 ? `<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 leading-relaxed">
+        <b>Dipakai ${formatInt(used)} produk.</b> Mengubah nama ikut mengubah tampilan satuan di semua produk itu. Gunakan hanya untuk memperbaiki penulisan, bukan mengganti arti satuan (mis. PCS menjadi METER). Mengganti satuan satu produk dilakukan di Edit Barang.
+        <label class="flex items-start gap-2 mt-2"><input id="unit-f-confirm" type="checkbox" class="mt-0.5 accent-[#D97757]"><span>Saya paham, ini hanya perbaikan penulisan nama.</span></label></div>` : ""}
+      <p id="unit-form-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" id="unit-f-submit" onclick="submitUnitForm(${id || 0})" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">${item ? "Simpan Perubahan" : "Simpan Satuan"}</button>
+      </div>
+    </div>`);
+  setTimeout(() => document.getElementById("unit-f-name")?.focus(), 0);
+}
+
+async function submitUnitForm(id) {
+  const item = id ? unitsCache.find(u => u.id === id) : null;
+  const name = document.getElementById("unit-f-name").value.trim().replace(/\s+/g, " ").toUpperCase();
+  const description = document.getElementById("unit-f-desc").value.trim();
+  if (!name) { unitFormError("Nama satuan wajib diisi."); return; }
+  const confirmEl = document.getElementById("unit-f-confirm");
+  if (item && name !== item.name && item.product_count > 0 && !(confirmEl && confirmEl.checked)) {
+    unitFormError("Centang pernyataan di atas untuk mengubah nama satuan yang sudah dipakai produk."); return;
+  }
+  const btn = document.getElementById("unit-f-submit");
+  btn.disabled = true;
+  const body = item ? { name, description, confirm_rename: Boolean(confirmEl && confirmEl.checked) } : { name, description };
+  const resp = await fetch(item ? `/api/units/${id}` : "/api/units", {
+    method: item ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!resp.ok) { unitFormError(await unitApiError(resp, "Gagal menyimpan satuan.")); btn.disabled = false; return; }
+  const saved = await resp.json();
+  closeModal();
+  await loadUnits();
+  showToast(item ? `Satuan ${saved.name} diperbarui.` : `Satuan ${saved.name} ditambahkan dan siap dipilih di Master Barang.`, "success");
+}
+
+function openUnitInfo(id) {
+  const item = unitsCache.find(u => u.id === id);
+  if (!item) return;
+  const row = (k, v) => `<div class="flex justify-between gap-3 py-1.5 border-b border-line last:border-b-0 text-sm"><span class="text-muted">${k}</span><span class="font-medium text-ink text-right">${v}</span></div>`;
+  openModal(`Informasi Satuan — ${item.name}`, `
+    <div>${row("Nama Satuan", esc(item.name))}${row("Keterangan", esc(item.description || "—"))}${row("Status", activePillHtml(item.is_active))}
+      ${row("Produk memakai satuan ini", `${formatInt(item.product_count)} (aktif ${formatInt(item.active_product_count)})`)}
+      ${row("Dibuat", esc(formatReceiptWhen(item.created_at, true)))}${!item.is_active && item.deactivated_reason ? row("Alasan nonaktif", esc(item.deactivated_reason)) : ""}</div>
+    <div class="flex justify-end pt-3"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Tutup</button></div>`);
+}
+
+function openUnitDeactivateModal(id) {
+  const item = unitsCache.find(u => u.id === id);
+  if (!item) return;
+  const row = (k, v) => `<div class="flex justify-between gap-3 text-sm"><span class="text-muted">${k}</span><span class="font-medium text-ink">${v}</span></div>`;
+  openModal(`Nonaktifkan Satuan ${item.name}?`, `
+    <div class="space-y-3">
+      <div class="rounded-lg bg-bg2 px-3 py-2 space-y-1">${row("Satuan", esc(item.name) + (item.description ? ` — ${esc(item.description)}` : ""))}${row("Produk terkait", `${formatInt(item.product_count)} produk`)}</div>
+      <ul class="text-xs text-muted space-y-1 list-disc pl-4">
+        <li>Satuan ini tidak muncul lagi di pilihan satuan untuk produk baru.</li>
+        <li>Produk, invoice, dan dokumen lama tetap menampilkan satuan ini dengan benar.</li>
+        <li>Stok dan data produk tidak berubah. Satuan bisa diaktifkan kembali kapan saja.</li></ul>
+      ${item.active_product_count > 0 ? `<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 leading-relaxed"><b>${formatInt(item.active_product_count)} produk aktif masih memakai satuan ini.</b> Produk tetap berfungsi, tetapi saat diedit pengguna harus memilih satuan aktif lain. Pastikan satuan pengganti sudah tersedia.</div>` : ""}
+      <div><label for="unit-f-reason" class="${UNIT_LABEL}">Alasan <span class="normal-case font-normal">(opsional)</span></label>
+        <input id="unit-f-reason" type="text" maxlength="120" data-no-uppercase placeholder="mis. Tidak dipakai lagi" class="${UNIT_INPUT}"></div>
+      <p id="unit-form-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+        <button type="button" onclick="deactivateUnit(${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90">Nonaktifkan</button></div>
+    </div>`);
+}
+
+async function deactivateUnit(id) {
+  const reason = document.getElementById("unit-f-reason").value.trim();
+  const resp = await fetch(`/api/units/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: false, reason: reason || null }) });
+  if (!resp.ok) { unitFormError(await unitApiError(resp, "Gagal menonaktifkan satuan.")); return; }
+  closeModal();
+  await loadUnits();
+  showToast("Satuan dinonaktifkan.", "success");
+}
+
+async function reactivateUnit(id) {
+  const resp = await fetch(`/api/units/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: true }) });
+  if (!resp.ok) { showToast(await unitApiError(resp, "Gagal mengaktifkan satuan.")); return; }
+  await loadUnits();
+  showToast("Satuan diaktifkan kembali.", "success");
+}
+
+function openUnitDeleteModal(id) {
+  const item = unitsCache.find(u => u.id === id);
+  if (!item) return;
+  openModal(`Hapus Satuan ${item.name}?`, `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Satuan ini belum pernah dipakai produk atau transaksi, jadi aman dihapus. Tindakan ini tidak bisa dibatalkan.</p>
+      <p id="unit-form-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+        <button type="button" onclick="deleteUnitEntity(${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90">Hapus Satuan</button></div>
+    </div>`);
 }
 
 async function deleteUnitEntity(id) {
   const resp = await fetch(`/api/units/${id}`, { method: "DELETE" });
-  if (!resp.ok) {
-    let message = "Gagal menghapus satuan.";
-    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
-    showToast(message);
-    return;
-  }
+  if (!resp.ok) { unitFormError(await unitApiError(resp, "Gagal menghapus satuan.")); return; }
   closeModal();
   await loadUnits();
   showToast("Satuan dihapus.", "success");
 }
 
-function confirmDeleteAllUnits() {
-  openModal("Hapus Semua Satuan", `
-    <div class="space-y-3">
-      <p class="text-sm text-muted">
-        Yakin ingin menghapus semua satuan? Satuan yang masih dipakai oleh barang atau dokumen akan dilewati secara otomatis. Tindakan ini tidak dapat dibatalkan.
-      </p>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" onclick="deleteAllUnitsAction()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus Semua</button>
-      </div>
-    </div>
-  `);
-}
-
-async function deleteAllUnitsAction() {
-  const resp = await fetch("/api/units", { method: "DELETE" });
-  if (!resp.ok) {
-    let message = "Gagal menghapus satuan.";
-    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
-    showToast(message);
-    return;
-  }
-  const result = await resp.json();
-  closeModal();
-  await loadUnits();
-  showToast(`${result.deleted_count} satuan dihapus${result.skipped_count > 0 ? `, ${result.skipped_count} dilewati (masih dipakai)` : ""}.`, "success");
-}
-
-function openAddUnitModal() {
-  openModal("Tambah Satuan Baru", `
-    <div class="space-y-3">
-      <div>
-        <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Satuan</label>
-        <input id="add-unit-name" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAddUnit();}" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-      </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" id="add-unit-submit-btn" onclick="submitAddUnit()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Simpan</button>
-      </div>
-    </div>
-  `);
-  setTimeout(() => { document.getElementById("add-unit-name")?.focus(); }, 0);
-}
-
-async function submitAddUnit() {
-  const name = document.getElementById("add-unit-name").value.trim();
-  if (!name) { showToast("Nama satuan tidak boleh kosong."); return; }
-  const submitBtn = document.getElementById("add-unit-submit-btn");
-  if (submitBtn) submitBtn.disabled = true;
-  const resp = await fetch("/api/units", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (!resp.ok) {
-    let message = "Gagal menambahkan satuan.";
-    try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
-    showToast(message);
-    if (submitBtn) submitBtn.disabled = false;
-    return;
-  }
-  const created = await resp.json();
-  await loadUnits();
-  closeModal();
-  showToast(`Satuan "${created.name}" ditambahkan.`, "success");
-}
+// Kept for the "+ Satuan" shortcuts elsewhere (Master Barang form).
+function openAddUnitModal() { openUnitModal(); }
 
 // ── Inventory: Master Customer — list / filter / pagination ──────────────────
 // Customers are people the shop has sold to. The server creates one the first time a receipt is

@@ -747,6 +747,11 @@ def init_db() -> None:
         ).fetchall():
             con.execute("UPDATE supplier_pos SET internal_invoice_no=? WHERE id=?",
                         (_next_internal_invoice_no(con, old["po_date"] or _now()[:10]), old["id"]))
+        # --- Additive migration: Master Satuan (keterangan, alasan nonaktif) ---
+        unit_cols = {row["name"] for row in con.execute("PRAGMA table_info(units)").fetchall()}
+        for col, ddl in (("description", "TEXT"), ("deactivated_reason", "TEXT"), ("updated_at", "TEXT")):
+            if col not in unit_cols:
+                con.execute(f"ALTER TABLE units ADD COLUMN {col} {ddl}")
         # --- Additive migration: Barang Masuk revision V2 (source PO/manual, surat jalan, officer, audit) ---
         ib_cols = {row["name"] for row in con.execute("PRAGMA table_info(inbound_documents)").fetchall()}
         for col, ddl in (
@@ -2760,44 +2765,111 @@ def delete_all_brands() -> dict:
 # schema shape), so "in use" is checked by name match, not id.
 
 
-def create_unit(name: str) -> dict:
-    name_normalized = _normalize_name(name)
+def _unit_key(name: str) -> str:
+    """Duplicates are judged on the trimmed, upper-cased name: 'pcs', 'PCS ' and 'Pcs' are one unit."""
+    return re.sub(r"\s+", " ", (name or "").strip()).upper()
+
+
+def _unit_clash(con: sqlite3.Connection, name: str, ignore_id: int | None = None) -> dict | None:
+    for r in con.execute("SELECT id, name, is_active FROM units").fetchall():
+        if r["id"] != ignore_id and _unit_key(r["name"]) == _unit_key(name):
+            return dict(r)
+    return None
+
+
+def _clash_message(name: str, clash: dict) -> str:
+    if clash["is_active"]:
+        return f"Satuan '{name.strip()}' sudah ada."
+    return f"Satuan '{name.strip()}' sudah ada tetapi nonaktif. Aktifkan kembali dari daftar."
+
+
+def create_unit(name: str, description: str | None = None) -> dict:
+    name = re.sub(r"\s+", " ", name.strip())
+    if not name:
+        raise ValueError("Nama satuan wajib diisi.")
+    if len(name) > 30:
+        raise ValueError("Nama satuan maksimal 30 karakter.")
     created_at = _now()
     with _conn() as con:
-        dup = con.execute(
-            "SELECT 1 FROM units WHERE name_normalized=? AND is_active=1", (name_normalized,)
-        ).fetchone()
-        if dup is not None:
-            raise ValueError(f"Satuan '{name}' sudah ada")
+        clash = _unit_clash(con, name)
+        if clash is not None:
+            raise ValueError(_clash_message(name, clash))
         cur = con.execute(
-            "INSERT INTO units (name, name_normalized, is_active, created_at) VALUES (?, ?, 1, ?)",
-            (name.strip(), name_normalized, created_at),
+            "INSERT INTO units (name, name_normalized, is_active, created_at, description, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
+            (name, _unit_key(name), created_at, (description or "").strip() or None, created_at),
         )
-        row = con.execute("SELECT * FROM units WHERE id=?", (cur.lastrowid,)).fetchone()
-        return dict(row)
+    return get_all_units_with_id(cur.lastrowid)
 
 
-def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = None) -> dict:
+def get_all_units_with_id(unit_id: int) -> dict:
+    return next(u for u in get_all_units() if u["id"] == unit_id)
+
+
+def _unit_usage(con: sqlite3.Connection) -> dict[str, dict]:
+    """Per upper-cased unit name: how many products use it (all / still active) and whether any document does.
+    Units are stored on products and documents as plain text, so this matches by name."""
+    use: dict[str, dict] = {}
+    for r in con.execute("SELECT UPPER(TRIM(unit)) AS k, COUNT(*) AS n, SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) AS a FROM master_items GROUP BY UPPER(TRIM(unit))").fetchall():
+        use[r["k"]] = {"products": r["n"], "active_products": r["a"] or 0, "docs": 0}
+    for table, col in (("inbound_items", "pending_unit"), ("preorder_items", "unit"), ("supplier_po_items", "unit"), ("receipt_items", "unit")):
+        try:
+            rows = con.execute(f"SELECT UPPER(TRIM({col})) AS k, COUNT(*) AS n FROM {table} WHERE {col} IS NOT NULL AND TRIM({col}) != '' GROUP BY UPPER(TRIM({col}))").fetchall()
+        except sqlite3.OperationalError:
+            continue
+        for r in rows:
+            slot = use.setdefault(r["k"], {"products": 0, "active_products": 0, "docs": 0})
+            slot["docs"] += r["n"]
+    return use
+
+
+def get_all_units(active_only: bool = False) -> list[dict]:
+    with _conn() as con:
+        rows = con.execute("SELECT * FROM units" + (" WHERE is_active=1" if active_only else "") + " ORDER BY name ASC").fetchall()
+        usage = _unit_usage(con)
+    out = []
+    for r in rows:
+        u = usage.get(_unit_key(r["name"]), {"products": 0, "active_products": 0, "docs": 0})
+        out.append({**dict(r), "product_count": u["products"], "active_product_count": u["active_products"],
+                    "in_use": bool(u["products"] or u["docs"])})
+    return out
+
+
+def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = None, description: str | None = None,
+                reason: str | None = None, confirm_rename: bool = False, fields_set: set | None = None) -> dict:
+    fields_set = fields_set if fields_set is not None else {k for k, v in (("name", name), ("is_active", is_active), ("description", description)) if v is not None}
     with _conn() as con:
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
             raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
-        new_name = name.strip() if name is not None else row["name"]
-        new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
+        new_name = re.sub(r"\s+", " ", name.strip()) if name is not None else row["name"]
         if name is not None:
-            dup = con.execute(
-                "SELECT 1 FROM units WHERE name_normalized=? AND is_active=1 AND id!=?",
-                (new_name_normalized, unit_id),
-            ).fetchone()
-            if dup is not None:
-                raise ValueError(f"Satuan '{name}' sudah ada")
+            if not new_name:
+                raise ValueError("Nama satuan wajib diisi.")
+            if len(new_name) > 30:
+                raise ValueError("Nama satuan maksimal 30 karakter.")
+            clash = _unit_clash(con, new_name, ignore_id=unit_id)
+            if clash is not None:
+                raise ValueError(_clash_message(new_name, clash))
+        renamed = name is not None and new_name != row["name"]
+        if renamed:
+            usage = _unit_usage(con).get(_unit_key(row["name"]), {"products": 0})
+            if usage["products"] > 0 and not confirm_rename:
+                raise ValueError(
+                    f"Satuan '{row['name']}' dipakai {usage['products']} produk. Konfirmasi dulu bahwa perubahan ini hanya perbaikan penulisan, bukan mengganti arti satuan."
+                )
+            # Products and unposted documents show the new spelling; transaction snapshots (receipts, POs) keep what they were.
+            con.execute("UPDATE master_items SET unit=? WHERE UPPER(TRIM(unit))=?", (new_name, _unit_key(row["name"])))
+            con.execute("UPDATE inbound_items SET pending_unit=? WHERE UPPER(TRIM(pending_unit))=?", (new_name, _unit_key(row["name"])))
+        new_desc = ((description or "").strip() or None) if "description" in fields_set else row["description"]
         new_active = int(is_active) if is_active is not None else row["is_active"]
+        new_reason = row["deactivated_reason"]
+        if is_active is not None:
+            new_reason = None if is_active else ((reason or "").strip() or None)
         con.execute(
-            "UPDATE units SET name=?, name_normalized=?, is_active=? WHERE id=?",
-            (new_name, new_name_normalized, new_active, unit_id),
+            "UPDATE units SET name=?, name_normalized=?, is_active=?, description=?, deactivated_reason=?, updated_at=? WHERE id=?",
+            (new_name, _unit_key(new_name), new_active, new_desc, new_reason, _now(), unit_id),
         )
-        updated = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
-        return dict(updated)
+    return get_all_units_with_id(unit_id)
 
 
 def get_unit(unit_id: int) -> dict | None:
@@ -2807,56 +2879,25 @@ def get_unit(unit_id: int) -> dict | None:
 
 
 def get_unit_by_name(name: str) -> dict | None:
-    """Case-insensitive lookup against active units — used to validate a
-    submitted unit string (from Tambah Barang Baru, item edit, or a Barang
-    Masuk pending-product row) against the Satuan master before it's saved."""
+    """Case-insensitive lookup against active units: used to validate a submitted unit string
+    (Tambah Barang, item edit, Barang Masuk) against Master Satuan before it is saved."""
     with _conn() as con:
-        row = con.execute(
-            "SELECT * FROM units WHERE UPPER(name)=UPPER(?) AND is_active=1", (name.strip(),)
-        ).fetchone()
-        return dict(row) if row is not None else None
-
-
-def get_all_units(active_only: bool = False) -> list[dict]:
-    with _conn() as con:
-        if active_only:
-            rows = con.execute("SELECT * FROM units WHERE is_active=1 ORDER BY name ASC").fetchall()
-        else:
-            rows = con.execute("SELECT * FROM units ORDER BY name ASC").fetchall()
-        return [dict(r) for r in rows]
-
-
-def _unit_in_use(con: sqlite3.Connection, unit_name: str) -> bool:
-    row = con.execute(
-        "SELECT 1 FROM master_items WHERE UPPER(unit)=UPPER(?) "
-        "UNION SELECT 1 FROM inbound_items WHERE UPPER(pending_unit)=UPPER(?) LIMIT 1",
-        (unit_name, unit_name),
-    ).fetchone()
-    return row is not None
+        for r in con.execute("SELECT * FROM units WHERE is_active=1").fetchall():
+            if _unit_key(r["name"]) == _unit_key(name):
+                return dict(r)
+        return None
 
 
 def delete_unit(unit_id: int) -> None:
+    """Only a unit nothing ever used can go. Anything with history is deactivated instead."""
     with _conn() as con:
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
             raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
-        if _unit_in_use(con, row["name"]):
-            raise ValueError("Satuan masih dipakai dan tidak bisa dihapus")
+        u = _unit_usage(con).get(_unit_key(row["name"]))
+        if u and (u["products"] or u["docs"]):
+            raise ValueError("Satuan sudah dipakai produk atau transaksi, jadi tidak bisa dihapus. Nonaktifkan saja.")
         con.execute("DELETE FROM units WHERE id=?", (unit_id,))
-
-
-def delete_all_units() -> dict:
-    with _conn() as con:
-        rows = con.execute("SELECT id, name FROM units").fetchall()
-        deleted = 0
-        skipped = 0
-        for row in rows:
-            if _unit_in_use(con, row["name"]):
-                skipped += 1
-                continue
-            con.execute("DELETE FROM units WHERE id=?", (row["id"],))
-            deleted += 1
-    return {"deleted_count": deleted, "skipped_count": skipped}
 
 
 # --- Duplicate lookups / SKU preview ---------------------------------------

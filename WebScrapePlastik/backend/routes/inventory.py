@@ -666,7 +666,7 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
     try:
         row = await loop.run_in_executor(
             None, create_master_item, req.supplier_id, req.brand_id, req.name.strip(), req.unit.strip(),
-            req.sell_price, req.cost_price, req.stock_qty, req.description, req.min_stock, req.location,
+            req.sell_price, (req.cost_price if user["role"] == "admin" else 0), req.stock_qty, req.description, req.min_stock, req.location,
             user["username"], req.category_id, req.is_active,
         )
     except ValueError as e:
@@ -683,6 +683,7 @@ async def master_items_summary():
 
 @router.get("/inventory/master-items", response_model=MasterItemListOut)
 async def list_master_items_route(
+    user: dict = Depends(get_current_user),
     page: int = 1,
     page_size: int = 20,
     search: str | None = None,
@@ -701,6 +702,8 @@ async def list_master_items_route(
         raise HTTPException(status_code=422, detail=f"stock_status harus salah satu dari: {', '.join(MASTER_STOCK_CLAUSES)}.")
     if sort not in MASTER_SORTS:
         raise HTTPException(status_code=422, detail=f"sort harus salah satu dari: {', '.join(MASTER_SORTS)}.")
+    if sort == "margin_desc" and user["role"] != "admin":
+        sort = "newest"  # margin order would reveal the cost
     if stock_min is not None and stock_max is not None and stock_min > stock_max:
         raise HTTPException(status_code=422, detail="Stok minimum tidak boleh lebih besar dari stok maksimum.")
     if page < 1:
@@ -725,7 +728,7 @@ async def list_master_items_route(
 
 
 @router.get("/inventory/master-items/export.csv")
-async def export_master_items_csv():
+async def export_master_items_csv(user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(None, get_master_items_for_export)
     output = io.StringIO()
@@ -733,11 +736,12 @@ async def export_master_items_csv():
     writer.writerow(
         ["SKU", "Nama Barang", "Supplier", "Brand", "Satuan", "Stok", "Stok Minimum", "Lokasi", "Deskripsi", "Harga Rata-rata", "Harga Beli Terakhir", "Harga Jual", "Aktif"]
     )
+    is_admin = user["role"] == "admin"
     for r in rows:
         writer.writerow(
             [
                 r["sku"], r["name"], r["supplier_name"], r["brand_name"], r["unit"], r["stock_qty"],
-                r["min_stock"], r["location"] or "", r["description"] or "", r["avg_cost_price"], r["last_cost_price"], r["sell_price"], "Ya" if r["is_active"] else "Tidak",
+                r["min_stock"], r["location"] or "", r["description"] or "", r["avg_cost_price"] if is_admin else "", r["last_cost_price"] if is_admin else "", r["sell_price"], "Ya" if r["is_active"] else "Tidak",
             ]
         )
     return Response(

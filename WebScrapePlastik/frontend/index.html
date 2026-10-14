@@ -1444,7 +1444,7 @@
 
   <!-- PAGE: FAKTUR PEMBELIAN (purchase invoices / accounts payable — supplier bills we owe) -->
   <div id="page-purchase-invoices" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-none mx-auto">
 
       <!-- LIST PANEL -->
       <div id="pi-list-panel">
@@ -1664,7 +1664,7 @@
 
   <!-- PAGE: PREORDER (pesanan barang yang belum ada di toko — bukan transaksi, tidak menyentuh stok) -->
   <div id="page-preorder" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-none mx-auto">
 
       <!-- LIST PANEL -->
       <div id="po-list-panel">
@@ -2409,7 +2409,7 @@
   <!-- PAGE: DASHBOARD (Ringkasan — moved here from the Inventori tab bar) -->
   <!-- ===== MASTER KATEGORI ===== -->
   <div id="page-kategori" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-none mx-auto">
 
       <!-- LIST + STRUKTUR -->
       <div id="kat-list-panel">
@@ -2645,14 +2645,14 @@
   </div>
 
   <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-none mx-auto">
 
       <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
           <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">SKU Aktif</div>
           <div id="ov-active-sku-count" class="font-sans text-2xl font-semibold text-ink">0</div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
+        <div class="admin-only border border-line rounded-xl bg-bg2 px-4 py-3">
           <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Nilai Persediaan</div>
           <div id="ov-total-value" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
         </div>
@@ -2828,7 +2828,7 @@
 
   <!-- PAGE: AKTIVITAS (admin-only audit trail) -->
   <div id="page-activity" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-none mx-auto">
       <div class="flex items-center justify-between mb-4">
         <span id="activity-total" class="text-sm text-muted px-1"></span>
       </div>
@@ -3213,7 +3213,7 @@
                   <option value="stock_desc">Stok tertinggi</option>
                   <option value="sell_desc">Harga jual tertinggi</option>
                   <option value="sell_asc">Harga jual terendah</option>
-                  <option value="margin_desc">Margin tertinggi</option>
+                  <option class="admin-only" value="margin_desc">Margin tertinggi</option>
                 </select>
               </label>
               <div class="flex items-center gap-1.5 text-sm text-muted">
@@ -3253,9 +3253,9 @@
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Produk</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Persediaan</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
-                    <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal Rata-rata</th>
+                    <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal Rata-rata</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th>
-                    <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Margin</th>
+                    <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Margin</th>
                     <th class="sticky right-0 bg-bg2 text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line shadow-[-6px_0_6px_-6px_rgba(20,20,19,0.12)]">Aksi</th>
                   </tr>
                 </thead>
@@ -3357,14 +3357,14 @@
                 <div id="dt-state" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-state-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                  <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-accent/10 text-accentDark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Nilai Stok</div>
                 <div id="dt-value" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-value-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                  <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-bg2 text-muted"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Harga Modal Rata-rata</div>
                 <div id="dt-cost" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-cost-sub" class="text-xs text-muted mt-0.5"></div>
@@ -3374,7 +3374,7 @@
                 <div id="dt-sell" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-sell-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                  <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Estimasi Margin</div>
                 <div id="dt-margin" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-margin-sub" class="text-xs text-muted mt-0.5"></div>
@@ -3430,7 +3430,7 @@
               <div class="border border-line rounded-xl overflow-hidden">
                 <table class="w-full text-sm">
                   <thead class="bg-bg2"><tr>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dokumen</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Masuk</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dokumen</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Masuk</th><th class="admin-only text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
                   </tr></thead>
                   <tbody id="batch-history-tbody"></tbody>
                 </table>
@@ -3459,7 +3459,7 @@
               <div class="border border-line rounded-xl overflow-hidden overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead class="bg-bg2"><tr>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diubah Oleh</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Catatan</th>
+                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="admin-only text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diubah Oleh</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Catatan</th>
                   </tr></thead>
                   <tbody id="dt-change-tbody"></tbody>
                 </table>
@@ -3556,7 +3556,7 @@
                   <thead class="bg-bg2"><tr><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Tanggal Efektif</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Jenis Perubahan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Harga Sebelum</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Harga Sesudah</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Sumber</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Pengguna</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Catatan</th></tr></thead>
                   <tbody id="ph-history-tbody"></tbody></table></div>
               </section>
-              <section id="ph-buy-card" class="bg-white border border-line rounded-xl overflow-hidden">
+              <section id="ph-buy-card" class="admin-only bg-white border border-line rounded-xl overflow-hidden">
                 <div class="flex flex-wrap items-center gap-3 px-4 py-3">
                   <div><h3 class="font-serif font-semibold text-ink">Riwayat Harga Beli / Supplier</h3><p class="text-xs text-muted">Daftar perubahan harga modal dan informasi supplier terkait.</p></div>
                   <label class="ml-auto inline-flex items-center gap-2 text-xs text-muted">Urutkan:
@@ -3634,7 +3634,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div class="admin-only">
                     <label for="new-item-cost-price" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5"><span id="new-item-cost-label">Harga Modal</span></label>
                     <div class="flex rounded-lg border border-line bg-white focus-within:ring-2 focus-within:ring-accent/30 focus-within:border-accent transition-colors">
                       <span class="px-3 grid place-items-center rounded-l-lg bg-bg2 border-r border-line text-sm text-muted select-none" aria-hidden="true">Rp</span>
@@ -3650,7 +3650,7 @@
                         class="price-input flex-1 min-w-0 px-3 py-2 text-sm bg-transparent text-ink text-right placeholder:text-muted/70 rounded-r-lg focus:outline-none" />
                     </div>
                   </div>
-                  <p id="new-item-margin-hint" class="sm:col-span-2 -mt-1 text-xs text-muted min-h-[1rem] tabular-nums"></p>
+                  <p id="new-item-margin-hint" class="admin-only sm:col-span-2 -mt-1 text-xs text-muted min-h-[1rem] tabular-nums"></p>
                 </div>
               </div>
             </section>
@@ -3790,6 +3790,7 @@
 
       <!-- TAB: MASTER BRAND -->
       <section id="inv-tab-brand" class="hidden">
+        <div id="brand-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" aria-live="polite"></div>
         <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4">
           <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <div class="flex-1 min-w-[14rem]">
@@ -3835,6 +3836,7 @@
 
       <!-- TAB: MASTER SUPPLIER -->
       <section id="inv-tab-supplier" class="hidden">
+        <div id="supplier-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" aria-live="polite"></div>
         <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4">
           <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <div class="flex-1 min-w-[14rem]">
@@ -3882,6 +3884,7 @@
 
       <!-- TAB: MASTER SATUAN -->
       <section id="inv-tab-unit" class="hidden">
+        <div id="unit-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" aria-live="polite"></div>
         <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4">
           <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <div class="flex-1 min-w-[14rem]">
@@ -3910,8 +3913,8 @@
             <table class="w-full text-sm">
               <thead class="bg-bg2">
                 <tr>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Satuan</th>
-                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
+                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Kode Satuan</th>
+                <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Satuan</th>
                 <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jumlah Produk</th>
                 <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
                 <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
@@ -3935,6 +3938,7 @@
       <section id="inv-tab-customer" class="hidden">
 
         <div id="mcust-list-panel">
+          <div id="mcust-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" aria-live="polite"></div>
           <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4">
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
               <div class="flex-1 min-w-[14rem]">
@@ -8370,11 +8374,49 @@ function openStandaloneQuickAdd(type) {
   renderQuickAddModal(type, "", null);
 }
 
+// Summary cards shared by every master list (Total / Aktif / Nonaktif).
+function renderMasterKpis(id, total, aktif, nonaktif, noun) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const card = (label, value, sub, tone, icon) => `
+    <div class="flex items-center gap-3.5 bg-white border border-line rounded-xl px-4 py-3.5 shadow-sm">
+      <span class="shrink-0 grid place-items-center w-11 h-11 rounded-xl ${tone}" aria-hidden="true">${svgIcon(icon, 20)}</span>
+      <div class="min-w-0"><div class="text-xs text-muted">${label}</div>
+        <div class="font-sans text-2xl font-semibold text-ink leading-tight tabular-nums">${formatInt(value)}</div>
+        <div class="text-[11px] text-muted">${sub}</div></div>
+    </div>`;
+  const pct = n => total ? `${Math.round(n / total * 100)}% dari total` : "belum ada data";
+  el.innerHTML =
+    card(`Total ${noun}`, total, "semua data", "bg-accent/10 text-accentDark", "archive") +
+    card("Aktif", aktif, pct(aktif), "bg-done/10 text-done", "check") +
+    card("Nonaktif", nonaktif, pct(nonaktif), "bg-failed/10 text-failed", "trash");
+}
+
+function renderEntityKpis(prefix, list, noun) {
+  const aktif = list.filter(x => x.is_active).length;
+  renderMasterKpis(`${prefix}-kpis`, list.length, aktif, list.length - aktif, noun);
+}
+
+// Shared delete confirmation: warning icon, what is deleted, and why it cannot be undone.
+function dangerModalHtml(lead, detail, confirmLabel, onconfirm, extra = "") {
+  return `<div class="space-y-3">
+    <div class="flex items-start gap-3">
+      <span class="shrink-0 grid place-items-center w-10 h-10 rounded-full bg-failed/10 text-failed" aria-hidden="true">${svgIcon("trash", 18)}</span>
+      <div class="min-w-0"><p class="text-sm text-ink">${lead}</p><p class="text-xs text-muted mt-1 leading-relaxed">${detail}</p></div>
+    </div>${extra}
+    <p id="danger-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+    <div class="flex justify-end gap-2 pt-1">
+      <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+      <button type="button" id="danger-confirm-btn" onclick="${onconfirm}" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">${confirmLabel}</button>
+    </div></div>`;
+}
+
 function renderBrandTable() {
   const tbody = document.getElementById("brand-list-tbody");
   const emptyEl = document.getElementById("brand-list-empty");
   if (!tbody) return;
   const query = document.getElementById("brand-search-input").value.trim().toLowerCase();
+  renderEntityKpis("brand", brandsCache, "Merek");
   const items = brandsCache.filter(b => !query || b.name.toLowerCase().includes(query) || b.code.toLowerCase().includes(query));
   tbody.innerHTML = "";
   renderEntityListMeta("brand", items.length, brandsCache.length, query, "merek");
@@ -8388,6 +8430,7 @@ function renderSupplierTable() {
   const emptyEl = document.getElementById("supplier-list-empty");
   if (!tbody) return;
   const query = document.getElementById("supplier-search-input").value.trim().toLowerCase();
+  renderEntityKpis("supplier", suppliersCache, "Supplier");
   const items = suppliersCache.filter(s => !query || s.name.toLowerCase().includes(query) || s.code.toLowerCase().includes(query));
   tbody.innerHTML = "";
   renderEntityListMeta("supplier", items.length, suppliersCache.length, query, "supplier");
@@ -8552,15 +8595,10 @@ function confirmDeleteEntity(type, id) {
   const label = type === "brand" ? "merek" : "supplier";
   const item = entityCache(type).find(e => e.id === id);
   const name = item ? esc(item.name) : "";
-  openModal(`Hapus ${type === "brand" ? "Merek" : "Supplier"}`, `
-    <div class="space-y-3">
-      <p class="text-sm text-muted">Yakin ingin menghapus ${label} <strong class="text-ink">${name}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" onclick="deleteEntity('${type}', ${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus</button>
-      </div>
-    </div>
-  `);
+  openModal(`Hapus ${type === "brand" ? "Merek" : "Supplier"}?`, dangerModalHtml(
+    `Hapus ${label} <strong>${name}</strong>?`,
+    `Hanya bisa dihapus jika belum dipakai barang atau dokumen. Kalau sudah dipakai, nonaktifkan saja. Tindakan ini tidak dapat dibatalkan.`,
+    "Ya, Hapus", `deleteEntity('${type}', ${id})`));
 }
 
 async function deleteEntity(type, id) {
@@ -8580,17 +8618,13 @@ async function deleteEntity(type, id) {
 
 function confirmDeleteAllEntities(type) {
   const label = type === "brand" ? "semua merek" : "semua supplier";
-  openModal(`Hapus Semua ${type === "brand" ? "Merek" : "Supplier"}`, `
-    <div class="space-y-3">
-      <p class="text-sm text-muted">
-        Yakin ingin menghapus ${label}? Merek/supplier sistem dan yang masih dipakai oleh barang atau dokumen akan dilewati secara otomatis. Tindakan ini tidak dapat dibatalkan.
-      </p>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" onclick="deleteAllEntities('${type}')" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90 transition-colors">Konfirmasi Hapus Semua</button>
-      </div>
-    </div>
-  `);
+  openModal(`Hapus Semua ${type === "brand" ? "Merek" : "Supplier"}?`, dangerModalHtml(
+    `Hapus ${label}?`,
+    `Data sistem dan yang masih dipakai barang atau dokumen dilewati otomatis. Tindakan ini tidak dapat dibatalkan.`,
+    "Ya, Hapus Semua", `deleteAllEntities('${type}')`,
+    `<div><label for="danger-type" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Ketik HAPUS untuk melanjutkan</label>
+      <input id="danger-type" type="text" autocomplete="off" data-no-uppercase oninput="document.getElementById('danger-confirm-btn').disabled = this.value.trim().toUpperCase() !== 'HAPUS'" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-failed/30 focus:border-failed"></div>`));
+  const b = document.getElementById("danger-confirm-btn"); if (b) { b.disabled = true; b.classList.add("disabled:opacity-40", "disabled:cursor-not-allowed"); }
 }
 
 async function deleteAllEntities(type) {
@@ -8621,6 +8655,7 @@ function renderUnitTable() {
   if (!tbody) return;
   const query = document.getElementById("unit-search-input").value.trim().toLowerCase();
   const st = document.getElementById("unit-filter-status").value;
+  renderEntityKpis("unit", unitsCache, "Satuan");
   const items = unitsCache.filter(u =>
     (!query || u.name.toLowerCase().includes(query) || (u.description || "").toLowerCase().includes(query))
     && (!st || (st === "active") === Boolean(u.is_active)));
@@ -8683,13 +8718,13 @@ function openUnitModal(id) {
   openModal(item ? `Edit Satuan — ${item.name}` : "Tambah Satuan Baru", `
     <div class="space-y-3">
       <div>
-        <label for="unit-f-name" class="${UNIT_LABEL}">Nama Satuan <span class="text-failed">*</span></label>
+        <label for="unit-f-name" class="${UNIT_LABEL}">Kode Satuan <span class="text-failed">*</span></label>
         <input id="unit-f-name" type="text" maxlength="30" autocomplete="off" placeholder="mis. PCS, SET, METER, ROLL" value="${esc(item ? item.name : "")}"
           onkeydown="if(event.key==='Enter'){event.preventDefault();submitUnitForm(${id || 0});}" class="${UNIT_INPUT}" />
-        <p class="text-[11px] text-muted mt-1">Nama ini juga dipakai sebagai kode. PCS dan pcs dianggap sama.</p>
+        <p class="text-[11px] text-muted mt-1">Kode dipakai di semua produk dan dokumen. PCS dan pcs dianggap sama.</p>
       </div>
       <div>
-        <label for="unit-f-desc" class="${UNIT_LABEL}">Keterangan <span class="normal-case font-normal">(opsional)</span></label>
+        <label for="unit-f-desc" class="${UNIT_LABEL}">Nama Satuan <span class="normal-case font-normal">(opsional)</span></label>
         <input id="unit-f-desc" type="text" maxlength="60" data-no-uppercase autocomplete="off" placeholder="mis. Pieces, Gulungan" value="${esc(item ? item.description || "" : "")}"
           onkeydown="if(event.key==='Enter'){event.preventDefault();submitUnitForm(${id || 0});}" class="${UNIT_INPUT}" />
       </div>
@@ -8783,19 +8818,15 @@ async function reactivateUnit(id) {
 function openUnitDeleteModal(id) {
   const item = unitsCache.find(u => u.id === id);
   if (!item) return;
-  openModal(`Hapus Satuan ${item.name}?`, `
-    <div class="space-y-3">
-      <p class="text-sm text-muted">Satuan ini belum pernah dipakai produk atau transaksi, jadi aman dihapus. Tindakan ini tidak bisa dibatalkan.</p>
-      <p id="unit-form-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
-      <div class="flex justify-end gap-2 pt-1">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
-        <button type="button" onclick="deleteUnitEntity(${id})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90">Hapus Satuan</button></div>
-    </div>`);
+  openModal(`Hapus Satuan ${item.name}?`, dangerModalHtml(
+    `Hapus satuan <strong>${esc(item.name)}</strong>${item.description ? ` (${esc(item.description)})` : ""}?`,
+    "Satuan ini belum pernah dipakai produk atau transaksi, jadi aman dihapus. Tindakan ini tidak dapat dibatalkan.",
+    "Ya, Hapus", `deleteUnitEntity(${id})`));
 }
 
 async function deleteUnitEntity(id) {
   const resp = await fetch(`/api/units/${id}`, { method: "DELETE" });
-  if (!resp.ok) { unitFormError(await unitApiError(resp, "Gagal menghapus satuan.")); return; }
+  if (!resp.ok) { (()=>{const e=document.getElementById("danger-error"); unitApiError(resp,"Gagal menghapus satuan.").then(m=>{e.textContent=m;e.classList.remove("hidden");});})(); return; }
   closeModal();
   await loadUnits();
   showToast("Satuan dihapus.", "success");
@@ -8914,6 +8945,16 @@ async function loadCustomers() {
   customerListState.total = data.total;
   renderCustomersTable(data);
   renderCustomersPagination(data);
+  loadCustomerKpis();
+}
+
+// Totals ignore the search and status filter: one cheap count per bucket.
+async function loadCustomerKpis() {
+  const count = async q => {
+    try { const r = await fetch(`/api/customers?page=1&page_size=1${q}`); return r.ok ? (await r.json()).total : 0; } catch (_) { return 0; }
+  };
+  const [aktif, nonaktif] = await Promise.all([count("&is_active=true"), count("&is_active=false")]);
+  renderMasterKpis("mcust-kpis", aktif + nonaktif, aktif, nonaktif, "Pelanggan");
 }
 
 function findCustomerListItem(id) {
@@ -10164,11 +10205,11 @@ function renderMasterItemsTable(data) {
       <td class="px-2.5 py-3">${activePillHtml(item.is_active)}</td>
       <td class="px-2.5 py-3">${statusPillHtml(stock.dot, stock.label, stock.tint)}</td>
       <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}<div class="text-[11px] font-normal text-muted">${esc(item.unit || "")}</div></td>
-      <td class="px-2.5 py-3 text-right tabular-nums whitespace-nowrap">${item.avg_cost_price > 0
+      <td class="admin-only px-2.5 py-3 text-right tabular-nums whitespace-nowrap">${item.avg_cost_price > 0
         ? `<span class="text-muted">${formatIDR(item.avg_cost_price)}</span>`
         : '<span class="text-xs text-muted">Belum dapat dihitung</span>'}</td>
       <td class="px-2.5 py-3 text-right tabular-nums text-ink whitespace-nowrap">${item.sell_price > 0 ? formatIDR(item.sell_price) : '<span class="text-xs text-muted">Belum ada</span>'}</td>
-      <td class="px-2.5 py-3 text-right tabular-nums whitespace-nowrap ${margin === null ? "text-muted" : margin >= 0 ? "text-done" : "text-failed"}">${margin === null ? "-" : margin.toFixed(2) + "%"}</td>
+      <td class="admin-only px-2.5 py-3 text-right tabular-nums whitespace-nowrap ${margin === null ? "text-muted" : margin >= 0 ? "text-done" : "text-failed"}">${margin === null ? "-" : margin.toFixed(2) + "%"}</td>
       <td class="sticky right-0 bg-white px-3 py-3 shadow-[-6px_0_6px_-6px_rgba(20,20,19,0.12)]" onclick="event.stopPropagation()">
         <div class="flex items-center justify-end">
           <button type="button" onclick="openMasterRowMenu(event, ${item.id})" aria-label="Aksi barang" aria-haspopup="menu" title="Aksi"
@@ -11187,7 +11228,7 @@ function renderMasterActivity(resetCount) {
     const prev = hist[i];
     const parts = [];
     if (prev.sell_price !== h.sell_price) parts.push(`harga jual ${formatIDR(prev.sell_price)} → ${formatIDR(h.sell_price)}`);
-    if (prev.cost_price !== h.cost_price) parts.push(`modal ${formatIDR(prev.cost_price)} → ${formatIDR(h.cost_price)}`);
+    if (isAdmin() && prev.cost_price !== h.cost_price) parts.push(`modal ${formatIDR(prev.cost_price)} → ${formatIDR(h.cost_price)}`);
     if (!parts.length) return;
     rows.push({ at: h.created_at, kind: "harga", text: `Perubahan ${parts.join(", ")}.${h.note ? " " + h.note : ""}`, by: h.changed_by || "-", ref: "" });
   });
@@ -11214,7 +11255,7 @@ function renderMasterChangeHistory() {
   const hist = masterDetailExtra.prices?.history || [];
   document.getElementById("dt-change-tbody").innerHTML = hist.length ? hist.map(h => `<tr class="border-b border-line last:border-b-0">
     <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(formatMasterDateTime(h.created_at))}</td>
-    <td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.cost_price)}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.sell_price)}</td>
+    <td class="admin-only px-3 py-2 text-right tabular-nums">${formatIDR(h.cost_price)}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.sell_price)}</td>
     <td class="px-3 py-2 text-muted">${esc(h.changed_by || "-")}</td><td class="px-3 py-2 text-ink">${esc(h.note || "-")}</td></tr>`).join("")
     : `<tr><td colspan="5" class="px-3 py-6 text-center text-muted">Belum ada riwayat perubahan.</td></tr>`;
 }
@@ -11235,7 +11276,7 @@ function renderBatchHistoryTable(batches) {
       </td>
       <td class="px-3 py-2 text-muted">${esc(b.received_date)}</td>
       <td class="px-3 py-2 text-right tabular-nums text-ink">${b.qty_in}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-muted">${formatIDR(b.cost_price)}</td>
+      <td class="admin-only px-3 py-2 text-right tabular-nums text-muted">${formatIDR(b.cost_price)}</td>
       <td class="px-3 py-2 text-right tabular-nums text-ink">${b.qty_remaining}</td>
     `;
     tbody.appendChild(tr);
@@ -11647,7 +11688,7 @@ async function openMasterPriceHistory() {
   showMasterPanel("price");
 }
 
-function setPriceTab(t) { phTab = t; renderPriceTables(); }
+function setPriceTab(t) { phTab = (t === "buy" && !isAdmin()) ? "sell" : t; renderPriceTables(); }
 
 // Sell-price rows: every history entry whose sell price differs from the one before it (and the first).
 function priceSellRows() {
@@ -11680,8 +11721,8 @@ function renderMasterPriceHistory() {
   const prim = p.suppliers.find(x => x.is_primary) || p.suppliers[0];
   g("ph-kpis").innerHTML =
     mhKpi("tag", "bg-orange-100 text-orange-600", "Harga Jual Aktif", formatIDR(it.sell_price), "Harga jual saat ini")
-    + mhKpi("coins", "bg-pending/15 text-pending", "Harga Modal Rata-rata", formatIDR(it.avg_cost_price), "Harga modal rata-rata saat ini")
-    + mhKpi("pct", "bg-done/10 text-done", "Margin Saat Ini", margin === null ? "-" : `${margin.toFixed(1)}%`, "Dihitung dari harga aktif")
+    + (isAdmin() ? mhKpi("coins", "bg-pending/15 text-pending", "Harga Modal Rata-rata", formatIDR(it.avg_cost_price), "Harga modal rata-rata saat ini")
+    + mhKpi("pct", "bg-done/10 text-done", "Margin Saat Ini", margin === null ? "-" : `${margin.toFixed(1)}%`, "Dihitung dari harga aktif") : "")
     + mhKpi("truck", "bg-purple-100 text-purple-600", "Supplier Utama", esc(prim ? prim.name : "-"), "Pemasok utama barang ini");
   const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" class="w-full h-full object-cover" />` : `<span class="text-muted">${mhIcon("box", 40)}</span>`;
   const row = (icon, tint, title, desc) => `<button type="button" onclick="backToMasterDetail()" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-bg2/60 border-t border-line first:border-t-0 transition-colors">
@@ -11708,6 +11749,7 @@ function renderPriceTables() {
     const on = phTab === k;
     g(id).className = `px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${on ? "border-accent text-accentDark bg-white rounded-t-lg" : "border-transparent text-muted hover:text-ink"}`;
     g(id).setAttribute("aria-selected", on);
+    if (k === "buy") g(id).classList.toggle("hidden", !isAdmin());
   }
   g("ph-sell-card").classList.toggle("hidden", phTab !== "sell");
   g("ph-buy-card").classList.toggle("hidden", phTab !== "buy");
@@ -11745,7 +11787,7 @@ function openChangeSellPriceModal() {
       <div><label for="csp-price" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual Baru</label>
         <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">Rp</span>
         <input id="csp-price" type="text" inputmode="numeric" class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30" /></div>
-        <p class="text-xs text-muted mt-1">Saat ini ${formatIDR(it.sell_price)}. Modal rata-rata ${formatIDR(it.avg_cost_price)}.</p></div>
+        <p class="text-xs text-muted mt-1">Saat ini ${formatIDR(it.sell_price)}.${isAdmin() ? ` Modal rata-rata ${formatIDR(it.avg_cost_price)}.` : ""}</p></div>
       <div><label for="csp-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan <span class="normal-case font-normal">(opsional)</span></label>
         <input id="csp-note" type="text" maxlength="120" data-no-uppercase placeholder="Misal: mengikuti harga pasar" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30" /></div>
       <div class="flex justify-end gap-2 pt-1">
@@ -12237,7 +12279,7 @@ function inboundItemRowTemplate(rowId) {
         <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Qty Masuk</label>
         <input type="text" inputmode="numeric" value="1" class="row-qty w-full text-center border border-line rounded-lg px-2 py-1.5 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
       </div>
-      <div class="w-28">
+      <div class="admin-only w-28">
         <label class="block text-[10px] font-medium text-muted uppercase tracking-wider mb-1">Harga Modal</label>
         <div class="relative">
           <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
@@ -13585,7 +13627,7 @@ async function searchPiProducts(inputEl, query) {
         <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
           <span class="font-mono">${esc(item.sku)}</span>
           <span>· ${esc(item.unit)}</span>
-          <span>· Modal ${formatIDR(item.last_cost_price)}</span>
+          ${isAdmin() ? `<span>· Modal ${formatIDR(item.last_cost_price)}</span>` : ""}
         </div>
       </button>
     `).join("");

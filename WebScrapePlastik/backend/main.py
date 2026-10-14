@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.activity import ActivityLogMiddleware
 from backend.auth import get_current_user, require_admin
 from backend.config import SCRAPER_ENABLED
+from backend.cost_privacy import CostPrivacyMiddleware
 from backend.idempotency import IdempotencyMiddleware
 from backend.database import fail_orphaned_jobs, init_db, purge_expired_sessions
 from backend.routes.activity import router as activity_router
@@ -40,6 +41,7 @@ app = FastAPI(title="Google Maps Scraper", lifespan=lifespan)
 
 # Added before CORS so it wraps the outermost layer and sees every request
 # that reaches the app, including ones rejected further in.
+app.add_middleware(CostPrivacyMiddleware)
 app.add_middleware(ActivityLogMiddleware)
 
 app.add_middleware(

@@ -2052,11 +2052,15 @@ def update_receipt(
         else:
             new_status = _compute_receipt_status(new_total, new_amount_paid, status)
         new_work_status = existing["work_status"]
-        # Payments already taken are real money: an edit that does not restate the paid
-        # amount may not shrink the nota below what has come in.
+        # A total that drops below what has already been paid (an item cancelled after payment) is
+        # allowed: the difference is Kelebihan Bayar, kept on the record until an admin refunds it
+        # (refund_receipt_overpay). Nothing is refunded or deleted automatically.
         if amount_paid is None and existing["status"] != "void" and status != "void" and new_total < new_amount_paid:
-            raise ValueError(
-                f"Jumlah total nota tidak boleh lebih kecil dari pembayaran yang sudah masuk (Rp {new_amount_paid:,}).".replace(",", ".")
+            over = new_amount_paid - new_total
+            _log_receipt_event(
+                con, receipt_id, "overpaid",
+                f"Total nota turun menjadi Rp {new_total:,}; kelebihan bayar Rp {over:,} perlu dikembalikan ke pelanggan.".replace(",", "."),
+                changed_by,
             )
         # An edit that states a different paid amount is recorded as an adjustment row, so the
         # payment history keeps adding up to amount_paid.
@@ -2151,6 +2155,61 @@ def settle_receipt(
             )
         updated = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
         return dict(updated)
+
+
+def refund_receipt_overpay(
+    receipt_id: str, amount: int, method: str, reason: str, by: str | None = None
+) -> dict:
+    """Kembalikan Kelebihan Bayar (admin): writes a negative payment row for money handed back, never
+    more than the nota is overpaid. Messages: 'tidak ditemukan' -> 404, 'Jumlah'/'Alasan' -> 422, else 409."""
+    reason = (reason or "").strip()
+    if len(reason) < 3:
+        raise ValueError("Alasan refund wajib diisi (minimal 3 karakter).")
+    with _conn() as con:
+        row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        if row is None:
+            raise ValueError("Nota tidak ditemukan.")
+        if row["status"] == "void":
+            raise ValueError("Nota sudah dibatalkan (void).")
+        over = max(row["amount_paid"] - row["total"], 0)
+        if over <= 0:
+            raise ValueError("Nota ini tidak punya kelebihan bayar.")
+        if amount <= 0:
+            raise ValueError("Jumlah refund harus lebih dari 0.")
+        if amount > over:
+            raise ValueError(f"Jumlah refund melebihi kelebihan bayar (Rp {over:,}).".replace(",", "."))
+        cur = con.execute(
+            "UPDATE receipts SET amount_paid=? WHERE id=? AND amount_paid=?",
+            (row["amount_paid"] - amount, receipt_id, row["amount_paid"]),
+        )
+        if cur.rowcount == 0:
+            raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
+        _insert_receipt_payment(con, receipt_id, -amount, method, f"Refund kelebihan bayar: {reason}", by)
+        _log_receipt_event(con, receipt_id, "refund",
+                           f"Kelebihan bayar Rp {amount:,} ({method}) dikembalikan ke pelanggan: {reason}".replace(",", "."), by)
+        return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
+
+
+def reopen_closed_receipt(receipt_id: str, reason: str, by: str | None = None) -> dict:
+    """Buka Kembali (admin): a closed nota (Lunas + Pengerjaan Selesai) goes back to Dalam Pengerjaan so it
+    can be revised. The reason, who and when stay in the nota's event log."""
+    reason = (reason or "").strip()
+    if len(reason) < 3:
+        raise ValueError("Alasan wajib diisi (minimal 3 karakter).")
+    with _conn() as con:
+        row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        if row is None:
+            raise ValueError("Nota tidak ditemukan.")
+        if not _is_closed(row):
+            raise ValueError("Nota ini belum ditutup (Lunas dan Pengerjaan Selesai).")
+        cur = con.execute(
+            "UPDATE receipts SET work_status='pengerjaan' WHERE id=? AND status='done' AND work_status='selesai'",
+            (receipt_id,),
+        )
+        if cur.rowcount == 0:
+            raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
+        _log_receipt_event(con, receipt_id, "reopen", f"Nota ditutup dibuka kembali untuk revisi: {reason}", by)
+        return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
 
 def change_receipt_work_status(

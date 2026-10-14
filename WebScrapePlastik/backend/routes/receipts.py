@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    refund_receipt_overpay,
+    reopen_closed_receipt,
     reverse_receipt_payment,
     get_receipt_preorders,
     PHONE_RE,
@@ -35,6 +37,8 @@ from backend.database import (
 )
 from backend.schemas import (
     ReceiptPaymentReverseRequest,
+    ReceiptRefundRequest,
+    ReceiptReopenRequest,
     VALID_PAYMENT_METHODS,
     ReceiptDetail,
     ReceiptEventOut,
@@ -588,6 +592,41 @@ async def reverse_receipt_payment_route(
     payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
     return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
                          payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+def _detail(updated: dict, items: list, payments: list) -> ReceiptDetail:
+    return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+@router.post("/receipts/{receipt_id}/refund", response_model=ReceiptDetail, dependencies=[Depends(require_admin)])
+async def refund_receipt_route(receipt_id: str, req: ReceiptRefundRequest, user: dict = Depends(get_current_user)):
+    """Kembalikan Kelebihan Bayar (admin). Only ever hands back what the nota is overpaid."""
+    if req.method not in VALID_PAYMENT_METHODS:
+        raise HTTPException(status_code=422, detail=f"Metode harus salah satu dari: {', '.join(sorted(VALID_PAYMENT_METHODS))}.")
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, refund_receipt_overpay, receipt_id, req.amount, req.method, req.reason, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Jumlah", "Alasan")) else 409
+        raise HTTPException(status_code=status, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
+@router.post("/receipts/{receipt_id}/reopen", response_model=ReceiptDetail, dependencies=[Depends(require_admin)])
+async def reopen_receipt_route(receipt_id: str, req: ReceiptReopenRequest, user: dict = Depends(get_current_user)):
+    """Buka Kembali (admin): revise a closed nota; reason and user are kept in its event log."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, reopen_closed_receipt, receipt_id, req.reason, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith("Alasan") else 409
+        raise HTTPException(status_code=status, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
 
 
 @router.get("/receipts/{receipt_id}/preorders")

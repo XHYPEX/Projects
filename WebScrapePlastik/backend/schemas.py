@@ -206,6 +206,16 @@ class ReceiptPaymentOut(BaseModel):
     reversed: bool = False  # true on an original payment that has been cancelled
 
 
+class ReceiptRefundRequest(BaseModel):
+    amount: int
+    method: str = "cash"
+    reason: str
+
+
+class ReceiptReopenRequest(BaseModel):
+    reason: str
+
+
 class ReceiptPaymentReverseRequest(BaseModel):
     reason: str
 

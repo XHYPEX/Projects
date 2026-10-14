@@ -820,6 +820,8 @@
                   class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Cetak Nota</button>
                 <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
                   class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah</button>
+                <button id="cashier-reopen-btn" type="button" onclick="openReopenReceiptModal()"
+                  class="hidden admin-only px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Buka Kembali (Revisi)</button>
                 <button id="cashier-void-btn" type="button" onclick="confirmVoidActiveReceipt()"
                   class="hidden px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-failed/40">Void</button>
                 <button id="cashier-delete-btn" type="button" onclick="confirmDeleteActiveReceipt()"
@@ -1151,6 +1153,8 @@
                 <div class="h-1.5 rounded-full bg-bg2 overflow-hidden"><div id="cashier-summary-progress" class="h-full rounded-full bg-done transition-all" style="width:0%"></div></div>
                 <div id="cashier-summary-progress-pct" class="text-[11px] text-muted mt-1 text-right tabular-nums">0% terbayar</div>
               </div>
+              <button id="cashier-refund-btn" type="button" onclick="openRefundModal()"
+                class="hidden admin-only mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-accent text-accentDark rounded-lg text-sm font-medium hover:bg-accent/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Kembalikan Kelebihan Bayar</button>
               <button id="cashier-summary-settle-btn" type="button" onclick="openCashierSettleModal()"
                 class="hidden mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
@@ -5707,6 +5711,11 @@ function recomputeTotals() {
     balanceLabel.textContent = "Status Bayar";
     balanceDisplay.textContent = "—";
     balanceDisplay.classList.remove("text-done", "text-pending");
+  } else if (amountPaid > total) {
+    balanceLabel.textContent = "Kelebihan Bayar";
+    balanceDisplay.textContent = formatIDR(amountPaid - total);
+    balanceDisplay.classList.remove("text-done");
+    balanceDisplay.classList.add("text-pending");
   } else if (remaining > 0) {
     balanceLabel.textContent = "Sisa Bayar";
     balanceDisplay.textContent = formatIDR(remaining);
@@ -5899,7 +5908,9 @@ function paymentKey(total, paid, status) {
 }
 function paymentBadge(total, paid, status) {
   const key = paymentKey(total, paid, status);
-  return key ? `<span class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${PAYMENT_STATUS_TINTS[key]}">${PAYMENT_STATUS_LABELS[key]}</span>` : "";
+  const over = status !== "void" && Number(total) > 0 ? Number(paid) - Number(total) : 0;
+  return key ? `<span class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${PAYMENT_STATUS_TINTS[key]}">${PAYMENT_STATUS_LABELS[key]}</span>`
+    + (over > 0 ? `<span class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium bg-accent/10 text-accentDark" title="Perlu dikembalikan ke pelanggan">Kelebihan ${formatIDR(over)}</span>` : "") : "";
 }
 const WORK_STATUS_TINTS = {
   draft: "bg-bg2 text-muted", belum: "bg-bg2 text-ink", pengerjaan: "bg-pending/10 text-ink",
@@ -6070,6 +6081,86 @@ async function submitWorkStatus() {
   showToast(`Status: ${WORK_STATUS_LABELS[to]}.`, "success");
 }
 
+// Kelebihan Bayar (a total that fell below what was paid, e.g. an item cancelled after payment):
+// admin hands the difference back as an explicit, audited refund. Nothing is refunded automatically.
+function openRefundModal() {
+  const tab = getActiveTab();
+  if (!tab || !tab.receiptId) return;
+  const over = Math.max((Number(tab.amountPaid) || 0) - (Number(tab.total) || 0), 0);
+  if (over <= 0) { showToast("Nota ini tidak punya kelebihan bayar."); return; }
+  const input = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
+  openModal("Kembalikan Kelebihan Bayar", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Kelebihan bayar <b class="text-ink">${formatIDR(over)}</b>. Pembayaran asli tetap tercatat; refund ditulis sebagai baris terpisah.</p>
+      <div><label for="rf-amount" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jumlah refund</label>
+        <input id="rf-amount" type="text" inputmode="numeric" value="${over}" class="${input} price-input text-right"></div>
+      <div><label for="rf-method" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Dikembalikan lewat</label>
+        <select id="rf-method" class="${input}">${Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+      <div><label for="rf-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan <span class="text-failed">*</span></label>
+        <input id="rf-reason" type="text" maxlength="150" data-no-uppercase placeholder="mis. item dibatalkan atas persetujuan toko" class="${input}"></div>
+      <p id="rf-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" id="rf-submit" onclick="submitRefund()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Catat Refund</button>
+      </div>
+    </div>`);
+}
+
+async function submitRefund() {
+  const tab = getActiveTab();
+  if (!tab || !tab.receiptId) { closeModal(); return; }
+  const err = document.getElementById("rf-error");
+  const amount = priceValue(document.getElementById("rf-amount"));
+  const reason = document.getElementById("rf-reason").value.trim();
+  const fail = msg => { err.textContent = msg; err.classList.remove("hidden"); };
+  if (amount <= 0) return fail("Jumlah refund harus lebih dari 0.");
+  if (reason.length < 3) return fail("Alasan wajib diisi (minimal 3 karakter).");
+  const btn = document.getElementById("rf-submit"); btn.disabled = true;
+  const resp = await fetch(`/api/receipts/${tab.receiptId}/refund`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount, method: document.getElementById("rf-method").value, reason }),
+  });
+  if (!resp.ok) { fail(await responseErrorDetail(resp, "Refund gagal dicatat.")); btn.disabled = false; return; }
+  closeModal();
+  await reloadTabFromServer(tab);
+  showToast(`Refund ${formatIDR(amount)} dicatat.`, "success");
+}
+
+// Buka Kembali (admin): a closed nota (Lunas + Pengerjaan Selesai) is revised only with a reason on record.
+function openReopenReceiptModal() {
+  const tab = getActiveTab();
+  if (!tab || !tab.receiptId) return;
+  openModal("Buka Kembali Nota", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Nota ini sudah Lunas dan Pengerjaan Selesai. Setelah dibuka kembali statusnya menjadi Dalam Pengerjaan dan bisa direvisi. Alasan, pengguna, dan waktu tercatat di riwayat.</p>
+      <div><label for="ro-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan revisi <span class="text-failed">*</span></label>
+        <input id="ro-reason" type="text" maxlength="150" data-no-uppercase placeholder="mis. salah input item" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></div>
+      <p id="ro-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" id="ro-submit" onclick="submitReopenReceipt()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Buka Kembali</button>
+      </div>
+    </div>`);
+}
+
+async function submitReopenReceipt() {
+  const tab = getActiveTab();
+  if (!tab || !tab.receiptId) { closeModal(); return; }
+  const reason = document.getElementById("ro-reason").value.trim();
+  const err = document.getElementById("ro-error");
+  if (reason.length < 3) { err.textContent = "Alasan wajib diisi (minimal 3 karakter)."; err.classList.remove("hidden"); return; }
+  const resp = await fetch(`/api/receipts/${tab.receiptId}/reopen`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }),
+  });
+  if (!resp.ok) { err.textContent = await responseErrorDetail(resp, "Nota gagal dibuka kembali."); err.classList.remove("hidden"); return; }
+  closeModal();
+  await reloadTabFromServer(tab);
+  tab.locked = false;
+  applyCashierVoidLock(tab);
+  renderCashierWorkUi();
+  showToast("Nota dibuka kembali untuk revisi.", "success");
+}
+
 // "Salin ke Nota Baru": the same customer, vehicle and lines as a fresh, unsaved nota.
 function copyActiveReceiptToNewTab() {
   const tab = getActiveTab();
@@ -6126,7 +6217,7 @@ function cashierTlGroups() {
     ["catatan", "Catatan Kasir", tab && tab.workNotes ? 1 : 0],
     ["item", "Riwayat Item", events.filter(e => e.kind === "created" || e.kind === "item_added" || e.kind === "item_changed").length],
     ["bayar", "Riwayat Pembayaran", payments.length],
-    ["status", "Riwayat Status", events.filter(e => e.kind === "status" || e.kind === "void").length],
+    ["status", "Riwayat Status", events.filter(e => ["status", "void", "reopen", "refund", "overpaid"].includes(e.kind)).length],
     ["po", "Terkait PO Customer", preorders.length],
   ];
 }
@@ -6194,8 +6285,8 @@ function renderCashierTimeline() {
       [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : ""), "tabular-nums font-medium")}${td(esc(pay.note || ""))}${td(esc(pay.created_by || "-"))}</tr>`));
   } else if (cashierTlTab === "status") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
-      events.filter(e => e.kind === "status" || e.kind === "void").sort(byTimeDesc)
-        .map(evRow(e => e.kind === "void" ? "Nota di-void" : "Status diubah")));
+      events.filter(e => ["status", "void", "reopen", "refund", "overpaid"].includes(e.kind)).sort(byTimeDesc)
+        .map(evRow(e => ({ void: "Nota di-void", reopen: "Dibuka kembali", refund: "Refund kelebihan bayar", overpaid: "Kelebihan bayar" })[e.kind] || "Status diubah")));
   } else {
     html = table(["No. PO", "Pelanggan", "Item dari PO", "DP Dialokasikan", ""],
       preorders.map(po => `<tr class="border-b border-line last:border-b-0">${td(`<span class="font-mono">${esc(po.po_number || po.id)}</span>`)}${td(esc(po.customer_name || "-"))}${td(String(po.item_count))}${td(esc(formatIDR(po.dp_allocated)), "tabular-nums")}${td(`<a href="#/preorder" onclick="openPreorderFromDashboard('${esc(po.id)}'); return false;" class="text-accentDark hover:underline">Buka</a>`)}</tr>`));
@@ -6308,6 +6399,7 @@ function tabStateFromReceipt(tabId, r) {
     })),
     workStatus: r.work_status || "belum",
     voidReason: r.void_reason || "", voidedBy: r.voided_by || "", voidedAt: r.voided_at || "",
+    total: Number(r.total) || 0,
     receiptNo: r.receipt_no || "",
     workNotes: r.work_notes || "",
     cashierName: r.cashier_name || "",
@@ -7172,6 +7264,9 @@ const PAYMENT_METHOD_LABELS = { cash: "Tunai", transfer: "Transfer", qris: "QRIS
 // the saved balance, so it must not disagree with what is on screen.
 function updateCashierSettleButtons() {
   const tab = getActiveTab();
+  const over = tab && tab.receiptId && tab.status !== "void" ? Math.max((Number(tab.amountPaid) || 0) - (Number(tab.total) || 0), 0) : 0;
+  document.getElementById("cashier-refund-btn")?.classList.toggle("hidden", !(over > 0 && isAdmin()));
+  document.getElementById("cashier-reopen-btn")?.classList.toggle("hidden", !(tab && tab.receiptId && tab.status === "done" && tab.workStatus === "selesai" && isAdmin()));
   const show = !!(tab && tab.receiptId && tab.status === "pending" && tab.workStatus !== "draft");
   const blocked = show && tab.dirty;
   for (const id of ["cashier-settle-btn", "cashier-summary-settle-btn"]) {

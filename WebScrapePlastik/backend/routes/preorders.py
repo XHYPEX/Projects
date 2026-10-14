@@ -14,6 +14,7 @@ from backend.database import (
     preorder_convertible_items,
     preorder_unallocated_dp,
     _conn,
+    _preorder_item_logistics,
     create_preorder,
     get_all_preorders,
     get_preorder,
@@ -100,6 +101,10 @@ def _validate_items(items: list[PreorderItemRequest]) -> list[dict]:
             raise HTTPException(status_code=422, detail="Harga satuan tidak boleh negatif.")
         if item.status is not None:
             _validate_status(item.status)
+        try:
+            _preorder_item_logistics(item.model_dump())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
         payload = item.model_dump()
         payload["product_name"] = item.product_name.strip()
         payload["unit"] = item.unit.strip() if item.unit else None
@@ -119,6 +124,9 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         status=row["status"],
         receipt_id=row.get("receipt_id"),
         supplier_pos=row.get("supplier_pos") or [],
+        ship_route=row.get("ship_route"),
+        priority=row.get("priority") or "normal",
+        eta_date=row.get("eta_date"),
     )
 
 
@@ -276,8 +284,10 @@ async def add_payment(
             status_code=422,
             detail=f"Pembayaran melebihi sisa tagihan (sisa Rp {row['remaining']:,}).".replace(",", "."),
         )
+    if req.method not in ("cash", "transfer", "qris", "debit"):
+        raise HTTPException(status_code=422, detail="Metode pembayaran harus salah satu dari: cash, transfer, qris, debit.")
     note = req.note.strip() if req.note and req.note.strip() else None
-    await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"])
+    await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"], req.method)
     return await _detail(preorder_id)
 
 

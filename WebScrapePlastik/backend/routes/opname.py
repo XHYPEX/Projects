@@ -42,6 +42,33 @@ async def opname_reasons():
     return {"reasons": list(op.REASONS)}
 
 
+@router.get("/stock-opnames/load-items")
+async def opname_load_items(location: str | None = None, limit: int = 500):
+    """Active master items on one shelf/location (substring match), or the whole warehouse when
+    `location` is blank: the starting list of a per-location / full-warehouse count."""
+    limit = max(1, min(limit, 1000))
+
+    def work():
+        where, params = ["m.is_active=1"], []
+        if (location or "").strip():
+            where.append("UPPER(IFNULL(m.location,'')) LIKE ?")
+            params.append(f"%{location.strip().upper()}%")
+        with op._conn() as con:
+            total = con.execute(f"SELECT COUNT(*) AS c FROM master_items m WHERE {' AND '.join(where)}", params).fetchone()["c"]
+            rows = con.execute(
+                f"""SELECT m.id, m.sku, m.name, m.unit, m.location, m.stock_qty, b.name AS brand_name,
+                           c.name AS category_name, pc.name AS category_parent_name
+                    FROM master_items m
+                    LEFT JOIN brands b ON b.id = m.brand_id
+                    LEFT JOIN categories c ON c.id = m.category_id
+                    LEFT JOIN categories pc ON pc.id = c.parent_id
+                    WHERE {' AND '.join(where)} ORDER BY IFNULL(m.location,''), m.name LIMIT ?""",
+                (*params, limit),
+            ).fetchall()
+        return {"total": total, "items": [dict(r) for r in rows]}
+    return await _run(work)
+
+
 @router.get("/stock-opnames/item-activity/{master_item_id}")
 async def opname_item_activity(master_item_id: int):
     def work():

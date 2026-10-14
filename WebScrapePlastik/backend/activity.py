@@ -45,6 +45,7 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/receipts$"), "POST", "Buat nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+/settle$"), "POST", "Tandai nota selesai", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+/payments$"), "POST", "Catat pembayaran nota", "receipt"),
+    (re.compile(r"^/api/receipts/[^/]+/payments/\d+/reverse$"), "POST", "Batalkan pembayaran nota", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+/work-status$"), "POST", "Ubah status pengerjaan nota", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "PATCH", "Ubah nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "DELETE", "Hapus nota penjualan", "receipt"),

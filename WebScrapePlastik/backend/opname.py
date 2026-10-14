@@ -46,13 +46,17 @@ def _activity_counts(con: sqlite3.Connection, master_item_id: int) -> dict:
         """SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items
            WHERE master_item_id=? AND status<>'terpasang' AND receipt_id IS NULL""", (master_item_id,)
     ).fetchone()["c"]
+    po_cust_reserved = con.execute(
+        """SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items
+           WHERE master_item_id=? AND status='sampai_di_toko' AND receipt_id IS NULL""", (master_item_id,)
+    ).fetchone()["c"]
     po_sup_qty = con.execute(
         """SELECT COALESCE(SUM(MAX(spi.quantity - spi.qty_received, 0)),0) AS c FROM supplier_po_items spi
            JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
            WHERE spi.master_item_id=? AND sp.status IN ('dipesan','sebagian_diterima')""", (master_item_id,)
     ).fetchone()["c"]
     return {"kasir_total": kasir, "kasir_terbuka": kasir_open, "po_customer_aktif": po_cust, "po_supplier_aktif": po_sup,
-            "po_customer_qty": po_cust_qty, "po_supplier_qty": po_sup_qty}
+            "po_customer_qty": po_cust_qty, "po_customer_reserved_qty": po_cust_reserved, "po_supplier_qty": po_sup_qty}
 
 
 def _items(con: sqlite3.Connection, opname_id: int) -> list[dict]:

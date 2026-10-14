@@ -11,6 +11,8 @@ from backend.database import (
     add_supplier_po_payment,
     cancel_supplier_po,
     cancel_supplier_po_item,
+    delete_spo_receive_draft,
+    save_spo_receive_draft,
     resolve_spo_cancellation,
     create_supplier_po,
     get_all_supplier_pos,
@@ -22,10 +24,13 @@ from backend.database import (
     receive_supplier_po,
     set_supplier_po_stage,
     set_supplier_po_tracking,
+    update_supplier_po_item_shipping,
     update_supplier_po,
     update_supplier_po_invoice,
 )
 from backend.schemas import (
+    SupplierPoReceiveDraft,
+    SupplierPoItemShippingRequest,
     SupplierPoCancelItemRequest,
     SupplierPoResolveCancelRequest,
     SupplierPoCandidatePage,
@@ -123,7 +128,8 @@ async def supplier_po_summary():
 @router.get("/supplier-pos", response_model=list[SupplierPoOut])
 async def list_supplier_pos(
     query: str | None = None, status: str | None = None, order_status: str | None = None,
-    payment_status: str | None = None,
+    payment_status: str | None = None, shipping_status: str | None = None, receipt_status: str | None = None,
+    supplier_id: int | None = None, date_from: str | None = None, date_to: str | None = None,
 ):
     if status and status not in SUPPLIER_PO_STATUSES:
         raise HTTPException(status_code=422, detail=f"Status '{status}' tidak dikenal. Pilihan: {', '.join(SUPPLIER_PO_STATUSES)}.")
@@ -131,7 +137,10 @@ async def list_supplier_pos(
         raise HTTPException(status_code=422, detail=f"order_status harus salah satu dari: {', '.join(SPO_ORDER_STATUSES)}.")
     if payment_status and payment_status not in SPO_PAYMENT_STATUSES:
         raise HTTPException(status_code=422, detail=f"payment_status harus salah satu dari: {', '.join(SPO_PAYMENT_STATUSES)}.")
-    return await _run(get_all_supplier_pos, query or None, status or None, order_status or None, payment_status or None)
+    return await _run(
+        get_all_supplier_pos, query or None, status or None, order_status or None, payment_status or None,
+        shipping_status or None, receipt_status or None, supplier_id, date_from or None, date_to or None,
+    )
 
 
 @router.post("/supplier-pos", response_model=SupplierPoDetail, status_code=201)
@@ -205,14 +214,43 @@ async def receive_supplier_po_route(
         receive_supplier_po, supplier_po_id, [line.model_dump() for line in req.items], user["username"],
         received_date=_text(req.received_date), surat_jalan_no=_text(req.surat_jalan_no),
         warehouse_location=_text(req.warehouse_location), note=_text(req.note), create_inbound=req.create_inbound,
+        officer=_text(req.officer),
     )
+
+
+@router.put("/supplier-pos/{supplier_po_id}/receive-draft", response_model=SupplierPoDetail)
+async def save_receive_draft_route(
+    supplier_po_id: str, req: SupplierPoReceiveDraft, user: dict = Depends(get_current_user)
+):
+    if len(req.lines) > 500:
+        raise HTTPException(status_code=422, detail="Terlalu banyak baris.")
+    return await _run(save_spo_receive_draft, supplier_po_id, req.model_dump(), user["username"])
+
+
+@router.delete("/supplier-pos/{supplier_po_id}/receive-draft", response_model=SupplierPoDetail)
+async def delete_receive_draft_route(supplier_po_id: str, user: dict = Depends(get_current_user)):
+    return await _run(delete_spo_receive_draft, supplier_po_id)
 
 
 @router.post("/supplier-pos/{supplier_po_id}/payments", response_model=SupplierPoDetail, status_code=201)
 async def add_payment_route(
     supplier_po_id: str, req: SupplierPoPaymentRequest, user: dict = Depends(get_current_user)
 ):
-    return await _run(add_supplier_po_payment, supplier_po_id, req.amount, req.method, _text(req.note), user["username"])
+    return await _run(
+        add_supplier_po_payment, supplier_po_id, req.amount, req.method, _text(req.note), user["username"],
+        _text(req.paid_date), _text(req.reference_no), _text(req.bank_account),
+    )
+
+
+@router.put("/supplier-pos/{supplier_po_id}/items/{item_id}/shipping", response_model=SupplierPoDetail)
+async def item_shipping_route(
+    supplier_po_id: str, item_id: int, req: SupplierPoItemShippingRequest, user: dict = Depends(get_current_user)
+):
+    """Update Status Item Pengiriman: shipping method, status, forwarder, resi and dates of one PO line."""
+    data = req.model_dump()
+    for key in ("forwarder", "tracking_no", "shipped_date", "eta_date", "transit_location", "note", "ship_method"):
+        data[key] = _text(data[key])
+    return await _run(update_supplier_po_item_shipping, supplier_po_id, item_id, data, user["username"])
 
 
 @router.post("/supplier-pos/{supplier_po_id}/items/{item_id}/cancel", response_model=SupplierPoDetail)

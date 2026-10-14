@@ -199,6 +199,12 @@ class ReceiptPaymentOut(BaseModel):
     transfer_account: str | None = None
     note: str | None = None
     created_by: str | None = None
+    reversed_of: int | None = None  # set on the negative row that cancels payment #reversed_of
+    reversed: bool = False  # true on an original payment that has been cancelled
+
+
+class ReceiptPaymentReverseRequest(BaseModel):
+    reason: str
 
 
 class ReceiptPaymentRequest(BaseModel):
@@ -412,6 +418,7 @@ class MasterItemOut(BaseModel):
     archived_reason: str | None = None
     archived_note: str | None = None
     archived_at: str | None = None
+    archive_mode: str | None = None
     updated_at: str | None = None
     category_id: int | None = None
     category_name: str | None = None
@@ -458,6 +465,7 @@ class MasterItemUpdateRequest(BaseModel):
 class MasterItemArchiveRequest(BaseModel):
     reason: str
     note: str | None = None
+    mode: str = "nonaktif"  # nonaktif | arsip
 
 
 class MasterItemListOut(BaseModel):
@@ -490,6 +498,9 @@ class InboundItemRequest(BaseModel):
     pending_sell_price: int | None = None
     qty_in: int
     cost_price: int
+    spo_item_id: int | None = None  # the PO Supplier line this quantity counts against
+    condition: str | None = None  # baik | rusak | tidak_sesuai
+    location: str | None = None
 
 
 class InboundItemOut(BaseModel):
@@ -511,6 +522,9 @@ class InboundItemOut(BaseModel):
     resolved_unit: str | None = None
     resolved_sell_price: int | None = None
     pending_brand_name: str | None = None
+    spo_item_id: int | None = None
+    condition: str | None = None
+    location: str | None = None
 
 
 class InboundDocumentCreateRequest(BaseModel):
@@ -519,6 +533,11 @@ class InboundDocumentCreateRequest(BaseModel):
     supplier_invoice_no: str | None = None
     notes: str | None = None
     items: list[InboundItemRequest]
+    supplier_po_id: str | None = None  # set when the goods come against a PO Supplier
+    surat_jalan_no: str | None = None
+    officer: str | None = None
+    source: str | None = None  # po_supplier | manual
+    manual_reason: str | None = None  # required for source=manual
 
 
 class InboundDocumentOut(BaseModel):
@@ -532,10 +551,29 @@ class InboundDocumentOut(BaseModel):
     status: str
     total_value: int
     created_at: str
+    supplier_po_id: str | None = None
+    supplier_po_number: str | None = None
+    surat_jalan_no: str | None = None
+    officer: str | None = None
+    source: str | None = None
+    manual_reason: str | None = None
+    created_by: str | None = None
+    reviewed_by: str | None = None
+    reviewed_at: str | None = None
+    posted_by: str | None = None
+    posted_at: str | None = None
+    item_count: int = 0
+    qty_total: int = 0
 
 
 class InboundDocumentDetail(InboundDocumentOut):
     items: list[InboundItemOut]
+    events: list[dict] = []
+    po: dict | None = None
+    fulfilment: list[dict] = []
+    customers: list[dict] = []
+    mutations: list[dict] = []
+    invoice: dict | None = None
 
 
 class VoidRequest(BaseModel):
@@ -656,6 +694,9 @@ class StockLedgerOut(BaseModel):
     # activity timeline's name and link.
     actor: str | None = None
     ref_receipt_id: str | None = None
+    # The PO Supplier behind an inbound document that came from a Penerimaan Barang.
+    supplier_po_number: str | None = None
+    supplier_po_id: str | None = None
 
 
 class PendingInvoiceOut(BaseModel):
@@ -774,6 +815,9 @@ class PreorderItemRequest(BaseModel):
     quantity: int
     unit_price: int
     status: str | None = None
+    ship_route: str | None = None  # udara|laut|darat|ambil_sendiri|lainnya
+    priority: str = "normal"  # normal|urgent
+    eta_date: str | None = None
 
 
 class PreorderRequest(BaseModel):
@@ -818,6 +862,7 @@ class PreorderStatusRequest(BaseModel):
 class PreorderPaymentRequest(BaseModel):
     amount: int
     note: str | None = None
+    method: str = "cash"  # cash | transfer | qris | debit
 
 
 class PreorderPaymentOut(BaseModel):
@@ -826,6 +871,7 @@ class PreorderPaymentOut(BaseModel):
     amount: int
     note: str | None = None
     created_by: str | None = None
+    method: str = "cash"
 
 
 class PreorderAllocationOut(BaseModel):
@@ -875,6 +921,9 @@ class PreorderItemOut(BaseModel):
     status: str
     # Set once the line is on a nota (PO Customer -> nota).
     receipt_id: str | None = None
+    ship_route: str | None = None
+    priority: str = "normal"
+    eta_date: str | None = None
 
 
 class PreorderHistoryOut(BaseModel):
@@ -935,6 +984,11 @@ class SupplierPoItemRequest(BaseModel):
     quantity: int
     est_unit_price: int = 0
     discount_pct: float = 0  # this line's discount, in percent
+    # Chosen while picking from the customer PO: how and through whom this line travels.
+    ship_method: str | None = None  # udara | laut | darat | ambil_sendiri | lainnya
+    courier: str | None = None  # ekspedisi / forwarder
+    eta_date: str | None = None
+    item_note: str | None = None
 
 
 class SupplierPoInvoiceFields(BaseModel):
@@ -973,6 +1027,8 @@ class SupplierPoUpdateRequest(SupplierPoInvoiceFields):
 class SupplierPoReceiveLine(BaseModel):
     item_id: int
     quantity: int
+    condition: str | None = None  # baik | rusak | tidak_sesuai
+    location: str | None = None   # lokasi simpan
 
 
 class SupplierPoReceiveRequest(BaseModel):
@@ -981,6 +1037,7 @@ class SupplierPoReceiveRequest(BaseModel):
     surat_jalan_no: str | None = None
     warehouse_location: str | None = None
     note: str | None = None
+    officer: str | None = None
     # Also open a draft Barang Masuk for the lines linked to a master item.
     create_inbound: bool = False
 
@@ -1005,6 +1062,21 @@ class SupplierPoPaymentRequest(BaseModel):
     amount: int
     method: str = "transfer"
     note: str | None = None
+    paid_date: str | None = None
+    reference_no: str | None = None
+    bank_account: str | None = None
+
+
+class SupplierPoItemShippingRequest(BaseModel):
+    item_status: str  # menunggu_konfirmasi | dikonfirmasi | diproses | dalam_pengiriman | tiba_di_hub
+    ship_method: str | None = None  # udara | laut | darat | ambil_sendiri | lainnya
+    forwarder: str | None = None
+    tracking_no: str | None = None
+    shipped_date: str | None = None
+    eta_date: str | None = None
+    transit_location: str | None = None
+    note: str | None = None
+    notify_customer: bool = False
 
 
 class SupplierPoCancelItemRequest(BaseModel):
@@ -1029,6 +1101,10 @@ class SupplierPoItemOut(BaseModel):
     tracking_no: str | None = None
     courier: str | None = None
     eta_date: str | None = None
+    ship_method: str | None = None
+    item_status: str | None = None
+    shipped_date: str | None = None
+    transit_location: str | None = None
     # Which customer order the line serves; null for a barang added by hand.
     customer_po_number: str | None = None
     customer_name: str | None = None
@@ -1050,12 +1126,32 @@ class SupplierPoPaymentOut(BaseModel):
     method: str
     note: str | None = None
     created_by: str | None = None
+    reference_no: str | None = None
+    bank_account: str | None = None
 
 
 class SupplierPoReceiptLineOut(BaseModel):
     item_id: int
     product_name: str
     quantity: int
+    condition: str = "baik"
+    location: str | None = None
+
+
+class SupplierPoShipmentOut(BaseModel):
+    id: int
+    item_id: int
+    at: str
+    by_user: str | None = None
+    status: str
+    ship_method: str | None = None
+    forwarder: str | None = None
+    tracking_no: str | None = None
+    shipped_date: str | None = None
+    eta_date: str | None = None
+    transit_location: str | None = None
+    note: str | None = None
+    notify_customer: int = 0
 
 
 class SupplierPoReceiptOut(BaseModel):
@@ -1067,6 +1163,8 @@ class SupplierPoReceiptOut(BaseModel):
     inbound_document_id: int | None = None
     created_by: str | None = None
     created_at: str
+    gr_number: str | None = None
+    officer: str | None = None
     lines: list[SupplierPoReceiptLineOut]
 
 
@@ -1104,7 +1202,10 @@ class SupplierPoOut(BaseModel):
     # diterima_lengkap or dibatalkan; and the payment state (null for a draft/cancelled PO).
     order_status: str
     payment_status: str | None = None
+    shipping_status: str | None = None  # belum_dikirim | diproses | dalam_pengiriman | tiba (null for draft/cancelled)
+    receipt_status: str | None = None  # belum | sebagian | lengkap
     supplier_invoice_no: str | None = None
+    internal_invoice_no: str | None = None
     payment_terms_days: int | None = None
     due_date: str | None = None
     est_arrival_date: str | None = None
@@ -1124,6 +1225,15 @@ class SupplierPoOut(BaseModel):
     tax_amount: int
     grand_total: int
     outstanding: int
+    # List columns: the customer POs this order serves and the names of its goods.
+    customer_refs: list[dict] = []
+    item_names: list[str] = []
+
+
+class SupplierPoReceiveDraft(BaseModel):
+    """Whatever the receiving form holds; opaque to the server beyond a size cap."""
+    form: dict
+    lines: list[dict] = []
 
 
 class SupplierPoDetail(SupplierPoOut):
@@ -1132,6 +1242,8 @@ class SupplierPoDetail(SupplierPoOut):
     payments: list[SupplierPoPaymentOut] = []
     receipts: list[SupplierPoReceiptOut] = []
     cancellations: list[SupplierPoCancellationOut] = []
+    shipments: list[SupplierPoShipmentOut] = []
+    receive_draft: dict | None = None
 
 
 class SupplierPoSummary(BaseModel):
@@ -1156,6 +1268,9 @@ class SupplierPoCandidateOut(BaseModel):
     qty_ordered_by_customer: int
     qty_bought: int
     qty_left: int
+    ship_route: str | None = None
+    priority: str = "normal"
+    eta_date: str | None = None
     # From the linked Master Barang; null for a free-text line.
     supplier_id: int | None = None
     supplier_name: str | None = None

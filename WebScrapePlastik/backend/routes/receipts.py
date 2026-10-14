@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    reverse_receipt_payment,
     get_receipt_preorders,
     PHONE_RE,
     RECEIPT_PAYMENT_CLAUSES,
@@ -33,6 +34,7 @@ from backend.database import (
     update_receipt,
 )
 from backend.schemas import (
+    ReceiptPaymentReverseRequest,
     VALID_PAYMENT_METHODS,
     ReceiptDetail,
     ReceiptEventOut,
@@ -563,6 +565,24 @@ async def list_receipt_events(receipt_id: str):
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
     return [ReceiptEventOut(**e) for e in await loop.run_in_executor(None, get_receipt_events, receipt_id)]
+
+
+@router.post("/receipts/{receipt_id}/payments/{payment_id}/reverse", response_model=ReceiptDetail, dependencies=[Depends(require_admin)])
+async def reverse_receipt_payment_route(
+    receipt_id: str, payment_id: int, req: ReceiptPaymentReverseRequest, user: dict = Depends(get_current_user)
+):
+    """Batalkan Pembayaran (admin): writes a negative row, never deletes the original."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, reverse_receipt_payment, receipt_id, payment_id, req.reason, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith("Alasan") else 409
+        raise HTTPException(status_code=status, detail=msg)
+    items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
 
 
 @router.get("/receipts/{receipt_id}/preorders")

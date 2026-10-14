@@ -32,6 +32,9 @@ from backend.database import (
     get_all_units,
     get_brand,
     get_inbound_document,
+    get_inbound_extras,
+    get_supplier_po,
+    review_inbound_document,
     get_inbound_document_items,
     get_inventory_overview,
     get_master_item,
@@ -128,6 +131,40 @@ def _validate_received_date(received_date: str) -> None:
         raise HTTPException(status_code=422, detail="Tanggal terima tidak boleh di masa depan.")
     if (today - rd).days > 30:
         raise HTTPException(status_code=422, detail="Tanggal terima tidak boleh lebih dari 30 hari yang lalu.")
+
+
+def _validate_inbound_po(req) -> None:
+    """A document against a PO Supplier: same supplier, PO issued, every PO line belongs to it and fits its remainder."""
+    if req.source is not None and req.source not in ("po_supplier", "manual"):
+        raise HTTPException(status_code=422, detail="Sumber harus po_supplier atau manual.")
+    if req.source == "manual" and not (req.manual_reason or "").strip():
+        raise HTTPException(status_code=422, detail="Alasan penerimaan manual wajib diisi.")
+    for it in req.items:
+        if it.condition is not None and it.condition not in ("baik", "rusak", "tidak_sesuai"):
+            raise HTTPException(status_code=422, detail="Kondisi barang harus baik, rusak, atau tidak_sesuai.")
+    if not req.supplier_po_id:
+        if any(i.spo_item_id for i in req.items):
+            raise HTTPException(status_code=422, detail="Baris PO Supplier butuh PO Supplier terpilih.")
+        return
+    po = get_supplier_po(req.supplier_po_id)
+    if po is None:
+        raise HTTPException(status_code=422, detail="PO Supplier tidak ditemukan.")
+    if po["supplier_id"] != req.supplier_id:
+        raise HTTPException(status_code=422, detail="Supplier dokumen berbeda dari supplier PO.")
+    if po["status"] not in ("dipesan", "sebagian_diterima"):
+        raise HTTPException(status_code=422, detail="PO Supplier belum diterbitkan atau sudah selesai/dibatalkan.")
+    lines = {i["id"]: i for i in po["items"]}
+    for it in req.items:
+        if it.spo_item_id is None:
+            continue
+        line = lines.get(it.spo_item_id)
+        if line is None:
+            raise HTTPException(status_code=422, detail="Baris PO Supplier bukan bagian dari PO ini.")
+        if line["master_item_id"] != it.master_item_id:
+            raise HTTPException(status_code=422, detail="Barang tidak sesuai dengan baris PO Supplier.")
+        left = line["quantity"] - line["qty_cancelled"] - line["qty_received"]
+        if it.qty_in > left:
+            raise HTTPException(status_code=422, detail=f"Jumlah untuk {line['product_name']} melebihi sisa pesanan PO ({left}).")
 
 
 def _validate_inbound_items(items: list) -> None:
@@ -231,6 +268,7 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         archived_reason=row.get("archived_reason"),
         archived_note=row.get("archived_note"),
         archived_at=row.get("archived_at"),
+        archive_mode=row.get("archive_mode"),
         updated_at=row.get("updated_at"),
         category_id=row.get("category_id"),
         category_name=row.get("category_name"),
@@ -264,6 +302,9 @@ def _row_to_inbound_item(row: dict) -> InboundItemOut:
         pending_sell_price=row["pending_sell_price"],
         qty_in=row["qty_in"],
         cost_price=row["cost_price"],
+        spo_item_id=row.get("spo_item_id"),
+        condition=row.get("condition"),
+        location=row.get("location"),
         qty_remaining=row["qty_remaining"],
         received_date=row["received_date"],
         resolved_sku=row.get("resolved_sku"),
@@ -288,12 +329,17 @@ def _row_to_document(row: dict) -> InboundDocumentOut:
         status=row["status"],
         total_value=row["total_value"],
         created_at=row["created_at"],
+        **{k: row.get(k) for k in ("supplier_po_id", "supplier_po_number", "surat_jalan_no", "officer", "source",
+                                   "manual_reason", "created_by", "reviewed_by", "reviewed_at", "posted_by", "posted_at")},
+        item_count=row.get("item_count") or 0,
+        qty_total=row.get("qty_total") or 0,
     )
 
 
 def _row_to_document_detail(row: dict, items: list[dict]) -> InboundDocumentDetail:
     base = _row_to_document(row)
-    return InboundDocumentDetail(**base.model_dump(), items=[_row_to_inbound_item(i) for i in items])
+    return InboundDocumentDetail(**base.model_dump(), items=[_row_to_inbound_item(i) for i in items],
+                                 **get_inbound_extras(row["id"]))
 
 
 def _row_to_ledger(row: dict) -> StockLedgerOut:
@@ -311,6 +357,8 @@ def _row_to_ledger(row: dict) -> StockLedgerOut:
         ref_doc_number=row.get("ref_doc_number"),
         actor=row.get("actor"),
         ref_receipt_id=row.get("ref_receipt_id"),
+        supplier_po_number=row.get("supplier_po_number"),
+        supplier_po_id=row.get("supplier_po_id"),
     )
 
 
@@ -648,6 +696,7 @@ async def list_master_items_route(
     no_price: bool = False,
     sort: str = "newest",
     category_id: int | None = None,
+    archived: bool = False,
 ):
     if stock_status is not None and stock_status not in MASTER_STOCK_CLAUSES:
         raise HTTPException(status_code=422, detail=f"stock_status harus salah satu dari: {', '.join(MASTER_STOCK_CLAUSES)}.")
@@ -665,6 +714,7 @@ async def list_master_items_route(
             page, page_size, search, supplier_id, brand_id, is_active,
             stock_status=stock_status, stock_min=stock_min, stock_max=stock_max, no_price=no_price, sort=sort,
             category_ids=(category_subtree_ids(category_id) if category_id is not None else None),
+            archived=archived,
         ),
     )
     return MasterItemListOut(
@@ -748,10 +798,12 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
 async def archive_master_item(master_item_id: int, req: MasterItemArchiveRequest, user: dict = Depends(get_current_user)):
     if not req.reason.strip():
         raise HTTPException(status_code=422, detail="Alasan pengarsipan wajib dipilih.")
+    if req.mode not in ("nonaktif", "arsip"):
+        raise HTTPException(status_code=422, detail="Tindakan pengarsipan harus 'nonaktif' atau 'arsip'.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
         raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
-    await loop.run_in_executor(None, set_master_item_archived, master_item_id, True, req.reason, req.note, user["username"])
+    await loop.run_in_executor(None, set_master_item_archived, master_item_id, True, req.reason, req.note, user["username"], req.mode)
     return _row_to_master_item(await loop.run_in_executor(None, get_master_item, master_item_id))
 
 
@@ -927,16 +979,21 @@ async def delete_master_item_image(master_item_id: int):
 
 
 @router.post("/inventory/inbound-documents", response_model=InboundDocumentDetail, status_code=201)
-async def create_new_inbound_document(req: InboundDocumentCreateRequest):
+async def create_new_inbound_document(req: InboundDocumentCreateRequest, user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
         raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
     _validate_received_date(req.received_date)
     _validate_inbound_items(req.items)
+    await loop.run_in_executor(None, _validate_inbound_po, req)
 
     items = [i.model_dump() for i in req.items]
+    meta = req.model_dump(include={"supplier_po_id", "surat_jalan_no", "officer", "source", "manual_reason"})
+    if not meta.get("source"):
+        meta["source"] = "po_supplier" if req.supplier_po_id else "manual"
     row = await loop.run_in_executor(
-        None, create_inbound_document, req.supplier_id, req.received_date, req.supplier_invoice_no, req.notes, items
+        None, create_inbound_document, req.supplier_id, req.received_date, req.supplier_invoice_no, req.notes, items,
+        meta, user["username"],
     )
     document_items = await loop.run_in_executor(None, get_inbound_document_items, row["id"])
     row = await loop.run_in_executor(None, get_inbound_document, row["id"])
@@ -944,11 +1001,14 @@ async def create_new_inbound_document(req: InboundDocumentCreateRequest):
 
 
 @router.get("/inventory/inbound-documents", response_model=list[InboundDocumentOut])
-async def list_inbound_documents_route(status: str | None = None, supplier_id: int | None = None):
+async def list_inbound_documents_route(
+    status: str | None = None, supplier_id: int | None = None, q: str | None = None,
+    date_from: str | None = None, date_to: str | None = None, supplier_po_id: str | None = None,
+):
     if status is not None and status not in ("draft", "posted", "void"):
         raise HTTPException(status_code=422, detail="Status harus salah satu dari: draft, posted, void.")
     loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, list_inbound_documents, status, supplier_id)
+    rows = await loop.run_in_executor(None, list_inbound_documents, status, supplier_id, q or None, date_from or None, date_to or None, supplier_po_id or None)
     return [_row_to_document(r) for r in rows]
 
 
@@ -963,7 +1023,7 @@ async def get_inbound_document_detail(document_id: int):
 
 
 @router.put("/inventory/inbound-documents/{document_id}", response_model=InboundDocumentDetail)
-async def put_inbound_document(document_id: int, req: InboundDocumentCreateRequest):
+async def put_inbound_document(document_id: int, req: InboundDocumentCreateRequest, user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
         raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
@@ -971,12 +1031,16 @@ async def put_inbound_document(document_id: int, req: InboundDocumentCreateReque
         raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
     _validate_received_date(req.received_date)
     _validate_inbound_items(req.items)
+    await loop.run_in_executor(None, _validate_inbound_po, req)
 
     items = [i.model_dump() for i in req.items]
+    meta = req.model_dump(include={"supplier_po_id", "surat_jalan_no", "officer", "source", "manual_reason"})
+    if not meta.get("source"):
+        meta["source"] = "po_supplier" if req.supplier_po_id else "manual"
     try:
         await loop.run_in_executor(
             None, update_inbound_document, document_id, req.supplier_id, req.received_date,
-            req.supplier_invoice_no, req.notes, items,
+            req.supplier_invoice_no, req.notes, items, meta, user["username"],
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -986,13 +1050,27 @@ async def put_inbound_document(document_id: int, req: InboundDocumentCreateReque
     return _row_to_document_detail(row, document_items)
 
 
-@router.post("/inventory/inbound-documents/{document_id}/post", response_model=InboundDocumentDetail)
-async def post_document(document_id: int):
+@router.post("/inventory/inbound-documents/{document_id}/review", response_model=InboundDocumentDetail)
+async def review_document(document_id: int, user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
         raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     try:
-        await loop.run_in_executor(None, post_inbound_document, document_id)
+        await loop.run_in_executor(None, review_inbound_document, document_id, user["username"])
+    except ValueError as e:
+        _raise_from_value_error(e)
+    row = await loop.run_in_executor(None, get_inbound_document, document_id)
+    items = await loop.run_in_executor(None, get_inbound_document_items, document_id)
+    return _row_to_document_detail(row, items)
+
+
+@router.post("/inventory/inbound-documents/{document_id}/post", response_model=InboundDocumentDetail)
+async def post_document(document_id: int, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
+        raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
+    try:
+        await loop.run_in_executor(None, post_inbound_document, document_id, user["username"])
     except ValueError as e:
         _raise_from_value_error(e)
 
@@ -1002,14 +1080,14 @@ async def post_document(document_id: int):
 
 
 @router.post("/inventory/inbound-documents/{document_id}/void", response_model=InboundDocumentDetail, dependencies=[Depends(require_admin)])
-async def void_document(document_id: int, req: VoidRequest):
+async def void_document(document_id: int, req: VoidRequest, user: dict = Depends(get_current_user)):
     if not req.reason.strip():
         raise HTTPException(status_code=422, detail="Alasan wajib diisi.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
         raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     try:
-        await loop.run_in_executor(None, void_inbound_document, document_id, req.reason.strip())
+        await loop.run_in_executor(None, void_inbound_document, document_id, req.reason.strip(), user["username"])
     except ValueError as e:
         _raise_from_value_error(e)
 

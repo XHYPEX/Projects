@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    get_receipt_preorders,
     PHONE_RE,
     RECEIPT_PAYMENT_CLAUSES,
     RECEIPT_SORTS,
@@ -562,6 +563,15 @@ async def list_receipt_events(receipt_id: str):
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
     return [ReceiptEventOut(**e) for e in await loop.run_in_executor(None, get_receipt_events, receipt_id)]
+
+
+@router.get("/receipts/{receipt_id}/preorders")
+async def list_receipt_preorders(receipt_id: str):
+    """Terkait PO Customer: pesanan yang menjadi sumber barang atau DP nota ini."""
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
+        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+    return await loop.run_in_executor(None, get_receipt_preorders, receipt_id)
 
 
 @router.delete("/receipts/{receipt_id}", status_code=204, response_class=Response, dependencies=[Depends(require_admin)])

@@ -5873,3 +5873,21 @@ def import_categories(rows: list[dict], by: str | None) -> dict:
             else:
                 errors.append({"line": i, "message": str(e)})
     return {"created": created, "skipped": skipped, "errors": errors}
+
+
+def get_receipt_preorders(receipt_id: str) -> list[dict]:
+    """PO Customer yang terkait ke sebuah nota: lewat alokasi DP atau barisnya yang sudah dijadikan nota."""
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT p.id, p.po_number, p.customer_name,
+                      COALESCE((SELECT SUM(a.amount) FROM preorder_payment_allocations a
+                                WHERE a.preorder_id = p.id AND a.receipt_id = ?), 0) AS dp_allocated,
+                      (SELECT COUNT(*) FROM preorder_items pi
+                        WHERE pi.preorder_id = p.id AND pi.receipt_id = ?) AS item_count
+               FROM preorders p
+               WHERE p.id IN (SELECT preorder_id FROM preorder_payment_allocations WHERE receipt_id = ?)
+                  OR p.id IN (SELECT preorder_id FROM preorder_items WHERE receipt_id = ?)
+               ORDER BY p.created_at ASC""",
+            (receipt_id, receipt_id, receipt_id, receipt_id),
+        ).fetchall()
+        return [dict(r) for r in rows]

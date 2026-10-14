@@ -1989,7 +1989,7 @@
 
   <!-- PAGE: PEMBELIAN SUPPLIER (PO Supplier — pesanan ke supplier, dibuat dari barang PO Customer; tidak menyentuh stok) -->
   <div id="page-supplier-po" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+    <div class="w-full">
 
       <!-- LIST PANEL -->
       <div id="spo-list-panel">
@@ -2117,8 +2117,9 @@
           </div>
         </div>
 
-        <div class="bg-white border border-line rounded-xl overflow-x-auto mb-4">
-          <table class="w-full min-w-[1040px] text-sm">
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-4 items-start mb-4">
+        <div class="bg-white border border-line rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
             <thead class="bg-bg2">
               <tr>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line w-10">No</th>
@@ -2135,13 +2136,13 @@
             </thead>
             <tbody id="spo-form-tbody"></tbody>
           </table>
-          <div id="spo-form-empty" class="text-center py-10">
+          <div id="spo-form-empty" class="text-center py-16">
             <p class="font-serif text-base text-ink mb-1">Belum ada barang.</p>
             <p class="text-sm text-muted">Ambil dari PO customer, atau tambah barang manual.</p>
           </div>
         </div>
 
-        <div class="sm:ml-auto sm:max-w-sm bg-white border border-line rounded-xl p-4 text-sm space-y-2.5 mb-4">
+        <div class="bg-white border border-line rounded-xl p-4 text-sm space-y-2.5 xl:sticky xl:top-2">
           <div class="flex items-center justify-between"><span class="text-muted">Subtotal <span id="spo-form-count" class="text-xs">(0 barang)</span></span><span id="spo-f-subtotal" class="text-ink tabular-nums">Rp 0</span></div>
           <div class="flex items-center justify-between gap-3">
             <label for="spo-f-disc" class="text-muted">Diskon (%)</label>
@@ -2181,6 +2182,7 @@
           <div class="flex items-center justify-between text-xs"><span class="text-muted">Sisa Pembayaran</span><span id="spo-f-outstanding" class="text-ink tabular-nums">Rp 0</span></div>
         </div>
 
+        </div>
         <div class="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
           <button id="spo-draft-btn" onclick="saveSupplierPo(false)"
             class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Draft</button>
@@ -2199,14 +2201,18 @@
           <div id="spo-detail-actions" class="flex flex-wrap items-center gap-2"></div>
         </div>
 
-        <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="flex flex-wrap items-start justify-between gap-4">
-            <table class="text-sm"><tbody id="spo-detail-info"></tbody></table>
-            <div class="flex flex-col items-end gap-2 text-sm text-muted">
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-4 mb-4">
+          <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
+            <div id="spo-detail-info" class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3"></div>
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted border-t border-line mt-4 pt-3">
               <div class="flex items-center gap-2">Status Order: <span id="spo-detail-status"></span></div>
               <div class="flex items-center gap-2">Pembayaran: <span id="spo-detail-pay"></span></div>
             </div>
           </div>
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900/80 leading-relaxed">
+              <div class="font-semibold text-amber-700 text-sm mb-1">Status PO Supplier vs Status Item</div>
+              Status PO Supplier adalah status keseluruhan pesanan ke supplier, sedangkan Status Item adalah status pengiriman masing-masing item. Dalam satu PO Supplier, beberapa item dapat memiliki status yang berbeda, misalnya satu lewat udara dan satu lewat laut.
+            </div>
         </div>
 
         <div id="spo-tabs" class="flex flex-wrap gap-1 border-b border-line mb-4" role="tablist"></div>
@@ -2216,12 +2222,8 @@
             <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Tracking Pengiriman</div>
             <ol id="spo-stepper" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3"></ol>
           </div>
-          <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 mb-4">
+          <div class="mb-4">
             <div id="spo-sum-money" class="bg-white border border-line rounded-xl p-4 text-sm space-y-2"></div>
-            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900/80 leading-relaxed">
-              <div class="font-semibold text-amber-700 text-sm mb-1">Status PO Supplier vs Status Item</div>
-              Status PO Supplier adalah status keseluruhan pesanan ke supplier, sedangkan Status Item adalah status pengiriman masing-masing item. Dalam satu PO Supplier, beberapa item dapat memiliki status yang berbeda, misalnya satu lewat udara dan satu lewat laut.
-            </div>
           </div>
         </div>
 
@@ -2247,6 +2249,7 @@
               <tbody id="spo-detail-items"></tbody>
             </table>
           </div>
+          <div id="spo-items-summary" class="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 mb-4"></div>
           <div id="spo-cancel-card" class="hidden bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
             <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Pembatalan Item</div>
             <div id="spo-detail-cancels" class="space-y-2 text-sm"></div>
@@ -2300,7 +2303,7 @@
       <div id="spo-picker" class="hidden fixed inset-0 z-50">
         <div class="absolute inset-0 bg-ink/40" onclick="closeSpoPicker()"></div>
         <div class="absolute inset-0 flex items-center justify-center p-3 sm:p-6 pointer-events-none">
-          <div class="pointer-events-auto bg-bg border border-line rounded-xl w-full max-w-5xl max-h-full flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="spo-picker-title">
+          <div class="pointer-events-auto bg-bg border border-line rounded-xl w-[min(96vw,100%)] max-h-full flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="spo-picker-title">
             <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-line">
               <div>
                 <h3 id="spo-picker-title" class="font-serif text-xl font-semibold text-ink">Ambil Barang dari PO Customer</h3>
@@ -2940,7 +2943,7 @@
           </div>
         </div>
 
-        <div id="inbound-form-panel" class="hidden max-w-6xl">
+        <div id="inbound-form-panel" class="hidden w-full">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div><h2 id="inbound-form-title" class="font-serif text-lg font-semibold text-ink">Buat Dokumen Barang Masuk</h2>
               <p id="inbound-form-sub" class="text-xs text-muted"></p></div>
@@ -2957,7 +2960,7 @@
           <div id="inbound-readonly-banner" class="hidden mb-3 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted"></div>
           <div id="inbound-po-hint" class="hidden mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900"></div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 mb-4">
+          <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-4 mb-4">
             <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
               <div class="font-serif font-semibold text-ink mb-3">Informasi Penerimaan</div>
               <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -3034,8 +3037,8 @@
           </div>
         </div>
 
-        <div id="inbound-review-panel" class="hidden max-w-6xl"></div>
-        <div id="inbound-detail-panel" class="hidden max-w-6xl"></div>
+        <div id="inbound-review-panel" class="hidden w-full"></div>
+        <div id="inbound-detail-panel" class="hidden w-full"></div>
 
       </section>
 
@@ -16129,6 +16132,7 @@ const SPO_PAY_STATUSES = [
 ];
 const SPO_ORDER_LABELS = Object.fromEntries(SPO_ORDER_STATUSES.map(s => [s.key, s.label]));
 const SPO_PAY_LABELS = Object.fromEntries(SPO_PAY_STATUSES.map(s => [s.key, s.label]));
+const SPO_HEADER_LABELS = { menunggu_konfirmasi: "Dikirim ke Supplier", dikonfirmasi: "Dikonfirmasi Supplier", diproses: "Diproses Supplier", dalam_pengiriman: "Dalam Pengiriman" };
 const SPO_STAGE_KEYS = ["menunggu_konfirmasi", "dikonfirmasi", "diproses", "dalam_pengiriman"];
 // The timeline on the detail page, in order. Step 2's name differs from its status on purpose.
 const SPO_STEPS = [
@@ -16609,9 +16613,7 @@ function spoEventsHtml(events) {
 function renderSupplierPoDetail(po) {
   currentSpo = po;
   setSpoHeader(po.po_number, `${po.supplier_name_snapshot} · ${SPO_ORDER_LABELS[po.order_status] || po.order_status}`);
-  const info = (label, value) => `<tr>
-    <td class="py-1 pr-3 text-muted whitespace-nowrap">${esc(label)}</td><td class="py-1 pr-2 text-muted">:</td>
-    <td class="py-1 text-ink">${value}</td></tr>`;
+  const info = (label, value) => `<div class="min-w-0"><div class="text-[11px] text-muted">${esc(label)}</div><div class="text-sm font-medium text-ink break-words">${value}</div></div>`;
   document.getElementById("spo-detail-info").innerHTML = [
     info("No. PO Supplier", `<span class="font-medium tabular-nums">${esc(po.po_number)}</span>`),
     info("Tanggal PO", `<span class="tabular-nums">${esc(formatPoDate(po.po_date))}</span>`),
@@ -16622,6 +16624,13 @@ function renderSupplierPoDetail(po) {
     info("Dibuat oleh", esc(po.created_by || "—")),
     info("Catatan", esc(po.notes || "—")),
   ].join("");
+  const sumCell = (k, v, cls = "text-ink") => `<div><div class="text-[11px] text-muted">${k}</div><div class="text-base font-semibold tabular-nums ${cls}">${v}</div></div>`;
+  document.getElementById("spo-items-summary").innerHTML = `
+    <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-3">Ringkasan Nilai PO</div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">${sumCell("Subtotal", formatIDR(po.subtotal))}${sumCell("Diskon", "- " + formatIDR(po.discount_amount))}${sumCell("Ongkir Supplier", formatIDR(po.shipping_cost))}
+        <div class="rounded-lg bg-green-50 px-3 py-1.5"><div class="text-[11px] text-muted">Grand Total</div><div class="text-base font-semibold tabular-nums text-done">${formatIDR(po.grand_total)}</div></div></div></div>
+    <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-3">Informasi Pembayaran</div>
+      <div class="grid grid-cols-2 gap-3">${sumCell("Sudah Dibayar", formatIDR(po.paid_amount), "text-blue-700")}${sumCell("Sisa Tagihan", formatIDR(po.outstanding), po.outstanding > 0 ? "text-failed" : "text-done")}</div></div>`;
   document.getElementById("spo-detail-status").innerHTML = spoOrderPill(po, true);
   document.getElementById("spo-detail-pay").innerHTML = spoPayPill(po, true);
   renderSpoStepper(po);
@@ -16632,8 +16641,10 @@ function renderSupplierPoDetail(po) {
     po.status === "draft" ? spoActionButton("Ubah Draft", `editSupplierPo('${esc(po.id)}')`) : "",
     po.status === "draft" ? spoActionButton("Terbitkan PO", "issueSupplierPo()", true) : "",
     po.status === "dipesan" ? `<select id="spo-header-status" onchange="spoHeaderStatusChange(this)" class="select-chevron border border-line rounded-lg px-3 py-1.5 text-sm bg-white text-ink" title="Status PO keseluruhan">
-      ${SPO_STAGE_KEYS.map(k => `<option value="${k}" ${k === po.order_status ? "selected" : ""}>${esc(SPO_ORDER_LABELS[k])}</option>`).join("")}
-      ${canCancel ? '<option value="__batal">Dibatalkan</option>' : ""}</select>` : "",
+      <option disabled>Draft</option>
+      ${SPO_STAGE_KEYS.map(k => `<option value="${k}" ${k === po.order_status ? "selected" : ""}>${esc(SPO_HEADER_LABELS[k] || SPO_ORDER_LABELS[k])}</option>`).join("")}
+      <option disabled>Selesai (otomatis saat semua diterima)</option>
+      ${canCancel ? '<option value="__batal">Dibatalkan</option>' : "<option disabled>Dibatalkan</option>"}</select>` : "",
     issued ? spoActionButton("Terima Barang", "openSpoReceiveModal()", true) : "",
     po.status !== "draft" && po.status !== "batal" ? spoActionButton("Lihat Faktur", "openSpoInvoicePage()") : "",
     canCancel ? spoActionButton("Batalkan PO", "confirmCancelSupplierPo()", false, true) : "",
@@ -16999,7 +17010,7 @@ function openSpoPaymentModal() {
       <div class="grid grid-cols-1 md:grid-cols-[1fr_1.3fr_1fr] gap-3">
         <div class="border border-line rounded-xl p-3 space-y-2 text-sm">
           <div class="font-serif font-semibold text-ink">Informasi Faktur</div>
-          <div><div class="text-[11px] text-muted">Nomor Faktur</div><div class="font-semibold">${esc(po.supplier_invoice_no || "Belum ada nomor")}</div></div>
+          <div><div class="text-[11px] text-muted">Nomor Faktur</div><div class="font-semibold">${esc(po.internal_invoice_no || po.supplier_invoice_no || "Belum ada nomor")}</div></div>
           <div><div class="text-[11px] text-muted">Supplier</div><div class="font-semibold">${esc(po.supplier_name_snapshot)}</div></div>
           <div><div class="text-[11px] text-muted">Referensi PO</div><div class="font-semibold">${esc(po.po_number)}</div></div>
           ${infoTile("bg-green-50", "Grand Total", formatIDR(po.grand_total))}
@@ -17099,7 +17110,7 @@ function openSpoInvoicePage(print) {
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 border-t border-line pt-3">
         ${meta("Supplier", esc(po.supplier_name_snapshot))}${meta("Tanggal Faktur", esc(formatPoDate(po.po_date)))}${meta("Jatuh Tempo", esc(po.due_date ? formatPoDate(po.due_date) : "—"))}
         ${meta("Status Faktur", statusPill(po.status === "batal" ? "Dibatalkan" : "Aktif", po.status === "batal" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"))}${meta("Dibuat Oleh", esc(po.created_by || "—"))}</div></div>
-    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 mb-4">
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-4 mb-4">
       <div class="space-y-4 min-w-0">
         <div class="bg-white border border-line rounded-xl overflow-x-auto"><div class="px-4 py-3 font-serif font-semibold text-ink">Daftar Item Faktur</div>
           <table class="w-full text-sm"><thead class="bg-bg2"><tr><th class="${SPO_TH}">No</th><th class="${SPO_TH}">Produk</th><th class="${SPO_TH}">Referensi Penerimaan (GR)</th><th class="${SPO_THR}">Qty Diterima</th><th class="${SPO_THR}">Harga Beli</th><th class="${SPO_THR}">Subtotal</th></tr></thead>

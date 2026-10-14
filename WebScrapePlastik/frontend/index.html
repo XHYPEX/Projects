@@ -3344,156 +3344,104 @@
 
         <!-- Riwayat Stok Barang -->
         <div id="master-stock-panel" class="hidden">
-          <button type="button" onclick="backToMasterDetail()" class="inline-flex items-center gap-1.5 mb-3 text-sm text-accent hover:text-accentDark font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
-            Kembali ke detail barang
-          </button>
-          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 class="font-serif text-xl font-semibold text-ink">Riwayat Stok Barang</h2>
-              <p class="text-xs text-muted mt-1">Lihat riwayat pergerakan stok untuk produk ini.</p>
-            </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <button type="button" onclick="backToMasterDetail()" class="inline-flex items-center gap-2 px-3.5 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+              Kembali ke detail barang
+            </button>
             <div class="flex flex-wrap items-center gap-2">
-              <button type="button" onclick="openStockAdjustModal(currentMasterItem)" class="admin-only inline-flex items-center gap-1.5 px-3.5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Penyesuaian Stok</button>
-              <button type="button" onclick="exportMasterStockHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Export Riwayat</button>
-              <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Cetak</button>
+              <button type="button" onclick="openStockAdjustModal(currentMasterItem)" class="admin-only inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Penyesuaian Stok</button>
+              <button type="button" onclick="exportMasterStockHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Unduh Riwayat</button>
+              <button type="button" onclick="openStockOpnameForItem(currentMasterItemId)" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Buka Stock Opname</button>
             </div>
           </div>
-          <section class="bg-white border border-line rounded-xl p-4 mb-4">
-            <div class="flex flex-wrap items-center gap-4">
-              <div class="min-w-0 flex-1">
-                <div id="sh-name" class="font-semibold text-ink"></div>
-                <div id="sh-meta" class="text-xs text-muted mt-0.5"></div>
+          <div id="sh-header" class="bg-white border border-line rounded-xl p-4 mb-4"></div>
+          <div id="sh-kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4"></div>
+          <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-4 items-start">
+            <div class="min-w-0 space-y-3">
+              <div class="bg-white border border-line rounded-xl p-3 flex flex-wrap items-center gap-2">
+                <div id="sh-chips" class="flex flex-wrap items-center gap-2" role="group" aria-label="Jenis mutasi"></div>
+                <select id="sh-type" class="hidden"><option value=""></option></select>
+                <div class="ml-auto flex flex-wrap items-center gap-2">
+                  <input id="sh-search" type="text" placeholder="Cari referensi atau keterangan…" autocomplete="off" aria-label="Cari" oninput="shGoPage(1)" class="border border-line rounded-lg px-3 py-1.5 text-sm bg-white text-ink placeholder:text-muted/70 w-56" />
+                  <label class="sr-only" for="sh-from">Dari</label><input id="sh-from" type="date" onchange="shGoPage(1)" class="border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink" />
+                  <span class="text-muted text-sm">–</span>
+                  <label class="sr-only" for="sh-to">Sampai</label><input id="sh-to" type="date" onchange="shGoPage(1)" class="border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink" />
+                  <button type="button" onclick="resetMasterStockFilters()" class="px-3 py-1.5 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Reset</button>
+                </div>
               </div>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[34rem]">
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Stok Saat Ini</div>
-                <div id="sh-now" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="sh-now-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Total Masuk</div>
-                <div id="sh-in" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="sh-in-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Total Keluar</div>
-                <div id="sh-out" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="sh-out-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Penyesuaian</div>
-                <div id="sh-adj" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="sh-adj-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-              </div>
+              <section class="bg-white border border-line rounded-xl overflow-hidden">
+                <div class="flex items-center gap-2.5 px-4 py-3">
+                  <span class="w-8 h-8 rounded-lg bg-bg2 text-ink grid place-items-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg></span>
+                  <h3 class="font-serif font-semibold text-ink">Riwayat Mutasi Stok</h3>
+                  <p id="sh-count" class="ml-auto text-xs text-muted"></p>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-bg2"><tr>
+                      <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Tanggal</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Jenis Mutasi</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Referensi Dokumen</th>
+                      <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Masuk (<span class="sh-unit"></span>)</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Keluar (<span class="sh-unit"></span>)</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Saldo (<span class="sh-unit"></span>)</th>
+                      <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Pengguna</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Keterangan</th>
+                    </tr></thead>
+                    <tbody id="sh-tbody"></tbody>
+                  </table>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-line text-sm text-muted">
+                  <label class="inline-flex items-center gap-2">Tampilkan
+                    <select id="sh-per" onchange="shGoPage(1)" class="select-chevron border border-line rounded-lg px-2.5 py-1 text-sm bg-white text-ink"><option>10</option><option selected>20</option><option>50</option></select>
+                    data per halaman</label>
+                  <div id="sh-pager" class="flex items-center gap-1"></div>
+                </div>
+              </section>
             </div>
-          </section>
-          <section class="bg-white border border-line rounded-xl p-4 mb-4">
-            <div class="flex flex-wrap items-end gap-3">
-              <div><label for="sh-from" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Dari</label>
-                <input id="sh-from" type="date" class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" /></div>
-              <div><label for="sh-to" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Sampai</label>
-                <input id="sh-to" type="date" class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" /></div>
-              <div><label for="sh-type" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jenis Pergerakan</label>
-                <select id="sh-type" class="select-chevron border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">
-                  <option value="">Semua jenis</option><option value="masuk">Barang Masuk</option><option value="jual">Penjualan</option>
-                  <option value="retur">Retur / Void</option><option value="adj">Penyesuaian</option><option value="awal">Saldo Awal</option>
-                </select></div>
-              <div class="flex-1 min-w-[12rem]"><label for="sh-search" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Referensi</label>
-                <input id="sh-search" type="text" placeholder="Cari nomor referensi, keterangan…" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70" /></div>
-              <button type="button" onclick="renderMasterStockHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Terapkan</button>
-              <button type="button" onclick="resetMasterStockFilters()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Reset</button>
-            </div>
-          </section>
-          <section class="bg-white border border-line rounded-xl overflow-hidden">
-            <p id="sh-count" class="text-sm text-muted px-4 py-3 border-b border-line"></p>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-bg2"><tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal &amp; Waktu</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jenis</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi</th>
-                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Masuk</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keluar</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Saldo</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pengguna</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
-                </tr></thead>
-                <tbody id="sh-tbody"></tbody>
-              </table>
-            </div>
-          </section>
+            <aside id="sh-aside" class="space-y-4"></aside>
+          </div>
         </div>
 
         <!-- Riwayat Harga & Supplier -->
         <div id="master-price-panel" class="hidden">
-          <button type="button" onclick="backToMasterDetail()" class="inline-flex items-center gap-1.5 mb-3 text-sm text-accent hover:text-accentDark font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
-            Kembali ke detail barang
-          </button>
-          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 class="font-serif text-xl font-semibold text-ink">Riwayat Harga &amp; Supplier</h2>
-              <p class="text-xs text-muted mt-1">Detail riwayat harga, supplier, dan pembelian untuk produk berikut.</p>
-            </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <button type="button" onclick="backToMasterDetail()" class="inline-flex items-center gap-2 px-3.5 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+              Kembali ke detail barang
+            </button>
             <div class="flex flex-wrap items-center gap-2">
-              <button type="button" onclick="exportMasterPriceHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Export CSV</button>
-              <button type="button" onclick="openChangeSellPriceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Harga Jual</button>
+              <button type="button" onclick="openChangeSellPriceModal()" class="admin-only inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Harga Jual</button>
+              <button type="button" onclick="exportMasterPriceHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Unduh Riwayat</button>
+              <button type="button" onclick="editMasterItemFromRow(currentMasterItemId)" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Edit Barang</button>
+              <button type="button" onclick="openMasterStockHistory()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Lihat Riwayat Stok</button>
             </div>
           </div>
-          <section class="bg-white border border-line rounded-xl p-4 mb-4">
-            <div class="flex flex-wrap items-center gap-4">
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2"><span id="ph-name" class="font-semibold text-ink"></span><span id="ph-status" class="px-2 py-0.5 rounded-full text-[11px] font-medium"></span></div>
-                <div id="ph-meta" class="text-xs text-muted mt-0.5"></div>
+          <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-4 items-start">
+            <div class="min-w-0 space-y-4">
+              <div id="ph-header" class="bg-white border border-line rounded-xl p-4"></div>
+              <div id="ph-kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+              <div class="flex gap-1 border-b border-line" role="tablist">
+                <button type="button" role="tab" id="ph-tab-sell" onclick="setPriceTab('sell')" class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px">Riwayat Harga Jual</button>
+                <button type="button" role="tab" id="ph-tab-buy" onclick="setPriceTab('buy')" class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px">Riwayat Harga Beli / Supplier</button>
               </div>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[34rem]">
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Harga Jual Saat Ini</div>
-                <div id="ph-sell" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="ph-sell-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Harga Modal Terakhir</div>
-                <div id="ph-cost" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="ph-cost-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Supplier Aktif</div>
-                <div id="ph-sup" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="ph-sup-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Perubahan Harga</div>
-                <div id="ph-changes" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="ph-changes-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-              </div>
+              <section id="ph-sell-card" class="bg-white border border-line rounded-xl overflow-hidden">
+                <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <div><h3 class="font-serif font-semibold text-ink">Riwayat Harga Jual</h3><p class="text-xs text-muted">Daftar perubahan harga jual produk dari waktu ke waktu.</p></div>
+                  <label class="ml-auto inline-flex items-center gap-2 text-xs text-muted">Urutkan:
+                    <select id="ph-sell-sort" onchange="renderPriceTables()" class="select-chevron border border-line rounded-lg px-2.5 py-1 text-sm bg-white text-ink"><option value="new">Terbaru</option><option value="old">Terlama</option></select></label>
+                </div>
+                <div class="overflow-x-auto"><table class="w-full text-sm">
+                  <thead class="bg-bg2"><tr><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Tanggal Efektif</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Jenis Perubahan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Harga Sebelum</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Harga Sesudah</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Sumber</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Pengguna</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Catatan</th></tr></thead>
+                  <tbody id="ph-history-tbody"></tbody></table></div>
+              </section>
+              <section id="ph-buy-card" class="bg-white border border-line rounded-xl overflow-hidden">
+                <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <div><h3 class="font-serif font-semibold text-ink">Riwayat Harga Beli / Supplier</h3><p class="text-xs text-muted">Daftar perubahan harga modal dan informasi supplier terkait.</p></div>
+                  <label class="ml-auto inline-flex items-center gap-2 text-xs text-muted">Urutkan:
+                    <select id="ph-buy-sort" onchange="renderPriceTables()" class="select-chevron border border-line rounded-lg px-2.5 py-1 text-sm bg-white text-ink"><option value="new">Terbaru</option><option value="old">Terlama</option></select></label>
+                </div>
+                <div class="overflow-x-auto"><table class="w-full text-sm">
+                  <thead class="bg-bg2"><tr><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Tanggal Efektif</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Jenis Perubahan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Harga Sebelum</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Harga Sesudah</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Supplier</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Sumber</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider">Catatan</th></tr></thead>
+                  <tbody id="ph-purchases-tbody"></tbody></table></div>
+              </section>
             </div>
-          </section>
-          <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 items-start">
-            <section class="bg-white border border-line rounded-xl overflow-hidden xl:col-span-2">
-              <div class="px-4 py-3 border-b border-line"><h3 class="font-serif font-semibold text-ink">Riwayat Perubahan Harga</h3>
-                <p class="text-xs text-muted">Daftar riwayat perubahan harga modal dan harga jual produk ini.</p></div>
-              <div class="overflow-x-auto"><table class="w-full text-sm">
-                <thead class="bg-bg2"><tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Margin</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diubah Oleh</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Catatan</th>
-                </tr></thead>
-                <tbody id="ph-history-tbody"></tbody></table></div>
-            </section>
-            <section class="bg-white border border-line rounded-xl overflow-hidden">
-              <div class="px-4 py-3 border-b border-line"><h3 class="font-serif font-semibold text-ink">Supplier Produk</h3>
-                <p class="text-xs text-muted">Supplier utama dan supplier lain yang pernah mengirim produk ini.</p></div>
-              <div class="overflow-x-auto"><table class="w-full text-sm">
-                <thead class="bg-bg2"><tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Supplier</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Beli Terakhir</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Kontak</th>
-                </tr></thead>
-                <tbody id="ph-suppliers-tbody"></tbody></table></div>
-            </section>
-            <section class="bg-white border border-line rounded-xl overflow-hidden">
-              <div class="px-4 py-3 border-b border-line"><h3 class="font-serif font-semibold text-ink">Pembelian Terakhir</h3>
-                <p class="text-xs text-muted">Daftar pembelian terakhir dari seluruh supplier.</p></div>
-              <div class="overflow-x-auto"><table class="w-full text-sm">
-                <thead class="bg-bg2"><tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Beli</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
-                </tr></thead>
-                <tbody id="ph-purchases-tbody"></tbody></table></div>
-            </section>
+            <aside id="ph-aside" class="space-y-4"></aside>
           </div>
         </div>
 
@@ -11316,6 +11264,75 @@ async function restoreMasterItem() {
 }
 
 // ── Master Barang: Riwayat Stok ──────────────────────────────────────────────
+let shPage = 1, shKind = "";
+let shActivity = null;
+
+const SH_PILL = {
+  jual: ["Penjualan Kasir", "bg-done/10 text-done"],
+  masuk: ["Barang Masuk", "bg-blue-100 text-blue-700"],
+  adj: ["Penyesuaian Stok", "bg-pending/15 text-pending"],
+  retur: ["Retur / Void", "bg-failed/10 text-failed"],
+  awal: ["Saldo Awal", "bg-bg2 text-muted"],
+};
+const SH_CHIPS = [["", "Semua", ""], ["jual", "Penjualan", "bg-done"], ["masuk", "Pembelian", "bg-blue-500"], ["adj", "Penyesuaian", "bg-pending"], ["lain", "Lainnya", "bg-muted"]];
+
+const MH_ICON = {
+  box: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/>',
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
+  warn: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17v.01"/>',
+  cart: '<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.2a1 1 0 0 0 1-.8L19 8H6"/><circle cx="9" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/>',
+  truck: '<path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="6.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>',
+  tag: '<path d="M3 12V3h9l9 9-9 9-9-9Z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+  coins: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+  pct: '<path d="M19 5 5 19"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/>',
+};
+function mhIcon(name, size = 18) { return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${MH_ICON[name] || ""}</svg>`; }
+
+// Product card shared by Riwayat Stok and Riwayat Harga.
+function masterHistoryHeader(it, withMeta) {
+  const st = masterStockState(it.stock_qty, it.min_stock ?? 5);
+  const img = it.image_url
+    ? `<img src="${esc(it.image_url)}" alt="" class="w-full h-full object-cover" />`
+    : `<span class="text-muted">${mhIcon("box", 28)}</span>`;
+  const chip = (cls, txt) => `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cls}"><span class="w-1.5 h-1.5 rounded-full bg-current"></span>${esc(txt)}</span>`;
+  const meta = withMeta ? `<dl class="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto_1fr] gap-x-4 gap-y-1 mt-3 text-sm">
+      ${[["SKU", it.sku], ["Satuan", it.unit], ["Merek", it.brand_name || "-"], ["Supplier Utama", it.supplier_name || "-"], ["Kategori", it.category_parent_name ? `${it.category_parent_name} › ${it.category_name}` : (it.category_name || "-")], ["Lokasi Rak", it.location || "-"]]
+        .map(([k, v]) => `<dt class="text-muted">${k}</dt><dd class="font-medium text-ink truncate">${esc(String(v))}</dd>`).join("")}</dl>` : "";
+  return `<div class="flex gap-4">
+    <div class="w-24 h-24 shrink-0 rounded-lg border border-line bg-bg2 grid place-items-center overflow-hidden">${img}</div>
+    <div class="min-w-0 flex-1">
+      <h2 class="font-serif text-xl font-semibold text-ink break-words">${esc(it.name)}</h2>
+      ${it.description ? `<p class="text-sm text-muted mt-0.5">${esc(it.description)}</p>` : ""}
+      <div class="flex flex-wrap items-center gap-2 mt-2.5">
+        <span class="inline-flex items-center rounded-lg bg-bg2 px-2.5 py-1 text-xs text-ink">SKU: <span class="font-mono ml-1 font-medium">${esc(it.sku)}</span></span>
+        ${chip(it.is_active ? "bg-done/10 text-done" : "bg-bg2 text-muted", it.is_active ? "Aktif" : "Diarsipkan")}
+        ${chip(`${st.tint} ${st.text}`, `Stok ${st.label}`)}
+      </div>
+      ${meta}
+    </div></div>`;
+}
+
+function mhKpi(icon, tint, label, value, sub) {
+  return `<div class="border border-line rounded-xl bg-white px-4 py-3 flex items-center gap-3">
+    <span class="w-11 h-11 rounded-xl grid place-items-center shrink-0 ${tint}">${mhIcon(icon, 20)}</span>
+    <div class="min-w-0"><div class="text-xs text-muted">${esc(label)}</div><div class="text-lg font-semibold text-ink tabular-nums truncate">${value}</div><div class="text-xs text-muted">${esc(sub)}</div></div></div>`;
+}
+
+function mhLinkCard(icon, tint, title, desc, foot) {
+  return `<div class="border border-line rounded-xl bg-white overflow-hidden">
+    <button type="button" onclick="backToMasterDetail()" class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-bg2/60 transition-colors">
+      <span class="w-10 h-10 rounded-lg grid place-items-center shrink-0 ${tint}">${mhIcon(icon, 18)}</span>
+      <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-ink">${title}</span><span class="block text-xs text-muted">${esc(desc)}</span></span>
+      <span class="text-muted" aria-hidden="true">&rsaquo;</span></button>
+    ${foot ? `<div class="flex items-center justify-between px-3 py-1.5 border-t border-line text-xs"><span class="text-accentDark">Lihat Detail</span><span class="text-muted">${esc(foot)}</span></div>` : ""}</div>`;
+}
+
+async function loadMasterActivity(id) {
+  shActivity = await fetch(`/api/stock-opnames/item-activity/${id}`).then(r => r.ok ? r.json() : null).catch(() => null);
+}
+
 async function openMasterStockHistory(id) {
   id = id || currentMasterItemId;
   const item = currentMasterItem && currentMasterItem.id === id ? currentMasterItem : null;
@@ -11325,12 +11342,7 @@ async function openMasterStockHistory(id) {
   const fresh = await fetch(`/api/inventory/master-items/${id}`).then(r => r.ok ? r.json() : null).catch(() => null);
   if (fresh) { currentMasterItem = fresh; }
   masterDetailExtra.ledger = await resp.json();
-  const it = currentMasterItem;
-  const g = i => document.getElementById(i);
-  g("sh-name").textContent = it.name;
-  g("sh-meta").textContent = `SKU: ${it.sku} · Merek: ${it.brand_name || "-"} · Satuan: ${it.unit}`;
-  g("sh-now").textContent = formatInt(it.stock_qty);
-  g("sh-now-sub").textContent = it.unit;
+  await loadMasterActivity(id);
   resetMasterStockFilters(true);
   renderMasterStockHistory();
   showMasterPanel("stock");
@@ -11341,47 +11353,80 @@ function resetMasterStockFilters(silent) {
   document.getElementById("sh-to").value = "";
   document.getElementById("sh-type").value = "";
   document.getElementById("sh-search").value = "";
+  shKind = ""; shPage = 1;
   if (!silent) renderMasterStockHistory();
 }
+
+function setStockKind(k) { shKind = k; document.getElementById("sh-type").value = k; shPage = 1; renderMasterStockHistory(); }
+function shGoPage(n) { shPage = n; renderMasterStockHistory(); }
 
 function masterStockHistoryRows() {
   const ledger = masterDetailExtra.ledger || [];
   const from = document.getElementById("sh-from").value, to = document.getElementById("sh-to").value;
-  const type = document.getElementById("sh-type").value;
   const q = document.getElementById("sh-search").value.trim().toLowerCase();
   return ledger.filter(e => {
-    const day = e.created_at.slice(0, 10);
+    const day = e.created_at.slice(0, 10), k = ledgerKind(e);
     if (from && day < from) return false;
     if (to && day > to) return false;
-    if (type && ledgerKind(e) !== type) return false;
+    if (shKind === "lain" ? (k === "jual" || k === "masuk" || k === "adj") : (shKind && k !== shKind)) return false;
     if (q && !`${e.ref_doc_number || ""} ${ledgerDescription(e)} ${e.note || ""}`.toLowerCase().includes(q)) return false;
     return true;
   }).slice().reverse();
 }
 
 function renderMasterStockHistory() {
-  const all = masterDetailExtra.ledger || [];
+  const it = currentMasterItem, all = masterDetailExtra.ledger || [];
   const g = i => document.getElementById(i);
-  const totalIn = all.filter(e => e.qty > 0 && ledgerKind(e) !== "awal").reduce((a, e) => a + e.qty, 0) + all.filter(e => ledgerKind(e) === "awal").reduce((a, e) => a + e.qty, 0);
-  const totalOut = all.filter(e => e.qty < 0).reduce((a, e) => a - e.qty, 0);
-  const adjCount = all.filter(e => ledgerKind(e) === "adj").length;
-  g("sh-in").textContent = formatInt(totalIn); g("sh-in-sub").textContent = currentMasterItem.unit;
-  g("sh-out").textContent = formatInt(totalOut); g("sh-out-sub").textContent = currentMasterItem.unit;
-  g("sh-adj").textContent = `${adjCount} kali`; g("sh-adj-sub").textContent = `dari ${all.length} pergerakan`;
+  const act = shActivity || {};
+  const alloc = act.po_customer_qty || 0;
+  g("sh-header").innerHTML = masterHistoryHeader(it, false);
+  g("sh-kpis").innerHTML =
+    mhKpi("box", "bg-blue-100 text-blue-600", "Stok Fisik", `${formatInt(it.stock_qty)} ${esc(it.unit)}`, "Stok tercatat di sistem")
+    + mhKpi("doc", "bg-blue-100 text-blue-600", "Stok Tersedia", `${formatInt(Math.max(it.stock_qty - alloc, 0))} ${esc(it.unit)}`, "Siap untuk dijual")
+    + mhKpi("box", "bg-orange-100 text-orange-600", "Dialokasikan", `${formatInt(alloc)} ${esc(it.unit)}`, "Untuk PO Customer aktif")
+    + mhKpi("warn", "bg-pending/15 text-pending", "Stok Minimum", `${formatInt(it.min_stock ?? 0)} ${esc(it.unit)}`, "Batas peringatan stok");
+  g("sh-chips").innerHTML = SH_CHIPS.map(([k, label, dot]) => `<button type="button" aria-pressed="${shKind === k}" data-kind="${k}" onclick="setStockKind('${k}')"
+    class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm transition-colors ${shKind === k ? "border-accent bg-accent/10 text-accentDark font-medium" : "border-line bg-white text-ink hover:bg-bg2"}">${dot ? `<span class="w-2 h-2 rounded-full ${dot}"></span>` : ""}${label}</button>`).join("");
+  document.querySelectorAll("#master-stock-panel .sh-unit").forEach(el => { el.textContent = (it.unit || "").toUpperCase(); });
+
   const rows = masterStockHistoryRows();
-  g("sh-count").textContent = `Menampilkan ${rows.length} dari ${all.length} data`;
-  g("sh-tbody").innerHTML = rows.length ? rows.map(e => {
-    const k = ledgerKind(e), meta = KIND_META[k];
+  const per = Number(g("sh-per").value) || 20;
+  const pages = Math.max(Math.ceil(rows.length / per), 1);
+  shPage = Math.min(Math.max(shPage, 1), pages);
+  const slice = rows.slice((shPage - 1) * per, shPage * per);
+  g("sh-count").textContent = `Menampilkan ${slice.length} dari ${rows.length} data${rows.length !== all.length ? ` (total ${all.length})` : ""}`;
+  g("sh-tbody").innerHTML = slice.length ? slice.map(e => {
+    const k = ledgerKind(e), pill = SH_PILL[k];
     return `<tr class="border-b border-line last:border-b-0">
-      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(formatMasterDateTime(e.created_at))}</td>
-      <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-[11px] font-medium ${meta[1]}">${meta[0]}</span></td>
-      <td class="px-3 py-2 font-mono text-xs text-muted">${e.ref_doc_number ? esc(e.ref_doc_number) : "-"}</td>
-      <td class="px-3 py-2 text-right tabular-nums ${e.qty > 0 ? "text-done font-medium" : "text-muted"}">${e.qty > 0 ? formatInt(e.qty) : "-"}</td>
-      <td class="px-3 py-2 text-right tabular-nums ${e.qty < 0 ? "text-failed font-medium" : "text-muted"}">${e.qty < 0 ? formatInt(-e.qty) : "-"}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatInt(e.balance_after)}</td>
-      <td class="px-3 py-2 text-muted">${esc(e.created_by || "-")}</td>
-      <td class="px-3 py-2 text-ink">${esc(ledgerDescription(e))}</td></tr>`;
+      <td class="px-3 py-2.5 text-muted whitespace-nowrap">${esc(formatMasterDateTime(e.created_at))}</td>
+      <td class="px-3 py-2.5"><span class="px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap ${pill[1]}">${pill[0]}</span></td>
+      <td class="px-3 py-2.5 font-mono text-xs text-ink">${e.ref_doc_number ? esc(e.ref_doc_number) : "-"}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums ${e.qty > 0 ? "text-done font-semibold" : "text-muted"}">${e.qty > 0 ? formatInt(e.qty) : "-"}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums ${e.qty < 0 ? "text-failed font-semibold" : "text-muted"}">${e.qty < 0 ? formatInt(-e.qty) : "-"}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums font-semibold text-ink">${formatInt(e.balance_after)}</td>
+      <td class="px-3 py-2.5 text-ink">${esc(e.created_by || e.actor || "-")}</td>
+      <td class="px-3 py-2.5 text-ink min-w-[12rem]">${esc(ledgerDescription(e))}</td></tr>`;
   }).join("") : `<tr><td colspan="8" class="px-3 py-8 text-center text-muted">Tidak ada pergerakan stok pada filter ini.</td></tr>`;
+  const pg = (n, label, on, dis) => `<button type="button" ${dis ? "disabled" : ""} onclick="shGoPage(${n})" aria-label="Halaman ${label}" class="min-w-[2rem] h-8 px-2 rounded-lg border text-sm transition-colors disabled:opacity-40 ${on ? "bg-accent text-bg border-accent" : "border-line bg-white text-ink hover:bg-bg2"}">${label}</button>`;
+  const nums = []; for (let n = 1; n <= pages; n++) if (n === 1 || n === pages || Math.abs(n - shPage) <= 1) nums.push(n);
+  g("sh-pager").innerHTML = pg(shPage - 1, "‹", false, shPage <= 1)
+    + nums.map((n, i) => (i && n - nums[i - 1] > 1 ? `<span class="px-1 text-muted">…</span>` : "") + pg(n, n, n === shPage, false)).join("")
+    + pg(shPage + 1, "›", false, shPage >= pages);
+
+  const cat = it.category_parent_name ? `${it.category_parent_name} › ${it.category_name}` : (it.category_name || "-");
+  g("sh-aside").innerHTML = `
+    <section class="bg-white border border-line rounded-xl p-4">
+      <h3 class="font-serif font-semibold text-ink mb-3 flex items-center gap-2">${mhIcon("link", 16)} Ringkasan Keterkaitan</h3>
+      <div class="space-y-3">
+        ${mhLinkCard("cart", "bg-done/10 text-done", `${act.kasir_total ?? 0} Invoice Kasir`, "Transaksi penjualan yang menggunakan barang ini", `${act.kasir_total ?? 0} transaksi`)}
+        ${mhLinkCard("doc", "bg-orange-100 text-orange-600", `${act.po_customer_aktif ?? 0} PO Customer Aktif`, "Reservasi stok untuk pesanan pelanggan", `${formatInt(alloc)} ${it.unit} dialokasikan`)}
+        ${mhLinkCard("truck", "bg-blue-100 text-blue-600", `${act.po_supplier_aktif ?? 0} PO Supplier Aktif`, "Pengadaan barang dari supplier yang akan menambah stok", `${formatInt(act.po_supplier_qty || 0)} ${it.unit} (dalam proses)`)}
+      </div></section>
+    <section class="bg-white border border-line rounded-xl p-4">
+      <h3 class="font-serif font-semibold text-ink mb-2 flex items-center gap-2">${mhIcon("info", 16)} Informasi Tambahan</h3>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        ${[["Kategori", cat], ["Merek", it.brand_name || "-"], ["Satuan", it.unit], ["Lokasi Rak", it.location || "-"]].map(([k, v]) => `<dt class="text-muted">${k}</dt><dd class="font-medium text-ink">${esc(String(v))}</dd>`).join("")}
+      </dl></section>`;
 }
 
 function downloadCsvText(filename, rows) {
@@ -11404,56 +11449,107 @@ function exportMasterStockHistory() {
   ]);
 }
 
-// ── Master Barang: Riwayat Harga & Supplier ──────────────────────────────────
+// ── Master Barang: Riwayat Harga ─────────────────────────────────────────────
+let phTab = "sell";
+
 async function openMasterPriceHistory() {
   const id = currentMasterItemId;
   const prices = await fetch(`/api/inventory/master-items/${id}/prices`).then(r => r.ok ? r.json() : null).catch(() => null);
   if (!prices) { showToast("Riwayat harga tidak bisa dimuat."); return; }
   masterDetailExtra.prices = prices;
+  await loadMasterActivity(id);
+  phTab = "sell";
   renderMasterPriceHistory();
   showMasterPanel("price");
+}
+
+function setPriceTab(t) { phTab = t; renderPriceTables(); }
+
+// Sell-price rows: every history entry whose sell price differs from the one before it (and the first).
+function priceSellRows() {
+  const hist = [...masterDetailExtra.prices.history].reverse();   // oldest first
+  const out = [];
+  hist.forEach((h, i) => {
+    const prev = i ? hist[i - 1].sell_price : null;
+    if (i && h.sell_price === prev) return;
+    out.push({ at: h.created_at, kind: i ? "Ubah Harga" : "Harga Awal", before: prev, after: h.sell_price, source: "Master Barang", by: h.changed_by, note: h.note });
+  });
+  return out;
+}
+
+// Cost rows come from purchases (barang masuk): each receipt's unit cost against the previous receipt's.
+function priceBuyRows() {
+  const pur = [...masterDetailExtra.prices.purchases].reverse();  // oldest first
+  return pur.map((x, i) => {
+    const prev = i ? pur[i - 1].cost_price : null;
+    return { at: x.received_date, kind: !i ? "Harga Awal" : (x.cost_price === prev ? "Harga Tetap" : "Ubah Harga"), before: prev, after: x.cost_price,
+      supplier: x.supplier_name, source: x.doc_number || "Barang Masuk", note: `Pembelian ${formatInt(x.qty_in)} ${currentMasterItem.unit}` };
+  });
 }
 
 function renderMasterPriceHistory() {
   const it = currentMasterItem, p = masterDetailExtra.prices;
   const g = i => document.getElementById(i);
-  g("ph-name").textContent = it.name;
-  g("ph-status").textContent = it.is_active ? "Aktif" : "Diarsipkan";
-  g("ph-status").className = "px-2 py-0.5 rounded-full text-[11px] font-medium " + (it.is_active ? "bg-done/10 text-done" : "bg-bg2 text-muted");
-  g("ph-meta").textContent = `SKU: ${it.sku} · Merek: ${it.brand_name || "-"} · Satuan: ${it.unit}`;
-  g("ph-sell").textContent = formatIDR(it.sell_price);
-  g("ph-sell-sub").textContent = `per ${it.unit}`;
-  g("ph-cost").textContent = formatIDR(it.last_cost_price);
-  g("ph-cost-sub").textContent = "dari barang masuk terakhir";
-  g("ph-sup").textContent = p.suppliers.length;
-  g("ph-sup-sub").textContent = `supplier terdaftar`;
-  const changes = Math.max(p.history.length - 1, 0);
-  g("ph-changes").textContent = `${changes} kali`;
-  g("ph-changes-sub").textContent = "dalam riwayat";
-  const pct = (cost, sell) => cost > 0 ? `${((sell - cost) / cost * 100).toFixed(2)}%` : "-";
-  g("ph-history-tbody").innerHTML = p.history.map((h, i) => `<tr class="border-b border-line last:border-b-0">
-    <td class="px-3 py-2 text-muted">${p.history.length - i}</td><td class="px-3 py-2 text-muted whitespace-nowrap">${esc(formatMasterDateTime(h.created_at))}</td>
-    <td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.cost_price)}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.sell_price)}</td>
-    <td class="px-3 py-2 text-right tabular-nums ${h.cost_price > 0 ? "text-done" : "text-muted"}">${pct(h.cost_price, h.sell_price)}</td>
-    <td class="px-3 py-2 text-muted">${esc(h.changed_by || "-")}</td><td class="px-3 py-2 text-ink">${esc(h.note || "-")}</td></tr>`).join("");
-  g("ph-suppliers-tbody").innerHTML = p.suppliers.map((s2, i) => `<tr class="border-b border-line last:border-b-0">
-    <td class="px-3 py-2 text-muted">${i + 1}</td>
-    <td class="px-3 py-2"><div class="font-medium text-ink">${esc(s2.name)}</div>${s2.address ? `<div class="text-xs text-muted">${esc(s2.address)}</div>` : ""}</td>
-    <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-[11px] font-medium ${s2.is_primary ? "bg-done/10 text-done" : "bg-bg2 text-muted"}">${s2.is_primary ? "Utama" : "Alternatif"}</span></td>
-    <td class="px-3 py-2 text-right tabular-nums">${s2.last_cost_price != null ? formatIDR(s2.last_cost_price) : "-"}</td>
-    <td class="px-3 py-2 text-muted">${esc(s2.phone || "-")}</td></tr>`).join("");
-  g("ph-purchases-tbody").innerHTML = p.purchases.length ? p.purchases.map(x => `<tr class="border-b border-line last:border-b-0">
-    <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(x.received_date)}</td><td class="px-3 py-2 text-ink">${esc(x.supplier_name)}</td>
-    <td class="px-3 py-2 text-right tabular-nums">${formatInt(x.qty_in)} ${esc(it.unit)}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(x.cost_price)}</td>
-    <td class="px-3 py-2 text-right tabular-nums">${formatIDR(x.total)}</td></tr>`).join("")
-    : `<tr><td colspan="5" class="px-3 py-6 text-center text-muted">Belum ada pembelian tercatat.</td></tr>`;
+  const act = shActivity || {};
+  g("ph-header").innerHTML = masterHistoryHeader({ ...it, supplier_name: (p.suppliers.find(x => x.is_primary) || p.suppliers[0] || {}).name || it.supplier_name }, true);
+  const margin = masterMarginText(it);
+  const prim = p.suppliers.find(x => x.is_primary) || p.suppliers[0];
+  g("ph-kpis").innerHTML =
+    mhKpi("tag", "bg-orange-100 text-orange-600", "Harga Jual Aktif", formatIDR(it.sell_price), "Harga jual saat ini")
+    + mhKpi("coins", "bg-pending/15 text-pending", "Harga Modal Rata-rata", formatIDR(it.avg_cost_price), "Harga modal rata-rata saat ini")
+    + mhKpi("pct", "bg-done/10 text-done", "Margin Saat Ini", margin === null ? "-" : `${margin.toFixed(1)}%`, "Dihitung dari harga aktif")
+    + mhKpi("truck", "bg-purple-100 text-purple-600", "Supplier Utama", esc(prim ? prim.name : "-"), "Pemasok utama barang ini");
+  const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" class="w-full h-full object-cover" />` : `<span class="text-muted">${mhIcon("box", 40)}</span>`;
+  const row = (icon, tint, title, desc) => `<button type="button" onclick="backToMasterDetail()" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-bg2/60 border-t border-line first:border-t-0 transition-colors">
+    <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 ${tint}">${mhIcon(icon, 17)}</span>
+    <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-ink">${title}</span><span class="block text-xs text-muted">${esc(desc)}</span></span><span class="text-muted" aria-hidden="true">&rsaquo;</span></button>`;
+  g("ph-aside").innerHTML = `
+    <section class="bg-white border border-line rounded-xl p-4"><h3 class="font-serif font-semibold text-ink mb-3">Foto Produk</h3>
+      <div class="aspect-[4/3] rounded-lg border border-line bg-bg2 grid place-items-center overflow-hidden">${img}</div></section>
+    <section class="bg-white border border-line rounded-xl overflow-hidden"><h3 class="font-serif font-semibold text-ink px-4 pt-4 pb-2">Keterkaitan Produk</h3>
+      ${row("cart", "bg-blue-100 text-blue-600", `Dipakai di ${act.kasir_total ?? 0} Invoice Kasir`, "Transaksi penjualan ke pelanggan")}
+      ${row("doc", "bg-orange-100 text-orange-600", `Terkait ${act.po_customer_aktif ?? 0} PO Customer Aktif`, "Pesanan pelanggan yang masih aktif")}
+      ${row("truck", "bg-purple-100 text-purple-600", `Terkait ${act.po_supplier_aktif ?? 0} PO Supplier Aktif`, "Pesanan pembelian ke supplier")}</section>
+    <section class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm"><div class="flex gap-2 font-semibold text-blue-700 mb-1">${mhIcon("info", 16)} Perubahan harga tidak memengaruhi transaksi lama</div>
+      <p class="text-blue-900/80 text-xs leading-relaxed">Perubahan harga jual atau harga beli di Master Barang tidak akan mengubah data pada invoice kasir yang sudah dibuat, maupun data pada faktur pembelian yang sudah ada.</p></section>
+    <section class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><div class="flex gap-2 font-semibold text-amber-700 mb-1">${mhIcon("doc", 16)} Riwayat harga disimpan otomatis</div>
+      <p class="text-amber-900/80 text-xs leading-relaxed">Setiap perubahan harga akan tercatat secara otomatis dengan informasi waktu, pengguna, dan sumber perubahan untuk menjaga keakuratan data dan memudahkan pelacakan.</p></section>`;
+  renderPriceTables();
+}
+
+function renderPriceTables() {
+  const it = currentMasterItem;
+  const g = i => document.getElementById(i);
+  for (const [k, id] of [["sell", "ph-tab-sell"], ["buy", "ph-tab-buy"]]) {
+    const on = phTab === k;
+    g(id).className = `px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${on ? "border-accent text-accentDark bg-white rounded-t-lg" : "border-transparent text-muted hover:text-ink"}`;
+    g(id).setAttribute("aria-selected", on);
+  }
+  g("ph-sell-card").classList.toggle("hidden", phTab !== "sell");
+  g("ph-buy-card").classList.toggle("hidden", phTab !== "buy");
+  const sorted = (rows, sel) => (g(sel).value === "old" ? rows : [...rows].reverse());
+  const money = v => (v === null || v === undefined ? "-" : formatIDR(v));
+  const kindPill = k => `<span class="px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap ${k === "Harga Awal" ? "bg-blue-100 text-blue-700" : k === "Harga Tetap" ? "bg-bg2 text-muted" : "bg-done/10 text-done"}">${k}</span>`;
+  const empty = n => `<tr><td colspan="${n}" class="px-3 py-6 text-center text-muted">Belum ada data.</td></tr>`;
+  const sell = sorted(priceSellRows(), "ph-sell-sort");
+  g("ph-history-tbody").innerHTML = sell.length ? sell.map(r => `<tr class="border-b border-line last:border-b-0">
+    <td class="px-3 py-2.5 text-muted whitespace-nowrap">${esc(formatMasterDateTime(r.at))}</td><td class="px-3 py-2.5">${kindPill(r.kind)}</td>
+    <td class="px-3 py-2.5 tabular-nums text-ink">${money(r.before)}</td><td class="px-3 py-2.5 tabular-nums font-semibold text-done">${money(r.after)}</td>
+    <td class="px-3 py-2.5 text-ink">${esc(r.source)}</td><td class="px-3 py-2.5 text-ink">${esc(r.by || "-")}</td><td class="px-3 py-2.5 text-ink">${esc(r.note || "-")}</td></tr>`).join("") : empty(7);
+  const buy = sorted(priceBuyRows(), "ph-buy-sort");
+  g("ph-purchases-tbody").innerHTML = buy.length ? buy.map(r => `<tr class="border-b border-line last:border-b-0">
+    <td class="px-3 py-2.5 text-muted whitespace-nowrap">${esc(r.at)}</td><td class="px-3 py-2.5">${kindPill(r.kind)}</td>
+    <td class="px-3 py-2.5 tabular-nums text-ink">${money(r.before)}</td><td class="px-3 py-2.5 tabular-nums font-semibold text-done">${money(r.after)}</td>
+    <td class="px-3 py-2.5 text-ink">${esc(r.supplier)}</td><td class="px-3 py-2.5 font-mono text-xs text-ink">${esc(r.source)}</td><td class="px-3 py-2.5 text-ink">${esc(r.note || "-")}</td></tr>`).join("")
+    : `<tr><td colspan="7" class="px-3 py-6 text-center text-muted">Belum ada pembelian tercatat.</td></tr>`;
 }
 
 function exportMasterPriceHistory() {
-  const it = currentMasterItem, p = masterDetailExtra.prices;
+  const it = currentMasterItem;
   downloadCsvText(`riwayat-harga-${it.sku}.csv`, [
-    ["Tanggal", "Harga Modal", "Harga Jual", "Diubah Oleh", "Catatan"],
-    ...p.history.map(h => [h.created_at, h.cost_price, h.sell_price, h.changed_by || "", h.note || ""]),
+    ["Jenis", "Tanggal", "Jenis Perubahan", "Harga Sebelum", "Harga Sesudah", "Supplier / Sumber", "Pengguna", "Catatan"],
+    ...priceSellRows().map(r => ["Harga Jual", r.at, r.kind, r.before ?? "", r.after, r.source, r.by || "", r.note || ""]),
+    ...priceBuyRows().map(r => ["Harga Beli", r.at, r.kind, r.before ?? "", r.after, `${r.supplier} / ${r.source}`, "", r.note || ""]),
   ]);
 }
 

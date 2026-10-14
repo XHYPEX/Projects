@@ -415,6 +415,10 @@ class MasterItemOut(BaseModel):
     updated_at: str | None = None
     category_id: int | None = None
     category_name: str | None = None
+    # Set when the item's category is a subcategory: the main category above it.
+    category_parent_id: int | None = None
+    category_parent_name: str | None = None
+    updated_by: str | None = None
 
 
 class DuplicateCheckOut(BaseModel):
@@ -435,6 +439,7 @@ class MasterItemCreateRequest(BaseModel):
     min_stock: int = 5
     location: str | None = None
     category_id: int | None = None
+    is_active: bool = True
 
 
 class MasterItemUpdateRequest(BaseModel):

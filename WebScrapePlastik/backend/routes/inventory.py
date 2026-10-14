@@ -234,6 +234,9 @@ def _row_to_master_item(row: dict) -> MasterItemOut:
         updated_at=row.get("updated_at"),
         category_id=row.get("category_id"),
         category_name=row.get("category_name"),
+        category_parent_id=row.get("category_parent_id"),
+        category_parent_name=row.get("category_parent_name"),
+        updated_by=row.get("updated_by"),
     )
 
 
@@ -617,11 +620,11 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
         row = await loop.run_in_executor(
             None, create_master_item, req.supplier_id, req.brand_id, req.name.strip(), req.unit.strip(),
             req.sell_price, req.cost_price, req.stock_qty, req.description, req.min_stock, req.location,
-            user["username"], req.category_id,
+            user["username"], req.category_id, req.is_active,
         )
     except ValueError as e:
         _raise_from_value_error(e)
-    return _row_to_master_item(row)
+    return _row_to_master_item(await loop.run_in_executor(None, get_master_item, row["id"]))
 
 
 @router.get("/inventory/master-items/summary")
@@ -738,26 +741,26 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
         )
     except ValueError as e:
         _raise_from_value_error(e)
-    return _row_to_master_item(row)
+    return _row_to_master_item(await loop.run_in_executor(None, get_master_item, master_item_id))
 
 
 @router.post("/inventory/master-items/{master_item_id}/archive", response_model=MasterItemOut)
-async def archive_master_item(master_item_id: int, req: MasterItemArchiveRequest):
+async def archive_master_item(master_item_id: int, req: MasterItemArchiveRequest, user: dict = Depends(get_current_user)):
     if not req.reason.strip():
         raise HTTPException(status_code=422, detail="Alasan pengarsipan wajib dipilih.")
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
         raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
-    await loop.run_in_executor(None, set_master_item_archived, master_item_id, True, req.reason, req.note)
+    await loop.run_in_executor(None, set_master_item_archived, master_item_id, True, req.reason, req.note, user["username"])
     return _row_to_master_item(await loop.run_in_executor(None, get_master_item, master_item_id))
 
 
 @router.post("/inventory/master-items/{master_item_id}/restore", response_model=MasterItemOut)
-async def restore_master_item(master_item_id: int):
+async def restore_master_item(master_item_id: int, user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
         raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
-    await loop.run_in_executor(None, set_master_item_archived, master_item_id, False)
+    await loop.run_in_executor(None, set_master_item_archived, master_item_id, False, None, None, user["username"])
     return _row_to_master_item(await loop.run_in_executor(None, get_master_item, master_item_id))
 
 

@@ -791,6 +791,7 @@ def init_db() -> None:
             ("archived_at", "TEXT"),
             ("updated_at", "TEXT"),
             ("category_id", "INTEGER REFERENCES categories(id)"),
+            ("updated_by", "TEXT"),
         ):
             if col not in master_item_cols:
                 con.execute(f"ALTER TABLE master_items ADD COLUMN {col} {ddl}")
@@ -2802,6 +2803,7 @@ def create_master_item(
     supplier_id: int, brand_id: int, name: str, unit: str, sell_price: int = 0, cost_price: int = 0,
     stock_qty: int = 0, description: str | None = None, min_stock: int = LOW_STOCK_THRESHOLD,
     location: str | None = None, created_by: str | None = None, category_id: int | None = None,
+    is_active: bool = True,
 ) -> dict:
     name_normalized = _normalize_name(name)
     with _conn() as con:
@@ -2822,13 +2824,14 @@ def create_master_item(
             """INSERT INTO master_items
                (sku, sku_prefix, sku_seq, supplier_id, brand_id, name, name_normalized, unit,
                 last_cost_price, avg_cost_price, sell_price, stock_qty, first_received_date, is_active, created_at,
-                description, min_stock, location, updated_at, category_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, ?, ?)""",
+                description, min_stock, location, updated_at, category_id, updated_by, archived_at, archived_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 sku, prefix, seq, supplier_id, brand_id, name, name_normalized, unit,
-                cost_price, cost_price, sell_price, stock_qty, created_at,
-                (description or "").strip() or None, min_stock, (location or "").strip() or None, created_at,
-                category_id,
+                cost_price, cost_price, sell_price, stock_qty,
+                1 if is_active else 0, created_at, (description or "").strip() or None, min_stock,
+                (location or "").strip() or None, created_at, category_id, created_by,
+                None if is_active else created_at, None if is_active else "Dinonaktifkan saat barang dibuat",
             ),
         )
         # The row id isn't known until after INSERT, so the barcode is generated
@@ -2874,9 +2877,9 @@ def update_master_item(
         try:
             con.execute(
                 """UPDATE master_items SET name=?, name_normalized=?, sell_price=?, unit=?,
-                          description=?, min_stock=?, location=?, updated_at=?, category_id=? WHERE id=?""",
+                          description=?, min_stock=?, location=?, updated_at=?, category_id=?, updated_by=? WHERE id=?""",
                 (new_name, new_name_normalized, new_sell_price, new_unit, new_desc, new_min, new_loc, now,
-                 category_id if set_category else row["category_id"], master_item_id),
+                 category_id if set_category else row["category_id"], changed_by, master_item_id),
             )
         except sqlite3.IntegrityError:
             raise ValueError(
@@ -2894,7 +2897,7 @@ def update_master_item(
 
 
 def set_master_item_archived(master_item_id: int, archived: bool, reason: str | None = None,
-                             note: str | None = None) -> dict:
+                             note: str | None = None, by: str | None = None) -> dict:
     """Archive = switch the product off (is_active=0) and remember why; restoring clears that.
     Nothing is deleted, so every receipt, ledger and PO line that points at it stays valid."""
     with _conn() as con:
@@ -2904,13 +2907,13 @@ def set_master_item_archived(master_item_id: int, archived: bool, reason: str | 
         now = _now()
         if archived:
             con.execute(
-                "UPDATE master_items SET is_active=0, archived_reason=?, archived_note=?, archived_at=?, updated_at=? WHERE id=?",
-                ((reason or "").strip() or None, (note or "").strip() or None, now, now, master_item_id),
+                "UPDATE master_items SET is_active=0, archived_reason=?, archived_note=?, archived_at=?, updated_at=?, updated_by=? WHERE id=?",
+                ((reason or "").strip() or None, (note or "").strip() or None, now, now, by, master_item_id),
             )
         else:
             con.execute(
-                "UPDATE master_items SET is_active=1, archived_reason=NULL, archived_note=NULL, archived_at=NULL, updated_at=? WHERE id=?",
-                (now, master_item_id),
+                "UPDATE master_items SET is_active=1, archived_reason=NULL, archived_note=NULL, archived_at=NULL, updated_at=?, updated_by=? WHERE id=?",
+                (now, by, master_item_id),
             )
         return dict(con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone())
 
@@ -3051,11 +3054,13 @@ def set_master_item_image_path(master_item_id: int, image_path: str | None) -> s
 def get_master_item(master_item_id: int) -> dict | None:
     with _conn() as con:
         row = con.execute(
-            """SELECT mi.*, s.name AS supplier_name, b.name AS brand_name, c.name AS category_name
+            """SELECT mi.*, s.name AS supplier_name, b.name AS brand_name, c.name AS category_name,
+                      c.parent_id AS category_parent_id, cp.name AS category_parent_name
                FROM master_items mi
                JOIN suppliers s ON s.id = mi.supplier_id
                JOIN brands b ON b.id = mi.brand_id
                LEFT JOIN categories c ON c.id = mi.category_id
+               LEFT JOIN categories cp ON cp.id = c.parent_id
                WHERE mi.id=?""",
             (master_item_id,),
         ).fetchone()
@@ -3199,11 +3204,13 @@ def list_master_items(
         total_row = con.execute(f"SELECT COUNT(*) AS c FROM master_items mi {where_sql}", params).fetchone()
         total = total_row["c"]
         rows = con.execute(
-            f"""SELECT mi.*, s.name AS supplier_name, b.name AS brand_name, c.name AS category_name
+            f"""SELECT mi.*, s.name AS supplier_name, b.name AS brand_name, c.name AS category_name,
+                       c.parent_id AS category_parent_id, cp.name AS category_parent_name
                 FROM master_items mi
                 JOIN suppliers s ON s.id = mi.supplier_id
                 JOIN brands b ON b.id = mi.brand_id
                 LEFT JOIN categories c ON c.id = mi.category_id
+                LEFT JOIN categories cp ON cp.id = c.parent_id
                 {where_sql}
                 ORDER BY {MASTER_SORTS[sort]}
                 LIMIT ? OFFSET ?""",
@@ -3726,7 +3733,7 @@ def create_stock_adjustment(master_item_id: int, qty_delta: int, reason: str, cr
                VALUES (?, 'ADJUSTMENT', ?, ?, 'manual', NULL, ?, ?, ?)""",
             (master_item_id, qty_delta, new_stock_qty, reason, _now(), created_by),
         )
-        con.execute("UPDATE master_items SET updated_at=? WHERE id=?", (_now(), master_item_id))
+        con.execute("UPDATE master_items SET updated_at=?, updated_by=? WHERE id=?", (_now(), created_by, master_item_id))
         return {"master_item_id": master_item_id, "qty_delta": qty_delta, "stock_qty": new_stock_qty}
 
 

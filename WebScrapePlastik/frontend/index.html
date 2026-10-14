@@ -2700,8 +2700,8 @@
   </div>
 
   <!-- PAGE: BARANG MASUK / MASTER BARANG (inventory module — Bahasa Indonesia UI labels, intentionally, per module scope) -->
-  <div id="page-inventory" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-6xl mx-auto">
+  <div id="page-inventory" class="hidden flex-1 overflow-auto p-3 sm:p-4">
+    <div class="max-w-[1680px] mx-auto">
 
       <!-- TAB: BARANG MASUK (inbound documents) -->
       <section id="inv-tab-inbound" class="hidden">
@@ -3003,16 +3003,16 @@
 
           <div class="bg-white border border-line rounded-xl overflow-hidden">
             <div id="master-table-wrap" class="overflow-x-auto">
-              <table class="w-full min-w-[1100px] text-sm">
+              <table class="w-full min-w-[900px] text-[13px]">
                 <thead class="bg-bg2">
                   <tr>
-                    <th class="w-10 pl-4 pr-1 py-2.5 border-b border-line">
+                    <th class="w-10 pl-3 pr-1 py-2.5 border-b border-line">
                       <input id="master-select-all" type="checkbox" onchange="toggleMasterSelectAll(this.checked)" aria-label="Pilih semua barang di halaman ini" class="w-4 h-4 rounded accent-accent cursor-pointer align-middle" />
                     </th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Foto</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Barang</th>
-                    <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek / Supplier</th>
+                    <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek / Kategori</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Produk</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Persediaan</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
@@ -3104,40 +3104,40 @@
                 <p id="detail-item-meta" class="text-xs text-muted mt-0.5 mb-3"></p>
                 <dl id="detail-item-info" class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm"></dl>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Stok Fisik</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-failed/10 text-failed"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Stok Fisik</div>
                 <div id="dt-stock" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-stock-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Stok Minimum</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-pending/10 text-pending"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Stok Minimum</div>
                 <div id="dt-min" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-min-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Status Stok</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Status Stok</div>
                 <div id="dt-state" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-state-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Stok</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-accent/10 text-accentDark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Nilai Stok</div>
                 <div id="dt-value" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-value-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Harga Modal Rata-rata</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-bg2 text-muted"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Harga Modal Rata-rata</div>
                 <div id="dt-cost" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-cost-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Harga Jual</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-accent/10 text-accentDark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Harga Jual</div>
                 <div id="dt-sell" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-sell-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Estimasi Margin</div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Estimasi Margin</div>
                 <div id="dt-margin" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-margin-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
@@ -3145,30 +3145,32 @@
               </section>
 
               <section class="bg-white border border-line rounded-xl p-5">
-                <h3 class="font-serif font-semibold text-ink">Transaksi Terkait</h3>
-                <p class="text-xs text-muted mb-3">Jumlah transaksi yang memuat barang ini.</p>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Transaksi Kasir</div>
-                <div id="dt-use-kasir" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="dt-use-kasir-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">PO Customer</div>
-                <div id="dt-use-pocust" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="dt-use-pocust-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">PO Supplier</div>
-                <div id="dt-use-posup" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="dt-use-posup-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                  <div class="border border-line rounded-xl bg-white px-4 py-3">
-                <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Barang Masuk</div>
-                <div id="dt-use-masuk" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="dt-use-masuk-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
+                <div class="flex items-center gap-2.5 mb-1">
+                  <span class="w-8 h-8 rounded-lg bg-accent/10 text-accent grid place-items-center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span>
+                  <div><h3 class="font-serif font-semibold text-ink">Transaksi Terkait</h3><p class="text-xs text-muted">Jumlah transaksi yang memuat barang ini.</p></div>
                 </div>
+                <ul class="divide-y divide-line">
+                  <li class="flex items-center gap-3 px-1 py-2.5">
+                    <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-done/10 text-done"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.2a1 1 0 0 0 1-.8L19 8H6"/><circle cx="9" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg></span>
+                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">Transaksi Kasir</div><div id="dt-use-kasir-sub" class="text-xs text-muted">penjualan barang ini di kasir</div></div>
+                    <div id="dt-use-kasir" class="text-lg font-semibold text-ink tabular-nums"></div>
+                  </li>
+                  <li class="flex items-center gap-3 px-1 py-2.5">
+                    <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-pending/10 text-pending"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 13 2 2 4-4"/></svg></span>
+                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">PO Customer</div><div id="dt-use-pocust-sub" class="text-xs text-muted">pesanan pelanggan</div></div>
+                    <div id="dt-use-pocust" class="text-lg font-semibold text-ink tabular-nums"></div>
+                  </li>
+                  <li class="flex items-center gap-3 px-1 py-2.5">
+                    <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-accent/10 text-accentDark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg></span>
+                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">PO Supplier</div><div id="dt-use-posup-sub" class="text-xs text-muted">pembelian dari supplier</div></div>
+                    <div id="dt-use-posup" class="text-lg font-semibold text-ink tabular-nums"></div>
+                  </li>
+                  <li class="flex items-center gap-3 px-1 py-2.5">
+                    <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-bg2 text-muted"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2-8h14l2 8"/><path d="M3 13v6a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-6h-5l-1.5 2h-5L8 13H3Z"/></svg></span>
+                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">Barang Masuk</div><div id="dt-use-masuk-sub" class="text-xs text-muted">dokumen barang masuk</div></div>
+                    <div id="dt-use-masuk" class="text-lg font-semibold text-ink tabular-nums"></div>
+                  </li>
+                </ul>
               </section>
 
               <div class="flex flex-wrap items-center gap-2">
@@ -3409,7 +3411,7 @@
                 </span>
                 <h3 class="font-serif font-semibold text-ink">Informasi Barang</h3>
               </div>
-              <div class="p-5 space-y-4">
+              <div class="p-6 space-y-5">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label for="new-item-supplier" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Supplier <span class="text-failed">*</span></label>
@@ -3492,10 +3494,21 @@
                   </div>
                   <p id="new-item-stock-hint" class="text-xs text-muted mt-1.5">Isi jumlah yang ada sekarang. Kosongkan atau 0 jika belum ada stok.</p>
                 </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label for="new-item-category-main" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kategori Produk <span class="normal-case font-normal">(opsional)</span></label>
+                    <select id="new-item-category-main" onchange="onItemCategoryMainChange()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+                  </div>
+                  <div>
+                    <label for="new-item-category" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Subkategori Produk <span class="normal-case font-normal">(opsional)</span></label>
+                    <select id="new-item-category" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+                  </div>
+                </div>
+                <p class="text-xs text-muted -mt-2 flex items-center gap-1.5"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Data kategori diambil dari Master Kategori. Kategori dan subkategori tidak dapat diisi manual.</p>
                 <div>
-                  <label for="new-item-category" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kategori <span class="normal-case font-normal">(opsional)</span></label>
-                  <select id="new-item-category" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
-                  <p class="text-xs text-muted mt-1.5">Pilih subkategori bila ada. Kelola daftar di Inventori &rsaquo; Master Kategori.</p>
+                  <label for="new-item-status" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Status Produk <span class="text-failed">*</span></label>
+                  <select id="new-item-status" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select>
+                  <p class="text-xs text-muted mt-1.5">Produk nonaktif tidak bisa dijual di kasir, tapi tetap tampil di daftar untuk dilihat stok dan harganya.</p>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -9793,9 +9806,9 @@ function renderMasterItemsTable(data) {
     const tr = document.createElement("tr");
     tr.className = `border-b border-line last:border-b-0 hover:bg-bg2/50 cursor-pointer transition-colors ${selected ? "bg-accent/5" : ""}`;
     tr.innerHTML = `
-      <td class="pl-4 pr-1 py-3 w-10" onclick="event.stopPropagation()">${checkbox}</td>
-      <td class="px-2.5 py-3">
-        <span class="master-thumb w-11 h-11 rounded-lg bg-bg2 border border-line text-muted grid place-items-center text-xs font-semibold overflow-hidden" aria-hidden="true">${esc(masterInitials(item.name))}</span>
+      <td class="pl-3 pr-1 py-2.5 w-10" onclick="event.stopPropagation()">${checkbox}</td>
+      <td class="px-2 py-2.5">
+        <span class="master-thumb w-10 h-10 rounded-lg bg-bg2 border border-line text-muted grid place-items-center text-xs font-semibold overflow-hidden" aria-hidden="true">${esc(masterInitials(item.name))}</span>
       </td>
       <td class="px-2.5 py-3 whitespace-nowrap">
         <span class="inline-flex items-center gap-1">
@@ -9812,7 +9825,7 @@ function renderMasterItemsTable(data) {
       </td>
       <td class="px-2.5 py-3">
         <div class="text-ink leading-snug">${esc(item.brand_name || "-")}</div>
-        <div class="text-xs text-muted leading-snug">${esc(item.supplier_name || "-")}</div>
+        <div class="text-xs text-muted leading-snug">${esc(item.category_name ? (item.category_parent_name ? item.category_parent_name + " › " + item.category_name : item.category_name) : "Tanpa kategori")}</div>
       </td>
       <td class="px-2.5 py-3">${activePillHtml(item.is_active)}</td>
       <td class="px-2.5 py-3">${statusPillHtml(stock.dot, stock.label, stock.tint)}</td>
@@ -10303,34 +10316,49 @@ function formatMasterDateTime(iso) {
   return d.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(/\./g, ":").replace(",", "");
 }
 
-// Category picker on the item form: active categories only (grouped by main category), plus the
-// item's current one even if it has since been switched off, so editing never silently drops it.
-async function fillItemCategorySelect(selectedId, selectedName) {
-  const el = document.getElementById("new-item-category");
-  const render = cats => {
-    const live = cats.filter(c => c.status === "aktif");
+// Category picker on the item form: Kategori (main) then Subkategori, active categories only, plus the item's
+// current one even if it has since been switched off, so editing never silently drops it.
+let itemCategoryKeep = null;   // { id, name, parentId, parentName } of the item being edited
+async function fillItemCategorySelect(selectedId, selectedName, parentId, parentName) {
+  itemCategoryKeep = selectedId ? { id: selectedId, name: selectedName, parentId, parentName } : null;
+  const render = () => {
+    const live = categoriesCache.filter(c => c.status === "aktif");
     const mains = live.filter(c => c.parent_id === null);
-    let html = `<option value="">Tanpa kategori</option>`;
-    for (const m of mains) {
-      const subs = live.filter(c => c.parent_id === m.id);
-      html += `<optgroup label="${esc(m.name)}"><option value="${m.id}">${esc(m.name)} (umum)</option>` +
-        subs.map(sc => `<option value="${sc.id}">${esc(sc.name)}</option>`).join("") + `</optgroup>`;
-    }
-    if (selectedId && !live.some(c => c.id === selectedId)) {
-      html += `<option value="${selectedId}">${esc(selectedName || "Kategori lama")} (tidak aktif)</option>`;
-    }
-    el.innerHTML = html;
-    el.value = selectedId ? String(selectedId) : "";
+    const mainSel = document.getElementById("new-item-category-main");
+    let mainId = selectedId ? (parentId || selectedId) : null;
+    let html = `<option value="">Pilih kategori produk</option>` + mains.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join("");
+    if (mainId && !mains.some(m => m.id === mainId)) html += `<option value="${mainId}">${esc(parentId ? parentName : selectedName)} (tidak aktif)</option>`;
+    mainSel.innerHTML = html;
+    mainSel.value = mainId ? String(mainId) : "";
+    onItemCategoryMainChange(parentId ? selectedId : null);
   };
-  render(categoriesCache);
+  render();
   try {
     const resp = await fetch("/api/categories");
-    if (resp.ok) { categoriesCache = await resp.json(); render(categoriesCache); }
+    if (resp.ok) { categoriesCache = await resp.json(); render(); }
   } catch (_) { /* keep the cached options */ }
 }
 
+function onItemCategoryMainChange(selectedSubId) {
+  const mainId = parseInt(document.getElementById("new-item-category-main").value, 10) || null;
+  const subSel = document.getElementById("new-item-category");
+  const subs = mainId ? categoriesCache.filter(c => c.parent_id === mainId && c.status === "aktif") : [];
+  let html = `<option value="">${mainId ? (subs.length ? "Pilih subkategori" : "Tidak ada subkategori") : "Pilih kategori dulu"}</option>` +
+    subs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  const keep = itemCategoryKeep;
+  if (typeof selectedSubId === "number" && !subs.some(c => c.id === selectedSubId) && keep && keep.id === selectedSubId) {
+    html += `<option value="${keep.id}">${esc(keep.name)} (tidak aktif)</option>`;
+  }
+  subSel.innerHTML = html;
+  subSel.disabled = !mainId;
+  subSel.value = typeof selectedSubId === "number" ? String(selectedSubId) : "";
+}
+
+// The category stored on the item is the subcategory when one is picked, otherwise the main category.
 function selectedItemCategoryId() {
-  const v = document.getElementById("new-item-category").value;
+  const sub = document.getElementById("new-item-category").value;
+  const main = document.getElementById("new-item-category-main").value;
+  const v = sub || main;
   return v ? parseInt(v, 10) : null;
 }
 
@@ -10368,7 +10396,9 @@ function openMasterForm(mode, item, prefillName) {
   g("new-item-stock-label").textContent = isEdit ? "Stok Saat Ini" : "Stok Awal";
   g("new-item-description").value = item ? (item.description || "") : "";
   g("new-item-min-stock").value = item ? String(item.min_stock ?? 5) : "5";
-  fillItemCategorySelect(item ? item.category_id : null, item ? item.category_name : null);
+  fillItemCategorySelect(item ? item.category_id : null, item ? item.category_name : null,
+    item ? item.category_parent_id : null, item ? item.category_parent_name : null);
+  g("new-item-status").value = isEdit && item.is_active === false ? "nonaktif" : "aktif";
   g("new-item-location").value = item ? (item.location || "") : "";
   g("new-item-sku-badge").textContent = "";
   g("new-item-duplicate-note").classList.add("hidden");
@@ -10379,7 +10409,7 @@ function openMasterForm(mode, item, prefillName) {
   badge.textContent = "Barang baru";
   g("mf-back-label").textContent = isEdit ? "Kembali ke detail barang" : "Kembali ke daftar";
   g("mf-subtitle").textContent = isEdit
-    ? `Ubah informasi produk pada master barang inventori. Terakhir diperbarui ${formatMasterDateTime(item.updated_at || item.created_at)}.`
+    ? `Ubah informasi produk pada master barang inventori. Terakhir diperbarui ${formatMasterDateTime(item.updated_at || item.created_at)}${item.updated_by ? " oleh " + item.updated_by : ""}.`
     : isDup ? `Salin data master dari barang yang sudah ada untuk membuat produk baru. Sumber: ${item.name} — ${item.sku}`
     : "Tambahkan produk baru ke master barang inventori.";
   const banner = g("mf-banner");
@@ -10540,6 +10570,14 @@ async function submitMasterFormEdit() {
       }),
     });
     if (!resp.ok) { showToast(`Gagal: ${await responseErrorDetail(resp, "Barang tidak bisa disimpan.")}`); return; }
+    const wantActive = document.getElementById("new-item-status").value === "aktif";
+    if (wantActive !== (item.is_active !== false)) {
+      const sr = await fetch(`/api/inventory/master-items/${item.id}/${wantActive ? "restore" : "archive"}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: wantActive ? undefined : JSON.stringify({ reason: "Dinonaktifkan lewat Edit Barang" }),
+      });
+      if (!sr.ok) showToast(`Barang disimpan, tapi status gagal diubah: ${await responseErrorDetail(sr, "Coba lagi.")}`);
+    }
     let photoError = null;
     try {
       if (newItemImage) {
@@ -10590,6 +10628,7 @@ async function submitNewMasterItem(keepAdding) {
         description: document.getElementById("new-item-description").value, min_stock: minStock,
         location: document.getElementById("new-item-location").value,
         category_id: selectedItemCategoryId(),
+        is_active: document.getElementById("new-item-status").value === "aktif",
       }),
     });
     if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
@@ -10665,7 +10704,7 @@ function renderMasterItemDetail(item) {
   const row = (k, v, mono) => `<div class="flex gap-3"><dt class="w-32 shrink-0 text-muted">${esc(k)}</dt><dd class="min-w-0 break-words text-ink ${mono ? "font-mono text-[13px]" : ""}">${v ? esc(v) : "-"}</dd></div>`;
   g("detail-item-info").innerHTML =
     `<div class="space-y-1.5">${row("SKU / Kode Barang", item.sku, true)}${row("Barcode", item.barcode, true)}${row("Merek", item.brand_name)}${row("Supplier Utama", item.supplier_name)}</div>` +
-    `<div class="space-y-1.5">${row("Kategori", item.category_name)}${row("Satuan", item.unit)}${row("Lokasi Rak / Gudang", item.location)}${row("Deskripsi Singkat", item.description)}</div>`;
+    `<div class="space-y-1.5">${row("Kategori Produk", item.category_parent_name || item.category_name)}${row("Subkategori Produk", item.category_parent_name ? item.category_name : "")}${row("Satuan", item.unit)}${row("Lokasi Rak / Gudang", item.location)}${row("Deskripsi Singkat", item.description)}</div>`;
   g("dt-stock").textContent = formatInt(item.stock_qty);
   g("dt-stock-sub").textContent = `${item.unit} di gudang`;
   g("dt-min").textContent = formatInt(item.min_stock ?? 5);

@@ -339,6 +339,16 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    /* A name too long for one line at a readable size wraps onto a second line instead of being cut. */
+    .barcode-label-name.wrap {
+      white-space: normal;
+      text-overflow: clip;
+      line-height: 1.05;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      word-break: break-word;
+    }
     /* Optional free-text line. Collapses entirely when unused so labels without
        one keep the spacing they had. */
     .barcode-label-note {
@@ -13316,16 +13326,33 @@ const BARCODE_MAX_WIDTH_PX = 58 / 25.4 * 96;
 // because the print sheet is display:none until printing, where scrollWidth
 // would measure 0.
 const LABEL_NAME_MAX_PT = 14;
-const LABEL_NAME_MIN_PT = 7.5;
+const LABEL_NAME_ONE_LINE_MIN_PT = 9;   // below this a single line gets hard to read
+const LABEL_NAME_TWO_LINE_MIN_PT = 6.5;
 const _labelTextCanvas = document.createElement("canvas").getContext("2d");
 
-function fitLabelNameSize(text) {
-  const maxPx = 58 / 25.4 * 96;
-  for (let pt = LABEL_NAME_MAX_PT; pt > LABEL_NAME_MIN_PT; pt -= 0.5) {
-    _labelTextCanvas.font = `600 ${pt}pt Inter, system-ui, sans-serif`;
-    if (_labelTextCanvas.measureText(text || "").width <= maxPx) return pt;
+function _labelNameLines(text, pt, maxPx) {
+  _labelTextCanvas.font = `600 ${pt}pt Inter, system-ui, sans-serif`;
+  let lines = 1, line = "";
+  for (const word of String(text || "").split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (_labelTextCanvas.measureText(next).width <= maxPx) { line = next; continue; }
+    if (!line || _labelTextCanvas.measureText(word).width > maxPx) return 99;  // a single word wider than the label
+    lines++; line = word;
   }
-  return LABEL_NAME_MIN_PT;
+  return lines;
+}
+
+// Returns {pt, wrap}: the largest size that fits on one line (down to 9pt), else the
+// largest size that fits on two lines. The name is never cut with an ellipsis.
+function fitLabelName(text) {
+  const maxPx = 58 / 25.4 * 96;
+  for (let pt = LABEL_NAME_MAX_PT; pt >= LABEL_NAME_ONE_LINE_MIN_PT; pt -= 0.5) {
+    if (_labelNameLines(text, pt, maxPx) === 1) return { pt, wrap: false };
+  }
+  for (let pt = LABEL_NAME_ONE_LINE_MIN_PT; pt >= LABEL_NAME_TWO_LINE_MIN_PT; pt -= 0.5) {
+    if (_labelNameLines(text, pt, maxPx) <= 2) return { pt, wrap: true };
+  }
+  return { pt: LABEL_NAME_TWO_LINE_MIN_PT, wrap: true };
 }
 
 // A long SKU renders wider than the label (18 characters at 1.5px per module is
@@ -13363,7 +13390,7 @@ function printBarcodeLabels(labels) {
   document.getElementById("barcode-single").style.display = "none";
   batch.innerHTML = labels.map((l, i) => `
     <div class="barcode-label">
-      <div class="barcode-label-name" style="font-size:${fitLabelNameSize(l.name || "")}pt">${esc(l.name || "")}</div>
+      ${(() => { const f = fitLabelName(l.name || ""); return `<div class="barcode-label-name${f.wrap ? " wrap" : ""}" style="font-size:${f.pt}pt">${esc(l.name || "")}</div>`; })()}
       <svg class="barcode-batch-svg" data-idx="${i}"></svg>
       <div class="barcode-label-price">${l.sellPrice != null ? esc(formatIDR(l.sellPrice)) : ""}</div>
       <div class="barcode-label-note">${esc(l.note || "")}</div>
@@ -13433,7 +13460,7 @@ function openManualBarcodeModal() {
       </div>
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Teks Bebas <span class="normal-case font-normal">(opsional)</span></label>
-        <input id="manual-barcode-note" type="text" data-no-uppercase autocomplete="off" placeholder="Ukuran, warna, catatan…"
+        <input id="manual-barcode-note" type="text" autocomplete="off" placeholder="Ukuran, warna, catatan…"
           onkeydown="if(event.key==='Enter'){event.preventDefault();submitManualBarcode();}"
           class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
       </div>
@@ -13467,7 +13494,7 @@ function submitManualBarcode() {
   if (!code) { showToast("Kode barcode belum diisi."); return; }
 
   const name = document.getElementById("manual-barcode-name").value.trim();
-  const note = document.getElementById("manual-barcode-note").value.trim();
+  const note = document.getElementById("manual-barcode-note").value.trim().toUpperCase();
   const priceEl = document.getElementById("manual-barcode-price");
   const price = priceEl.value.trim() ? priceValue(priceEl) : null;
   const qty = Math.max(1, parseInt(document.getElementById("manual-barcode-qty").value, 10) || 1);
@@ -13491,7 +13518,7 @@ function printMasterItemBarcode() {
     <div class="space-y-3">
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Teks Bebas <span class="normal-case font-normal">(opsional)</span></label>
-        <input id="master-barcode-note" type="text" data-no-uppercase autocomplete="off" placeholder="Ukuran, warna, catatan…"
+        <input id="master-barcode-note" type="text" autocomplete="off" placeholder="Ukuran, warna, catatan…"
           onkeydown="if(event.key==='Enter'){event.preventDefault();submitMasterItemBarcode();}"
           class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         <p class="text-[11px] text-muted mt-1.5">Dicetak di bawah kode. Kosongkan bila tidak perlu.</p>
@@ -13506,7 +13533,7 @@ function printMasterItemBarcode() {
 }
 
 function submitMasterItemBarcode() {
-  const note = document.getElementById("master-barcode-note").value.trim();
+  const note = document.getElementById("master-barcode-note").value.trim().toUpperCase();
   closeModal();
   runMasterItemBarcodePrint(note);
 }
@@ -13519,7 +13546,9 @@ function runMasterItemBarcodePrint(note) {
   document.getElementById("barcode-single").style.display = "";
   const nameEl = document.getElementById("barcode-print-name");
   nameEl.textContent = currentMasterItem.name;
-  nameEl.style.fontSize = `${fitLabelNameSize(currentMasterItem.name)}pt`;
+  const fit = fitLabelName(currentMasterItem.name);
+  nameEl.style.fontSize = `${fit.pt}pt`;
+  nameEl.classList.toggle("wrap", fit.wrap);
   document.getElementById("barcode-print-price").textContent = formatIDR(currentMasterItem.sell_price);
   document.getElementById("barcode-print-note").textContent = note || "";
   JsBarcode("#barcode-print-svg", currentMasterItem.barcode || currentMasterItem.sku, {

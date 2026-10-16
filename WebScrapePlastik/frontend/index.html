@@ -363,7 +363,7 @@
 
     /* Purchase invoice: A4 document, screen-hidden and only laid out for print. */
     #pi-print-area { display: none; }
-    /* Customer nota (Nota Penjualan): A5 landscape, filled by printReceiptNota() right before printing. */
+    /* Customer nota (Nota Penjualan): 9.5in x 11in continuous form, portrait, filled by printReceiptNota() right before printing. */
     #nota-print-area { display: none; }
 
     @media print {
@@ -1132,6 +1132,10 @@
                   <dt class="text-muted">Diskon</dt>
                   <dd id="cashier-summary-discount" class="text-ink tabular-nums">Rp 0</dd>
                 </div>
+                <div id="cashier-summary-return-row" class="hidden flex items-baseline justify-between gap-3 py-2.5 border-b border-line">
+                  <dt class="text-muted">Retur</dt>
+                  <dd id="cashier-summary-return" class="text-ink tabular-nums">Rp 0</dd>
+                </div>
                 <div id="cashier-summary-service-row" class="hidden flex items-baseline justify-between gap-3 py-2.5 border-b border-line">
                   <dt class="text-muted">Biaya Jasa</dt>
                   <dd id="cashier-summary-service" class="text-ink tabular-nums">Rp 0</dd>
@@ -1155,6 +1159,8 @@
               </div>
               <button id="cashier-refund-btn" type="button" onclick="openRefundModal()"
                 class="hidden admin-only mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-accent text-accentDark rounded-lg text-sm font-medium hover:bg-accent/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Kembalikan Kelebihan Bayar</button>
+              <button id="cashier-return-btn" type="button" onclick="openReturnModal(getActiveTab()?.receiptId)"
+                class="hidden admin-only mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-line text-ink rounded-lg text-sm font-medium bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Retur Barang</button>
               <button id="cashier-summary-settle-btn" type="button" onclick="openCashierSettleModal()"
                 class="hidden mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
@@ -1362,6 +1368,8 @@
                 class="history-work-btn is-active px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Semua</button>
               <button type="button" data-work-filter="draft" onclick="applyHistoryWorkFilter('draft')"
                 class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Draft</button>
+              <button type="button" data-work-filter="menunggu" onclick="applyHistoryWorkFilter('menunggu')"
+                class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Menunggu Barang</button>
               <button type="button" data-work-filter="belum" onclick="applyHistoryWorkFilter('belum')"
                 class="history-work-btn px-3 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Belum Dikerjakan</button>
               <button type="button" data-work-filter="pengerjaan" onclick="applyHistoryWorkFilter('pengerjaan')"
@@ -1841,13 +1849,12 @@
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <button onclick="openPreorderEdit(currentPreorder.id)" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Edit Data PO</button>
-            <button onclick="openPoPaymentModal()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Tambah Pembayaran</button>
+            <button id="po-pay-btn" onclick="poPayClick()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Tambah Pembayaran</button>
             <button onclick="openPoStatusModal()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Ubah Status PO</button>
             <button onclick="openPreorderPrint(currentPreorder.id)" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Cetak Nota</button>
             <div class="relative">
               <button onclick="togglePoMenu(event)" aria-label="Aksi lainnya" class="px-2.5 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">&middot;&middot;&middot;</button>
               <div id="po-menu" class="hidden absolute right-0 mt-1 z-20 min-w-[170px] bg-bg border border-line rounded-lg shadow-sm py-1">
-                <button onclick="openPoConvertModal()" class="w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg2 transition-colors">Buat Nota Penjualan</button>
                 <button id="po-menu-draft" onclick="togglePreorderDraft()" class="admin-only w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg2 transition-colors">Jadikan Draft</button>
               </div>
             </div>
@@ -1905,6 +1912,18 @@
             <div class="flex items-center justify-between"><span class="text-muted">Total Dibayar</span><span id="po-detail-paid" class="font-semibold text-done tabular-nums"></span></div>
             <div class="flex items-center justify-between border-t border-line pt-2"><span class="text-muted">Sisa Tagihan</span><span id="po-detail-remaining" class="font-serif text-base font-semibold text-failed tabular-nums"></span></div>
           </div>
+        </div>
+
+        <div id="po-detail-invoice-card" class="hidden bg-white border border-line rounded-xl p-4 mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Invoice PO</div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="po-inv-open-btn" onclick="openReceiptFromHistory(currentPreorder.receipt_id)" class="px-3 py-1.5 border border-line rounded-lg text-xs font-medium text-ink hover:bg-bg2 transition-colors">Buka Invoice</button>
+              <button type="button" id="po-inv-pay-btn" onclick="poPayClick()" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">Bayar di Invoice</button>
+              <button type="button" id="po-inv-return-btn" onclick="openReturnModal(currentPreorder.receipt_id, () => openPreorder(currentPreorder.id))" class="admin-only px-3 py-1.5 border border-line rounded-lg text-xs font-medium text-ink hover:bg-bg2 transition-colors">Retur Barang</button>
+            </div>
+          </div>
+          <div id="po-detail-invoice-info" class="mt-2 text-sm text-muted"></div>
         </div>
 
         <div id="po-detail-nota-card" class="bg-white border border-line rounded-xl p-4 mb-4">
@@ -5076,6 +5095,9 @@ function addItemRow(prefill) {
   if (prefill && prefill.addedAt) row.dataset.addedAt = prefill.addedAt;
   if (prefill && prefill.addedBy) row.dataset.addedBy = prefill.addedBy;
   if (prefill && prefill.addedDuringWork) row.dataset.addedDuringWork = "1";
+  // A line of a PO Customer is changed on the PO; a returned line is frozen (see applyCashierVoidLock).
+  if (prefill && prefill.preorderItemId) row.dataset.poItem = prefill.preorderItemId;
+  if (prefill && Number(prefill.returnedQty) > 0) row.dataset.returnedQty = prefill.returnedQty;
   // Photo of the linked master item: from the prefill, else from what the register already knows
   // about this SKU. Dataset values are plain strings, so this stays out of the markup below.
   const knownImage = (prefill && prefill.imageUrl) || (prefill && prefill.sku ? skuImageCache.get(prefill.sku) : "") || "";
@@ -5154,6 +5176,8 @@ function refreshItemRowMeta(row) {
   if (row.dataset.sku) bits.push(`SKU: <span class="font-mono">${esc(row.dataset.sku)}</span>`);
   else if (isService) bits.push("Jasa, tanpa stok");
   else if (name) bits.push("Tanpa SKU, stok tidak berkurang");
+  if (row.dataset.poItem) bits.push(`<span class="text-accentDark font-medium">Dari PO Customer</span>`);
+  if (row.dataset.returnedQty) bits.push(`<span class="text-failed font-medium">Diretur ${esc(row.dataset.returnedQty)}</span>`);
   if (row.dataset.addedAt) {
     bits.push(`<span class="lg:hidden">Ditambah ${esc(formatReceiptWhen(row.dataset.addedAt, true))}${row.dataset.addedBy ? " oleh " + esc(row.dataset.addedBy) : ""}</span>`);
   } else if (name && !row.dataset.itemId && isWorkedOnTab()) {
@@ -5679,9 +5703,11 @@ function recomputeTotals() {
   });
   const net = gross - lineDiscount;
   const discount = priceValue(document.getElementById("discount-input"));
-  const total = Math.max(net - discount, 0);
+  // Retur Barang takes the refunds off the total; the lines themselves keep their quantity.
+  const returnTotal = Number(getActiveTab()?.returnTotal) || 0;
+  const total = Math.max(net - discount - returnTotal, 0);
   cashierLastTotal = total;
-  cashierLastBreakdown = { gross, lineDiscount, serviceTotal, discount };
+  cashierLastBreakdown = { gross, lineDiscount, serviceTotal, discount, returnTotal };
 
   document.getElementById("subtotal-display").textContent = formatIDR(gross);
   document.getElementById("line-discount-display").textContent = "- " + formatIDR(lineDiscount);
@@ -5771,6 +5797,8 @@ function renderCashierSummary() {
   document.getElementById("cashier-summary-discount").textContent = bd.lineDiscount + bd.discount > 0 ? "- " + formatIDR(bd.lineDiscount + bd.discount) : formatIDR(0);
   document.getElementById("cashier-summary-service").textContent = formatIDR(bd.serviceTotal);
   document.getElementById("cashier-summary-service-row").classList.toggle("hidden", bd.serviceTotal <= 0);
+  document.getElementById("cashier-summary-return").textContent = "- " + formatIDR(bd.returnTotal || 0);
+  document.getElementById("cashier-summary-return-row").classList.toggle("hidden", !(bd.returnTotal > 0));
   const paidNow = priceValue(document.getElementById("amount-paid-input"));
   document.getElementById("cashier-summary-paid").textContent = formatIDR(paidNow);
   const pct = cashierLastTotal > 0 ? Math.min(100, Math.round(paidNow / cashierLastTotal * 100)) : 0;
@@ -5897,7 +5925,7 @@ function validateReceiptForm(payload) {
 // Pengerjaan: Draft (a note to self: no stock, no payment) -> Belum Dikerjakan -> Dalam Pengerjaan ->
 // Pengerjaan Selesai. Leaving draft takes the stock. Pembayaran is separate (Belum Bayar / Sebagian /
 // Lunas) and never moves the work stage. Payments are taken in Pembayaran Nota (openReceiptPaymentModal).
-const WORK_STATUS_LABELS = { draft: "Draft", belum: "Belum Dikerjakan", pengerjaan: "Dalam Pengerjaan", selesai: "Pengerjaan Selesai" };
+const WORK_STATUS_LABELS = { draft: "Draft", menunggu: "Menunggu Barang", belum: "Belum Dikerjakan", pengerjaan: "Dalam Pengerjaan", selesai: "Pengerjaan Selesai" };
 // Two independent statuses on every nota: Pembayaran (from amount paid vs total) and Pengerjaan (the stage).
 const PAYMENT_STATUS_LABELS = { belum: "Belum Bayar", sebagian: "Sebagian", lunas: "Lunas" };
 const PAYMENT_STATUS_TINTS = { belum: "bg-failed/10 text-failed", sebagian: "bg-pending/10 text-ink", lunas: "bg-done/10 text-ink" };
@@ -5913,7 +5941,7 @@ function paymentBadge(total, paid, status) {
     + (over > 0 ? `<span class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium bg-accent/10 text-accentDark" title="Perlu dikembalikan ke pelanggan">Kelebihan ${formatIDR(over)}</span>` : "") : "";
 }
 const WORK_STATUS_TINTS = {
-  draft: "bg-bg2 text-muted", belum: "bg-bg2 text-ink", pengerjaan: "bg-pending/10 text-ink",
+  draft: "bg-bg2 text-muted", menunggu: "bg-accent/10 text-accentDark", belum: "bg-bg2 text-ink", pengerjaan: "bg-pending/10 text-ink",
   selesai: "bg-done/10 text-ink", void: "bg-failed/10 text-failed",
 };
 
@@ -5935,8 +5963,10 @@ function renderCashierWorkUi() {
   const isVoid = tab.status === "void";
   // Closed = Lunas and Pengerjaan Selesai. A paid nota still being worked on stays editable.
   const isDone = saved && tab.status === "done" && ws === "selesai";
+  const poChip = saved && tab.preorderId
+    ? ` <button type="button" onclick="openPreorderFromDashboard('${esc(tab.preorderId)}')" title="Buka PO Customer" class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border border-accent/40 text-accentDark hover:bg-accent/10">${esc(tab.poNumber || "PO Customer")}</button>` : "";
   const badge = saved ? workBadge(ws, tab.status) : UNSAVED_BADGE;
-  document.getElementById("cashier-work-badge").innerHTML = badge;
+  document.getElementById("cashier-work-badge").innerHTML = badge + poChip;
   document.getElementById("cashier-work-pill").innerHTML = badge;
 
   const isDraft = saved && ws === "draft" && !isVoid;
@@ -6124,6 +6154,147 @@ async function submitRefund() {
   closeModal();
   await reloadTabFromServer(tab);
   showToast(`Refund ${formatIDR(amount)} dicatat.`, "success");
+}
+
+// Retur Barang (admin): the customer brings goods back, also on a closed nota. Pick the line and how many,
+// where the goods go (only "Kembali ke stok" puts them back on the shelf) and how much is refunded --
+// the full price by default, less to keep a fee. The total drops by the refund; whatever was paid beyond
+// the new total is handed back at once (a negative payment on today's date).
+let returnCtx = null;
+const RETURN_DEST_LABELS = { stok: "Kembali ke stok", supplier: "Dikembalikan ke supplier", rusak: "Rusak / dibuang" };
+const RETURN_REASON_LABELS = {
+  salah_input: "Salah input kasir", pelanggan_batal: "Pelanggan batal", tidak_cocok: "Barang tidak cocok",
+  cacat: "Barang cacat / rusak", salah_kirim: "Salah kirim / salah barang", lainnya: "Lainnya",
+};
+
+async function openReturnModal(receiptId, onDone) {
+  if (!receiptId) return;
+  let d;
+  try {
+    const resp = await fetch(`/api/receipts/${encodeURIComponent(receiptId)}`);
+    if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Nota tidak bisa dimuat."));
+    d = await resp.json();
+  } catch (err) { showToast(err.message || "Nota tidak bisa dimuat."); return; }
+  const lines = d.items.filter(i => i.item_type !== "jasa" && i.quantity > (i.returned_qty || 0));
+  if (!lines.length) { showToast("Tidak ada barang yang bisa diretur di nota ini."); return; }
+  returnCtx = { id: d.id, total: d.total, paid: d.amount_paid, lines, onDone };
+  const input = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
+  const lbl = (f, t) => `<label for="${f}" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">${t}</label>`;
+  openModal("Retur / Void Barang", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">Nota <b class="text-ink">${esc(d.receipt_no || d.plate_full)}</b>${d.po_number ? ` &middot; ${esc(d.po_number)}` : ""}. Retur tercatat di riwayat nota beserta alasan dan penggunanya.</p>
+      <div>${lbl("rt-item", "Barang")}
+        <select id="rt-item" onchange="updateReturnModal(true)" class="${input}">${lines.map(i => `<option value="${i.id}">${esc(i.product_name)} (${i.quantity - (i.returned_qty || 0)} bisa diretur)</option>`).join("")}</select></div>
+      <div>${lbl("rt-kind", "Jenis pembatalan")}
+        <select id="rt-kind" onchange="updateReturnModal(true)" class="${input}">
+          <option value="retur">Retur barang (barang dikembalikan pelanggan)</option>
+          <option value="void_item">Void barang (salah input, barang tidak keluar)</option></select></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>${lbl("rt-qty", "Jumlah dibatalkan")}<input id="rt-qty" type="text" inputmode="numeric" value="1" oninput="this.value=this.value.replace(/[^0-9]/g,''); updateReturnModal(true)" class="${input} text-right tabular-nums"></div>
+        <div id="rt-refund-wrap">${lbl("rt-refund", "Nilai refund")}<input id="rt-refund" type="text" inputmode="numeric" oninput="updateReturnModal(false)" class="${input} price-input text-right tabular-nums"></div>
+      </div>
+      <p id="rt-value" class="text-xs text-muted -mt-1"></p>
+      <div id="rt-dest-wrap"><div class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Barang yang dibatalkan, berapa ke mana?</div>
+        <div class="grid grid-cols-3 gap-2">${Object.entries(RETURN_DEST_LABELS).map(([k, v]) => `
+          <div><label for="rt-d-${k}" class="block text-[11px] text-muted mb-1">${v}</label>
+            <input id="rt-d-${k}" type="text" inputmode="numeric" value="0" oninput="this.value=this.value.replace(/[^0-9]/g,''); updateReturnModal(false)" class="${input} text-right tabular-nums"></div>`).join("")}</div>
+        <p id="rt-dest-hint" class="text-[11px] text-muted mt-1"></p></div>
+      <div><label for="rt-method" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Uang dikembalikan lewat</label>
+        <select id="rt-method" class="${input}">${Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>${lbl("rt-reason-code", 'Alasan <span class="text-failed">*</span>')}
+          <select id="rt-reason-code" class="${input}"><option value="">Pilih alasan…</option>${Object.entries(RETURN_REASON_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+        <div>${lbl("rt-reason", "Catatan")}
+          <input id="rt-reason" type="text" maxlength="150" data-no-uppercase placeholder="mis. tidak cocok dengan mobil" class="${input}"></div>
+      </div>
+      <div id="rt-summary" class="rounded-lg bg-bg2 px-3 py-2 text-sm"></div>
+      <p id="rt-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" id="rt-submit" onclick="submitReturn()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Catat Retur</button>
+      </div>
+    </div>`);
+  updateReturnModal(true);
+}
+
+function returnLineValue() {
+  const ctx = returnCtx;
+  const line = ctx.lines.find(i => String(i.id) === document.getElementById("rt-item").value);
+  const left = line.quantity - (line.returned_qty || 0);
+  const qty = Math.min(parseInt(document.getElementById("rt-qty").value, 10) || 0, left);
+  const lineTotal = line.quantity * line.unit_price - (line.line_discount || 0);
+  return { line, left, qty, value: Math.floor(lineTotal * qty / line.quantity) };
+}
+
+function returnDestSplit() {
+  const n = id => parseInt(document.getElementById(id).value, 10) || 0;
+  return { stok: n("rt-d-stok"), supplier: n("rt-d-supplier"), rusak: n("rt-d-rusak") };
+}
+
+function updateReturnModal(resetRefund) {
+  if (!returnCtx) return;
+  const voidItem = document.getElementById("rt-kind").value === "void_item";
+  const { left, qty, value } = returnLineValue();
+  const refundEl = document.getElementById("rt-refund");
+  if (resetRefund || voidItem) refundEl.value = groupDigits(value);
+  refundEl.disabled = voidItem;
+  document.getElementById("rt-dest-wrap").classList.toggle("hidden", voidItem);
+  if (resetRefund && !voidItem) {  // new quantity or item: everything defaults back to stock
+    document.getElementById("rt-d-stok").value = String(qty);
+    document.getElementById("rt-d-supplier").value = "0"; document.getElementById("rt-d-rusak").value = "0";
+  }
+  const sp = returnDestSplit(), sum = sp.stok + sp.supplier + sp.rusak;
+  const hint = document.getElementById("rt-dest-hint");
+  hint.textContent = sum === qty ? `Total ${qty} sesuai. Hanya jumlah "Kembali ke stok" yang menambah stok.` : `Total ${sum} dari ${qty}: jumlahnya harus sama.`;
+  hint.classList.toggle("text-failed", sum !== qty);
+  hint.classList.toggle("text-muted", sum === qty);
+  const reasonSel = document.getElementById("rt-reason-code");
+  if (voidItem && !reasonSel.value) reasonSel.value = "salah_input";
+  const refund = priceValue(refundEl);
+  document.getElementById("rt-value").textContent = voidItem
+    ? `Void ${qty} barang: refund penuh ${formatIDR(value)}, seluruhnya kembali ke stok, tanpa biaya (maks. ${left}).`
+    : `Harga ${qty} barang: ${formatIDR(value)} (maks. ${left}). Refund boleh lebih kecil; selisihnya jadi biaya retur.`;
+  const newTotal = returnCtx.total - refund;
+  const cashOut = Math.max(Math.min(returnCtx.paid - newTotal, refund), 0);
+  document.getElementById("rt-summary").innerHTML =
+    `Total nota menjadi <b class="tabular-nums">${formatIDR(Math.max(newTotal, 0))}</b>`
+    + (value > refund ? ` &middot; biaya retur <b class="tabular-nums">${formatIDR(value - refund)}</b>` : "")
+    + `<br>${cashOut > 0 ? `Uang dikembalikan ke pelanggan: <b class="tabular-nums text-failed">${formatIDR(cashOut)}</b>` : "Tidak ada uang yang dikembalikan (mengurangi sisa tagihan)."}`;
+}
+
+async function submitReturn() {
+  const ctx = returnCtx;
+  if (!ctx) { closeModal(); return; }
+  const err = document.getElementById("rt-error");
+  const fail = msg => { err.textContent = msg; err.classList.remove("hidden"); };
+  const { line, left, value } = returnLineValue();
+  const quantity = parseInt(document.getElementById("rt-qty").value, 10) || 0;
+  const refund = priceValue(document.getElementById("rt-refund"));
+  const reason = document.getElementById("rt-reason").value.trim();
+  const reasonCode = document.getElementById("rt-reason-code").value;
+  const kind = document.getElementById("rt-kind").value;
+  const sp = kind === "void_item" ? { stok: quantity, supplier: 0, rusak: 0 } : returnDestSplit();
+  if (quantity < 1 || quantity > left) return fail(`Jumlah dibatalkan harus 1 sampai ${left}.`);
+  if (refund > value) return fail(`Refund maksimal ${formatIDR(value)}.`);
+  if (!reasonCode) return fail("Pilih alasan pembatalan.");
+  if (reasonCode === "lainnya" && reason.length < 3) return fail("Isi catatan untuk alasan Lainnya (minimal 3 karakter).");
+  if (sp.stok + sp.supplier + sp.rusak !== quantity) return fail(`Jumlah stok + supplier + rusak harus sama dengan ${quantity}.`);
+  const btn = document.getElementById("rt-submit"); btn.disabled = true;
+  const resp = await fetch(`/api/receipts/${encodeURIComponent(ctx.id)}/returns`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id: line.id, quantity, refund_amount: refund, reason, kind, reason_code: reasonCode,
+      restock_qty: sp.stok, supplier_qty: sp.supplier, damaged_qty: sp.rusak,
+      method: document.getElementById("rt-method").value,
+    }),
+  });
+  if (!resp.ok) { fail(await responseErrorDetail(resp, "Retur gagal dicatat.")); btn.disabled = false; return; }
+  closeModal();
+  returnCtx = null;
+  const tab = findTabByReceiptId(ctx.id);
+  if (tab) await reloadTabFromServer(tab);
+  if (ctx.onDone) await ctx.onDone();
+  showToast(`${kind === "void_item" ? "Void" : "Retur"} ${line.product_name} x${quantity} dicatat.`, "success");
 }
 
 // Buka Kembali (admin): a closed nota (Lunas + Pengerjaan Selesai) is revised only with a reason on record.
@@ -6396,7 +6567,12 @@ function tabStateFromReceipt(tabId, r) {
       addedAt: it.added_at || "",
       addedBy: it.added_by || "",
       addedDuringWork: !!it.added_during_work,
+      preorderItemId: it.preorder_item_id || null,
+      returnedQty: it.returned_qty || 0,
     })),
+    preorderId: r.preorder_id || null,
+    poNumber: r.po_number || "",
+    returnTotal: Number(r.return_total) || 0,
     workStatus: r.work_status || "belum",
     voidReason: r.void_reason || "", voidedBy: r.voided_by || "", voidedAt: r.voided_at || "",
     total: Number(r.total) || 0,
@@ -6471,6 +6647,8 @@ function captureFormIntoActiveTab() {
     addedAt: row.dataset.addedAt || "",
     addedBy: row.dataset.addedBy || "",
     addedDuringWork: !!row.dataset.addedDuringWork,
+    preorderItemId: row.dataset.poItem ? Number(row.dataset.poItem) : null,
+    returnedQty: Number(row.dataset.returnedQty) || 0,
   }));
   tab.cashierName = document.getElementById("cashier-name-input").value;
   tab.estimatedFinish = document.getElementById("est-finish-input").value;
@@ -6485,7 +6663,7 @@ function captureFormIntoActiveTab() {
   tab.customerPhone = document.getElementById("customer-phone").value;
   tab.customerName = document.getElementById("customer-name").value;
   tab.discount = document.getElementById("discount-input").value;
-  tab.amountPaid = document.getElementById("amount-paid-input").value;
+  tab.amountPaid = String(priceValue(document.getElementById("amount-paid-input")));
   tab.paymentMethod = document.getElementById("payment-method-select").value;
   tab.transferSender = document.getElementById("transfer-sender-input").value;
   tab.transferAccount = document.getElementById("transfer-account-input").value;
@@ -6669,6 +6847,12 @@ function applyCashierVoidLock(tab) {
 
   document.querySelectorAll("#item-rows .item-row").forEach(row => {
     row.querySelectorAll("input, button").forEach(el => { el.disabled = readOnly; });
+    // PO lines: only the discount is the cashier's. Returned lines: nothing.
+    if (row.dataset.poItem || row.dataset.returnedQty) {
+      row.querySelectorAll("input, button").forEach(el => {
+        if (!el.classList.contains("item-disc") || row.dataset.returnedQty) el.disabled = true;
+      });
+    }
   });
 
   // Edit is offered only for a saved receipt that is locked and not voided —
@@ -6707,6 +6891,7 @@ function confirmVoidActiveReceipt() {
         <label for="void-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan Void <span class="text-failed">*</span></label>
         <textarea id="void-reason" rows="2" maxlength="200" data-no-uppercase placeholder="Contoh: salah input nota, pelanggan batal…" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"></textarea>
       </div>
+      ${isAdmin() ? `<div class="text-xs bg-bg2 border border-line rounded-lg px-3 py-2 text-ink flex items-center justify-between gap-3"><span>Hanya satu barang yang salah? Retur barang itu saja: stok kembali dan uang dikembalikan sesuai barangnya.</span><button type="button" onclick="closeModal(); openReturnModal('${tab.receiptId}')" class="shrink-0 px-3 py-1.5 border border-line rounded-lg text-xs font-medium bg-white hover:bg-bg2">Retur Barang</button></div>` : ""}
       ${Number(tab.amountPaid || 0) > 0 ? `<p class="text-xs bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-ink">Nota ini sudah dibayar ${formatIDR(Number(tab.amountPaid))}. Pembayaran dibalik dan dicatat; uangnya harus dikembalikan ke pelanggan. Hanya admin yang bisa melakukannya.</p>` : ""}
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
@@ -7266,6 +7451,12 @@ function updateCashierSettleButtons() {
   const tab = getActiveTab();
   const over = tab && tab.receiptId && tab.status !== "void" ? Math.max((Number(tab.amountPaid) || 0) - (Number(tab.total) || 0), 0) : 0;
   document.getElementById("cashier-refund-btn")?.classList.toggle("hidden", !(over > 0 && isAdmin()));
+  {
+    const t = getActiveTab();
+    const returnable = !!t && !!t.receiptId && t.status !== "void" && t.workStatus !== "draft" && !t.dirty
+      && (t.items || []).some(i => i.itemType !== "jasa" && (Number(i.qty) || 0) > (Number(i.returnedQty) || 0));
+    document.getElementById("cashier-return-btn")?.classList.toggle("hidden", !(returnable && isAdmin()));
+  }
   document.getElementById("cashier-reopen-btn")?.classList.toggle("hidden", !(tab && tab.receiptId && tab.status === "done" && tab.workStatus === "selesai" && isAdmin()));
   const show = !!(tab && tab.receiptId && tab.status === "pending" && tab.workStatus !== "draft");
   const blocked = show && tab.dirty;
@@ -7607,6 +7798,9 @@ async function reloadReceiptIntoOpenTab(receiptId) {
 async function refreshAfterSettle() {
   await loadReceiptHistory();
   if (currentRoute() === "/invoices") await refreshInvoiceHistory(true);
+  if (currentRoute() === "/preorder" && currentPreorder && !document.getElementById("po-detail-panel").classList.contains("hidden")) {
+    await openPreorder(currentPreorder.id);
+  }
 }
 
 // ── Invoices: history search, date range and status filter ───────────────────
@@ -8000,6 +8194,7 @@ function confirmVoidHistoryRow(receiptId) {
         <label for="void-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan Void <span class="text-failed">*</span></label>
         <textarea id="void-reason" rows="2" maxlength="200" data-no-uppercase placeholder="Contoh: salah input nota, pelanggan batal…" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"></textarea>
       </div>
+      ${isAdmin() ? `<div class="text-xs bg-bg2 border border-line rounded-lg px-3 py-2 text-ink flex items-center justify-between gap-3"><span>Hanya satu barang yang salah? Retur barang itu saja: stok kembali dan uang dikembalikan sesuai barangnya.</span><button type="button" onclick="closeModal(); openReturnModal('${esc(receiptId)}', () => loadReceiptHistory())" class="shrink-0 px-3 py-1.5 border border-line rounded-lg text-xs font-medium bg-white hover:bg-bg2">Retur Barang</button></div>` : ""}
       ${r.amount_paid > 0 ? `<p class="text-xs bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-ink">Nota ini sudah dibayar ${formatIDR(r.amount_paid)}. Pembayaran dibalik dan dicatat; uangnya harus dikembalikan ke pelanggan. Hanya admin yang bisa melakukannya.</p>` : ""}
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
@@ -10874,7 +11069,7 @@ function openMasterForm(mode, item, prefillName) {
     comboboxSetValue(supplierEl, "", "");
     comboboxSetValue(brandEl, "", "");
   }
-  supplierEl.disabled = isEdit;
+  supplierEl.disabled = isEdit && !isAdmin();
   brandEl.disabled = isEdit;
   g("new-item-name").value = (item ? item.name : (prefillName || "")).toUpperCase();
   if (item) setUnitSelectValue(g("new-item-unit"), item.unit); else g("new-item-unit").value = "";
@@ -10908,7 +11103,7 @@ function openMasterForm(mode, item, prefillName) {
     : isDup ? `Salin data master dari barang yang sudah ada untuk membuat produk baru. Sumber: ${item.name} — ${item.sku}`
     : "Tambahkan produk baru ke master barang inventori.";
   const banner = g("mf-banner");
-  const bannerText = isEdit ? "SKU, supplier, dan merek tidak dapat diubah karena membentuk kode SKU barang. Harga modal dihitung otomatis dari barang masuk."
+  const bannerText = isEdit ? "SKU dan merek tidak dapat diubah karena membentuk kode SKU barang. Supplier hanya dapat diganti oleh admin; SKU tetap sama. Harga modal dihitung otomatis dari barang masuk."
     : isDup ? "Hanya data master yang disalin. Stok, riwayat transaksi, dan data pergerakan barang tidak ikut disalin. Ubah nama sebelum menyimpan: nama yang sama untuk supplier dan merek ini sudah ada."
     : "";
   banner.textContent = bannerText;
@@ -11059,6 +11254,7 @@ async function submitMasterFormEdit() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name, unit, sell_price: sellPrice, min_stock: minStock, expected_updated_at: item.updated_at || undefined,
+        supplier_id: isAdmin() ? (Number(document.getElementById("new-item-supplier").dataset.selectedId) || undefined) : undefined,
         description: document.getElementById("new-item-description").value,
         location: document.getElementById("new-item-location").value,
         category_id: selectedItemCategoryId(),
@@ -13973,7 +14169,7 @@ async function submitPurchaseInvoicePayment() {
 }
 
 // ── Cashier: customer nota (Nota Penjualan) ──────────────────────────────────
-// Printed on A5 landscape from the saved receipt, never from the form, so the paper always
+// Printed portrait on 9.5in x 11in continuous form from the saved receipt, never from the form, so the paper always
 // matches what was stored (number, items, totals).
 
 const TERBILANG_WORDS = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
@@ -14030,7 +14226,8 @@ async function printReceiptNota(receiptId) {
   } else if (logo && !logo.naturalWidth) {
     logo.parentElement.remove();  // already failed (missing file) before we started waiting
   }
-  printWithPageRule("@page { size: A5 landscape; margin: 7mm 9mm; }", "print-nota");
+  // Portrait continuous form (9.5in x 11in): a page wider than tall makes the driver rotate it sideways.
+  printWithPageRule("@page { size: 9.5in 11in; margin: 7mm 9mm; }", "print-nota");
 }
 
 function receiptNotaHtml(r, customer) {
@@ -14801,6 +14998,7 @@ async function savePreorder(asDraft = false) {
     } else {
       renderPreorderDetail(detail);
       showToast(editing ? "Preorder diperbarui." : `Preorder ${detail.po_number} tersimpan.`, "success");
+      if (!editing && detail.receipt_id) openPoInvoiceCreatedModal(detail);
     }
   } catch (e) {
     showToast(e.message);
@@ -14862,13 +15060,31 @@ function renderPreorderDetail(detail) {
     </tr>
   `).join("");
   document.getElementById("po-detail-payments-empty").classList.toggle("hidden", detail.payments.length > 0);
-  document.getElementById("po-detail-total").textContent = formatIDR(detail.total);
+  // With an invoice the money side is the invoice's: it also carries lines the cashier added (jasa) and returns.
+  const poTotalEl = document.getElementById("po-detail-total");
+  poTotalEl.textContent = formatIDR(detail.receipt_id ? (detail.invoice_total || 0) : detail.total);
+  poTotalEl.previousElementSibling.textContent = detail.receipt_id ? "Total Invoice" : "Total Pesanan";
   document.getElementById("po-detail-paid").textContent = formatIDR(detail.deposit);
   const remainingEl = document.getElementById("po-detail-remaining");
   remainingEl.textContent = formatIDR(detail.remaining);
   remainingEl.classList.toggle("text-failed", detail.remaining > 0);
   remainingEl.classList.toggle("text-done", detail.remaining === 0);
 
+  // Every published PO has its invoice: payments are taken there and it follows the PO's items.
+  // The old "Buat Nota Penjualan" card is left only for a PO that has none (draft, or an old PO).
+  const hasInvoice = !!detail.receipt_id;
+  document.getElementById("po-detail-invoice-card").classList.toggle("hidden", !hasInvoice);
+  document.getElementById("po-detail-nota-card").classList.toggle("hidden", hasInvoice || detail.is_draft);
+  if (hasInvoice) {
+    const invVoid = detail.invoice_status === "void";
+    document.getElementById("po-detail-invoice-info").innerHTML =
+      `<span class="text-ink font-medium tabular-nums">${esc(detail.receipt_no || "Invoice")}</span> &middot; ${formatIDR(detail.invoice_total || 0)} `
+      + `<span class="inline-flex gap-1 align-middle">${paymentBadge(detail.invoice_total, detail.deposit, detail.invoice_status)}${workBadge(detail.invoice_work_status, detail.invoice_status)}</span>`
+      + `<div class="text-xs text-muted mt-1">Pembayaran dicatat di invoice. Perubahan barang di PO ikut mengubah invoice; stok berkurang saat barang sampai di toko.</div>`;
+    document.getElementById("po-inv-pay-btn").classList.toggle("hidden", invVoid || detail.remaining <= 0);
+    document.getElementById("po-inv-return-btn").classList.toggle("hidden", invVoid || !isAdmin());
+  }
+  document.getElementById("po-pay-btn").classList.toggle("hidden", hasInvoice && (detail.invoice_status === "void" || detail.remaining <= 0));
   const poReady = detail.items.filter(i => !i.receipt_id && (i.status === "sampai_di_toko" || i.status === "terpasang"));
   const poOnNota = detail.items.filter(i => i.receipt_id).length;
   document.getElementById("po-convert-btn").disabled = poReady.length === 0;
@@ -14893,6 +15109,30 @@ function renderPreorderDetail(detail) {
       </tr>
     `).join("");
   showPreorderPanel("po-detail-panel");
+}
+
+// "Tambah Pembayaran" on a PO: once the PO has its invoice the money is taken there (Pembayaran Nota);
+// a draft PO still records a DP on the PO itself, moved onto the invoice when it is published.
+function poPayClick() {
+  if (!currentPreorder) return;
+  if (currentPreorder.receipt_id) openReceiptPaymentModal(currentPreorder.receipt_id);
+  else openPoPaymentModal();
+}
+
+function openPoInvoiceCreatedModal(detail) {
+  openModal("Invoice Dibuat", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">PO <b class="text-ink">${esc(detail.po_number)}</b> tersimpan dan invoicenya sudah dibuat:
+        <b class="text-ink tabular-nums">${esc(detail.receipt_no || "")}</b> (${formatIDR(detail.invoice_total || 0)}).
+        Status pengerjaan <b class="text-ink">Menunggu Barang</b> sampai semua barang sampai di toko.</p>
+      <div class="rounded-lg bg-bg2 px-3 py-2 text-sm flex justify-between"><span class="text-muted">Sudah dibayar</span><span class="tabular-nums text-ink">${formatIDR(detail.deposit)}</span></div>
+      <div class="rounded-lg bg-bg2 px-3 py-2 text-sm flex justify-between"><span class="text-muted">Sisa tagihan</span><span class="tabular-nums font-semibold text-ink">${formatIDR(detail.remaining)}</span></div>
+      <div class="flex flex-wrap justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Nanti</button>
+        <button type="button" id="po-created-open" onclick="closeModal(); openReceiptFromHistory('${esc(detail.receipt_id)}')" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Buka Invoice</button>
+        ${detail.remaining > 0 ? `<button type="button" id="po-created-pay" onclick="closeModal(); openReceiptPaymentModal('${esc(detail.receipt_id)}')" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Bayar Sekarang</button>` : ""}
+      </div>
+    </div>`);
 }
 
 function togglePoMenu(event) {
@@ -17700,10 +17940,15 @@ async function saveSupplierPo(issue) {
 // what is ticked here.
 const spoPicker = { query: "", progress: "belum", page: 1, size: 10, rows: [], total: 0, counts: { belum: 0, sebagian: 0, semua: 0 }, selected: new Map(), seq: 0 };
 
+// Generic ("UMUM") items can be bought from any supplier, so they never lock or get blocked.
+function spoIsGenericRow(row) {
+  return String(row?.supplier_name || "").trim().toUpperCase() === "UMUM";
+}
+
 function spoPickerLockId() {
   const chosen = spoSupplierId();
   if (chosen) return chosen;
-  for (const sel of spoPicker.selected.values()) if (sel.supplier_id != null) return sel.supplier_id;
+  for (const sel of spoPicker.selected.values()) if (sel.supplier_id != null && !spoIsGenericRow(sel)) return sel.supplier_id;
   return null;
 }
 
@@ -17808,7 +18053,7 @@ function renderSpoPicker() {
   document.getElementById("spo-picker-empty").classList.toggle("hidden", spoPicker.rows.length > 0);
   tbody.innerHTML = spoPicker.rows.map(row => {
     const sel = spoPicker.selected.get(row.preorder_item_id);
-    const blocked = !sel && row.supplier_id != null && lockId != null && row.supplier_id !== lockId;
+    const blocked = !sel && row.supplier_id != null && lockId != null && row.supplier_id !== lockId && !spoIsGenericRow(row);
     const rid = row.preorder_item_id;
     return `
     <tr class="border-b border-line last:border-b-0 ${blocked ? "opacity-45" : "hover:bg-bg2/60"}" ${blocked ? `title="Supplier ${esc(row.supplier_name)} berbeda dari supplier PO ini"` : ""}>

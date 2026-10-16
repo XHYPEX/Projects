@@ -23,6 +23,11 @@ def number_preview(day: str) -> str:
         return _next_no(con, day)
 
 
+# A PO Customer line still open: not yet on a nota, or on the PO's own invoice. (Lines of an older PO
+# that were turned into a separate nota are counted under Kasir instead.)
+_OPEN_PO_LINE = "(pi.receipt_id IS NULL OR pi.receipt_id = (SELECT p.receipt_id FROM preorders p WHERE p.id = pi.preorder_id))"
+
+
 def _activity_counts(con: sqlite3.Connection, master_item_id: int) -> dict:
     """What is still in flight for an item: the warning panel on the form."""
     kasir = con.execute(
@@ -34,8 +39,8 @@ def _activity_counts(con: sqlite3.Connection, master_item_id: int) -> dict:
            WHERE ri.master_item_id=? AND r.status='pending'""", (master_item_id,)
     ).fetchone()["c"]
     po_cust = con.execute(
-        """SELECT COUNT(DISTINCT preorder_id) AS c FROM preorder_items
-           WHERE master_item_id=? AND status<>'terpasang' AND receipt_id IS NULL""", (master_item_id,)
+        f"""SELECT COUNT(DISTINCT preorder_id) AS c FROM preorder_items pi
+           WHERE master_item_id=? AND status<>'terpasang' AND {_OPEN_PO_LINE}""", (master_item_id,)
     ).fetchone()["c"]
     po_sup = con.execute(
         """SELECT COUNT(DISTINCT spi.supplier_po_id) AS c FROM supplier_po_items spi
@@ -43,9 +48,11 @@ def _activity_counts(con: sqlite3.Connection, master_item_id: int) -> dict:
            WHERE spi.master_item_id=? AND sp.status IN ('dipesan','sebagian_diterima')""", (master_item_id,)
     ).fetchone()["c"]
     po_cust_qty = con.execute(
-        """SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items
-           WHERE master_item_id=? AND status<>'terpasang' AND receipt_id IS NULL""", (master_item_id,)
+        f"""SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items pi
+           WHERE master_item_id=? AND status<>'terpasang' AND {_OPEN_PO_LINE}""", (master_item_id,)
     ).fetchone()["c"]
+    # Arrived and still on the shelf for a customer. A PO with an invoice has already taken them off the
+    # shelf on arrival, so only lines of a PO without one (older POs) are reserved here.
     po_cust_reserved = con.execute(
         """SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items
            WHERE master_item_id=? AND status='sampai_di_toko' AND receipt_id IS NULL""", (master_item_id,)

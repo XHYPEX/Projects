@@ -8,6 +8,9 @@ from backend.auth import get_current_user
 from backend.database import (
     PREORDER_STATUSES,
     add_preorder_payment,
+    get_receipt_payments,
+    po_invoice_payment,
+    split_plate,
     apply_preorder_dp,
     create_receipt,
     get_preorder_allocations,
@@ -74,6 +77,18 @@ def _validate_plate(raw: str) -> str:
     return plate
 
 
+def _require_invoice_plate(plate: str) -> None:
+    """A published PO gets its invoice at once, and an invoice needs a plate the cashier accepts."""
+    if split_plate(plate) is None:
+        raise HTTPException(status_code=422, detail="Plat mobil harus berformat seperti B 1234 ABC (kode wilayah, nomor, huruf).")
+
+
+def _po_error(e: ValueError) -> HTTPException:
+    msg = str(e)
+    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat")) else 409
+    return HTTPException(status_code=status, detail=msg)
+
+
 def _validate_po_date(raw: str) -> str:
     try:
         return parse_ymd(raw).isoformat()
@@ -137,7 +152,15 @@ async def _detail(preorder_id: str) -> PreorderDetail:
         raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
     items = await loop.run_in_executor(None, get_preorder_items, preorder_id)
     history = await loop.run_in_executor(None, get_preorder_history, preorder_id)
-    payments = await loop.run_in_executor(None, get_preorder_payments, preorder_id)
+    if row.get("receipt_id"):
+        # Money is taken on the invoice; the PO shows the invoice's payments.
+        payments = [
+            {"id": p["id"], "paid_at": p["paid_at"], "amount": p["amount"], "note": p["note"],
+             "created_by": p["created_by"], "method": p["method"]}
+            for p in await loop.run_in_executor(None, get_receipt_payments, row["receipt_id"])
+        ]
+    else:
+        payments = await loop.run_in_executor(None, get_preorder_payments, preorder_id)
     allocations = await loop.run_in_executor(None, get_preorder_allocations, preorder_id)
     def _free() -> int:
         with _conn() as con:
@@ -165,6 +188,10 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
         raise HTTPException(status_code=422, detail="Minimal harus ada satu baris barang.")
     if req.deposit < 0:
         raise HTTPException(status_code=422, detail="Uang muka tidak boleh negatif.")
+    if req.deposit_method not in ("cash", "transfer", "qris", "debit"):
+        raise HTTPException(status_code=422, detail="Metode pembayaran harus salah satu dari: cash, transfer, qris, debit.")
+    if not req.is_draft:
+        _require_invoice_plate(plate_full)
 
     items = _validate_items(req.items)
     if req.deposit > sum(i["quantity"] * i["unit_price"] for i in items):
@@ -173,10 +200,15 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
 
     preorder_id = str(uuid4())
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(
-        None, create_preorder, preorder_id, customer_name, customer_phone, items,
-        req.deposit, notes, user["username"], plate_full, po_date, req.is_draft,
-    )
+    try:
+        await loop.run_in_executor(
+            None, lambda: create_preorder(
+                preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
+                plate_full, po_date, req.is_draft, deposit_method=req.deposit_method,
+            ),
+        )
+    except ValueError as e:
+        raise _po_error(e)
     return await _detail(preorder_id)
 
 
@@ -224,15 +256,21 @@ async def update_preorder_route(
     # field leaves the stored note intact while an explicit null clears it.
     update_notes = "notes" in req.model_fields_set
     notes = (req.notes.strip() if req.notes else None) if update_notes else None
+    will_be_draft = current["is_draft"] if req.is_draft is None else req.is_draft
+    if not will_be_draft and (plate_full is not None or current["is_draft"]):
+        _require_invoice_plate(plate_full if plate_full is not None else current["plate_full"])
 
-    await loop.run_in_executor(
-        None,
-        lambda: update_preorder(
-            preorder_id, customer_name=customer_name, customer_phone=customer_phone, items=items,
-            notes=notes, update_notes=update_notes, changed_by=user["username"],
-            is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
-        ),
-    )
+    try:
+        await loop.run_in_executor(
+            None,
+            lambda: update_preorder(
+                preorder_id, customer_name=customer_name, customer_phone=customer_phone, items=items,
+                notes=notes, update_notes=update_notes, changed_by=user["username"],
+                is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
+            ),
+        )
+    except ValueError as e:
+        raise _po_error(e)
     return await _detail(preorder_id)
 
 
@@ -252,7 +290,7 @@ async def update_preorder_item_status(
             None, set_preorder_item_status, preorder_id, item_id, status, user["username"]
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise _po_error(e)
     return await _detail(preorder_id)
 
 
@@ -265,7 +303,7 @@ async def update_preorder_status(
     try:
         await loop.run_in_executor(None, set_preorder_status, preorder_id, status, user["username"])
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise _po_error(e)
     return await _detail(preorder_id)
 
 
@@ -287,7 +325,18 @@ async def add_payment(
     if req.method not in ("cash", "transfer", "qris", "debit"):
         raise HTTPException(status_code=422, detail="Metode pembayaran harus salah satu dari: cash, transfer, qris, debit.")
     note = req.note.strip() if req.note and req.note.strip() else None
-    await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"], req.method)
+    if row.get("receipt_id"):
+        if req.method == "transfer" and not ((req.transfer_sender or "").strip() and (req.transfer_account or "").strip()):
+            raise HTTPException(status_code=422, detail="Untuk transfer, isi nama pengirim dan rekening tujuan.")
+        try:
+            await loop.run_in_executor(
+                None, po_invoice_payment, preorder_id, req.amount, req.method, note, user["username"],
+                (req.transfer_sender or "").strip() or None, (req.transfer_account or "").strip() or None,
+            )
+        except ValueError as e:
+            raise _po_error(e)
+    else:
+        await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"], req.method)
     return await _detail(preorder_id)
 
 
@@ -301,6 +350,8 @@ async def convert_to_receipt(
     po = await loop.run_in_executor(None, get_preorder, preorder_id)
     if po is None:
         raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
+    if po.get("receipt_id"):
+        raise HTTPException(status_code=409, detail="PO ini sudah punya invoice. Buka invoicenya untuk pembayaran.")
     lines = await loop.run_in_executor(None, preorder_convertible_items, preorder_id, req.item_ids)
     if req.item_ids is not None and len(lines) != len(set(req.item_ids)):
         raise HTTPException(status_code=409, detail="Ada item yang belum sampai di toko atau sudah masuk nota.")

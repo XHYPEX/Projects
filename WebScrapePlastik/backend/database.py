@@ -996,6 +996,53 @@ def init_db() -> None:
                     (seed_unit_name, unit_seed_normalized, _now()),
                 )
 
+        # --- Additive migration: PO Customer -> Invoice ---
+        # Every published PO Customer owns exactly one invoice (receipts row) from the moment it is
+        # created; its lines carry preorder_item_id so the invoice follows the PO, and payments are
+        # taken on the invoice only.
+        if "receipt_id" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
+            con.execute("ALTER TABLE preorders ADD COLUMN receipt_id TEXT")
+        if "preorder_item_id" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
+            con.execute("ALTER TABLE receipt_items ADD COLUMN preorder_item_id INTEGER")
+        # --- Additive migration: Retur Barang ---
+        # returned_qty: how many of a line the customer brought back; returned_stock_qty: how many of
+        # those went back on the shelf (the rest went to the supplier or were written off).
+        # receipts.return_total: what the returns took off the nota's total (the refunds).
+        ri_cols = {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}
+        if "returned_qty" not in ri_cols:
+            con.execute("ALTER TABLE receipt_items ADD COLUMN returned_qty INTEGER NOT NULL DEFAULT 0")
+        if "returned_stock_qty" not in ri_cols:
+            con.execute("ALTER TABLE receipt_items ADD COLUMN returned_stock_qty INTEGER NOT NULL DEFAULT 0")
+        if "return_total" not in {r["name"] for r in con.execute("PRAGMA table_info(receipts)").fetchall()}:
+            con.execute("ALTER TABLE receipts ADD COLUMN return_total INTEGER NOT NULL DEFAULT 0")
+        con.executescript("""
+            CREATE TABLE IF NOT EXISTS receipt_returns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_id TEXT NOT NULL,
+                receipt_item_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL,
+                master_item_id INTEGER,
+                quantity INTEGER NOT NULL,
+                item_value INTEGER NOT NULL,
+                refund_amount INTEGER NOT NULL,
+                cash_out INTEGER NOT NULL DEFAULT 0,
+                method TEXT,
+                destination TEXT NOT NULL CHECK (destination IN ('stok','supplier','rusak')),
+                reason TEXT NOT NULL,
+                returned_by TEXT,
+                returned_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_receipt_returns_receipt ON receipt_returns(receipt_id);
+        """)
+        rr_cols = {r["name"] for r in con.execute("PRAGMA table_info(receipt_returns)").fetchall()}
+        for col, ddl in (
+            ("kind", "TEXT NOT NULL DEFAULT 'retur'"), ("reason_code", "TEXT"), ("restock_qty", "INTEGER"),
+            ("supplier_qty", "INTEGER"), ("damaged_qty", "INTEGER"),
+        ):
+            if col not in rr_cols:
+                con.execute(f"ALTER TABLE receipt_returns ADD COLUMN {col} {ddl}")
+        _backfill_po_invoices(con)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -1234,9 +1281,12 @@ def _resolve_master_item_id(con: sqlite3.Connection, sku: str | None) -> int | N
 # Work stage, independent of payment: draft (parked, no stock, no money) -> belum (Belum Dikerjakan)
 # -> pengerjaan (Dalam Pengerjaan) -> selesai (Pengerjaan Selesai). Payment status is derived from
 # amount_paid vs total and lives in receipts.status (pending / done / void).
-RECEIPT_WORK_STATUSES = ("draft", "belum", "pengerjaan", "selesai")
+# "menunggu" (Menunggu Barang) is only ever set by a PO Customer invoice whose goods have not all
+# arrived; it moves on to "belum" by itself once they have (or by hand).
+RECEIPT_WORK_STATUSES = ("draft", "menunggu", "belum", "pengerjaan", "selesai")
 _WORK_TRANSITIONS = {
     "draft": {"belum", "pengerjaan", "selesai"},
+    "menunggu": {"belum", "pengerjaan", "selesai"},
     "belum": {"pengerjaan", "selesai"},
     "pengerjaan": {"belum", "selesai"},
     "selesai": {"pengerjaan"},
@@ -1273,17 +1323,27 @@ def get_receipt_events(receipt_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def _receipt_item_holdings(items: list[dict]) -> dict[int, int]:
+PO_ARRIVED_STATUSES = ("sampai_di_toko", "terpasang")
+
+
+def _receipt_item_holdings(items: list[dict], con: sqlite3.Connection | None = None) -> dict[int, int]:
     """Sum of quantity per master_item_id across a set of receipt items, skipping
     lines with no master item link. This is the 'holding' referenced throughout
     the stock-movement code: what a non-void receipt currently has taken off the
-    shelf, per product."""
+    shelf, per product. A line that comes from a PO Customer holds nothing until
+    that PO line has arrived (sampai di toko / terpasang) -- pass `con` so it can look."""
     holdings: dict[int, int] = {}
     for item in items:
         master_item_id = item.get("master_item_id")
         if master_item_id is None or item.get("item_type") == "jasa":
             continue
-        holdings[master_item_id] = holdings.get(master_item_id, 0) + item["quantity"]
+        if con is not None and item.get("preorder_item_id"):
+            po_line = con.execute("SELECT status FROM preorder_items WHERE id=?", (item["preorder_item_id"],)).fetchone()
+            if po_line is None or po_line["status"] not in PO_ARRIVED_STATUSES:
+                continue
+        held = item["quantity"] - (item.get("returned_stock_qty") or 0)
+        if held > 0:
+            holdings[master_item_id] = holdings.get(master_item_id, 0) + held
     return holdings
 
 
@@ -1402,13 +1462,15 @@ _CUSTOMER_FULL_NAME_SQL = "TRIM(c.first_name || ' ' || COALESCE(c.last_name, '')
 _RECEIPT_REVISION_SQL = """
     (SELECT COUNT(*) FROM receipt_events e WHERE e.receipt_id = r.id) || '-' || r.total || '-' || r.amount_paid
     || '-' || r.work_status || '-' || r.status || '-' || r.discount || '-'
-    || COALESCE((SELECT SUM(ri.id * 7 + ri.quantity * 131 + ri.unit_price + ri.line_discount * 3)
+    || COALESCE((SELECT SUM(ri.id * 7 + ri.quantity * 131 + ri.unit_price + ri.line_discount * 3 + ri.returned_qty * 17)
                  FROM receipt_items ri WHERE ri.receipt_id = r.id), 0) || '-'
     || (SELECT COUNT(*) FROM receipt_payments p WHERE p.receipt_id = r.id)"""
 
 _RECEIPT_SELECT = f"""SELECT r.*,
         CASE WHEN c.id IS NOT NULL THEN {_CUSTOMER_FULL_NAME_SQL} ELSE r.customer_name END AS customer_full_name,
-        {_RECEIPT_REVISION_SQL} AS revision
+        {_RECEIPT_REVISION_SQL} AS revision,
+        (SELECT p.id FROM preorders p WHERE p.receipt_id = r.id) AS preorder_id,
+        (SELECT p.po_number FROM preorders p WHERE p.receipt_id = r.id) AS po_number
     FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id"""
 
 
@@ -1643,7 +1705,7 @@ def create_receipt(
         # A brand-new receipt has no prior holding; a draft or a receipt created straight
         # into 'void' (the only status a caller can set directly) holds nothing.
         after_holdings = (
-            _receipt_item_holdings(resolved_items) if _holds_stock(final_status, work_status) else {}
+            _receipt_item_holdings(resolved_items, con) if _holds_stock(final_status, work_status) else {}
         )
         _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings)
         _log_receipt_event(con, receipt_id, "created", {
@@ -1817,7 +1879,9 @@ def get_all_receipts(
         rows = con.execute(
             f"""SELECT r.*,
                    CASE WHEN c.id IS NOT NULL THEN {_CUSTOMER_FULL_NAME_SQL} ELSE r.customer_name END AS customer_full_name,
-                   (SELECT COUNT(*) FROM receipt_items ri WHERE ri.receipt_id = r.id) AS item_count
+                   (SELECT COUNT(*) FROM receipt_items ri WHERE ri.receipt_id = r.id) AS item_count,
+                   (SELECT p.id FROM preorders p WHERE p.receipt_id = r.id) AS preorder_id,
+                   (SELECT p.po_number FROM preorders p WHERE p.receipt_id = r.id) AS po_number
                FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id
                {where_sql} ORDER BY {RECEIPT_SORTS[sort]}{limit_sql}""",
             params,
@@ -1864,6 +1928,7 @@ def get_receipt_summary(tz_offset_minutes: int | None = None) -> dict:
                  COALESCE(SUM(CASE WHEN status = 'pending' AND work_status != 'draft' THEN MAX(total - amount_paid, 0) END), 0) AS pending_outstanding,
                  COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'draft' THEN 1 END), 0) AS draft_count,
                  COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'pengerjaan' THEN 1 END), 0) AS pengerjaan_count,
+                 COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'menunggu' THEN 1 END), 0) AS menunggu_count,
                  COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'belum' THEN 1 END), 0) AS belum_count,
                  COALESCE(SUM(CASE WHEN status != 'void' AND work_status = 'selesai' THEN 1 END), 0) AS selesai_count,
                  COALESCE(SUM(CASE WHEN created_at >= ? AND created_at < ? AND status = 'void' THEN 1 END), 0) AS void_today
@@ -1908,6 +1973,9 @@ def update_receipt(
         existing = dict(row)
         extra = extra or {}
         is_draft = existing["work_status"] == "draft"
+        if status == "void" and existing["status"] != "void" and existing.get("return_total") is not None \
+                and con.execute("SELECT 1 FROM receipt_returns WHERE receipt_id=?", (receipt_id,)).fetchone():
+            raise ValueError("Nota ini sudah ada retur barang, jadi tidak bisa di-void. Retur sisa barangnya bila perlu.")
 
         new_plate_region = plate_region if plate_region is not None else existing["plate_region"]
         new_plate_number = plate_number if plate_number is not None else existing["plate_number"]
@@ -1960,7 +2028,7 @@ def update_receipt(
             "SELECT * FROM receipt_items WHERE receipt_id=? ORDER BY id ASC", (receipt_id,)
         ).fetchall()]
         before_holdings = (
-            _receipt_item_holdings(existing_items)
+            _receipt_item_holdings(existing_items, con)
             if _holds_stock(existing["status"], existing["work_status"]) else {}
         )
 
@@ -1971,6 +2039,25 @@ def update_receipt(
             # Lines the client echoes back by id keep who added them and when; anything else is
             # new. A line added once the car is already being worked on is flagged as such.
             old_by_id = {r["id"]: r for r in existing_items}
+            # Lines that come from a PO Customer belong to the PO: they are changed (or removed) there,
+            # and the invoice follows. Here they must come back untouched apart from discount.
+            sent_by_id = {item.get("id"): item for item in resolved_items if item.get("id") in old_by_id}
+            for old_row in existing_items:
+                if not old_row.get("preorder_item_id"):
+                    continue
+                sent = sent_by_id.get(old_row["id"])
+                if sent is None or sent["product_name"] != old_row["product_name"] or sent["quantity"] != old_row["quantity"] \
+                        or sent["unit_price"] != old_row["unit_price"]:
+                    raise ValueError(f"Barang {old_row['product_name']} berasal dari PO Customer. Ubah atau batalkan di halaman PO Customer.")
+                sent["master_item_id"] = old_row["master_item_id"]
+            for old_row in existing_items:
+                if not old_row.get("returned_qty"):
+                    continue
+                sent = sent_by_id.get(old_row["id"])
+                if sent is None or sent["quantity"] != old_row["quantity"] or sent["unit_price"] != old_row["unit_price"] \
+                        or (sent.get("line_discount") or 0) != (old_row["line_discount"] or 0):
+                    raise ValueError(f"Barang {old_row['product_name']} sudah pernah diretur, jadi baris itu tidak bisa diubah atau dihapus.")
+                sent["master_item_id"] = old_row["master_item_id"]
             now_iso = _now()
             during_work = 0 if is_draft else 1
             con.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
@@ -1996,11 +2083,13 @@ def update_receipt(
                         changed_notes.append(f"{item['product_name']}: " + ", ".join(bits))
                     con.execute(
                         """INSERT INTO receipt_items (id, receipt_id, product_name, quantity, unit_price, warranty_date,
-                               master_item_id, item_type, line_discount, added_at, added_by, added_during_work)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               master_item_id, item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id,
+                               returned_qty, returned_stock_qty)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (old["id"], receipt_id, item["product_name"], item["quantity"], item["unit_price"],
                          item.get("warranty_date"), item["master_item_id"], item.get("item_type") or "barang",
-                         item.get("line_discount") or 0, old["added_at"], old["added_by"], old["added_during_work"]),
+                         item.get("line_discount") or 0, old["added_at"], old["added_by"], old["added_during_work"],
+                         old.get("preorder_item_id"), old.get("returned_qty") or 0, old.get("returned_stock_qty") or 0),
                     )
                 else:
                     con.execute(
@@ -2030,7 +2119,7 @@ def update_receipt(
         if effective_items is not None:
             new_subtotal = sum(_line_total(item) for item in effective_items)
             new_discount = discount if discount is not None else existing["discount"]
-            new_total = new_subtotal - new_discount
+            new_total = new_subtotal - new_discount - (existing.get("return_total") or 0)
         else:
             new_subtotal = existing["subtotal"]
             new_discount = existing["discount"]
@@ -2093,7 +2182,7 @@ def update_receipt(
         # the ones just written, or the untouched existing ones.
         after_items = effective_items if effective_items is not None else existing_items
         after_holdings = (
-            _receipt_item_holdings(after_items) if _holds_stock(new_status, new_work_status) else {}
+            _receipt_item_holdings(after_items, con) if _holds_stock(new_status, new_work_status) else {}
         )
         _apply_receipt_stock_delta(con, receipt_id, before_holdings, after_holdings)
         if new_status == "void" and existing["status"] != "void":
@@ -2212,6 +2301,134 @@ def reopen_closed_receipt(receipt_id: str, reason: str, by: str | None = None) -
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
 
+RETURN_DESTINATIONS = {"stok": "kembali ke stok", "supplier": "dikembalikan ke supplier", "rusak": "rusak / dibuang"}
+RETURN_REASONS = {
+    "salah_input": "Salah input kasir", "pelanggan_batal": "Pelanggan batal", "tidak_cocok": "Barang tidak cocok",
+    "cacat": "Barang cacat / rusak", "salah_kirim": "Salah kirim / salah barang", "lainnya": "Lainnya",
+}
+
+
+def return_receipt_item(
+    receipt_id: str, item_id: int, quantity: int, destination: str | None, refund_amount: int,
+    method: str, reason: str, by: str | None = None, *, kind: str = "retur", reason_code: str | None = None,
+    restock_qty: int | None = None, supplier_qty: int | None = None, damaged_qty: int | None = None,
+) -> dict:
+    """Retur Barang (admin): the customer brings back `quantity` of one barang line, also on a closed nota.
+    The line keeps its quantity and is marked returned; the nota's total drops by `refund_amount` (at most
+    what those units were sold for -- anything less is kept by the shop as a fee). Whatever is then paid
+    beyond the new total is handed back at once as a negative payment, so sales drop on the return date.
+    Only destination 'stok' puts the goods back on the shelf. Messages: 'tidak ditemukan' -> 404,
+    'Jumlah'/'Alasan'/'Tujuan' -> 422, else 409."""
+    reason = (reason or "").strip()
+    if kind not in ("retur", "void_item"):
+        raise ValueError("Jenis pembatalan tidak valid.")
+    if reason_code is not None and reason_code not in RETURN_REASONS:
+        raise ValueError("Alasan tidak valid.")
+    if kind == "void_item":
+        # A mistaken line: the goods never left, so everything goes back on the shelf at full value.
+        reason_code = reason_code or "salah_input"
+    if reason_code is None and len(reason) < 3:
+        raise ValueError("Alasan retur wajib diisi (minimal 3 karakter).")
+    if reason_code == "lainnya" and len(reason) < 3:
+        raise ValueError("Alasan: isi catatan untuk alasan Lainnya (minimal 3 karakter).")
+    reason_text = RETURN_REASONS[reason_code] + (f": {reason}" if reason else "") if reason_code else reason
+    if quantity <= 0:
+        raise ValueError("Jumlah retur harus lebih dari 0.")
+    # Where the returned units go. Either one `destination` for all of them, or a split that adds up.
+    if restock_qty is None and supplier_qty is None and damaged_qty is None:
+        if kind == "void_item":
+            destination = "stok"
+        if destination not in RETURN_DESTINATIONS:
+            raise ValueError("Tujuan barang retur tidak valid.")
+        restock_qty, supplier_qty, damaged_qty = (
+            quantity if destination == "stok" else 0, quantity if destination == "supplier" else 0,
+            quantity if destination == "rusak" else 0,
+        )
+    else:
+        restock_qty, supplier_qty, damaged_qty = restock_qty or 0, supplier_qty or 0, damaged_qty or 0
+        if min(restock_qty, supplier_qty, damaged_qty) < 0 or restock_qty + supplier_qty + damaged_qty != quantity:
+            raise ValueError(f"Tujuan: jumlah masuk stok, ke supplier, dan rusak harus berjumlah {quantity}.")
+        destination = max((("stok", restock_qty), ("supplier", supplier_qty), ("rusak", damaged_qty)), key=lambda x: x[1])[0]
+    with _conn() as con:
+        rec = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        if rec is None:
+            raise ValueError("Nota tidak ditemukan.")
+        rec = dict(rec)
+        if rec["status"] == "void":
+            raise ValueError("Nota sudah dibatalkan (void).")
+        if rec["work_status"] in ("draft",):
+            raise ValueError("Nota masih Draft, barangnya belum diserahkan.")
+        item = con.execute("SELECT * FROM receipt_items WHERE id=? AND receipt_id=?", (item_id, receipt_id)).fetchone()
+        if item is None:
+            raise ValueError("Barang tidak ditemukan di nota ini.")
+        item = dict(item)
+        if item["item_type"] == "jasa":
+            raise ValueError("Jasa tidak bisa diretur. Gunakan potongan atau refund.")
+        if item.get("preorder_item_id"):
+            po_line = con.execute("SELECT status FROM preorder_items WHERE id=?", (item["preorder_item_id"],)).fetchone()
+            if po_line is None or po_line["status"] not in PO_ARRIVED_STATUSES:
+                raise ValueError("Barang PO ini belum sampai ke pelanggan. Batalkan di halaman PO Customer saja.")
+        left = item["quantity"] - (item["returned_qty"] or 0)
+        if quantity <= 0 or quantity > left:
+            raise ValueError(f"Jumlah retur harus 1 sampai {left}.")
+        # What those units were sold for, line discount spread over the line.
+        value = _line_total(item) * quantity // item["quantity"]
+        if kind == "void_item":
+            refund_amount = value
+        if refund_amount < 0 or refund_amount > value:
+            raise ValueError(f"Jumlah refund harus 0 sampai Rp {value:,}.".replace(",", "."))
+
+        before = _receipt_item_holdings([item], con)
+        to_stock = restock_qty
+        con.execute(
+            "UPDATE receipt_items SET returned_qty=returned_qty+?, returned_stock_qty=returned_stock_qty+? WHERE id=?",
+            (quantity, to_stock, item_id),
+        )
+        item["returned_qty"] = (item["returned_qty"] or 0) + quantity
+        item["returned_stock_qty"] = (item["returned_stock_qty"] or 0) + to_stock
+        _apply_receipt_stock_delta(con, receipt_id, before, _receipt_item_holdings([item], con))
+
+        new_total = rec["total"] - refund_amount
+        cash_out = max(min(rec["amount_paid"] - new_total, refund_amount), 0)
+        new_paid = rec["amount_paid"] - cash_out
+        cur = con.execute(
+            "UPDATE receipts SET total=?, return_total=return_total+?, amount_paid=?, status=? WHERE id=? AND total=? AND amount_paid=?",
+            (new_total, refund_amount, new_paid, _compute_receipt_status(new_total, new_paid, None),
+             receipt_id, rec["total"], rec["amount_paid"]),
+        )
+        if cur.rowcount == 0:
+            raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
+        if cash_out > 0:
+            _insert_receipt_payment(con, receipt_id, -cash_out, method, f"Refund retur {item['product_name']}: {reason}", by)
+        now = _now()
+        con.execute(
+            """INSERT INTO receipt_returns (receipt_id, receipt_item_id, product_name, master_item_id, quantity, item_value,
+                   refund_amount, cash_out, method, destination, reason, returned_by, returned_at,
+                   kind, reason_code, restock_qty, supplier_qty, damaged_qty)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (receipt_id, item_id, item["product_name"], item["master_item_id"], quantity, value, refund_amount,
+             cash_out, method if cash_out else None, destination, reason_text, by, now,
+             kind, reason_code, restock_qty, supplier_qty, damaged_qty),
+        )
+        fmt = lambda n: f"Rp {n:,}".replace(",", ".")
+        where = ", ".join(f"{n} {RETURN_DESTINATIONS[d]}" for d, n in
+                          (("stok", restock_qty), ("supplier", supplier_qty), ("rusak", damaged_qty)) if n)
+        label = "Void barang" if kind == "void_item" else "Retur"
+        note = f"{label} {item['product_name']} x{quantity} ({where}): {reason_text}. Refund {fmt(refund_amount)}"
+        if refund_amount < value:
+            note += f", biaya retur {fmt(value - refund_amount)}"
+        note += f"; uang dikembalikan {fmt(cash_out)} ({method})." if cash_out else "; mengurangi sisa tagihan."
+        _log_receipt_event(con, receipt_id, "return", note, by)
+        return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
+
+
+def get_receipt_returns(receipt_id: str) -> list[dict]:
+    with _conn() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT * FROM receipt_returns WHERE receipt_id=? ORDER BY returned_at ASC, id ASC", (receipt_id,)
+        ).fetchall()]
+
+
 def change_receipt_work_status(
     receipt_id: str, to_status: str, note: str | None = None, changed_by: str | None = None
 ) -> dict:
@@ -2219,7 +2436,7 @@ def change_receipt_work_status(
     payment state. Leaving Draft is the moment stock is taken off the shelf (and an oversell is
     refused here, rolling the move back). A closed nota (Lunas + Pengerjaan Selesai) is read-only.
     Messages: 'tidak ditemukan' -> 404, 'Stok' -> 422, the rest -> 409."""
-    if to_status not in RECEIPT_WORK_STATUSES or to_status == "draft":
+    if to_status not in RECEIPT_WORK_STATUSES or to_status in ("draft", "menunggu"):
         raise ValueError("Status tujuan tidak valid.")
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -2240,7 +2457,7 @@ def change_receipt_work_status(
         if current == "draft":
             if not items:
                 raise ValueError("Nota belum punya item.")
-            _apply_receipt_stock_delta(con, receipt_id, {}, _receipt_item_holdings(items))
+            _apply_receipt_stock_delta(con, receipt_id, {}, _receipt_item_holdings(items, con))
         cur = con.execute(
             "UPDATE receipts SET work_status=?, draft_saved_at=NULL WHERE id=? AND work_status=?",
             (to_status, receipt_id, current),
@@ -2273,6 +2490,10 @@ def delete_receipt(receipt_id: str) -> None:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
             raise ValueError(f"Nota {receipt_id} tidak ditemukan.")
+        if con.execute("SELECT 1 FROM preorders WHERE receipt_id=?", (receipt_id,)).fetchone():
+            raise ValueError("Invoice ini milik PO Customer dan tidak bisa dihapus. Void saja bila pesanan batal.")
+        if con.execute("SELECT 1 FROM receipt_returns WHERE receipt_id=?", (receipt_id,)).fetchone():
+            raise ValueError("Nota ini sudah ada retur barang, jadi tidak bisa dihapus.")
         existing = dict(row)
 
         # Stock: deleting a receipt that still held stock returns it, same as a
@@ -2282,7 +2503,7 @@ def delete_receipt(receipt_id: str) -> None:
             items = [dict(r) for r in con.execute(
                 "SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,)
             ).fetchall()]
-            before_holdings = _receipt_item_holdings(items)
+            before_holdings = _receipt_item_holdings(items, con)
             _apply_receipt_stock_delta(con, receipt_id, before_holdings, {})
 
         con.execute("DELETE FROM receipt_items WHERE receipt_id=?", (receipt_id,))
@@ -2292,14 +2513,17 @@ def delete_receipt(receipt_id: str) -> None:
 
 
 def get_sales_summary(date_from: str, date_to: str) -> dict:
+    """Money in per day, by the date each payment was taken (shop's clock): a DP counts on the day it
+    was paid, a pelunasan on its own day. Refunds/reversals (negative rows) net out; void notas are left out."""
+    shift = f"{SHOP_UTC_OFFSET_MINUTES:+d} minutes"
     with _conn() as con:
         rows = con.execute(
-            """SELECT date(created_at) AS day, SUM(total) AS revenue, COUNT(*) AS receipt_count
-               FROM receipts
-               WHERE date(created_at) BETWEEN ? AND ? AND status='done'
-               GROUP BY date(created_at)
+            """SELECT date(p.paid_at, ?) AS day, SUM(p.amount) AS revenue, COUNT(DISTINCT p.receipt_id) AS receipt_count
+               FROM receipt_payments p JOIN receipts r ON r.id = p.receipt_id
+               WHERE r.status != 'void' AND date(p.paid_at, ?) BETWEEN ? AND ?
+               GROUP BY date(p.paid_at, ?)
                ORDER BY day ASC""",
-            (date_from, date_to),
+            (shift, shift, date_from, date_to, shift),
         ).fetchall()
 
     by_day = {
@@ -3134,12 +3358,13 @@ def update_master_item(
     master_item_id: int, name: str | None = None, sell_price: int | None = None, unit: str | None = None,
     description: str | None = None, min_stock: int | None = None, location: str | None = None,
     changed_by: str | None = None, price_note: str | None = None,
-    set_category: bool = False, category_id: int | None = None,
+    set_category: bool = False, category_id: int | None = None, supplier_id: int | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         if row is None:
             raise ValueError(f"Barang {master_item_id} tidak ditemukan.")
+        new_supplier_id = supplier_id if supplier_id is not None else row["supplier_id"]
         new_name = name if name is not None else row["name"]
         new_name_normalized = _normalize_name(new_name) if name is not None else row["name_normalized"]
         new_sell_price = sell_price if sell_price is not None else row["sell_price"]
@@ -3151,13 +3376,14 @@ def update_master_item(
         try:
             con.execute(
                 """UPDATE master_items SET name=?, name_normalized=?, sell_price=?, unit=?,
-                          description=?, min_stock=?, location=?, updated_at=?, category_id=?, updated_by=? WHERE id=?""",
+                          description=?, min_stock=?, location=?, updated_at=?, category_id=?, updated_by=?,
+                          supplier_id=? WHERE id=?""",
                 (new_name, new_name_normalized, new_sell_price, new_unit, new_desc, new_min, new_loc, now,
-                 category_id if set_category else row["category_id"], changed_by, master_item_id),
+                 category_id if set_category else row["category_id"], changed_by, new_supplier_id, master_item_id),
             )
         except sqlite3.IntegrityError:
             raise ValueError(
-                "Nama tidak bisa diubah: sudah ada barang lain dengan nama ini untuk supplier dan merek yang sama"
+                "Tidak bisa disimpan: sudah ada barang lain dengan nama ini untuk supplier dan merek yang sama"
             )
         if new_sell_price != row["sell_price"]:
             con.execute(
@@ -3594,19 +3820,23 @@ def get_inventory_overview() -> dict:
         ).fetchall():
             preorder_items_by_order.setdefault(preorder_item["preorder_id"], []).append(dict(preorder_item))
         preorder_paid = _preorder_paid_by_order(con)
+        po_rows = [dict(r) for r in con.execute("SELECT * FROM preorders ORDER BY created_at DESC").fetchall()]
+        po_inv = po_invoices(con, [r["receipt_id"] for r in po_rows])
         preorders_open = [
-            _preorder_row(dict(r), preorder_items_by_order.get(r["id"], []), preorder_paid.get(r["id"], 0))
-            for r in con.execute("SELECT * FROM preorders ORDER BY created_at DESC").fetchall()
+            _preorder_row(r, preorder_items_by_order.get(r["id"], []), preorder_paid.get(r["id"], 0), po_inv.get(r["receipt_id"]))
+            for r in po_rows
         ]
         # Fully installed orders are finished business and drop off the dashboard.
         preorders_open = [r for r in preorders_open if r["status"] != PREORDER_STATUSES[-1]]
 
         # Sales this calendar month (paid receipts).
         month_start = date.today().replace(day=1).isoformat()
+        shift = f"{SHOP_UTC_OFFSET_MINUTES:+d} minutes"
         sales_month = con.execute(
-            "SELECT COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS c "
-            "FROM receipts WHERE status='done' AND date(created_at) >= ?",
-            (month_start,),
+            "SELECT COALESCE(SUM(p.amount), 0) AS revenue, COUNT(DISTINCT p.receipt_id) AS c "
+            "FROM receipt_payments p JOIN receipts r ON r.id = p.receipt_id "
+            "WHERE r.status != 'void' AND date(p.paid_at, ?) >= ?",
+            (shift, month_start),
         ).fetchone()
 
         return {
@@ -4826,11 +5056,11 @@ def _preorder_paid_by_order(con: sqlite3.Connection) -> dict[str, int]:
     }
 
 
-def _preorder_row(row: dict, items: list[dict], paid: int = 0) -> dict:
-    """`paid` is the sum of the order's payments; the legacy preorders.deposit
-    column is ignored (migrated into a payment row at startup)."""
+def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | None = None) -> dict:
+    """`paid` is the sum of the order's own payments; the legacy preorders.deposit column is ignored.
+    Once the PO has its invoice, paid and remaining are the invoice's (payments are taken there)."""
     total = sum(i["quantity"] * i["unit_price"] for i in items)
-    return {
+    out = {
         **row,
         "deposit": paid,
         "total": total,
@@ -4838,7 +5068,16 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0) -> dict:
         "remaining": max(total - paid, 0),
         "item_count": len(items),
         "status": _preorder_overall_status([i["status"] for i in items]),
+        "receipt_no": None, "invoice_total": None, "invoice_status": None, "invoice_work_status": None,
     }
+    if invoice:
+        out.update({
+            "deposit": invoice["amount_paid"],
+            "remaining": max(invoice["total"] - invoice["amount_paid"], 0),
+            "receipt_no": invoice["receipt_no"], "invoice_total": invoice["total"],
+            "invoice_status": invoice["status"], "invoice_work_status": invoice["work_status"],
+        })
+    return out
 
 
 PREORDER_PRIORITIES = ("normal", "urgent")
@@ -4903,8 +5142,10 @@ def create_preorder(
     plate_full: str = "",
     po_date: str | None = None,
     is_draft: bool = False,
+    deposit_method: str = "cash",
 ) -> dict:
-    """A deposit given at creation is recorded as the first payment ("DP awal")."""
+    """A deposit given at creation is recorded as the first payment ("DP awal"); on a published PO it
+    is booked straight onto the PO's invoice, which is created here too."""
     now = _now()
     po_date = po_date or shop_today().isoformat()
     with _conn() as con:
@@ -4923,11 +5164,13 @@ def create_preorder(
             )
         for position, item in enumerate(items):
             _insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now)
-        row = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
-        stored = [dict(r) for r in con.execute(
-            "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
-        ).fetchall()]
-    return _preorder_row(row, stored, max(deposit, 0))
+        if deposit > 0 and deposit_method != "cash":
+            con.execute("UPDATE preorder_payments SET method=? WHERE preorder_id=?", (deposit_method, preorder_id))
+        # A published PO gets its invoice now; the DP lands on it.
+        receipt_id = _po_invoice_sync(con, preorder_id, changed_by)
+        if receipt_id:
+            _po_move_payments_to_invoice(con, preorder_id, receipt_id, changed_by)
+    return get_preorder(preorder_id)
 
 
 def get_preorder(preorder_id: str) -> dict | None:
@@ -4941,7 +5184,8 @@ def get_preorder(preorder_id: str) -> dict | None:
         paid = con.execute(
             "SELECT COALESCE(SUM(amount), 0) AS paid FROM preorder_payments WHERE preorder_id=?", (preorder_id,)
         ).fetchone()["paid"]
-    return _preorder_row(dict(row), items, paid)
+        invoice = po_invoices(con, [row["receipt_id"]]).get(row["receipt_id"])
+    return _preorder_row(dict(row), items, paid, invoice)
 
 
 def get_preorder_items(preorder_id: str) -> list[dict]:
@@ -5097,6 +5341,244 @@ def apply_preorder_dp(preorder_id: str, receipt_id: str, item_ids: list[int], by
         return amount
 
 
+# --- PO Customer -> Invoice ---------------------------------------------------
+# A published PO Customer owns one invoice (a receipts row, preorders.receipt_id). Its lines carry
+# receipt_items.preorder_item_id and follow the PO: added, changed or removed on the PO, the invoice
+# changes with it. Money is only ever taken on the invoice. A PO line's goods are taken off the shelf
+# when that line has arrived (see _receipt_item_holdings); until every line has, the invoice sits in
+# "Menunggu Barang".
+
+_PLATE_RE = re.compile(r"^([A-Z]{1,2})\s+(\d{1,4})\s+([A-Z]{1,3})$")
+
+
+def split_plate(plate_full: str | None) -> tuple[str, str, str] | None:
+    """'B 1234 ABC' -> ('B', '1234', 'ABC') when it is a plate the cashier accepts, else None."""
+    m = _PLATE_RE.match(" ".join((plate_full or "").upper().split()))
+    if not m:
+        return None
+    from plate_codes import PLATE_CODES
+    return m.groups() if m.group(1) in PLATE_CODES else None
+
+
+def _receipt_take_payment(
+    con: sqlite3.Connection, receipt_id: str, amount: int, method: str, note: str | None, by: str | None,
+    paid_at: str | None = None, transfer_sender: str | None = None, transfer_account: str | None = None,
+) -> None:
+    """Books a payment on an invoice inside the caller's transaction."""
+    row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+    new_paid = row["amount_paid"] + amount
+    con.execute(
+        "UPDATE receipts SET amount_paid=?, status=?, payment_method=? WHERE id=?",
+        (new_paid, _compute_receipt_status(row["total"], new_paid, None), method, receipt_id),
+    )
+    _insert_receipt_payment(con, receipt_id, amount, method, note, by, transfer_sender, transfer_account, paid_at)
+
+
+def _po_invoice_holdings(con: sqlite3.Connection, receipt_id: str | None) -> dict[int, int]:
+    if not receipt_id:
+        return {}
+    rec = con.execute("SELECT status, work_status FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+    if rec is None or not _holds_stock(rec["status"], rec["work_status"]):
+        return {}
+    items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,)).fetchall()]
+    return _receipt_item_holdings(items, con)
+
+
+def _po_invoice_snapshot(con: sqlite3.Connection, preorder_id: str) -> dict[int, int] | None:
+    """What the PO's invoice holds now, taken before a PO change so the stock move can be worked out."""
+    row = con.execute("SELECT receipt_id FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+    return _po_invoice_holdings(con, row["receipt_id"]) if row and row["receipt_id"] else None
+
+
+def _po_create_invoice(con: sqlite3.Connection, po: dict, by: str | None) -> str:
+    plate = split_plate(po["plate_full"])
+    if plate is None:
+        raise ValueError("Plat mobil di PO harus berformat seperti B 1234 ABC supaya invoicenya bisa dibuat.")
+    from uuid import uuid4
+    receipt_id = str(uuid4())
+    created_at = _now()
+    customer_id, phone, name = _resolve_receipt_customer(con, None, po["customer_phone"], po["customer_name"])
+    con.execute(
+        """INSERT INTO receipts
+           (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
+            subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method, customer_id,
+            receipt_no, work_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, 'pending', 0, 'cash', ?, ?, 'menunggu')""",
+        (receipt_id, *plate, " ".join(plate), phone, name, created_at, created_at, customer_id,
+         _next_receipt_no(con, created_at)),
+    )
+    con.execute("UPDATE preorders SET receipt_id=? WHERE id=?", (receipt_id, po["id"]))
+    _log_receipt_event(con, receipt_id, "created", f"Invoice dibuat dari PO Customer {po['po_number']}", by)
+    return receipt_id
+
+
+def _po_move_payments_to_invoice(con: sqlite3.Connection, preorder_id: str, receipt_id: str, by: str | None) -> int:
+    """Payments recorded on the PO itself (a draft PO's DP, or a PO from before invoices existed)
+    are booked on the invoice once, keeping their date and method, through the allocation ledger."""
+    free = preorder_unallocated_dp(con, preorder_id)
+    if free <= 0:
+        return 0
+    already = con.execute(
+        "SELECT COALESCE(SUM(a.amount),0) AS n FROM preorder_payment_allocations a LEFT JOIN receipts r ON r.id=a.receipt_id "
+        "WHERE a.preorder_id=? AND COALESCE(r.status,'')<>'void'", (preorder_id,),
+    ).fetchone()["n"]
+    skip, left = already, free
+    for pp in con.execute("SELECT * FROM preorder_payments WHERE preorder_id=? ORDER BY id ASC", (preorder_id,)).fetchall():
+        avail = pp["amount"]
+        if skip >= avail:
+            skip -= avail
+            continue
+        avail -= skip
+        skip = 0
+        take = min(avail, left)
+        if take > 0:
+            _receipt_take_payment(con, receipt_id, take, pp["method"] or "cash", pp["note"] or "Pembayaran PO",
+                                  pp["created_by"], pp["paid_at"])
+            left -= take
+        if left <= 0:
+            break
+    con.execute(
+        "INSERT INTO preorder_payment_allocations (preorder_id, receipt_id, amount, allocated_at, allocated_by) VALUES (?, ?, ?, ?, ?)",
+        (preorder_id, receipt_id, free, _now(), by),
+    )
+    return free
+
+
+def _po_invoice_sync(
+    con: sqlite3.Connection, preorder_id: str, by: str | None, before: dict[int, int] | None = None,
+) -> str | None:
+    """Makes the PO's invoice match the PO: creates it the first time, adds/changes/removes the PO
+    lines, recomputes the totals, moves Menunggu Barang on once everything has arrived, and moves
+    stock for lines that have arrived. Returns the invoice id (None for a draft PO)."""
+    po = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+    if po is None or po["is_draft"]:
+        return None
+    po = dict(po)
+    receipt_id = po.get("receipt_id")
+    created = False
+    if not receipt_id:
+        receipt_id = _po_create_invoice(con, po, by)
+        created, before = True, {}
+    rec = dict(con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone())
+    if rec["status"] == "void":
+        return receipt_id
+    if before is None:
+        before = _po_invoice_holdings(con, receipt_id)
+    po_items = [dict(r) for r in con.execute(
+        "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
+    ).fetchall()]
+    lines = {r["preorder_item_id"]: dict(r) for r in con.execute(
+        "SELECT * FROM receipt_items WHERE receipt_id=? AND preorder_item_id IS NOT NULL", (receipt_id,)
+    ).fetchall()}
+    now = _now()
+    added, changed = [], []
+    for pi in po_items:
+        ln = lines.pop(pi["id"], None)
+        if ln is None:
+            con.execute(
+                """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
+                       item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id)
+                   VALUES (?, ?, ?, ?, NULL, ?, 'barang', 0, ?, ?, ?, ?)""",
+                (receipt_id, pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"], now, by,
+                 0 if created or rec["work_status"] in ("menunggu", "belum") else 1, pi["id"]),
+            )
+            added.append(pi["product_name"])
+        elif (ln["product_name"], ln["quantity"], ln["unit_price"], ln["master_item_id"]) != \
+                (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"]):
+            if ln["returned_qty"]:
+                raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa diubah lagi di PO.")
+            con.execute(
+                "UPDATE receipt_items SET product_name=?, quantity=?, unit_price=?, master_item_id=? WHERE id=?",
+                (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"], ln["id"]),
+            )
+            bits = []
+            if ln["quantity"] != pi["quantity"]:
+                bits.append(f"qty {ln['quantity']} -> {pi['quantity']}")
+            if ln["unit_price"] != pi["unit_price"]:
+                bits.append(f"harga {ln['unit_price']:,} -> {pi['unit_price']:,}".replace(",", "."))
+            changed.append(f"{pi['product_name']}" + (f": {', '.join(bits)}" if bits else " diubah"))
+    for ln in lines.values():
+        if ln["returned_qty"]:
+            raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa dihapus dari PO.")
+        con.execute("DELETE FROM receipt_items WHERE id=?", (ln["id"],))
+        changed.append(f"{ln['product_name']} dibatalkan")
+    if (added or changed) and not created and _is_closed(rec):
+        raise ValueError("Invoice PO ini sudah lunas dan selesai (ditutup). Minta admin membukanya kembali dulu.")
+    con.execute("UPDATE preorder_items SET receipt_id=? WHERE preorder_id=?", (receipt_id, preorder_id))
+
+    items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,)).fetchall()]
+    subtotal = sum(_line_total(i) for i in items)
+    discount = min(rec["discount"] or 0, subtotal)
+    total = subtotal - discount - (rec.get("return_total") or 0)
+    status = _compute_receipt_status(total, rec["amount_paid"], None)
+    work = rec["work_status"]
+    if work == "menunggu" and po_items and all(pi["status"] in PO_ARRIVED_STATUSES for pi in po_items):
+        work = "belum"
+    con.execute("UPDATE receipts SET subtotal=?, discount=?, total=?, status=?, work_status=? WHERE id=?",
+                (subtotal, discount, total, status, work, receipt_id))
+    tag = f" (PO {po['po_number']})"
+    if added and not created:
+        _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added) + tag, by)
+    if changed:
+        _log_receipt_event(con, receipt_id, "item_changed", "Item diubah: " + "; ".join(changed) + tag, by)
+    if work != rec["work_status"]:
+        _log_receipt_event(con, receipt_id, "status", "Status: Belum Dikerjakan — semua barang PO sudah sampai", by)
+    if total < rec["amount_paid"] and total != rec["total"]:
+        _log_receipt_event(
+            con, receipt_id, "overpaid",
+            f"Total invoice turun menjadi Rp {total:,}; kelebihan bayar Rp {rec['amount_paid'] - total:,} perlu dikembalikan ke pelanggan.".replace(",", "."),
+            by,
+        )
+    _apply_receipt_stock_delta(con, receipt_id, before, _po_invoice_holdings(con, receipt_id))
+    return receipt_id
+
+
+def po_invoice_payment(
+    preorder_id: str, amount: int, method: str, note: str | None, by: str | None,
+    transfer_sender: str | None = None, transfer_account: str | None = None,
+) -> str:
+    """'Tambah Pembayaran' from the PO page lands on the PO's invoice. Returns the invoice id."""
+    with _conn() as con:
+        row = con.execute("SELECT receipt_id FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if row is None:
+            raise ValueError("Preorder tidak ditemukan.")
+        receipt_id = row["receipt_id"]
+    if not receipt_id:
+        raise ValueError("PO ini belum punya invoice (masih draft).")
+    add_receipt_payment(receipt_id, amount, method, note, transfer_sender, transfer_account, by)
+    return receipt_id
+
+
+def po_invoices(con: sqlite3.Connection, receipt_ids: list[str]) -> dict[str, dict]:
+    ids = [r for r in receipt_ids if r]
+    if not ids:
+        return {}
+    return {r["id"]: dict(r) for r in con.execute(
+        f"SELECT id, receipt_no, total, amount_paid, status, work_status FROM receipts WHERE id IN ({_placeholders(ids)})", ids
+    ).fetchall()}
+
+
+def _backfill_po_invoices(con: sqlite3.Connection) -> None:
+    """Startup: a published PO without an invoice gets one, and what was paid on the PO moves onto it.
+    A PO whose lines were already turned into a nota the old way, or whose plate the cashier would not
+    accept, is left as it was (it keeps working through the old flow)."""
+    for po in con.execute("SELECT * FROM preorders WHERE is_draft=0 AND receipt_id IS NULL").fetchall():
+        if con.execute("SELECT 1 FROM preorder_items WHERE preorder_id=? AND receipt_id IS NOT NULL", (po["id"],)).fetchone():
+            continue
+        if split_plate(po["plate_full"]) is None:
+            continue
+        if not con.execute("SELECT 1 FROM preorder_items WHERE preorder_id=?", (po["id"],)).fetchone():
+            continue
+        con.execute("SAVEPOINT po_backfill")
+        try:
+            rid = _po_invoice_sync(con, po["id"], "sistem")
+            _po_move_payments_to_invoice(con, po["id"], rid, "sistem")
+            con.execute("RELEASE po_backfill")
+        except ValueError:
+            con.execute("ROLLBACK TO po_backfill")
+            con.execute("RELEASE po_backfill")
+
+
 def get_all_preorders(query: str | None = None, status: str | None = None, draft: bool = False) -> list[dict]:
     """`status` filters on the computed order-level stage, so it is applied in
     Python rather than SQL — the value does not exist as a column. `draft` is a
@@ -5123,8 +5605,10 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
         ).fetchall():
             items_by_order.setdefault(item["preorder_id"], []).append(dict(item))
         paid_by_order = _preorder_paid_by_order(con)
+        invoices = po_invoices(con, [r["receipt_id"] for r in rows])
 
-    result = [_preorder_row(row, items_by_order.get(row["id"], []), paid_by_order.get(row["id"], 0)) for row in rows]
+    result = [_preorder_row(row, items_by_order.get(row["id"], []), paid_by_order.get(row["id"], 0),
+                            invoices.get(row["receipt_id"])) for row in rows]
     if status:
         result = [r for r in result if r["status"] == status]
     return result
@@ -5152,6 +5636,11 @@ def update_preorder(
         if row is None:
             raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
         existing = dict(row)
+        before = _po_invoice_snapshot(con, preorder_id)
+        if is_draft and not existing["is_draft"] and existing.get("receipt_id"):
+            inv = con.execute("SELECT status, work_status FROM receipts WHERE id=?", (existing["receipt_id"],)).fetchone()
+            if inv is not None and inv["status"] != "void" and not _is_closed(inv):
+                raise ValueError("PO ini punya invoice yang masih aktif. Selesaikan atau void invoicenya dulu sebelum diarsipkan.")
 
         con.execute(
             """UPDATE preorders SET customer_name=?, customer_phone=?, plate_full=?, po_date=?, notes=?,
@@ -5200,14 +5689,11 @@ def update_preorder(
                 con.execute("DELETE FROM preorder_status_history WHERE preorder_item_id=?", (stale_id,))
                 con.execute("DELETE FROM preorder_items WHERE id=?", (stale_id,))
 
-        updated = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
-        stored = [dict(r) for r in con.execute(
-            "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
-        ).fetchall()]
-        paid = con.execute(
-            "SELECT COALESCE(SUM(amount), 0) AS paid FROM preorder_payments WHERE preorder_id=?", (preorder_id,)
-        ).fetchone()["paid"]
-    return _preorder_row(updated, stored, paid)
+        # A published PO's invoice follows (and a draft that is published now gets its invoice).
+        receipt_id = _po_invoice_sync(con, preorder_id, changed_by, before)
+        if receipt_id:
+            _po_move_payments_to_invoice(con, preorder_id, receipt_id, changed_by)
+    return get_preorder(preorder_id)
 
 
 def set_preorder_item_status(
@@ -5222,10 +5708,12 @@ def set_preorder_item_status(
             raise ValueError(f"Item preorder {item_id} tidak ditemukan.")
         item = dict(row)
         if item["status"] != status:
+            before = _po_invoice_snapshot(con, preorder_id)
             con.execute("UPDATE preorder_items SET status=? WHERE id=?", (status, item_id))
             con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
             _log_preorder_status(con, preorder_id, item_id, item["product_name"], status, now,
                                  changed_by, item["status"])
+            _po_invoice_sync(con, preorder_id, changed_by, before)
         updated = dict(con.execute("SELECT * FROM preorder_items WHERE id=?", (item_id,)).fetchone())
     return updated
 
@@ -5238,6 +5726,7 @@ def set_preorder_status(preorder_id: str, status: str, changed_by: str | None = 
     with _conn() as con:
         if con.execute("SELECT 1 FROM preorders WHERE id=?", (preorder_id,)).fetchone() is None:
             raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
+        before = _po_invoice_snapshot(con, preorder_id)
         for item in con.execute(
             "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>?", (preorder_id, status)
         ).fetchall():
@@ -5247,6 +5736,7 @@ def set_preorder_status(preorder_id: str, status: str, changed_by: str | None = 
             changed += 1
         if changed:
             con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
+            _po_invoice_sync(con, preorder_id, changed_by, before)
     return changed
 
 
@@ -5670,10 +6160,12 @@ def _sync_preorder_line(con: sqlite3.Connection, preorder_item_id: int, changed_
         return
     if PREORDER_STATUSES.index(target) <= PREORDER_STATUSES.index(line["status"]):
         return
+    before = _po_invoice_snapshot(con, line["preorder_id"])
     con.execute("UPDATE preorder_items SET status=? WHERE id=?", (target, preorder_item_id))
     con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, line["preorder_id"]))
     _log_preorder_status(con, line["preorder_id"], preorder_item_id, line["product_name"], target, now,
                          changed_by, line["status"])
+    _po_invoice_sync(con, line["preorder_id"], changed_by, before)
 
 
 def _spo_sync_all(con: sqlite3.Connection, supplier_po_id: str, changed_by: str | None, now: str) -> None:

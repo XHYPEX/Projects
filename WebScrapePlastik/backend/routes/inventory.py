@@ -781,6 +781,13 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
         raise HTTPException(status_code=409, detail="Data ini baru saja diubah oleh pengguna lain. Muat ulang halaman lalu ulangi perubahan Anda.")
     if req.unit is not None and await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
         raise HTTPException(status_code=422, detail=f"Satuan '{req.unit}' tidak valid.")
+    new_supplier_id = None
+    if req.supplier_id is not None and req.supplier_id != current["supplier_id"]:
+        if user["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Hanya admin yang dapat mengganti supplier barang.")
+        if await loop.run_in_executor(None, get_supplier, req.supplier_id) is None:
+            raise HTTPException(status_code=422, detail=f"Supplier dengan ID {req.supplier_id} tidak ditemukan.")
+        new_supplier_id = req.supplier_id
     set_category = "category_id" in req.model_fields_set
     if set_category and req.category_id != current.get("category_id"):
         await _require_assignable_category(loop, req.category_id)
@@ -789,7 +796,7 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
             None, lambda: update_master_item(
                 master_item_id, req.name, req.sell_price, req.unit, req.description, req.min_stock,
                 req.location, user["username"], req.price_note,
-                set_category=set_category, category_id=req.category_id,
+                set_category=set_category, category_id=req.category_id, supplier_id=new_supplier_id,
             ),
         )
     except ValueError as e:

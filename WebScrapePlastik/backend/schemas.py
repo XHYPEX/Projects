@@ -145,6 +145,9 @@ class ReceiptItemOut(BaseModel):
     added_at: str | None = None
     added_by: str | None = None
     added_during_work: bool = False
+    # Set when the line belongs to a PO Customer: it is changed there, not on the nota.
+    preorder_item_id: int | None = None
+    returned_qty: int = 0  # how many of `quantity` the customer brought back (Retur Barang)
 
 
 class ReceiptOut(ReceiptExtra):
@@ -173,7 +176,11 @@ class ReceiptOut(ReceiptExtra):
     receipt_no: str | None = None  # printed nota number, PJSG/YY/MM/NNNN
     transfer_sender: str | None = None  # for a transfer: the name on the sending account
     transfer_account: str | None = None  # for a transfer: the shop account it was paid into
-    work_status: str = "belum"  # draft | belum | pengerjaan | selesai
+    work_status: str = "belum"  # draft | menunggu | belum | pengerjaan | selesai
+    # Set on the invoice of a PO Customer.
+    preorder_id: str | None = None
+    po_number: str | None = None
+    return_total: int = 0  # what Retur Barang took off the total
     void_reason: str | None = None
     voided_by: str | None = None
     voided_at: str | None = None
@@ -210,6 +217,40 @@ class ReceiptRefundRequest(BaseModel):
     amount: int
     method: str = "cash"
     reason: str
+
+
+class ReceiptReturnRequest(BaseModel):
+    item_id: int
+    quantity: int
+    destination: str | None = None  # stok | supplier | rusak, for all units; or use the split below
+    refund_amount: int = 0  # at most what those units were sold for; less keeps the rest as a fee
+    method: str = "cash"  # how money is handed back, when any is
+    reason: str = ""
+    kind: str = "retur"  # retur | void_item (a mistaken line: full refund, all stock back)
+    reason_code: str | None = None
+    restock_qty: int | None = None  # split of `quantity`; must add up to it
+    supplier_qty: int | None = None
+    damaged_qty: int | None = None
+
+
+class ReceiptReturnOut(BaseModel):
+    id: int
+    receipt_item_id: int
+    product_name: str
+    quantity: int
+    item_value: int
+    refund_amount: int
+    cash_out: int
+    method: str | None = None
+    destination: str
+    reason: str
+    returned_by: str | None = None
+    returned_at: str
+    kind: str = "retur"
+    reason_code: str | None = None
+    restock_qty: int | None = None
+    supplier_qty: int | None = None
+    damaged_qty: int | None = None
 
 
 class ReceiptReopenRequest(BaseModel):
@@ -473,6 +514,7 @@ class MasterItemCreateRequest(BaseModel):
 
 class MasterItemUpdateRequest(BaseModel):
     expected_updated_at: str | None = None
+    supplier_id: int | None = None
     name: str | None = None
     sell_price: int | None = None
     unit: str | None = None
@@ -855,6 +897,7 @@ class PreorderRequest(BaseModel):
     # A deposit given up front becomes the first payment ("DP awal"). Further
     # payments go through POST /preorders/{id}/payments.
     deposit: int = 0
+    deposit_method: str = "cash"  # cash | transfer | qris | debit
     notes: str | None = None
 
 
@@ -885,6 +928,9 @@ class PreorderPaymentRequest(BaseModel):
     amount: int
     note: str | None = None
     method: str = "cash"  # cash | transfer | qris | debit
+    # A PO with an invoice takes the payment there, where a transfer needs both names.
+    transfer_sender: str | None = None
+    transfer_account: str | None = None
 
 
 class PreorderPaymentOut(BaseModel):
@@ -979,6 +1025,13 @@ class PreorderOut(BaseModel):
     # Stored, not computed -- a parked/archived preorder, independent of `status`.
     is_draft: bool
     updated_at: str
+    # The PO's invoice (every published PO has one). Payments are taken there; deposit/remaining above
+    # are the invoice's once it exists.
+    receipt_id: str | None = None
+    receipt_no: str | None = None
+    invoice_total: int | None = None
+    invoice_status: str | None = None  # pending | done | void
+    invoice_work_status: str | None = None
 
 
 class PreorderDetail(PreorderOut):

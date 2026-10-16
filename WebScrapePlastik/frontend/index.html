@@ -1944,7 +1944,7 @@
             <div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Invoice PO</div>
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" id="po-inv-open-btn" onclick="openReceiptFromHistory(currentPreorder.receipt_id)" class="px-3 py-1.5 border border-line rounded-lg text-xs font-medium text-ink hover:bg-bg2 transition-colors">Buka Invoice</button>
-              <button type="button" id="po-inv-pay-btn" onclick="poPayClick()" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">Bayar di Invoice</button>
+              <button type="button" id="po-inv-pay-btn" onclick="poSettleClick()" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">Lunasi di Invoice</button>
               <button type="button" id="po-inv-return-btn" onclick="openReturnModal(currentPreorder.receipt_id, () => openPreorder(currentPreorder.id))" class="admin-only px-3 py-1.5 border border-line rounded-lg text-xs font-medium text-ink hover:bg-bg2 transition-colors">Retur Barang</button>
             </div>
           </div>
@@ -2550,7 +2550,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label for="kat-f-name" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Kategori <span class="text-failed">*</span></label>
-                <input id="kat-f-name" type="text" maxlength="80" autocomplete="off" data-no-uppercase oninput="katOnNameInput()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+                <input id="kat-f-name" type="text" maxlength="80" autocomplete="off" oninput="katOnNameInput()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
               </div>
               <div>
                 <label for="kat-f-code" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kode Kategori <span class="text-failed">*</span></label>
@@ -7855,8 +7855,12 @@ async function reloadReceiptIntoOpenTab(receiptId) {
 async function refreshAfterSettle() {
   await loadReceiptHistory();
   if (currentRoute() === "/invoices") await refreshInvoiceHistory(true);
-  if (currentRoute() === "/preorder" && currentPreorder && !document.getElementById("po-detail-panel").classList.contains("hidden")) {
-    await openPreorder(currentPreorder.id);
+  if (currentRoute() === "/preorder") {
+    // The list shows the invoice's payment status too, so it must not keep a stale "Belum lunas".
+    await loadPreorders();
+    if (currentPreorder && !document.getElementById("po-detail-panel").classList.contains("hidden")) {
+      await openPreorder(currentPreorder.id);
+    }
   }
 }
 
@@ -14687,7 +14691,7 @@ function renderPreorderList(rows) {
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(r.total)}</td>
       <td class="px-3 py-2 text-right text-done tabular-nums whitespace-nowrap">${formatIDR(r.deposit)}</td>
       <td class="px-3 py-2 text-right tabular-nums whitespace-nowrap ${r.remaining > 0 ? "text-failed" : "text-muted"}">${formatIDR(r.remaining)}</td>
-      <td class="px-3 py-2">${preorderStatusBadgeHtml(r.status)}</td>
+      <td class="px-3 py-2"><div class="flex flex-wrap items-center gap-1">${preorderStatusBadgeHtml(r.status)}${r.receipt_id ? paymentBadge(r.invoice_total ?? r.total, r.deposit, r.invoice_status) : ""}</div></td>
       <td class="px-3 py-2">
         <div class="flex items-center justify-end gap-1.5">
           ${poIconButton(PO_ICON_VIEW, "Lihat detail", `openPreorder('${esc(r.id)}')`)}
@@ -15196,12 +15200,22 @@ function poPayClick() {
   else openPoPaymentModal();
 }
 
+// "Lunasi di Invoice": the invoice's payment form, already filled with the whole remaining amount.
+// Saving it makes the invoice Lunas, and the Sales Order detail and list reload to show it.
+async function poSettleClick() {
+  if (!currentPreorder) return;
+  if (!currentPreorder.receipt_id) { openPoPaymentModal(); return; }
+  await openReceiptPaymentModal(currentPreorder.receipt_id);
+  if (receiptPayCtx && document.getElementById("rp-amount")) setReceiptPayAmount(receiptPayCtx.remaining);
+}
+
 function openPoInvoiceCreatedModal(detail) {
   openModal("Invoice Dibuat", `
     <div class="space-y-3">
-      <p class="text-sm text-muted">PO <b class="text-ink">${esc(detail.po_number)}</b> tersimpan dan invoicenya sudah dibuat:
+      <p class="text-sm text-muted">Sales Order <b class="text-ink">${esc(detail.po_number)}</b> tersimpan dan invoicenya sudah dibuat:
         <b class="text-ink tabular-nums">${esc(detail.receipt_no || "")}</b> (${formatIDR(detail.invoice_total || 0)}).
         Status pengerjaan <b class="text-ink">Menunggu Barang</b> sampai semua barang sampai di toko.</p>
+      <p class="text-xs text-muted">Purchase Order draft sudah dibuat otomatis per supplier dan terhubung ke Sales Order ini. Buka menu Purchase Order untuk menerbitkannya.</p>
       <div class="rounded-lg bg-bg2 px-3 py-2 text-sm flex justify-between"><span class="text-muted">Sudah dibayar</span><span class="tabular-nums text-ink">${formatIDR(detail.deposit)}</span></div>
       <div class="rounded-lg bg-bg2 px-3 py-2 text-sm flex justify-between"><span class="text-muted">Sisa tagihan</span><span class="tabular-nums font-semibold text-ink">${formatIDR(detail.remaining)}</span></div>
       <div class="flex flex-wrap justify-end gap-2 pt-1">

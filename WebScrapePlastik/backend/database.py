@@ -995,6 +995,12 @@ def init_db() -> None:
                     "INSERT INTO units (name, name_normalized, is_active, created_at) VALUES (?, ?, 1, ?)",
                     (seed_unit_name, unit_seed_normalized, _now()),
                 )
+        # Satuan names are UPPERCASE. Matching is case-insensitive everywhere, so rewriting the
+        # spelling of existing rows is safe; transaction snapshots (receipts, POs) are left as they were.
+        con.execute("UPDATE categories SET name=UPPER(name) WHERE name != UPPER(name)")
+        con.execute("UPDATE units SET name=UPPER(name) WHERE name != UPPER(name)")
+        con.execute("UPDATE master_items SET unit=UPPER(unit) WHERE unit != UPPER(unit)")
+        con.execute("UPDATE inbound_items SET pending_unit=UPPER(pending_unit) WHERE pending_unit IS NOT NULL AND pending_unit != UPPER(pending_unit)")
 
         # --- Additive migration: Sales Order -> Invoice ---
         # Every published Sales Order owns exactly one invoice (receipts row) from the moment it is
@@ -3097,7 +3103,7 @@ def _clash_message(name: str, clash: dict) -> str:
 
 
 def create_unit(name: str, description: str | None = None) -> dict:
-    name = re.sub(r"\s+", " ", name.strip())
+    name = re.sub(r"\s+", " ", name.strip()).upper()
     if not name:
         raise ValueError("Nama satuan wajib diisi.")
     if len(name) > 30:
@@ -3154,7 +3160,7 @@ def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = 
         row = con.execute("SELECT * FROM units WHERE id=?", (unit_id,)).fetchone()
         if row is None:
             raise ValueError(f"Satuan {unit_id} tidak ditemukan.")
-        new_name = re.sub(r"\s+", " ", name.strip()) if name is not None else row["name"]
+        new_name = re.sub(r"\s+", " ", name.strip()).upper() if name is not None else row["name"]
         if name is not None:
             if not new_name:
                 raise ValueError("Nama satuan wajib diisi.")
@@ -5132,6 +5138,57 @@ def _log_preorder_status(
     )
 
 
+def _general_supplier(con: sqlite3.Connection) -> dict:
+    """The catch-all supplier "UMUM" (barang that can be bought anywhere); created on first use."""
+    key = _normalize_name("UMUM")
+    row = con.execute("SELECT * FROM suppliers WHERE name_normalized=? AND is_active=1", (key,)).fetchone()
+    if row is not None:
+        return dict(row)
+    cur = con.execute(
+        """INSERT INTO suppliers (code, name, is_active, created_at, name_normalized, is_system, source)
+           VALUES (?, 'UMUM', 1, ?, ?, 0, 'quick_add')""",
+        (_generate_entity_code(con, "suppliers", "UMUM"), _now(), key),
+    )
+    return dict(con.execute("SELECT * FROM suppliers WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, by: str | None) -> list[str]:
+    """Every published Sales Order must have Purchase Order(s): whatever quantity of its lines no
+    Purchase Order covers yet goes on a new draft, one per supplier (barang with no supplier go to
+    UMUM). Lines already at the shop need none. Safe to call repeatedly: drafts count as ordered."""
+    from uuid import uuid4
+    po = con.execute("SELECT po_number, is_draft FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+    if po is None or po["is_draft"]:
+        return []
+    groups: dict[int, list[dict]] = {}
+    for r in _spo_candidate_rows(con, None, None):
+        if r["preorder_id"] != preorder_id:
+            continue
+        sid = r["supplier_id"] if r["supplier_id"] is not None else _general_supplier(con)["id"]
+        groups.setdefault(sid, []).append({
+            "preorder_item_id": r["preorder_item_id"], "master_item_id": r["master_item_id"],
+            "product_name": r["product_name"], "unit": r["unit"], "quantity": r["qty_left"],
+            "est_unit_price": r["est_unit_price"], "discount_pct": 0,
+        })
+    now, po_date, created = _now(), shop_today().isoformat(), []
+    for supplier_id, items in groups.items():
+        supplier = _spo_supplier(con, supplier_id)
+        _spo_validate_items(con, supplier_id, items, None)
+        spo_id = str(uuid4())
+        con.execute(
+            """INSERT INTO supplier_pos
+               (id, po_number, po_date, supplier_id, supplier_name_snapshot, notes, status,
+                created_by, created_at, updated_at, discount_pct, shipping_cost, tax_rate)
+               VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, 0, 0, 0)""",
+            (spo_id, _next_supplier_po_no(con, po_date), po_date, supplier_id, supplier["name"],
+             f"Otomatis dari Sales Order {po['po_number']}", by, now, now),
+        )
+        _spo_replace_items(con, spo_id, items)
+        _spo_event(con, spo_id, "created", f"Draft dibuat otomatis dari Sales Order {po['po_number']}", by)
+        created.append(spo_id)
+    return created
+
+
 def create_preorder(
     preorder_id: str,
     customer_name: str,
@@ -5171,6 +5228,7 @@ def create_preorder(
         receipt_id = _po_invoice_sync(con, preorder_id, changed_by)
         if receipt_id:
             _po_move_payments_to_invoice(con, preorder_id, receipt_id, changed_by)
+        _auto_supplier_pos_for_preorder(con, preorder_id, changed_by)
     return get_preorder(preorder_id)
 
 
@@ -5694,6 +5752,7 @@ def update_preorder(
         receipt_id = _po_invoice_sync(con, preorder_id, changed_by, before)
         if receipt_id:
             _po_move_payments_to_invoice(con, preorder_id, receipt_id, changed_by)
+        _auto_supplier_pos_for_preorder(con, preorder_id, changed_by)
     return get_preorder(preorder_id)
 
 
@@ -6908,7 +6967,7 @@ def create_category(
 ) -> dict:
     if status not in ("aktif", "nonaktif"):
         raise ValueError("Status baru harus aktif atau nonaktif.")
-    name = " ".join(name.split())
+    name = " ".join(name.split()).upper()
     now = _now()
     with _conn() as con:
         _validate_category_fields(con, name, parent_id, None)
@@ -6944,7 +7003,7 @@ def update_category(
             raise ValueError("Data ini baru saja diubah oleh pengguna lain. Muat ulang halaman lalu ulangi perubahan Anda.")
         if row["status"] == "arsip":
             raise ValueError("Kategori ini diarsipkan. Pulihkan dulu sebelum mengubahnya.")
-        new_name = " ".join((name if name is not None else row["name"]).split())
+        new_name = " ".join((name if name is not None else row["name"]).split()).upper()
         new_parent = parent_id if set_parent else row["parent_id"]
         if set_parent and new_parent is not None:
             if con.execute("SELECT 1 FROM categories WHERE parent_id=?", (category_id,)).fetchone():

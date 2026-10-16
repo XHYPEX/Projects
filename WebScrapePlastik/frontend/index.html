@@ -153,7 +153,7 @@
     .po-pill.is-solid.is-sampai_di_toko   { background: #D97757; }
     .po-pill.is-solid.is-terpasang        { background: #5B7A5B; }
 
-    /* PO Supplier statuses (same pill as the preorder stages). */
+    /* Purchase Order statuses (same pill as the preorder stages). */
     .po-pill.is-spo-draft { color: #6F6A62; background: rgba(154, 147, 138, 0.16); }
     .po-pill.is-spo-menunggu_konfirmasi { color: #8A6218; background: rgba(173, 122, 30, 0.16); }
     .po-pill.is-spo-dikonfirmasi { color: #3B5658; background: rgba(75, 108, 111, 0.16); }
@@ -485,13 +485,13 @@
           <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
           <path d="m9 13 2 2 4-4"/>
         </svg>
-        Preorder
+        Sales Order
       </a>
       <a href="#/supplier-po" data-route="/supplier-po" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
           <path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>
         </svg>
-        Pembelian Supplier
+        Purchase Order
       </a>
       <a href="#/invoices" data-route="/invoices" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
@@ -1707,7 +1707,7 @@
             </svg>
             <p class="text-sm text-muted leading-snug max-w-xs">Pesanan barang yang belum ada di toko. Tidak mengubah stok sampai barang datang.</p>
           </div>
-          <button onclick="newPreorderForm()" class="ml-auto px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Preorder Baru</button>
+          <button onclick="newPreorderForm()" class="ml-auto px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Sales Order Baru</button>
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
@@ -1746,6 +1746,7 @@
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat Mobil</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. HP</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Barang</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">DP</th>
@@ -1757,17 +1758,17 @@
             <tbody id="po-list-tbody"></tbody>
           </table>
           <div id="po-list-empty" class="hidden text-center py-12">
-            <p id="po-list-empty-title" class="font-serif text-base text-ink mb-1">Belum ada preorder.</p>
-            <p id="po-list-empty-msg" class="text-sm text-muted">Catat pesanan pelanggan lewat tombol “+ Preorder Baru”.</p>
+            <p id="po-list-empty-title" class="font-serif text-base text-ink mb-1">Belum ada sales order.</p>
+            <p id="po-list-empty-msg" class="text-sm text-muted">Catat pesanan pelanggan lewat tombol “+ Sales Order Baru”.</p>
           </div>
         </div>
       </div>
 
-      <!-- FORM PANEL (Preorder Baru / Edit Data PO) -->
+      <!-- FORM PANEL (Sales Order Baru / Edit Data PO) -->
       <div id="po-form-panel" class="hidden">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h2 id="po-form-title" class="font-serif text-lg font-semibold text-ink">Preorder Baru</h2>
+            <h2 id="po-form-title" class="font-serif text-lg font-semibold text-ink">Sales Order Baru</h2>
             <p id="po-form-meta" class="hidden text-xs text-muted mt-0.5"></p>
           </div>
           <button id="po-form-back" onclick="poFormBack()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
@@ -1782,9 +1783,21 @@
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
             <div>
-              <label for="po-plate" class="block text-xs text-muted mb-1.5">Nomor Plat Mobil <span class="text-failed">*</span></label>
-              <input id="po-plate" type="text" placeholder="B 1234 ABC" autocomplete="off"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <label for="po-plate-region" class="block text-xs text-muted mb-1.5">Nomor Plat Mobil <span class="text-failed">*</span></label>
+              <div class="flex items-center gap-2">
+                <input id="po-plate-region" type="text" maxlength="2" placeholder="B" autocomplete="off" aria-label="Kode wilayah plat"
+                  class="w-14 uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                  oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,''); validatePoPlateRegion();" />
+                <span class="text-muted" aria-hidden="true">·</span>
+                <input id="po-plate-number" type="text" maxlength="4" inputmode="numeric" placeholder="1234" autocomplete="off" aria-label="Nomor plat"
+                  class="w-[4.5rem] border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                  oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                <span class="text-muted" aria-hidden="true">·</span>
+                <input id="po-plate-suffix" type="text" maxlength="3" placeholder="ABC" autocomplete="off" aria-label="Huruf belakang plat"
+                  class="w-16 uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                  oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'');" />
+              </div>
+              <p id="po-plate-feedback" class="text-xs text-muted mt-1.5 min-h-[1rem]"></p>
             </div>
             <div>
               <label for="po-customer-phone" class="block text-xs text-muted mb-1.5">Nomor Telepon <span class="text-failed">*</span></label>
@@ -1848,7 +1861,7 @@
           <button id="po-draft-btn" onclick="savePreorder(true)"
             class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Draft</button>
           <button id="po-save-btn" onclick="savePreorder(false)"
-            class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Preorder</button>
+            class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Sales Order</button>
         </div>
       </div>
 
@@ -1856,7 +1869,7 @@
       <div id="po-detail-panel" class="hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div class="flex items-center gap-3">
-            <h2 class="font-serif text-lg font-semibold text-ink">Detail Preorder</h2>
+            <h2 class="font-serif text-lg font-semibold text-ink">Detail Sales Order</h2>
             <button onclick="backToPreorderList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -1964,10 +1977,10 @@
         </div>
       </div>
 
-      <!-- PRINT PANEL (Preview dan Cetak Nota PO Customer, dot matrix) -->
+      <!-- PRINT PANEL (Preview dan Cetak Nota Sales Order, dot matrix) -->
       <div id="po-print-panel" class="hidden">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="font-serif text-lg font-semibold text-ink">Nota PO Customer</h2>
+          <h2 class="font-serif text-lg font-semibold text-ink">Nota Sales Order</h2>
           <button onclick="poPrintBack()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali</button>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 items-start">
@@ -2023,14 +2036,14 @@
     </div>
   </div>
 
-  <!-- PAGE: PEMBELIAN SUPPLIER (PO Supplier — pesanan ke supplier, dibuat dari barang PO Customer; tidak menyentuh stok) -->
+  <!-- PAGE: PEMBELIAN SUPPLIER (Purchase Order — pesanan ke supplier, dibuat dari barang Sales Order; tidak menyentuh stok) -->
   <div id="page-supplier-po" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="w-full">
 
       <!-- LIST PANEL -->
       <div id="spo-list-panel">
         <div class="flex items-center justify-end mb-4">
-          <button onclick="newSupplierPoForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ PO Supplier Baru</button>
+          <button onclick="newSupplierPoForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Purchase Order Baru</button>
         </div>
 
         <div id="spo-kpis" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3 mb-3"></div>
@@ -2040,7 +2053,7 @@
         </div>
 
         <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4 space-y-3">
-          <input id="spo-search-input" type="text" placeholder="Cari no. PO / supplier / nama barang / no. PO customer / keterangan…" autocomplete="off"
+          <input id="spo-search-input" type="text" placeholder="Cari no. PO / supplier / nama barang / no. Sales Order / keterangan…" autocomplete="off"
             oninput="onSupplierPoSearchInput()"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
           <div class="flex flex-wrap items-end gap-3">
@@ -2066,10 +2079,10 @@
           <table class="w-full min-w-[1250px] text-sm">
             <thead class="bg-bg2">
               <tr>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. PO Supplier</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Purchase Order</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal Order</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi PO Customer</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi Sales Order</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jumlah Item</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total Pembelian</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status PO</th>
@@ -2083,27 +2096,27 @@
             <tbody id="spo-list-tbody"></tbody>
           </table>
           <div id="spo-list-empty" class="hidden text-center py-12">
-            <p id="spo-list-empty-title" class="font-serif text-base text-ink mb-1">Belum ada PO supplier.</p>
-            <p id="spo-list-empty-msg" class="text-sm text-muted">Buat dari barang PO customer atau isi manual lewat tombol “+ PO Supplier Baru”.</p>
+            <p id="spo-list-empty-title" class="font-serif text-base text-ink mb-1">Belum ada Purchase Order.</p>
+            <p id="spo-list-empty-msg" class="text-sm text-muted">Buat dari barang Sales Order atau isi manual lewat tombol “+ Purchase Order Baru”.</p>
           </div>
         </div>
       </div>
 
-      <!-- FORM PANEL (PO Supplier Baru / Ubah Draft): written like a purchase invoice -->
+      <!-- FORM PANEL (Purchase Order Baru / Ubah Draft): written like a purchase invoice -->
       <div id="spo-form-panel" class="hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
           <button onclick="backToSupplierPoList()" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">&larr; Kembali</button>
           <div class="flex flex-wrap gap-2">
             <button onclick="addSpoManualItem()" class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors">+ Barang Manual</button>
-            <button onclick="openSpoPicker()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Ambil Barang dari PO Customer</button>
+            <button onclick="openSpoPicker()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Ambil Barang dari Sales Order</button>
           </div>
         </div>
 
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Data PO Supplier</div>
+          <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Data Purchase Order</div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <label class="block text-xs text-muted mb-1.5">No. PO Supplier</label>
+              <label class="block text-xs text-muted mb-1.5">No. Purchase Order</label>
               <input id="spo-number" type="text" readonly value="Otomatis saat disimpan" data-no-uppercase
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-muted focus:outline-none" />
             </div>
@@ -2159,7 +2172,7 @@
             <thead class="bg-bg2">
               <tr>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line w-10">No</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">PO Customer</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sales Order</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Satuan</th>
@@ -2174,7 +2187,7 @@
           </table>
           <div id="spo-form-empty" class="text-center py-16">
             <p class="font-serif text-base text-ink mb-1">Belum ada barang.</p>
-            <p class="text-sm text-muted">Ambil dari PO customer, atau tambah barang manual.</p>
+            <p class="text-sm text-muted">Ambil dari Sales Order, atau tambah barang manual.</p>
           </div>
         </div>
 
@@ -2231,7 +2244,7 @@
       <div id="spo-detail-panel" class="hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div class="flex items-center gap-3">
-            <h2 class="font-serif text-lg font-semibold text-ink">Detail PO Supplier</h2>
+            <h2 class="font-serif text-lg font-semibold text-ink">Detail Purchase Order</h2>
             <button onclick="backToSupplierPoList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
           </div>
           <div id="spo-detail-actions" class="flex flex-wrap items-center gap-2"></div>
@@ -2246,8 +2259,8 @@
             </div>
           </div>
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900/80 leading-relaxed">
-              <div class="font-semibold text-amber-700 text-sm mb-1">Status PO Supplier vs Status Item</div>
-              Status PO Supplier adalah status keseluruhan pesanan ke supplier, sedangkan Status Item adalah status pengiriman masing-masing item. Dalam satu PO Supplier, beberapa item dapat memiliki status yang berbeda, misalnya satu lewat udara dan satu lewat laut.
+              <div class="font-semibold text-amber-700 text-sm mb-1">Status Purchase Order vs Status Item</div>
+              Status Purchase Order adalah status keseluruhan pesanan ke supplier, sedangkan Status Item adalah status pengiriman masing-masing item. Dalam satu Purchase Order, beberapa item dapat memiliki status yang berbeda, misalnya satu lewat udara dan satu lewat laut.
             </div>
         </div>
 
@@ -2264,14 +2277,14 @@
         </div>
 
         <div data-spo-tab="item">
-          <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Daftar Item PO Supplier</div>
+          <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Daftar Item Purchase Order</div>
           <div class="bg-white border border-line rounded-xl overflow-x-auto mb-4">
             <table class="w-full min-w-[1100px] text-sm">
               <thead class="bg-bg2">
                 <tr>
                   <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line w-10">No</th>
                   <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Produk</th>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi PO Customer</th>
+                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi Sales Order</th>
                   <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
                   <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Pesan</th>
                   <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Diterima</th>
@@ -2335,15 +2348,15 @@
       <div id="spo-recv-panel" class="hidden"><div id="spo-recv-root"></div></div>
       <div id="spo-inv-panel" class="hidden"><div id="spo-inv-root"></div></div>
 
-      <!-- PICKER: Ambil Barang dari PO Customer. Its own overlay because the shared modal is too narrow for the table. -->
+      <!-- PICKER: Ambil Barang dari Sales Order. Its own overlay because the shared modal is too narrow for the table. -->
       <div id="spo-picker" class="hidden fixed inset-0 z-50">
         <div class="absolute inset-0 bg-ink/40" onclick="closeSpoPicker()"></div>
         <div class="absolute inset-0 flex items-center justify-center p-3 sm:p-6 pointer-events-none">
           <div class="pointer-events-auto bg-bg border border-line rounded-xl w-[min(96vw,100%)] max-h-full flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="spo-picker-title">
             <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-line">
               <div>
-                <h3 id="spo-picker-title" class="font-serif text-xl font-semibold text-ink">Ambil Barang dari PO Customer</h3>
-                <p class="text-sm text-muted mt-0.5">Pilih barang dari PO customer yang belum dipesankan ke supplier untuk ditambahkan ke PO supplier.</p>
+                <h3 id="spo-picker-title" class="font-serif text-xl font-semibold text-ink">Ambil Barang dari Sales Order</h3>
+                <p class="text-sm text-muted mt-0.5">Pilih barang dari Sales Order yang belum dipesankan ke supplier untuk ditambahkan ke Purchase Order.</p>
               </div>
               <button type="button" onclick="closeSpoPicker()" aria-label="Tutup" class="p-2 -m-1 border border-line rounded-lg text-muted hover:text-ink hover:bg-bg2 transition-colors shrink-0">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -2367,7 +2380,7 @@
                   <thead class="bg-bg2">
                     <tr>
                       <th class="px-3 py-2 border-b border-line w-10"></th>
-                      <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. PO Customer</th>
+                      <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Sales Order</th>
                       <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
                       <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
                       <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
@@ -2413,7 +2426,7 @@
                   <table class="w-full min-w-[860px] text-xs">
                     <thead>
                       <tr class="text-muted">
-                        <th class="text-left px-3 py-2 font-medium border-b border-line">No. PO Customer</th>
+                        <th class="text-left px-3 py-2 font-medium border-b border-line">No. Sales Order</th>
                         <th class="text-left px-3 py-2 font-medium border-b border-line">Customer</th>
                         <th class="text-left px-3 py-2 font-medium border-b border-line">Barang</th>
                         <th class="text-left px-3 py-2 font-medium border-b border-line">Supplier Tujuan</th>
@@ -2433,7 +2446,7 @@
             <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-line">
               <button type="button" onclick="closeSpoPicker()" class="px-6 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors">Batal</button>
               <button id="spo-picker-add" type="button" onclick="applySpoPicker()"
-                class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Tambahkan ke PO Supplier</button>
+                class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Tambahkan ke Purchase Order</button>
             </div>
           </div>
         </div>
@@ -2703,7 +2716,7 @@
           <div id="ov-pending-outstanding" class="text-xs text-muted mt-0.5">Rp 0 belum dibayar</div>
         </div>
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Preorder Berjalan</div>
+          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Sales Order Berjalan</div>
           <div id="ov-preorder-count" class="font-sans text-2xl font-semibold text-ink">0</div>
           <div id="ov-preorder-outstanding" class="text-xs text-muted mt-0.5">Rp 0 sisa tagihan</div>
         </div>
@@ -2786,7 +2799,7 @@
 
       <div class="mb-6">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Preorder Berjalan</h2>
+          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Sales Order Berjalan</h2>
           <span id="ov-preorder-caption" class="text-xs text-muted"></span>
         </div>
         <div class="bg-white border border-line rounded-xl overflow-x-auto">
@@ -2804,7 +2817,7 @@
             <tbody id="ov-preorder-tbody"></tbody>
           </table>
           <div id="ov-preorder-empty" class="hidden text-center py-8">
-            <p class="text-sm text-muted">Tidak ada preorder berjalan.</p>
+            <p class="text-sm text-muted">Tidak ada sales order berjalan.</p>
           </div>
         </div>
       </div>
@@ -2883,7 +2896,7 @@
           <option value="master_item">Barang</option>
           <option value="inbound_document">Barang masuk</option>
           <option value="purchase_invoice">Faktur pembelian</option>
-          <option value="supplier_po">PO supplier</option>
+          <option value="supplier_po">Purchase Order</option>
           <option value="supplier">Supplier</option>
           <option value="brand">Merek</option>
           <option value="unit">Satuan</option>
@@ -2966,7 +2979,7 @@
               <table class="w-full text-sm min-w-[1000px]">
                 <thead class="bg-bg2">
                   <tr>
-                    <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Dokumen</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi PO Supplier</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang Diterima</th>
+                    <th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Dokumen</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Referensi Purchase Order</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang Diterima</th>
                     <th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nilai Barang</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th><th class="text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Petugas</th><th class="text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
                   </tr>
                 </thead>
@@ -3000,7 +3013,7 @@
             <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
               <div class="font-serif font-semibold text-ink mb-3">Informasi Penerimaan</div>
               <div class="flex flex-wrap items-center gap-2 mb-3">
-                <button type="button" id="inbound-mode-po" onclick="setInboundMode('po')" class="po-status-btn px-3 py-1 border border-line rounded-full text-xs">Dari PO Supplier</button>
+                <button type="button" id="inbound-mode-po" onclick="setInboundMode('po')" class="po-status-btn px-3 py-1 border border-line rounded-full text-xs">Dari Purchase Order</button>
                 <button type="button" id="inbound-mode-manual" onclick="setInboundMode('manual')" class="po-status-btn px-3 py-1 border border-line rounded-full text-xs">Penerimaan Manual</button>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3017,8 +3030,8 @@
                   </div>
                 </div>
                 <div id="inbound-po-wrap">
-                  <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">PO Supplier</label>
-                  <select id="inbound-po-select" onchange="onInboundPoChange()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="">Pilih PO Supplier…</option></select>
+                  <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Purchase Order</label>
+                  <select id="inbound-po-select" onchange="onInboundPoChange()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="">Pilih Purchase Order…</option></select>
                 </div>
                 <div>
                   <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Tanggal Terima</label>
@@ -3057,7 +3070,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <div class="font-serif font-semibold text-ink">Item Penerimaan</div>
               <div class="flex gap-2">
-                <button type="button" id="inbound-pick-po-btn" onclick="openInboundPoPicker()" class="px-3 py-1 border border-accent text-accentDark rounded-lg text-xs font-medium bg-white hover:bg-bg2">+ Ambil dari PO Supplier</button>
+                <button type="button" id="inbound-pick-po-btn" onclick="openInboundPoPicker()" class="px-3 py-1 border border-accent text-accentDark rounded-lg text-xs font-medium bg-white hover:bg-bg2">+ Ambil dari Purchase Order</button>
                 <button type="button" id="inbound-add-row-btn" onclick="addInboundItemRow()" class="px-3 py-1 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors">+ Tambah Barang</button>
               </div>
             </div>
@@ -3431,12 +3444,12 @@
                   </li>
                   <li class="flex items-center gap-3 px-1 py-2.5">
                     <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-pending/10 text-pending"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 13 2 2 4-4"/></svg></span>
-                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">PO Customer</div><div id="dt-use-pocust-sub" class="text-xs text-muted">pesanan pelanggan</div></div>
+                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">Sales Order</div><div id="dt-use-pocust-sub" class="text-xs text-muted">pesanan pelanggan</div></div>
                     <div id="dt-use-pocust" class="text-lg font-semibold text-ink tabular-nums"></div>
                   </li>
                   <li class="flex items-center gap-3 px-1 py-2.5">
                     <span class="w-9 h-9 rounded-lg grid place-items-center shrink-0 bg-accent/10 text-accentDark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg></span>
-                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">PO Supplier</div><div id="dt-use-posup-sub" class="text-xs text-muted">pembelian dari supplier</div></div>
+                    <div class="min-w-0 flex-1"><div class="text-sm font-medium text-ink">Purchase Order</div><div id="dt-use-posup-sub" class="text-xs text-muted">pembelian dari supplier</div></div>
                     <div id="dt-use-posup" class="text-lg font-semibold text-ink tabular-nums"></div>
                   </li>
                   <li class="flex items-center gap-3 px-1 py-2.5">
@@ -4474,8 +4487,8 @@ function closeDrawer() {
 const ROUTES = {
   "/scraper": { title: "Maps Scraper", page: "page-scraper" },
   "/cashier": { title: "Kasir", page: "page-cashier" },
-  "/preorder": { title: "Preorder", page: "page-preorder" },
-  "/supplier-po": { title: "Pembelian Supplier", page: "page-supplier-po" },
+  "/preorder": { title: "Sales Order", page: "page-preorder" },
+  "/supplier-po": { title: "Purchase Order", page: "page-supplier-po" },
   "/invoices": { title: "Riwayat Invoice", page: "page-invoices" },
   "/purchase-invoices": { title: "Faktur Pembelian", page: "page-purchase-invoices" },
   "/inventory": { title: "Barang Masuk", page: "page-inventory", section: "inv-tab-inbound", data: "inbound" },
@@ -4599,7 +4612,7 @@ const ROUTE_META = {
     icon: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 13 2 2 4-4"/>',
   },
   "/supplier-po": {
-    subtitle: "Pesanan pembelian barang ke supplier untuk memenuhi permintaan PO customer.",
+    subtitle: "Pesanan pembelian barang ke supplier untuk memenuhi permintaan Sales Order.",
     icon: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
   },
   "/invoices": {
@@ -5001,6 +5014,38 @@ function validatePlateRegion() {
   }
 }
 
+// PO list: the first item's name, plus how many more lines the order has.
+function poItemNamesHtml(names) {
+  if (!names || !names.length) return '<span class="text-muted">—</span>';
+  const more = names.length > 1 ? ` <span class="text-[11px] text-muted whitespace-nowrap">+${names.length - 1} lainnya</span>` : "";
+  return `<span class="block truncate">${esc(names[0])}</span>${more}`;
+}
+
+// PO form plate: three boxes like the cashier's, saved as one "B 1234 ABC" string.
+function getPoPlate() {
+  return ["po-plate-region", "po-plate-number", "po-plate-suffix"]
+    .map(id => document.getElementById(id).value.trim()).filter(Boolean).join(" ");
+}
+
+function setPoPlate(full) {
+  const m = String(full || "").toUpperCase().match(/^\s*([A-Z]{1,2})\s*(\d{1,4})\s*([A-Z]{0,3})\s*$/);
+  const [region, number, suffix] = m ? [m[1], m[2], m[3]] : [String(full || "").trim(), "", ""];
+  document.getElementById("po-plate-region").value = region;
+  document.getElementById("po-plate-number").value = number;
+  document.getElementById("po-plate-suffix").value = suffix;
+  validatePoPlateRegion();
+}
+
+function validatePoPlateRegion() {
+  const input = document.getElementById("po-plate-region");
+  const feedback = document.getElementById("po-plate-feedback");
+  const region = input.value;
+  const known = !region || plateCodes[region];
+  input.classList.toggle("border-failed", !known);
+  feedback.textContent = !region ? "" : known ? plateCodes[region] : "Kode wilayah tidak dikenal";
+  feedback.className = `text-xs ${known ? "text-muted" : "text-failed"} mt-1.5 min-h-[1rem]`;
+}
+
 // ── Product photo thumbnails (Master Barang list, cashier lines) ─────────────
 // A fixed-size tile (the caller sizes it and gives it overflow-hidden) shows the product photo
 // when there is one, and `fallbackHtml` (initials or an icon, built by the caller with esc())
@@ -5107,7 +5152,7 @@ function addItemRow(prefill) {
   if (prefill && prefill.addedAt) row.dataset.addedAt = prefill.addedAt;
   if (prefill && prefill.addedBy) row.dataset.addedBy = prefill.addedBy;
   if (prefill && prefill.addedDuringWork) row.dataset.addedDuringWork = "1";
-  // A line of a PO Customer is changed on the PO; a returned line is frozen (see applyCashierVoidLock).
+  // A line of a Sales Order is changed on the PO; a returned line is frozen (see applyCashierVoidLock).
   if (prefill && prefill.preorderItemId) row.dataset.poItem = prefill.preorderItemId;
   if (prefill && Number(prefill.returnedQty) > 0) row.dataset.returnedQty = prefill.returnedQty;
   // Photo of the linked master item: from the prefill, else from what the register already knows
@@ -5188,7 +5233,7 @@ function refreshItemRowMeta(row) {
   if (row.dataset.sku) bits.push(`SKU: <span class="font-mono">${esc(row.dataset.sku)}</span>`);
   else if (isService) bits.push("Jasa, tanpa stok");
   else if (name) bits.push("Tanpa SKU, stok tidak berkurang");
-  if (row.dataset.poItem) bits.push(`<span class="text-accentDark font-medium">Dari PO Customer</span>`);
+  if (row.dataset.poItem) bits.push(`<span class="text-accentDark font-medium">Dari Sales Order</span>`);
   if (row.dataset.returnedQty) bits.push(`<span class="text-failed font-medium">Diretur ${esc(row.dataset.returnedQty)}</span>`);
   if (row.dataset.addedAt) {
     bits.push(`<span class="lg:hidden">Ditambah ${esc(formatReceiptWhen(row.dataset.addedAt, true))}${row.dataset.addedBy ? " oleh " + esc(row.dataset.addedBy) : ""}</span>`);
@@ -5976,7 +6021,7 @@ function renderCashierWorkUi() {
   // Closed = Lunas and Pengerjaan Selesai. A paid nota still being worked on stays editable.
   const isDone = saved && tab.status === "done" && ws === "selesai";
   const poChip = saved && tab.preorderId
-    ? ` <button type="button" onclick="openPreorderFromDashboard('${esc(tab.preorderId)}')" title="Buka PO Customer" class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border border-accent/40 text-accentDark hover:bg-accent/10">${esc(tab.poNumber || "PO Customer")}</button>` : "";
+    ? ` <button type="button" onclick="openPreorderFromDashboard('${esc(tab.preorderId)}')" title="Buka Sales Order" class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border border-accent/40 text-accentDark hover:bg-accent/10">${esc(tab.poNumber || "Sales Order")}</button>` : "";
   const badge = saved ? workBadge(ws, tab.status) : UNSAVED_BADGE;
   document.getElementById("cashier-work-badge").innerHTML = badge + poChip;
   document.getElementById("cashier-work-pill").innerHTML = badge;
@@ -6401,7 +6446,7 @@ function cashierTlGroups() {
     ["item", "Riwayat Item", events.filter(e => e.kind === "created" || e.kind === "item_added" || e.kind === "item_changed").length],
     ["bayar", "Riwayat Pembayaran", payments.length],
     ["status", "Riwayat Status", events.filter(e => ["status", "void", "reopen", "refund", "overpaid"].includes(e.kind)).length],
-    ["po", "Terkait PO Customer", preorders.length],
+    ["po", "Terkait Sales Order", preorders.length],
   ];
 }
 
@@ -11494,7 +11539,7 @@ const KIND_META = {
 function ledgerDescription(e) {
   const k = ledgerKind(e);
   if (k === "awal") return "Stok awal saat barang ditambahkan.";
-  if (k === "masuk") return `Barang ini masuk ${Math.abs(e.qty)} ${currentMasterItem?.unit || ""} dari pembelian supplier.`;
+  if (k === "masuk") return `Barang ini masuk ${Math.abs(e.qty)} ${currentMasterItem?.unit || ""} dari purchase order.`;
   if (k === "jual") return `Barang ini terjual ${Math.abs(e.qty)} ${currentMasterItem?.unit || ""} melalui transaksi kasir.`;
   if (k === "retur") return e.ref_type === "receipt" ? "Stok kembali karena nota diubah atau di-void." : "Dokumen barang masuk di-void.";
   if (e.ref_type === "stock_opname") return `Hasil stock opname ${e.ref_doc_number || ""}: ${(e.note || "").replace(/^Stock opname:\s*/, "") || "sesuai hitung"}.`;
@@ -11930,13 +11975,13 @@ function renderMasterStockHistory() {
   const it = currentMasterItem, all = masterDetailExtra.ledger || [];
   const g = i => document.getElementById(i);
   const act = shActivity || {};
-  const alloc = act.po_customer_reserved_qty || 0;   // barang PO Customer yang sudah di toko, ditahan untuk pelanggan
+  const alloc = act.po_customer_reserved_qty || 0;   // barang Sales Order yang sudah di toko, ditahan untuk pelanggan
   const demand = act.po_customer_qty || 0;
   g("sh-header").innerHTML = masterHistoryHeader(it, false);
   g("sh-kpis").innerHTML =
     mhKpi("box", "bg-blue-100 text-blue-600", "Stok Fisik", `${formatInt(it.stock_qty)} ${esc(it.unit)}`, "Stok tercatat di sistem")
     + mhKpi("doc", "bg-blue-100 text-blue-600", "Stok Tersedia", `${formatInt(Math.max(it.stock_qty - alloc, 0))} ${esc(it.unit)}`, "Siap untuk dijual")
-    + mhKpi("box", "bg-orange-100 text-orange-600", "Dialokasikan", `${formatInt(alloc)} ${esc(it.unit)}`, "Reservasi PO Customer (sudah di toko)")
+    + mhKpi("box", "bg-orange-100 text-orange-600", "Dialokasikan", `${formatInt(alloc)} ${esc(it.unit)}`, "Reservasi Sales Order (sudah di toko)")
     + mhKpi("warn", "bg-pending/15 text-pending", "Stok Minimum", `${formatInt(it.min_stock ?? 0)} ${esc(it.unit)}`, "Batas peringatan stok");
   g("sh-chips").innerHTML = SH_CHIPS.map(([k, label, dot]) => `<button type="button" aria-pressed="${shKind === k}" data-kind="${k}" onclick="setStockKind('${k}')"
     class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm transition-colors ${shKind === k ? "border-accent bg-accent/10 text-accentDark font-medium" : "border-line bg-white text-ink hover:bg-bg2"}">${dot ? `<span class="w-2 h-2 rounded-full ${dot}"></span>` : ""}${label}</button>`).join("");
@@ -11972,8 +12017,8 @@ function renderMasterStockHistory() {
       <h3 class="font-serif font-semibold text-ink mb-3 flex items-center gap-2">${mhIcon("link", 16)} Ringkasan Keterkaitan</h3>
       <div class="space-y-3">
         ${mhLinkCard("cart", "bg-done/10 text-done", `${act.kasir_total ?? 0} Invoice Kasir`, "Transaksi penjualan yang menggunakan barang ini", `${act.kasir_total ?? 0} transaksi`)}
-        ${mhLinkCard("doc", "bg-orange-100 text-orange-600", `${act.po_customer_aktif ?? 0} PO Customer Aktif`, "Reservasi stok untuk pesanan pelanggan", `${formatInt(alloc)} ${it.unit} dialokasikan · total pesanan ${formatInt(demand)} ${it.unit}`)}
-        ${mhLinkCard("truck", "bg-blue-100 text-blue-600", `${act.po_supplier_aktif ?? 0} PO Supplier Aktif`, "Pengadaan barang dari supplier yang akan menambah stok", `${formatInt(act.po_supplier_qty || 0)} ${it.unit} (dalam proses)`)}
+        ${mhLinkCard("doc", "bg-orange-100 text-orange-600", `${act.po_customer_aktif ?? 0} Sales Order Aktif`, "Reservasi stok untuk pesanan pelanggan", `${formatInt(alloc)} ${it.unit} dialokasikan · total pesanan ${formatInt(demand)} ${it.unit}`)}
+        ${mhLinkCard("truck", "bg-blue-100 text-blue-600", `${act.po_supplier_aktif ?? 0} Purchase Order Aktif`, "Pengadaan barang dari supplier yang akan menambah stok", `${formatInt(act.po_supplier_qty || 0)} ${it.unit} (dalam proses)`)}
       </div></section>
     <section class="bg-white border border-line rounded-xl p-4">
       <h3 class="font-serif font-semibold text-ink mb-2 flex items-center gap-2">${mhIcon("info", 16)} Informasi Tambahan</h3>
@@ -12061,8 +12106,8 @@ function renderMasterPriceHistory() {
       <div class="aspect-[4/3] rounded-lg border border-line bg-bg2 grid place-items-center overflow-hidden">${img}</div></section>
     <section class="bg-white border border-line rounded-xl overflow-hidden"><h3 class="font-serif font-semibold text-ink px-4 pt-4 pb-2">Keterkaitan Produk</h3>
       ${row("cart", "bg-blue-100 text-blue-600", `Dipakai di ${act.kasir_total ?? 0} Invoice Kasir`, "Transaksi penjualan ke pelanggan")}
-      ${row("doc", "bg-orange-100 text-orange-600", `Terkait ${act.po_customer_aktif ?? 0} PO Customer Aktif`, "Pesanan pelanggan yang masih aktif")}
-      ${row("truck", "bg-purple-100 text-purple-600", `Terkait ${act.po_supplier_aktif ?? 0} PO Supplier Aktif`, "Pesanan pembelian ke supplier")}</section>
+      ${row("doc", "bg-orange-100 text-orange-600", `Terkait ${act.po_customer_aktif ?? 0} Sales Order Aktif`, "Pesanan pelanggan yang masih aktif")}
+      ${row("truck", "bg-purple-100 text-purple-600", `Terkait ${act.po_supplier_aktif ?? 0} Purchase Order Aktif`, "Pesanan pembelian ke supplier")}</section>
     <section class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm"><div class="flex gap-2 font-semibold text-blue-700 mb-1">${mhIcon("info", 16)} Perubahan harga tidak memengaruhi transaksi lama</div>
       <p class="text-blue-900/80 text-xs leading-relaxed">Perubahan harga jual atau harga beli di Master Barang tidak akan mengubah data pada invoice kasir yang sudah dibuat, maupun data pada faktur pembelian yang sudah ada.</p></section>
     <section class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><div class="flex gap-2 font-semibold text-amber-700 mb-1">${mhIcon("doc", 16)} Riwayat harga disimpan otomatis</div>
@@ -12192,9 +12237,9 @@ function backToMasterList() {
 }
 
 // ── Barang Masuk V2: list ────────────────────────────────────────────────────
-let inboundMode = "po";            // "po" = against a PO Supplier, "manual" = no formal PO
-let inboundPoLines = [];           // lines picked from the PO Supplier
-let inboundPoDoc = null;           // the PO Supplier detail those lines belong to
+let inboundMode = "po";            // "po" = against a Purchase Order, "manual" = no formal PO
+let inboundPoLines = [];           // lines picked from the Purchase Order
+let inboundPoDoc = null;           // the Purchase Order detail those lines belong to
 let inboundLoadedMeta = null;      // source/PO of a draft the PO page opened (its lines carry no PO line ids)
 let inboundSuppliersLoaded = false;
 const INBOUND_STATUS_LABEL = { draft: "Draft", posted: "Diposting", void: "Dibatalkan" };
@@ -12313,7 +12358,7 @@ async function loadReceivablePos(selectedId) {
     const r = await fetch("/api/supplier-pos");
     if (r.ok) list = (await r.json()).filter(p => p.status === "dipesan" || p.status === "sebagian_diterima" || p.id === selectedId);
   } catch (_) { /* leave the list empty */ }
-  sel.innerHTML = '<option value="">Pilih PO Supplier…</option>' + list.map(p =>
+  sel.innerHTML = '<option value="">Pilih Purchase Order…</option>' + list.map(p =>
     `<option value="${esc(p.id)}">${esc(p.po_number)} · ${esc(p.supplier_name_snapshot)} · ${esc(SPO_ORDER_LABELS[p.order_status] || p.order_status)}</option>`).join("");
   if (selectedId) sel.value = selectedId;
 }
@@ -12334,7 +12379,7 @@ function setInboundMode(mode) {
   document.getElementById("inbound-supplier-add").classList.toggle("hidden", po);
   const hint = document.getElementById("inbound-po-hint");
   if (!po) {
-    hint.textContent = "Mode manual tidak boleh dipakai untuk barang yang sudah tercatat di PO Supplier, supaya penerimaan tidak ganda. Cari dokumen PO lebih dulu untuk mengisi penerimaan.";
+    hint.textContent = "Mode manual tidak boleh dipakai untuk barang yang sudah tercatat di Purchase Order, supaya penerimaan tidak ganda. Cari dokumen PO lebih dulu untuk mengisi penerimaan.";
     hint.classList.remove("hidden");
   } else {
     renderInboundPoHint();
@@ -12377,21 +12422,21 @@ function inboundNetCost(i) {
 }
 
 function openInboundPoPicker() {
-  if (!inboundPoDoc) { showToast("Pilih PO Supplier terlebih dahulu."); return; }
+  if (!inboundPoDoc) { showToast("Pilih Purchase Order terlebih dahulu."); return; }
   const picked = new Map(inboundPoLines.map(l => [l.spo_item_id, l]));
   const rows = inboundPoDoc.items.map(i => ({ i, left: i.quantity - i.qty_cancelled - i.qty_received })).filter(r => r.left > 0);
   if (!rows.length) { showToast("Tidak ada barang yang menunggu penerimaan di PO ini."); return; }
   const inp = "border border-line rounded-md px-2 py-1 text-xs w-16 text-right bg-white text-ink";
-  openModal("Ambil Barang dari PO Supplier", `
-    <div class="text-xs text-muted mb-3">Pilih barang yang benar-benar datang hari ini. Referensi PO Customer tetap melekat pada setiap baris.</div>
+  openModal("Ambil Barang dari Purchase Order", `
+    <div class="text-xs text-muted mb-3">Pilih barang yang benar-benar datang hari ini. Referensi Sales Order tetap melekat pada setiap baris.</div>
     <div class="grid grid-cols-2 gap-3 mb-3 text-xs">
       <div class="border border-line rounded-lg p-2.5"><div class="text-[10px] uppercase text-muted">Supplier Terpilih</div><div class="font-semibold text-ink">${esc(inboundPoDoc.supplier_name_snapshot)}</div><div class="text-muted">Nomor PO: ${esc(inboundPoDoc.po_number)}</div></div>
       <div class="border border-line rounded-lg p-2.5"><div class="text-[10px] uppercase text-muted">Surat Jalan</div><div class="font-semibold text-ink">${esc(document.getElementById("inbound-sj").value || "belum diisi")}</div></div></div>
     <div class="border border-line rounded-lg overflow-x-auto"><table class="w-full text-xs"><thead class="bg-bg2"><tr>
-      <th class="${SPO_TH} w-8"></th><th class="${SPO_TH}">Produk / PO Customer</th><th class="${SPO_TH}">Jalur / Status</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah</th><th class="${SPO_THR}">Belum</th><th class="${SPO_THR}">Terima Kini</th></tr></thead><tbody>
+      <th class="${SPO_TH} w-8"></th><th class="${SPO_TH}">Produk / Sales Order</th><th class="${SPO_TH}">Jalur / Status</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah</th><th class="${SPO_THR}">Belum</th><th class="${SPO_THR}">Terima Kini</th></tr></thead><tbody>
       ${rows.map(({ i, left }) => { const p = picked.get(i.id); const linked = i.master_item_id != null; return `<tr class="border-b border-line last:border-b-0 ${linked ? "" : "opacity-50"}">
         <td class="px-3 py-2"><input type="checkbox" data-ibp-check="${i.id}" ${p ? "checked" : ""} ${linked ? "" : "disabled"} class="accent-[#D97757]"></td>
-        <td class="px-3 py-2"><div class="font-medium text-ink">${esc(i.product_name)}</div><div class="text-[11px] text-muted">${i.sku ? "SKU " + esc(i.sku) + " · " : ""}${esc(i.customer_po_number || "tanpa PO Customer")}${i.customer_name ? " · " + esc(i.customer_name) : ""}${linked ? "" : " · belum terhubung ke Master Barang"}</div></td>
+        <td class="px-3 py-2"><div class="font-medium text-ink">${esc(i.product_name)}</div><div class="text-[11px] text-muted">${i.sku ? "SKU " + esc(i.sku) + " · " : ""}${esc(i.customer_po_number || "tanpa Sales Order")}${i.customer_name ? " · " + esc(i.customer_name) : ""}${linked ? "" : " · belum terhubung ke Master Barang"}</div></td>
         <td class="px-3 py-2">${spoShipMethodPill(i.ship_method)} <div class="mt-1">${spoItemStatusPill(i.item_status)}</div></td>
         <td class="px-3 py-2 text-right tabular-nums">${i.quantity - i.qty_cancelled}</td><td class="px-3 py-2 text-right tabular-nums">${i.qty_received}</td><td class="px-3 py-2 text-right tabular-nums">${left}</td>
         <td class="px-3 py-2 text-right"><input type="number" min="1" max="${left}" step="1" value="${p ? p.qty_in : left}" data-ibp-qty="${i.id}" data-max="${left}" ${linked ? "" : "disabled"} class="${inp}"></td></tr>`; }).join("")}
@@ -12429,12 +12474,12 @@ function renderInboundPoRows() {
   const box = document.getElementById("inbound-po-rows");
   if (!box) return;
   if (!inboundPoLines.length) {
-    box.innerHTML = `<div class="text-center text-sm text-muted py-8 border border-dashed border-line rounded-lg">${inboundPoDoc ? "Belum ada barang. Klik “+ Ambil dari PO Supplier”." : "Pilih PO Supplier, lalu ambil barang yang sudah datang."}</div>`;
+    box.innerHTML = `<div class="text-center text-sm text-muted py-8 border border-dashed border-line rounded-lg">${inboundPoDoc ? "Belum ada barang. Klik “+ Ambil dari Purchase Order”." : "Pilih Purchase Order, lalu ambil barang yang sudah datang."}</div>`;
     return;
   }
   const inp = "border border-line rounded-md px-2 py-1 text-xs bg-white text-ink";
   box.innerHTML = `<table class="w-full min-w-[900px] text-sm"><thead class="bg-bg2"><tr>
-    <th class="${SPO_TH}">Barang / PO Customer</th><th class="${SPO_TH}">Jalur Pengiriman</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah Terima</th>
+    <th class="${SPO_TH}">Barang / Sales Order</th><th class="${SPO_TH}">Jalur Pengiriman</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah Terima</th>
     <th class="${SPO_THR}">Terima Sekarang</th><th class="${SPO_THR}">Sisa Setelah</th><th class="${SPO_THR}">Harga Beli</th><th class="${SPO_TH}">Kondisi</th><th class="${SPO_TH} w-10"></th></tr></thead><tbody>
     ${inboundPoLines.map((l, idx) => `<tr class="border-b border-line last:border-b-0 align-middle">
       <td class="px-3 py-2"><div class="font-medium text-ink">${esc(l.product_name)}</div><div class="text-[11px] text-muted">${l.sku ? "SKU " + esc(l.sku) + " · " : ""}${esc(l.customer_po_number || "—")}${l.customer_name ? " · " + esc(l.customer_name) : ""}</div></td>
@@ -12473,7 +12518,7 @@ function renderInboundSideSummary() {
   box.innerHTML = [
     line("Supplier", esc(document.getElementById("inbound-supplier-select").value || "—")),
     po ? line("Referensi PO", esc(inboundPoDoc.po_number)) : line("Mode", "Manual"),
-    po ? line("PO Customer", refs.length ? esc(refs.join(", ")) : "—") : "",
+    po ? line("Sales Order", refs.length ? esc(refs.join(", ")) : "—") : "",
     line("Barang diterima", `${po ? lines.length : manualRows.length} item / ${qty} pcs`),
     line("Petugas", esc(document.getElementById("inbound-officer").value || "—")),
   ].join("");
@@ -12486,7 +12531,7 @@ function newInboundForm(mode) {
   inboundPoDoc = null;
   inboundLoadedMeta = null;
   document.getElementById("inbound-form-title").textContent = mode === "manual" ? "Barang Masuk Manual" : "Buat Dokumen Barang Masuk";
-  document.getElementById("inbound-form-sub").textContent = mode === "manual" ? "Penerimaan tanpa PO Supplier: perlu alasan dan verifikasi ekstra." : "Penerimaan dari PO Supplier. Nomor dokumen dibuat otomatis (BM-…).";
+  document.getElementById("inbound-form-sub").textContent = mode === "manual" ? "Penerimaan tanpa Purchase Order: perlu alasan dan verifikasi ekstra." : "Penerimaan dari Purchase Order. Nomor dokumen dibuat otomatis (BM-…).";
   document.getElementById("inbound-readonly-banner").classList.add("hidden");
   document.getElementById("inbound-audit-box").classList.add("hidden");
 
@@ -12943,7 +12988,7 @@ function collectInboundPayload() {
 }
 
 function validateInboundForm(payload) {
-  if (inboundMode === "po" && !payload.supplier_po_id) { showToast("Pilih PO Supplier terlebih dahulu."); return false; }
+  if (inboundMode === "po" && !payload.supplier_po_id) { showToast("Pilih Purchase Order terlebih dahulu."); return false; }
   if (!payload.supplier_id) { showToast("Pilih supplier terlebih dahulu."); return false; }
   if (!payload.received_date) { showToast("Tanggal terima wajib diisi."); return false; }
   if (payload.source === "manual" && !payload.manual_reason) { showToast("Alasan penerimaan manual wajib diisi."); document.getElementById("inbound-manual-reason").focus(); return false; }
@@ -13025,14 +13070,14 @@ function renderInboundReview(doc) {
         ${meta("Nilai barang diterima", formatIDR(doc.total_value))}${meta("Posting ganda", '<span class="text-done">Dicegah</span>')}${meta("Hak akses", esc((currentUser && currentUser.role) || "—"))}</div></div>
     <div class="bg-white border border-line rounded-xl overflow-x-auto mb-3"><div class="px-4 py-3 flex items-center justify-between"><span class="font-serif font-semibold text-ink">Periksa Item yang Diposting</span>
       ${partial ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Penerimaan Sebagian</span>' : ""}</div>
-      <table class="w-full text-sm min-w-[800px]"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Barang</th><th class="${SPO_TH}">PO Customer</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah Diterima</th><th class="${SPO_THR}">Diterima Sekarang</th><th class="${SPO_THR}">Sisa PO</th><th class="${SPO_THR}">Mutasi Stok</th><th class="${SPO_THR}">Nilai</th></tr></thead><tbody>
+      <table class="w-full text-sm min-w-[800px]"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Barang</th><th class="${SPO_TH}">Sales Order</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah Diterima</th><th class="${SPO_THR}">Diterima Sekarang</th><th class="${SPO_THR}">Sisa PO</th><th class="${SPO_THR}">Mutasi Stok</th><th class="${SPO_THR}">Nilai</th></tr></thead><tbody>
       ${doc.items.map(i => { const f = fulfil.get(i.spo_item_id); return `<tr class="border-b border-line last:border-b-0">
         <td class="px-3 py-2 font-medium text-ink">${esc(inboundItemName(i))}<div class="text-[11px] text-muted font-mono font-normal">${esc(i.resolved_sku || "")}</div></td>
         <td class="px-3 py-2 text-xs text-accentDark">${f ? esc(f.customer_po_number || "—") : "—"}${f && f.customer_name ? `<div class="text-muted">${esc(f.customer_name)}</div>` : ""}</td>
         <td class="px-3 py-2 text-right tabular-nums">${f ? f.qty_ordered : "—"}</td><td class="px-3 py-2 text-right tabular-nums">${f ? f.qty_received : "—"}</td>
         <td class="px-3 py-2 text-right tabular-nums font-semibold">${i.qty_in}</td><td class="px-3 py-2 text-right tabular-nums">${f ? f.qty_ordered - f.qty_received - i.qty_in : "—"}</td>
         <td class="px-3 py-2 text-right tabular-nums text-done font-medium">+${i.qty_in}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(i.qty_in * i.cost_price)}</td></tr>`; }).join("")}</tbody></table></div>
-    <div class="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900/80 mb-4">Setelah posting${partial ? ", barang yang belum tiba tetap tercatat sebagai sisa pesanan PO Supplier" : ", dokumen terkunci dan hanya bisa dibatalkan (void) oleh admin"}.</div>
+    <div class="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900/80 mb-4">Setelah posting${partial ? ", barang yang belum tiba tetap tercatat sebagai sisa pesanan Purchase Order" : ", dokumen terkunci dan hanya bisa dibatalkan (void) oleh admin"}.</div>
     <div class="sticky bottom-0 bg-bg border-t border-line py-3 flex flex-wrap items-center justify-between gap-2">
       <div><div class="text-sm font-medium text-ink">Siap diposting?</div><div class="text-[11px] text-muted">${esc(doc.doc_number)} · tidak dapat diposting ulang.</div></div>
       <div class="flex gap-2"><button type="button" onclick="inboundReviewBack()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2">Kembali Periksa</button>
@@ -13082,7 +13127,7 @@ function renderInboundDetail(doc) {
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4 mb-4">
       <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-2">Informasi Dokumen</div>
         ${meta("No. Barang Masuk", `<span class="font-mono">${esc(doc.doc_number)}</span>`)}${meta("Supplier", esc(doc.supplier_name || ""))}
-        ${meta("PO Supplier", po ? `<a href="#" onclick="openSupplierPoFromActivity('${esc(po.id)}'); return false;" class="text-accentDark underline">${esc(po.po_number)} &raquo;</a>` : "Manual (tanpa PO)")}
+        ${meta("Purchase Order", po ? `<a href="#" onclick="openSupplierPoFromActivity('${esc(po.id)}'); return false;" class="text-accentDark underline">${esc(po.po_number)} &raquo;</a>` : "Manual (tanpa PO)")}
         ${meta("Tanggal terima", esc(formatPoDate(doc.received_date)))}${meta("Surat jalan", esc(doc.surat_jalan_no || "—"))}
         ${meta("Pengiriman", esc(ships.join(" · ") || "—"))}${meta("Dibuat / Diposting", `${esc(doc.created_by || "—")} / ${esc(doc.posted_by || "—")}`)}
         ${doc.source === "manual" && doc.manual_reason ? meta("Alasan manual", esc(doc.manual_reason)) : ""}</div>
@@ -13092,7 +13137,7 @@ function renderInboundDetail(doc) {
           <div class="rounded-lg ${posted ? "bg-green-50" : "bg-bg2"} p-2"><div class="text-[10px] uppercase text-muted">Stok diterima</div><div class="font-semibold ${posted ? "text-done" : "text-muted"} text-lg tabular-nums">${posted ? "+" : ""}${qtyThis} PCS</div></div></div>
         <div class="rounded-lg ${posted ? "bg-green-50 text-green-900" : "bg-bg2 text-muted"} px-3 py-2 text-xs">${posted ? `Inventori telah bertambah ${qtyThis} pcs. Dokumen sudah dikunci (read-only).` : "Dokumen dibatalkan; stok yang pernah masuk sudah dikembalikan."}</div></div></div>
     <div class="bg-white border border-line rounded-xl overflow-x-auto mb-4"><div class="px-4 py-3 font-serif font-semibold text-ink">Barang yang Benar-benar Diterima</div>
-      <table class="w-full text-sm min-w-[900px]"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Item / PO Customer</th><th class="${SPO_TH}">Pengiriman</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Diterima Sebelum</th><th class="${SPO_THR}">Diterima Saat Ini</th><th class="${SPO_THR}">Sisa PO</th><th class="${SPO_THR}">Mutasi Stok</th><th class="${SPO_THR}">Nilai</th></tr></thead><tbody>
+      <table class="w-full text-sm min-w-[900px]"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Item / Sales Order</th><th class="${SPO_TH}">Pengiriman</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Diterima Sebelum</th><th class="${SPO_THR}">Diterima Saat Ini</th><th class="${SPO_THR}">Sisa PO</th><th class="${SPO_THR}">Mutasi Stok</th><th class="${SPO_THR}">Nilai</th></tr></thead><tbody>
       ${doc.items.map(i => { const f = fulfil.get(i.spo_item_id); const before = f ? f.qty_received - (posted ? i.qty_in : 0) : null; return `<tr class="border-b border-line last:border-b-0">
         <td class="px-3 py-2 font-medium text-ink">${esc(inboundItemName(i))}<div class="text-[11px] text-muted font-normal">${esc(i.resolved_sku || "")}${f && f.customer_po_number ? " · " + esc(f.customer_po_number) : ""}${f && f.customer_name ? " · " + esc(f.customer_name) : ""}</div></td>
         <td class="px-3 py-2">${f ? spoShipMethodPill(f.ship_method) : "—"}</td>
@@ -13101,12 +13146,12 @@ function renderInboundDetail(doc) {
         <td class="px-3 py-2 text-right tabular-nums ${posted ? "text-done" : "text-muted"} font-medium">${posted ? "+" + (mutBy.get(i.master_item_id) ?? i.qty_in) : "—"}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(i.qty_in * i.cost_price)}</td></tr>`; }).join("")}</tbody></table>
       <div class="px-4 py-2 text-right text-sm font-semibold text-ink border-t border-line">Nilai barang masuk ${formatIDR(doc.total_value)}</div></div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-      <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-2">Status Pemenuhan PO Supplier</div>
+      <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-2">Status Pemenuhan Purchase Order</div>
         ${(doc.fulfilment || []).length ? doc.fulfilment.map(f => { const pct = f.qty_ordered ? Math.min(100, Math.round(f.qty_received * 100 / f.qty_ordered)) : 0; return `<div class="mb-3"><div class="flex justify-between text-xs"><span class="text-ink">${esc(f.product_name)}${f.customer_po_number ? ` · ${esc(f.customer_po_number)}` : ""}${f.qty_received < f.qty_ordered && !f.in_this_document ? ' <span class="text-muted">(masih di jalur)</span>' : ""}</span><span class="tabular-nums text-muted">${f.qty_received} / ${f.qty_ordered}</span></div>
-          <div class="h-1.5 rounded-full bg-bg2 mt-1"><div class="h-1.5 rounded-full ${pct >= 100 ? "bg-done" : "bg-accent"}" style="width:${pct}%"></div></div></div>`; }).join("") : '<p class="text-xs text-muted">Dokumen manual: tidak terkait PO Supplier.</p>'}</div>
+          <div class="h-1.5 rounded-full bg-bg2 mt-1"><div class="h-1.5 rounded-full ${pct >= 100 ? "bg-done" : "bg-accent"}" style="width:${pct}%"></div></div></div>`; }).join("") : '<p class="text-xs text-muted">Dokumen manual: tidak terkait Purchase Order.</p>'}</div>
       <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-2">Tautan Transaksi Terkait</div>
-        ${(doc.customers || []).map(c => `<a href="#" onclick="openPreorderFromDashboard('${esc(c.id)}'); return false;" class="flex items-center justify-between border border-line rounded-lg px-3 py-2 mb-2 text-sm hover:bg-bg2"><span><span class="text-[11px] text-muted">PO Customer</span> <b class="text-accentDark">${esc(c.po_number)}</b> — ${esc(c.customer_name || "")}</span><span class="text-muted">&raquo;</span></a>`).join("")}
-        ${po ? `<a href="#" onclick="openSupplierPoFromActivity('${esc(po.id)}'); return false;" class="flex items-center justify-between border border-line rounded-lg px-3 py-2 text-sm hover:bg-bg2"><span><span class="text-[11px] text-muted">PO Supplier</span> <b class="text-accentDark">${esc(po.po_number)}</b></span><span>${spoOrderPill({ order_status: po.order_status })}</span></a>` : ""}
+        ${(doc.customers || []).map(c => `<a href="#" onclick="openPreorderFromDashboard('${esc(c.id)}'); return false;" class="flex items-center justify-between border border-line rounded-lg px-3 py-2 mb-2 text-sm hover:bg-bg2"><span><span class="text-[11px] text-muted">Sales Order</span> <b class="text-accentDark">${esc(c.po_number)}</b> — ${esc(c.customer_name || "")}</span><span class="text-muted">&raquo;</span></a>`).join("")}
+        ${po ? `<a href="#" onclick="openSupplierPoFromActivity('${esc(po.id)}'); return false;" class="flex items-center justify-between border border-line rounded-lg px-3 py-2 text-sm hover:bg-bg2"><span><span class="text-[11px] text-muted">Purchase Order</span> <b class="text-accentDark">${esc(po.po_number)}</b></span><span>${spoOrderPill({ order_status: po.order_status })}</span></a>` : ""}
         ${!po && !(doc.customers || []).length ? '<p class="text-xs text-muted">Tidak ada transaksi terkait.</p>' : ""}</div></div>
     ${po ? `<div class="bg-white border border-line rounded-xl p-4 mb-4"><div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div class="font-serif font-semibold text-ink">Relasi Penerimaan &amp; Faktur Supplier</div>
         <button type="button" onclick="inboundOpenInvoice('${esc(po.id)}')" class="px-3 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">Buka Faktur Supplier</button></div>
@@ -13115,7 +13160,7 @@ function renderInboundDetail(doc) {
         <div class="rounded-lg bg-bg2 p-3"><div class="text-[10px] uppercase text-muted">Penerimaan Barang</div><div class="font-semibold text-ink">${esc(doc.doc_number)}</div></div>
         <div class="rounded-lg bg-bg2 p-3"><div class="text-[10px] uppercase text-muted">Faktur Supplier</div><div class="font-semibold text-ink">${esc(po.internal_invoice_no || "Belum ada")}</div></div></div>
       ${doc.invoice ? `<div class="text-xs text-muted">Total tagihan <b class="text-ink">${formatIDR(doc.invoice.grand_total)}</b> · dibayar <b class="text-ink">${formatIDR(doc.invoice.paid)}</b> · sisa <b class="${doc.invoice.outstanding > 0 ? "text-failed" : "text-done"}">${formatIDR(doc.invoice.outstanding)}</b></div>` : ""}
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-[11px]"><div class="rounded-lg bg-green-50 text-green-900 px-3 py-2">PO Supplier mencatat yang dipesan, bukan stok.</div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 text-[11px]"><div class="rounded-lg bg-green-50 text-green-900 px-3 py-2">Purchase Order mencatat yang dipesan, bukan stok.</div>
         <div class="rounded-lg bg-green-50 text-green-900 px-3 py-2">Barang Masuk mencatat fisik diterima dan menambah stok saat posting.</div>
         <div class="rounded-lg bg-blue-50 text-blue-900 px-3 py-2">Faktur dan pembayaran tidak mengubah status penerimaan.</div></div></div>` : ""}
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
@@ -14576,7 +14621,7 @@ async function loadPreorders() {
     preorderCache = await resp.json();
   } catch (_) {
     preorderCache = [];
-    showToast("Gagal memuat daftar preorder.");
+    showToast("Gagal memuat daftar sales order.");
   }
   renderPreorderSummary(preorderCache);
   renderPreorderList(preorderCache);
@@ -14614,12 +14659,12 @@ function renderPreorderList(rows) {
     if (poDraftView) {
       document.getElementById("po-list-empty-title").textContent = "Belum ada draft.";
       document.getElementById("po-list-empty-msg").textContent =
-        "Preorder yang dijadikan draft akan muncul di sini dan bisa diaktifkan kembali.";
+        "Sales Order yang dijadikan draft akan muncul di sini dan bisa diaktifkan kembali.";
     } else {
-      document.getElementById("po-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada preorder.";
+      document.getElementById("po-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada sales order.";
       document.getElementById("po-list-empty-msg").textContent = filtered
         ? "Coba kata kunci lain atau pilih status “Semua”."
-        : "Catat pesanan pelanggan lewat tombol “+ Preorder Baru”.";
+        : "Catat pesanan pelanggan lewat tombol “+ Sales Order Baru”.";
     }
     emptyEl.classList.remove("hidden");
     return;
@@ -14637,6 +14682,7 @@ function renderPreorderList(rows) {
       <td class="px-3 py-2 text-ink whitespace-nowrap">${esc(r.plate_full) || '<span class="text-muted">—</span>'}</td>
       <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(r.customer_phone)}</td>
       <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatPoDate(r.po_date))}</td>
+      <td class="px-3 py-2 text-ink max-w-[16rem]" title="${esc((r.item_names || []).join(", "))}">${poItemNamesHtml(r.item_names)}</td>
       <td class="px-3 py-2 text-right text-muted tabular-nums">${r.item_count}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(r.total)}</td>
       <td class="px-3 py-2 text-right text-done tabular-nums whitespace-nowrap">${formatIDR(r.deposit)}</td>
@@ -14684,7 +14730,7 @@ async function fetchPreorder(preorderId) {
     if (!resp.ok) throw new Error("gagal memuat");
     return await resp.json();
   } catch (_) {
-    showToast("Gagal membuka preorder.");
+    showToast("Gagal membuka sales order.");
     return null;
   }
 }
@@ -14713,7 +14759,7 @@ function renderPreorderForm(detail) {
   currentPreorder = detail;
   poFormOrigin = detail && !document.getElementById("po-detail-panel").classList.contains("hidden") ? "detail" : "list";
   const editing = Boolean(detail);
-  document.getElementById("po-form-title").textContent = editing ? `Edit ${detail.po_number}` : "Preorder Baru";
+  document.getElementById("po-form-title").textContent = editing ? `Edit ${detail.po_number}` : "Sales Order Baru";
   const meta = document.getElementById("po-form-meta");
   if (editing) {
     meta.textContent = `Dibuat ${formatDateTimeSeconds(detail.created_at)} · terakhir diubah ${formatDateTimeSeconds(detail.updated_at)}`;
@@ -14724,7 +14770,7 @@ function renderPreorderForm(detail) {
   document.getElementById("po-form-back").innerHTML = poFormOrigin === "detail" && editing
     ? "&larr; Kembali ke detail" : "&larr; Kembali ke daftar";
   document.getElementById("po-customer-name").value = editing ? detail.customer_name : "";
-  document.getElementById("po-plate").value = editing ? detail.plate_full : "";
+  setPoPlate(editing ? detail.plate_full : "");
   document.getElementById("po-customer-phone").value = editing ? detail.customer_phone : "";
   document.getElementById("po-date").value = editing ? detail.po_date : toDateInputValue(new Date());
   document.getElementById("po-notes").value = editing ? (detail.notes || "") : "";
@@ -14741,7 +14787,7 @@ function renderPreorderForm(detail) {
   // Parking an active order is the detail page's menu; the form only offers the
   // draft save for a new order or one that is already a draft.
   document.getElementById("po-draft-btn").classList.toggle("hidden", editing && !detail.is_draft);
-  document.getElementById("po-save-btn").textContent = editing && detail.is_draft ? "Simpan & Aktifkan" : "Simpan Preorder";
+  document.getElementById("po-save-btn").textContent = editing && detail.is_draft ? "Simpan & Aktifkan" : "Simpan Sales Order";
   updatePreorderTotals();
   showPreorderPanel("po-form-panel");
   document.getElementById("po-customer-name").focus();
@@ -14826,7 +14872,7 @@ function setPoRowMeta(rowEl, sku, supplierPos) {
   const pos = (supplierPos || []).map(p =>
     `<span class="px-1.5 py-0.5 rounded bg-bg2 border border-line text-ink">${esc(p.po_number)} · dipesan ${p.qty_ordered}, diterima ${p.qty_received}</span>`).join(" ");
   if (sku || pos) {
-    meta.innerHTML = [sku ? `<span class="font-mono text-done">${esc(sku)}</span> · tertaut ke Master Barang` : "", pos ? `PO Supplier: ${pos}` : ""].filter(Boolean).join(" &nbsp;|&nbsp; ");
+    meta.innerHTML = [sku ? `<span class="font-mono text-done">${esc(sku)}</span> · tertaut ke Master Barang` : "", pos ? `Purchase Order: ${pos}` : ""].filter(Boolean).join(" &nbsp;|&nbsp; ");
     meta.classList.remove("hidden");
   } else {
     meta.textContent = "";
@@ -14977,7 +15023,7 @@ function collectPreorderPayload(asDraft) {
   const payload = {
     customer_name: document.getElementById("po-customer-name").value.trim(),
     customer_phone: document.getElementById("po-customer-phone").value.trim(),
-    plate_full: document.getElementById("po-plate").value.trim(),
+    plate_full: getPoPlate(),
     po_date: document.getElementById("po-date").value || null,
     notes: document.getElementById("po-notes").value.trim() || null,
     is_draft: asDraft,
@@ -15020,7 +15066,7 @@ async function savePreorder(asDraft = false) {
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : "Gagal menyimpan preorder");
+      throw new Error(typeof err.detail === "string" ? err.detail : "Gagal menyimpan sales order");
     }
     const detail = await resp.json();
     if (asDraft) {
@@ -15028,7 +15074,7 @@ async function savePreorder(asDraft = false) {
       await backToPreorderList();
     } else {
       renderPreorderDetail(detail);
-      showToast(editing ? "Preorder diperbarui." : `Preorder ${detail.po_number} tersimpan.`, "success");
+      showToast(editing ? "Sales Order diperbarui." : `Sales Order ${detail.po_number} tersimpan.`, "success");
       if (!editing && detail.receipt_id) openPoInvoiceCreatedModal(detail);
     }
   } catch (e) {
@@ -15188,7 +15234,7 @@ async function togglePreorderDraft() {
       const err = await resp.json().catch(() => ({}));
       throw new Error(err.detail || "Gagal mengubah status draft.");
     }
-    showToast(makeDraft ? "Preorder dijadikan draft." : "Preorder diaktifkan kembali.", "success");
+    showToast(makeDraft ? "Sales Order dijadikan draft." : "Sales Order diaktifkan kembali.", "success");
     backToPreorderList();
   } catch (e) {
     showToast(e.message);
@@ -15199,7 +15245,7 @@ function confirmRemovePoItem(itemId) {
   const item = currentPreorder?.items.find(i => i.id === itemId);
   if (!item) return;
   if (currentPreorder.items.length <= 1) {
-    showToast("Preorder harus punya minimal satu barang.");
+    showToast("Sales Order harus punya minimal satu barang.");
     return;
   }
   openModal("Hapus barang?", `
@@ -16112,8 +16158,8 @@ function opRenderWarning() {
       <div><div class="font-serif font-semibold text-ink">Perhatian Sebelum Melanjutkan</div>
       <p class="text-xs text-muted">Barang yang dipilih punya transaksi yang masih berjalan. Saat disetujui, sistem memeriksa mutasi stok terbaru agar hasil hitung tetap akurat.</p></div></div>
     ${opForm.items.length ? row("bg-failed/10 text-failed", "Digunakan di Invoice Kasir", "Pernah dipakai di transaksi kasir.", kasir, "transaksi") +
-      row("bg-accent/10 text-accentDark", "Terkait PO Customer Aktif", "Termasuk pesanan pelanggan yang masih aktif.", poc, "PO aktif") +
-      row("bg-pending/20 text-pending", "Terkait PO Supplier Aktif", "Termasuk pembelian supplier yang masih aktif.", pos, "PO aktif")
+      row("bg-accent/10 text-accentDark", "Terkait Sales Order Aktif", "Termasuk pesanan pelanggan yang masih aktif.", poc, "PO aktif") +
+      row("bg-pending/20 text-pending", "Terkait Purchase Order Aktif", "Termasuk purchase order yang masih aktif.", pos, "PO aktif")
       : `<p class="text-sm text-muted">Pilih barang untuk melihat transaksi terkait.</p>`}
     <div class="text-xs text-ink bg-white/60 rounded-lg px-3 py-2">Stok baru berubah setelah admin menyetujui. Jika ada mutasi (penjualan, barang masuk) sejak dikirim, admin akan diminta memeriksa stok terbaru dulu.</div>`;
 }
@@ -16236,7 +16282,7 @@ async function opCancel() {
 // From the item detail page: open an opname for this item.
 function openStockOpnameForItem(itemId) { opPendingItem = itemId; opOrigin = "detail"; if (currentRoute() === "/stock-opname") opInit(); else location.hash = "/stock-opname"; }
 
-// ── Preorder: Buat Nota Penjualan (PO Customer -> nota, DP dialokasikan sekali) ──
+// ── Preorder: Buat Nota Penjualan (Sales Order -> nota, DP dialokasikan sekali) ──
 function openPoConvertModal() {
   const po = currentPreorder;
   if (!po) return;
@@ -16288,7 +16334,7 @@ async function submitPoConvert() {
 function openPoPaymentModal() {
   if (!currentPreorder) return;
   if (currentPreorder.remaining <= 0) {
-    showToast("Preorder ini sudah lunas.", "success");
+    showToast("Sales Order ini sudah lunas.", "success");
     return;
   }
   openModal("Tambah Pembayaran", `
@@ -16342,7 +16388,7 @@ async function submitPoPayment() {
     const detail = await resp.json();
     closeModal();
     renderPreorderDetail(detail);
-    showToast(detail.remaining === 0 ? "Preorder lunas." : "Pembayaran dicatat.", "success");
+    showToast(detail.remaining === 0 ? "Sales Order lunas." : "Pembayaran dicatat.", "success");
   } catch (e) {
     showToast(e.message);
   }
@@ -16388,7 +16434,7 @@ async function submitPoStatus() {
   }
 }
 
-// ── Preorder: Nota PO Customer (dot matrix) ──────────────────────────────────
+// ── Preorder: Nota Sales Order (dot matrix) ──────────────────────────────────
 // Plain monospace text, so a dot-matrix printer renders it in its own draft font.
 // Courier at 12pt is exactly 10 characters per inch, which is how the column
 // count is derived from the paper width and margins; 12pt line height is 6 lines
@@ -16461,7 +16507,7 @@ function poNotaText(po, settings, columns) {
 
   push(rule("="));
   out.push(center(shopName));
-  out.push(center("NOTA PO CUSTOMER"));
+  out.push(center("NOTA SALES ORDER"));
   push(rule("="));
   out.push(kv("No. PO", po.po_number));
   out.push(kv("Tanggal", poDateTimeLabel(po)));
@@ -16545,7 +16591,7 @@ function printPreorderNota() {
   printWithPageRule(`@page { size: ${PO_PAPERS[settings.paper].page}; margin: ${margin}; }`, "print-nota");
 }
 
-// ── PO Supplier (Pembelian Supplier) ─────────────────────────────────────────
+// ── Purchase Order (Pembelian Supplier) ─────────────────────────────────────────
 // A purchase order to a supplier, built from the lines customers have preordered or typed in by hand,
 // and kept as a purchase invoice (discount, PPN, shipping, payments). It never moves stock itself:
 // goods enter stock through Barang Masuk (receiving can open a DRAFT one). Issuing a PO carries the
@@ -16583,13 +16629,13 @@ const SPO_STEPS = [
 ];
 const SPO_CANCEL_REASONS = ["Stok supplier habis", "Customer membatalkan pesanan", "Salah pesan", "Harga berubah", "Barang diganti", "Lainnya"];
 const SPO_CANCEL_ACTIONS = [
-  { key: "kembali_ke_customer", label: "Kembalikan ke PO Customer", hint: "Jumlah ini bisa dipesan lagi lewat PO supplier lain." },
+  { key: "kembali_ke_customer", label: "Kembalikan ke Sales Order", hint: "Jumlah ini bisa dipesan lagi lewat Purchase Order lain." },
   { key: "simpan_stok_toko", label: "Simpan sebagai stok toko", hint: "Barang tetap dibeli untuk stok, tidak lagi untuk customer." },
   { key: "retur_supplier", label: "Retur ke supplier", hint: "Barang dikembalikan atau tidak jadi dikirim supplier." },
   { key: "tidak_ada", label: "Tidak ada tindakan", hint: "Hanya dicatat." },
 ];
 const SPO_PANELS = ["spo-list-panel", "spo-form-panel", "spo-detail-panel", "spo-recv-panel", "spo-inv-panel"];
-const SPO_DEFAULT_TITLE = "Pembelian Supplier";
+const SPO_DEFAULT_TITLE = "Purchase Order";
 
 let spoCache = [];
 let spoOrderFilter = "";
@@ -16614,7 +16660,7 @@ function showSpoPanel(id) {
   for (const panel of SPO_PANELS) document.getElementById(panel).classList.toggle("hidden", panel !== id);
 }
 
-// The top bar names the page; the form and the detail rename it ("PO Supplier Baru", the PO number).
+// The top bar names the page; the form and the detail rename it ("Purchase Order Baru", the PO number).
 function setSpoHeader(title, subtitle) {
   const titleEl = document.getElementById("topbar-title");
   const subEl = document.getElementById("topbar-subtitle");
@@ -16649,7 +16695,7 @@ function spoCalc(lines, discPct, taxPct, ship) {
   return { sub, disc, tax, total: sub - disc + tax + (ship || 0) };
 }
 
-// ── PO Supplier: list ────────────────────────────────────────────────────────
+// ── Purchase Order: list ────────────────────────────────────────────────────────
 function chipButton(label, onclick, active) {
   return `<button type="button" onclick="${onclick}"
     class="po-status-btn ${active ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">${esc(label)}</button>`;
@@ -16742,7 +16788,7 @@ async function loadSupplierPos() {
     if (sumResp.ok) renderSupplierPoSummary(await sumResp.json());
   } catch (_) {
     spoCache = [];
-    showToast("Gagal memuat daftar PO supplier.");
+    showToast("Gagal memuat daftar Purchase Order.");
   }
   renderSupplierPoList(spoCache);
 }
@@ -16750,7 +16796,7 @@ async function loadSupplierPos() {
 function renderSupplierPoKpis(all) {
   const n = k => all.filter(r => r.order_status === k).length;
   const cards = [
-    ["Semua PO", all.length, "Total PO supplier", "bg-blue-50", "", ""],
+    ["Semua PO", all.length, "Total Purchase Order", "bg-blue-50", "", ""],
     ["Draft", n("draft"), "Belum dikirim ke supplier", "bg-amber-50", "draft", ""],
     ["Dikonfirmasi", n("dikonfirmasi") + n("menunggu_konfirmasi"), "Sudah dikirim ke supplier", "bg-sky-50", "dikonfirmasi", ""],
     ["Dalam Pengiriman", n("dalam_pengiriman"), "Sedang dalam perjalanan", "bg-purple-50", "dalam_pengiriman", ""],
@@ -16782,10 +16828,10 @@ function renderSupplierPoList(rows) {
   tbody.innerHTML = "";
   if (rows.length === 0) {
     const filtered = Boolean(spoSearchQuery || spoOrderFilter || spoPayFilter || spoShipFilter || spoRecvFilter || spoSupplierFilter || spoDateFrom || spoDateTo);
-    document.getElementById("spo-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada PO supplier.";
+    document.getElementById("spo-list-empty-title").textContent = filtered ? "Tidak ada yang cocok." : "Belum ada Purchase Order.";
     document.getElementById("spo-list-empty-msg").textContent = filtered
       ? "Coba kata kunci lain atau pilih status “Semua”."
-      : "Buat dari barang PO customer atau isi manual lewat tombol “+ PO Supplier Baru”.";
+      : "Buat dari barang Sales Order atau isi manual lewat tombol “+ Purchase Order Baru”.";
     emptyEl.classList.remove("hidden");
     return;
   }
@@ -16844,7 +16890,7 @@ async function fetchSupplierPo(id) {
     if (!resp.ok) throw new Error("gagal memuat");
     return await resp.json();
   } catch (_) {
-    showToast("Gagal membuka PO supplier.");
+    showToast("Gagal membuka Purchase Order.");
     return null;
   }
 }
@@ -16858,15 +16904,15 @@ async function editSupplierPo(id) {
   const detail = await fetchSupplierPo(id);
   if (!detail) return;
   if (detail.status !== "draft") {
-    showToast("PO supplier yang sudah diterbitkan tidak bisa diubah.");
+    showToast("Purchase Order yang sudah diterbitkan tidak bisa diubah.");
     renderSupplierPoDetail(detail);
     return;
   }
   await renderSpoForm(detail);
 }
 
-// ── PO Supplier: detail ──────────────────────────────────────────────────────
-// ── PO Supplier: tabs, item shipping ─────────────────────────────────────────
+// ── Purchase Order: detail ──────────────────────────────────────────────────────
+// ── Purchase Order: tabs, item shipping ─────────────────────────────────────────
 const SPO_TABS = [["ringkasan", "Ringkasan"], ["item", "Item PO"], ["pengiriman", "Pengiriman"], ["penerimaan", "Penerimaan"], ["pembayaran", "Pembayaran"], ["riwayat", "Riwayat Status"]];
 let spoTab = "ringkasan";
 
@@ -16942,12 +16988,12 @@ function openSpoItemShippingModal(itemId) {
   const nextItem = po.items.find(i => i.id !== itemId && spoItemLeft(i) > 0);
   openModal("Update Status Item Pengiriman", `
     <div class="space-y-3">
-      <p class="text-xs text-muted -mt-2">Perbarui informasi pengiriman untuk item barang pada PO Supplier.</p>
+      <p class="text-xs text-muted -mt-2">Perbarui informasi pengiriman untuk item barang pada Purchase Order.</p>
       <div class="rounded-xl border border-line bg-bg2/50 p-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 text-sm">
         <div><div class="font-serif font-semibold text-ink">${esc(it.product_name)}</div>${it.sku ? `<div class="text-[11px] text-muted font-mono">SKU: ${esc(it.sku)}</div>` : ""}</div>
-        <dl class="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-xs"><dt class="text-muted">PO Supplier</dt><dd class="font-medium">${esc(po.po_number)}</dd>
+        <dl class="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-xs"><dt class="text-muted">Purchase Order</dt><dd class="font-medium">${esc(po.po_number)}</dd>
           <dt class="text-muted">Supplier</dt><dd class="font-medium">${esc(po.supplier_name_snapshot)}</dd>
-          <dt class="text-muted">PO Customer</dt><dd class="font-medium text-accentDark">${esc(it.customer_po_number || "—")}</dd></dl></div>
+          <dt class="text-muted">Sales Order</dt><dd class="font-medium text-accentDark">${esc(it.customer_po_number || "—")}</dd></dl></div>
       <div class="grid grid-cols-4 gap-2 text-center text-xs">
         <div class="rounded-lg bg-rose-50 p-2"><div class="text-muted">Qty Pesan</div><div class="text-base font-semibold">${it.quantity - it.qty_cancelled}</div></div>
         <div class="rounded-lg bg-green-50 p-2"><div class="text-muted">Qty Diterima</div><div class="text-base font-semibold">${it.qty_received}</div></div>
@@ -16964,7 +17010,7 @@ function openSpoItemShippingModal(itemId) {
       ${fld("spo-sh-transit", "Lokasi Transit", `<input id="spo-sh-transit" type="text" maxlength="100" value="${esc(it.transit_location || "")}" placeholder="mis. Pelabuhan Tanjung Priok, Jakarta" class="${SPO_INPUT}" />`)}
       ${fld("spo-sh-note", "Catatan Pengiriman", `<textarea id="spo-sh-note" rows="2" maxlength="500" data-no-uppercase class="${SPO_INPUT}"></textarea>`)}
       <label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input id="spo-sh-notify" type="checkbox" class="accent-[#D97757] mt-0.5" /><span>Kirim notifikasi ke customer<span class="block text-xs text-muted">Mencatat bahwa customer terkait perlu diberi tahu tentang perubahan status item ini.</span></span></label>
-      <div class="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900/80"><b>Informasi Penting.</b> Status PO Supplier adalah status keseluruhan pesanan; status pengiriman diatur per item karena setiap item bisa berbeda jalur dan jadwal.</div>
+      <div class="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900/80"><b>Informasi Penting.</b> Status Purchase Order adalah status keseluruhan pesanan; status pengiriman diatur per item karena setiap item bisa berbeda jalur dan jadwal.</div>
       <div class="flex flex-wrap justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2">Batal</button>
         <button type="button" onclick="submitSpoItemShipping(${itemId}, 0)" class="px-4 py-2 border border-accent text-accentDark rounded-lg text-sm font-medium bg-white hover:bg-accent/10">Simpan Perubahan</button>
@@ -17052,7 +17098,7 @@ function renderSupplierPoDetail(po) {
   setSpoHeader(po.po_number, `${po.supplier_name_snapshot} · ${SPO_ORDER_LABELS[po.order_status] || po.order_status}`);
   const info = (label, value) => `<div class="min-w-0"><div class="text-[11px] text-muted">${esc(label)}</div><div class="text-sm font-medium text-ink break-words">${value}</div></div>`;
   document.getElementById("spo-detail-info").innerHTML = [
-    info("No. PO Supplier", `<span class="font-medium tabular-nums">${esc(po.po_number)}</span>`),
+    info("No. Purchase Order", `<span class="font-medium tabular-nums">${esc(po.po_number)}</span>`),
     info("Tanggal PO", `<span class="tabular-nums">${esc(formatPoDate(po.po_date))}</span>`),
     info("Supplier", esc(po.supplier_name_snapshot)),
     info("No. Faktur Internal", esc(po.internal_invoice_no || "—")),
@@ -17220,16 +17266,16 @@ function spoModalButtons(submitLabel, submitCall, danger = false) {
 }
 
 function issueSupplierPo() {
-  spoSend("issue", null, "PO supplier diterbitkan. Barang di PO customer ditandai sudah dipesankan.");
+  spoSend("issue", null, "Purchase Order diterbitkan. Barang di Sales Order ditandai sudah dipesankan.");
 }
 
 function confirmCancelSupplierPo() {
   if (!currentSpo) return;
-  openModal("Batalkan PO supplier?", `
+  openModal("Batalkan Purchase Order?", `
     <div class="space-y-4">
-      <p class="text-sm text-ink">${esc(currentSpo.po_number)} dibatalkan dan jumlahnya bisa dipesan lagi lewat PO supplier lain.</p>
-      ${currentSpo.status === "dipesan" ? '<p class="text-xs text-muted">Barang di PO customer yang sudah ditandai “Sudah dipesankan” tidak otomatis kembali; ubah statusnya manual bila perlu.</p>' : ""}
-      ${spoModalButtons("Batalkan PO", "spoSend('cancel', null, 'PO supplier dibatalkan.')", true)}
+      <p class="text-sm text-ink">${esc(currentSpo.po_number)} dibatalkan dan jumlahnya bisa dipesan lagi lewat Purchase Order lain.</p>
+      ${currentSpo.status === "dipesan" ? '<p class="text-xs text-muted">Barang di Sales Order yang sudah ditandai “Sudah dipesankan” tidak otomatis kembali; ubah statusnya manual bila perlu.</p>' : ""}
+      ${spoModalButtons("Batalkan PO", "spoSend('cancel', null, 'Purchase Order dibatalkan.')", true)}
     </div>
   `);
 }
@@ -17315,7 +17361,7 @@ function openSpoReceivePage() {
       <button type="button" onclick="renderSupplierPoDetail(currentSpo)" class="px-3 py-1.5 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2">&larr; Kembali ke detail PO</button>
     </div>
     <div class="bg-white border border-line rounded-xl p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-      <div><div class="text-xs text-muted">Referensi PO Supplier</div><div class="font-serif text-lg font-semibold text-ink">${esc(po.po_number)} <span class="align-middle ml-2">${spoOrderPill(po)}</span></div></div>
+      <div><div class="text-xs text-muted">Referensi Purchase Order</div><div class="font-serif text-lg font-semibold text-ink">${esc(po.po_number)} <span class="align-middle ml-2">${spoOrderPill(po)}</span></div></div>
       <div><div class="text-xs text-muted">Supplier</div><div class="font-serif text-lg font-semibold text-ink">${esc(po.supplier_name_snapshot)}</div></div></div>
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
       ${kpi("bg-rose-50", "Qty Dipesan", "spo-r-k-ord", ordered + " pcs", "Total pesanan")}
@@ -17334,7 +17380,7 @@ function openSpoReceivePage() {
     <div class="bg-white border border-line rounded-xl overflow-x-auto mb-4">
       <div class="px-4 py-3 font-serif font-semibold text-ink">Daftar Item Penerimaan</div>
       <table class="w-full min-w-[1000px] text-sm"><thead class="bg-bg2"><tr>
-        <th class="${SPO_TH} w-10">No</th><th class="${SPO_TH}">Produk</th><th class="${SPO_TH}">Referensi PO Customer</th><th class="${SPO_THR}">Qty Pesan</th><th class="${SPO_THR}">Sudah Diterima Sebelumnya</th>
+        <th class="${SPO_TH} w-10">No</th><th class="${SPO_TH}">Produk</th><th class="${SPO_TH}">Referensi Sales Order</th><th class="${SPO_THR}">Qty Pesan</th><th class="${SPO_THR}">Sudah Diterima Sebelumnya</th>
         <th class="${SPO_THR}">Qty Diterima Sekarang</th><th class="${SPO_THR}">Total Diterima</th><th class="${SPO_THR}">Qty Sisa</th><th class="${SPO_TH}">Kondisi</th><th class="${SPO_TH}">Lokasi Simpan</th><th class="${SPO_TH}">Status Item Setelah Penerimaan</th></tr></thead>
       <tbody>${open.map((i, idx) => { const left = spoItemLeft(i); const qty = i.quantity - i.qty_cancelled; return `<tr class="border-b border-line last:border-b-0 align-middle">
         <td class="px-3 py-2 text-muted">${idx + 1}</td>
@@ -17543,7 +17589,7 @@ function openSpoInvoicePage(print) {
       <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div><div class="text-[11px] text-muted">Nomor Faktur Supplier</div><div class="font-serif text-xl font-semibold text-ink">${esc(po.internal_invoice_no || po.supplier_invoice_no || "Belum ada nomor")} ${spoPayPill(po, true)}</div>
           <div class="text-[11px] text-muted mt-0.5">No. invoice dari supplier: ${esc(po.supplier_invoice_no || "belum dicatat")}</div></div>
-        <div class="text-right"><div class="text-[11px] text-muted">Referensi PO Supplier</div><div class="font-semibold text-accentDark">${esc(po.po_number)}</div></div></div>
+        <div class="text-right"><div class="text-[11px] text-muted">Referensi Purchase Order</div><div class="font-semibold text-accentDark">${esc(po.po_number)}</div></div></div>
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 border-t border-line pt-3">
         ${meta("Supplier", esc(po.supplier_name_snapshot))}${meta("Tanggal Faktur", esc(formatPoDate(po.po_date)))}${meta("Jatuh Tempo", esc(po.due_date ? formatPoDate(po.due_date) : "—"))}
         ${meta("Status Faktur", statusPill(po.status === "batal" ? "Dibatalkan" : "Aktif", po.status === "batal" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"))}${meta("Dibuat Oleh", esc(po.created_by || "—"))}</div></div>
@@ -17622,7 +17668,7 @@ function submitSpoInvoice() {
   }, "Faktur diperbarui.", "PATCH");
 }
 
-// Batalkan Item PO Supplier
+// Batalkan Item Purchase Order
 function openSpoCancelItemModal(itemId) {
   const po = currentSpo;
   const item = po && po.items.find(i => i.id === itemId);
@@ -17631,7 +17677,7 @@ function openSpoCancelItemModal(itemId) {
   const left = spoItemLeft(item) - pending;
   if (left <= 0) { showToast(pending ? "Semua sisa item ini sudah diajukan pembatalannya dan menunggu persetujuan supplier." : "Tidak ada sisa item yang bisa dibatalkan."); return; }
   const past = po.cancellations.filter(c => c.item_id === itemId);
-  openModal("Ajukan Pembatalan Item PO Supplier", `
+  openModal("Ajukan Pembatalan Item Purchase Order", `
     <div class="space-y-4" data-cancel-item="${item.id}" data-left="${left}">
       <div class="border border-line rounded-lg px-3 py-2.5">
         <div class="text-sm font-medium text-ink">${esc(item.product_name)}</div>
@@ -17723,7 +17769,7 @@ function submitSpoResolveCancel(cancellationId, approved) {
     approved ? "Pembatalan disetujui supplier dan diterapkan." : "Penolakan supplier dicatat. Item tetap dipesan.");
 }
 
-// ── PO Supplier: form ────────────────────────────────────────────────────────
+// ── Purchase Order: form ────────────────────────────────────────────────────────
 async function loadSpoSuppliers() {
   try {
     const resp = await fetch("/api/suppliers?active_only=true");
@@ -17750,7 +17796,7 @@ function newSupplierPoForm() {
 async function renderSpoForm(detail) {
   await loadSpoSuppliers();
   spoEditingId = detail ? detail.id : null;
-  setSpoHeader(detail ? `Ubah ${detail.po_number}` : "PO Supplier Baru",
+  setSpoHeader(detail ? `Ubah ${detail.po_number}` : "Purchase Order Baru",
     "Buat pesanan pembelian barang dari supplier, seperti menulis faktur pembelian.");
   document.getElementById("spo-number").value = detail ? detail.po_number : "Otomatis saat disimpan";
   document.getElementById("spo-date").value = detail ? detail.po_date : toDateInputValue(new Date());
@@ -17943,7 +17989,7 @@ async function saveSupplierPo(issue) {
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : "Gagal menyimpan PO supplier.");
+      throw new Error(typeof err.detail === "string" ? err.detail : "Gagal menyimpan Purchase Order.");
     }
     let saved = await resp.json();
     if (editing && issue) {
@@ -17957,7 +18003,7 @@ async function saveSupplierPo(issue) {
     }
     currentSpo = saved;
     renderSupplierPoDetail(saved);
-    showToast(saved.status === "draft" ? "Draft PO supplier tersimpan." : `PO supplier ${saved.po_number} dibuat.`, "success");
+    showToast(saved.status === "draft" ? "Draft Purchase Order tersimpan." : `Purchase Order ${saved.po_number} dibuat.`, "success");
   } catch (e) {
     showToast(e.message);
   } finally {
@@ -17965,9 +18011,9 @@ async function saveSupplierPo(issue) {
   }
 }
 
-// ── PO Supplier: Ambil Barang dari PO Customer (picker) ──────────────────────
+// ── Purchase Order: Ambil Barang dari Sales Order (picker) ──────────────────────
 // The picker edits the form's selection: lines already on the PO start ticked with
-// their quantities, and "Tambahkan ke PO Supplier" replaces the selection with
+// their quantities, and "Tambahkan ke Purchase Order" replaces the selection with
 // what is ticked here.
 const spoPicker = { query: "", progress: "belum", page: 1, size: 10, rows: [], total: 0, counts: { belum: 0, sebagian: 0, semua: 0 }, selected: new Map(), seq: 0 };
 
@@ -18053,7 +18099,7 @@ async function loadSpoPicker(resetPage) {
     if (!resp.ok) throw new Error("gagal memuat");
     data = await resp.json();
   } catch (_) {
-    if (seq === spoPicker.seq) showToast("Gagal memuat barang PO customer.");
+    if (seq === spoPicker.seq) showToast("Gagal memuat barang Sales Order.");
     return;
   }
   if (seq !== spoPicker.seq) return;
@@ -18355,7 +18401,7 @@ const activityState = { page: 1, pageSize: 50, total: 0, actorsLoaded: false };
 
 const ENTITY_LABELS = {
   receipt: "Nota penjualan", master_item: "Barang", inbound_document: "Barang masuk",
-  purchase_invoice: "Faktur pembelian", supplier_po: "PO supplier", preorder: "Preorder", supplier: "Supplier", brand: "Merek",
+  purchase_invoice: "Faktur pembelian", supplier_po: "Purchase Order", preorder: "Sales Order", supplier: "Supplier", brand: "Merek",
   unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Masuk / keluar",
   customer: "Pelanggan", scrape: "Scraper", job: "Job scraper",
 };

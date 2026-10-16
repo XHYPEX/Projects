@@ -111,7 +111,7 @@ async def list_candidates(
     limit: int = 10,
     offset: int = 0,
 ):
-    """The "Ambil Barang dari PO Customer" picker: customer preorder lines with
+    """The "Ambil Barang dari Sales Order" picker: customer preorder lines with
     quantity still unordered. `exclude_po` is the draft being edited."""
     if progress not in CANDIDATE_PROGRESS:
         raise HTTPException(status_code=422, detail=f"progress harus salah satu dari: {', '.join(CANDIDATE_PROGRESS)}.")
@@ -157,7 +157,7 @@ async def create_new_supplier_po(req: SupplierPoRequest, user: dict = Depends(ge
 async def get_supplier_po_detail(supplier_po_id: str):
     po = await _run(get_supplier_po, supplier_po_id)
     if po is None:
-        raise HTTPException(status_code=404, detail="PO supplier tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Purchase Order tidak ditemukan.")
     return po
 
 

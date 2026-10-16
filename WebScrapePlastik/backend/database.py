@@ -209,7 +209,7 @@ def init_db() -> None:
                 created_by TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_preorder_payments_preorder_id ON preorder_payments(preorder_id);
-            -- Ledger of how much of a PO Customer's down payment was applied to which
+            -- Ledger of how much of a Sales Order's down payment was applied to which
             -- final nota. Unallocated DP = SUM(preorder_payments) - SUM(this table), so a
             -- DP can never be used twice.
             CREATE TABLE IF NOT EXISTS preorder_payment_allocations (
@@ -223,7 +223,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_ppa_preorder_id ON preorder_payment_allocations(preorder_id);
             CREATE INDEX IF NOT EXISTS idx_ppa_receipt_id ON preorder_payment_allocations(receipt_id);
 
-            -- PO Supplier: purchase orders to a supplier, built from customer preorder
+            -- Purchase Order: purchase orders to a supplier, built from customer preorder
             -- lines. Like preorders they never touch stock; see the Supplier POs section.
             CREATE TABLE IF NOT EXISTS supplier_pos (
                 id TEXT PRIMARY KEY,
@@ -726,7 +726,7 @@ def init_db() -> None:
         )""")
         con.execute("CREATE INDEX IF NOT EXISTS idx_receipt_events_receipt_id ON receipt_events(receipt_id)")
 
-        # --- Additive migration: PO Supplier as a purchase invoice ---
+        # --- Additive migration: Purchase Order as a purchase invoice ---
         # supplier_pos.status keeps its coarse CHECKed set (draft/dipesan/.../batal); `stage` is the finer
         # step while a PO is out with the supplier (menunggu_konfirmasi -> dalam_pengiriman). Money fields
         # make the PO a purchase invoice: discount, PPN, shipping, and payments tracked in spo_payments.
@@ -852,7 +852,7 @@ def init_db() -> None:
             for col, ddl in cols:
                 if col not in have:
                     con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
-        # Drafts that Penerimaan Barang (PO Supplier) opened already point at their PO.
+        # Drafts that Penerimaan Barang (Purchase Order) opened already point at their PO.
         con.execute(
             """UPDATE inbound_documents SET
                  supplier_po_id = (SELECT r.supplier_po_id FROM spo_receipts r WHERE r.inbound_document_id = inbound_documents.id),
@@ -996,8 +996,8 @@ def init_db() -> None:
                     (seed_unit_name, unit_seed_normalized, _now()),
                 )
 
-        # --- Additive migration: PO Customer -> Invoice ---
-        # Every published PO Customer owns exactly one invoice (receipts row) from the moment it is
+        # --- Additive migration: Sales Order -> Invoice ---
+        # Every published Sales Order owns exactly one invoice (receipts row) from the moment it is
         # created; its lines carry preorder_item_id so the invoice follows the PO, and payments are
         # taken on the invoice only.
         if "receipt_id" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
@@ -1281,7 +1281,7 @@ def _resolve_master_item_id(con: sqlite3.Connection, sku: str | None) -> int | N
 # Work stage, independent of payment: draft (parked, no stock, no money) -> belum (Belum Dikerjakan)
 # -> pengerjaan (Dalam Pengerjaan) -> selesai (Pengerjaan Selesai). Payment status is derived from
 # amount_paid vs total and lives in receipts.status (pending / done / void).
-# "menunggu" (Menunggu Barang) is only ever set by a PO Customer invoice whose goods have not all
+# "menunggu" (Menunggu Barang) is only ever set by a Sales Order invoice whose goods have not all
 # arrived; it moves on to "belum" by itself once they have (or by hand).
 RECEIPT_WORK_STATUSES = ("draft", "menunggu", "belum", "pengerjaan", "selesai")
 _WORK_TRANSITIONS = {
@@ -1330,7 +1330,7 @@ def _receipt_item_holdings(items: list[dict], con: sqlite3.Connection | None = N
     """Sum of quantity per master_item_id across a set of receipt items, skipping
     lines with no master item link. This is the 'holding' referenced throughout
     the stock-movement code: what a non-void receipt currently has taken off the
-    shelf, per product. A line that comes from a PO Customer holds nothing until
+    shelf, per product. A line that comes from a Sales Order holds nothing until
     that PO line has arrived (sampai di toko / terpasang) -- pass `con` so it can look."""
     holdings: dict[int, int] = {}
     for item in items:
@@ -2039,7 +2039,7 @@ def update_receipt(
             # Lines the client echoes back by id keep who added them and when; anything else is
             # new. A line added once the car is already being worked on is flagged as such.
             old_by_id = {r["id"]: r for r in existing_items}
-            # Lines that come from a PO Customer belong to the PO: they are changed (or removed) there,
+            # Lines that come from a Sales Order belong to the PO: they are changed (or removed) there,
             # and the invoice follows. Here they must come back untouched apart from discount.
             sent_by_id = {item.get("id"): item for item in resolved_items if item.get("id") in old_by_id}
             for old_row in existing_items:
@@ -2048,7 +2048,7 @@ def update_receipt(
                 sent = sent_by_id.get(old_row["id"])
                 if sent is None or sent["product_name"] != old_row["product_name"] or sent["quantity"] != old_row["quantity"] \
                         or sent["unit_price"] != old_row["unit_price"]:
-                    raise ValueError(f"Barang {old_row['product_name']} berasal dari PO Customer. Ubah atau batalkan di halaman PO Customer.")
+                    raise ValueError(f"Barang {old_row['product_name']} berasal dari Sales Order. Ubah atau batalkan di halaman Sales Order.")
                 sent["master_item_id"] = old_row["master_item_id"]
             for old_row in existing_items:
                 if not old_row.get("returned_qty"):
@@ -2367,7 +2367,7 @@ def return_receipt_item(
         if item.get("preorder_item_id"):
             po_line = con.execute("SELECT status FROM preorder_items WHERE id=?", (item["preorder_item_id"],)).fetchone()
             if po_line is None or po_line["status"] not in PO_ARRIVED_STATUSES:
-                raise ValueError("Barang PO ini belum sampai ke pelanggan. Batalkan di halaman PO Customer saja.")
+                raise ValueError("Barang PO ini belum sampai ke pelanggan. Batalkan di halaman Sales Order saja.")
         left = item["quantity"] - (item["returned_qty"] or 0)
         if quantity <= 0 or quantity > left:
             raise ValueError(f"Jumlah retur harus 1 sampai {left}.")
@@ -2491,7 +2491,7 @@ def delete_receipt(receipt_id: str) -> None:
         if row is None:
             raise ValueError(f"Nota {receipt_id} tidak ditemukan.")
         if con.execute("SELECT 1 FROM preorders WHERE receipt_id=?", (receipt_id,)).fetchone():
-            raise ValueError("Invoice ini milik PO Customer dan tidak bisa dihapus. Void saja bila pesanan batal.")
+            raise ValueError("Invoice ini milik Sales Order dan tidak bisa dihapus. Void saja bila pesanan batal.")
         if con.execute("SELECT 1 FROM receipt_returns WHERE receipt_id=?", (receipt_id,)).fetchone():
             raise ValueError("Nota ini sudah ada retur barang, jadi tidak bisa dihapus.")
         existing = dict(row)
@@ -4159,7 +4159,7 @@ def _recompute_master_item_costing(con: sqlite3.Connection, master_item_id: int)
 
 
 def _spo_apply_inbound_receipt(con: sqlite3.Connection, header, lines: list[dict], by: str | None) -> None:
-    """Counts a posted Barang Masuk against its PO Supplier: qty_received, a GR record, PO events and status."""
+    """Counts a posted Barang Masuk against its Purchase Order: qty_received, a GR record, PO events and status."""
     supplier_po_id = header["supplier_po_id"]
     now = _now()
     received_date = header["received_date"]
@@ -4218,12 +4218,12 @@ def post_inbound_document(document_id: int, by: str | None = None) -> dict:
         if header["supplier_po_id"] and po_lines:
             po_row = con.execute("SELECT status FROM supplier_pos WHERE id=?", (header["supplier_po_id"],)).fetchone()
             if po_row is None or po_row["status"] not in ("dipesan", "sebagian_diterima"):
-                raise ValueError("PO Supplier terkait belum diterbitkan atau sudah selesai/dibatalkan.")
+                raise ValueError("Purchase Order terkait belum diterbitkan atau sudah selesai/dibatalkan.")
             for i in po_lines:
                 spi = con.execute("SELECT * FROM supplier_po_items WHERE id=? AND supplier_po_id=?",
                                   (i["spo_item_id"], header["supplier_po_id"])).fetchone()
                 if spi is None:
-                    raise ValueError("Baris PO Supplier tidak ditemukan pada dokumen ini.")
+                    raise ValueError("Baris Purchase Order tidak ditemukan pada dokumen ini.")
                 left = spi["quantity"] - spi["qty_cancelled"] - spi["qty_received"]
                 if i["qty_in"] > left:
                     raise ValueError(f"Jumlah untuk “{spi['product_name']}” melebihi sisa pesanan PO ({left}).")
@@ -5067,6 +5067,7 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | N
         # Overpayment would otherwise show as a negative balance owing.
         "remaining": max(total - paid, 0),
         "item_count": len(items),
+        "item_names": [i["product_name"] for i in items],
         "status": _preorder_overall_status([i["status"] for i in items]),
         "receipt_no": None, "invoice_total": None, "invoice_status": None, "invoice_work_status": None,
     }
@@ -5084,7 +5085,7 @@ PREORDER_PRIORITIES = ("normal", "urgent")
 
 
 def _preorder_item_logistics(item: dict) -> tuple:
-    """(ship_route, priority, eta_date) of a PO Customer line, validated."""
+    """(ship_route, priority, eta_date) of a Sales Order line, validated."""
     route = item.get("ship_route") or None
     if route is not None and route not in SPO_SHIP_METHODS:
         raise ValueError(f"Jalur kirim harus salah satu dari: {', '.join(SPO_SHIP_METHODS)}.")
@@ -5341,8 +5342,8 @@ def apply_preorder_dp(preorder_id: str, receipt_id: str, item_ids: list[int], by
         return amount
 
 
-# --- PO Customer -> Invoice ---------------------------------------------------
-# A published PO Customer owns one invoice (a receipts row, preorders.receipt_id). Its lines carry
+# --- Sales Order -> Invoice ---------------------------------------------------
+# A published Sales Order owns one invoice (a receipts row, preorders.receipt_id). Its lines carry
 # receipt_items.preorder_item_id and follow the PO: added, changed or removed on the PO, the invoice
 # changes with it. Money is only ever taken on the invoice. A PO line's goods are taken off the shelf
 # when that line has arrived (see _receipt_item_holdings); until every line has, the invoice sits in
@@ -5408,7 +5409,7 @@ def _po_create_invoice(con: sqlite3.Connection, po: dict, by: str | None) -> str
          _next_receipt_no(con, created_at)),
     )
     con.execute("UPDATE preorders SET receipt_id=? WHERE id=?", (receipt_id, po["id"]))
-    _log_receipt_event(con, receipt_id, "created", f"Invoice dibuat dari PO Customer {po['po_number']}", by)
+    _log_receipt_event(con, receipt_id, "created", f"Invoice dibuat dari Sales Order {po['po_number']}", by)
     return receipt_id
 
 
@@ -5705,7 +5706,7 @@ def set_preorder_item_status(
             "SELECT * FROM preorder_items WHERE id=? AND preorder_id=?", (item_id, preorder_id)
         ).fetchone()
         if row is None:
-            raise ValueError(f"Item preorder {item_id} tidak ditemukan.")
+            raise ValueError(f"Item Sales Order {item_id} tidak ditemukan.")
         item = dict(row)
         if item["status"] != status:
             before = _po_invoice_snapshot(con, preorder_id)
@@ -5744,7 +5745,7 @@ def set_preorder_status(preorder_id: str, status: str, changed_by: str | None = 
 # deleted -- there is deliberately no delete_preorder function. Do not re-add one.
 
 
-# --- Supplier POs (PO Supplier) --------------------------------------------
+# --- Supplier POs (Purchase Order) --------------------------------------------
 # A purchase order to a supplier, built from the lines customers have preordered or
 # typed in by hand, and kept as a purchase invoice (discount, PPN, shipping, payments).
 # It never touches stock_ledger or master_items.stock_qty itself: goods enter stock only
@@ -6062,7 +6063,7 @@ def get_all_supplier_pos(
 
 
 def get_supplier_po_summary() -> dict:
-    """Header tiles of the PO Supplier list."""
+    """Header tiles of the Purchase Order list."""
     rows = get_all_supplier_pos()
     live = [r for r in rows if r["status"] not in ("draft", "batal")]
     open_pos = [r for r in live if r["status"] in ("dipesan", "sebagian_diterima")]
@@ -6268,9 +6269,9 @@ def update_supplier_po(
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] != "draft":
-            raise ValueError("PO supplier yang sudah diterbitkan tidak bisa diubah.")
+            raise ValueError("Purchase Order yang sudah diterbitkan tidak bisa diubah.")
         new_supplier_id = supplier_id if supplier_id is not None else row["supplier_id"]
         supplier = _spo_supplier(con, new_supplier_id)
         new_date = po_date if po_date is not None else row["po_date"]
@@ -6304,9 +6305,9 @@ def update_supplier_po_invoice(supplier_po_id: str, fields: dict, updated_by: st
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] == "batal":
-            raise ValueError("PO supplier yang dibatalkan tidak bisa diubah.")
+            raise ValueError("Purchase Order yang dibatalkan tidak bisa diubah.")
         merged = {k: fields[k] if k in fields else row[k] for k in _SPO_HEADER_FIELDS}
         _spo_check_header(merged)
         if "payment_terms_days" in fields and "due_date" not in fields:
@@ -6326,9 +6327,9 @@ def issue_supplier_po(supplier_po_id: str, changed_by: str | None = None) -> dic
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] != "draft":
-            raise ValueError("Hanya PO supplier berstatus draft yang bisa diterbitkan.")
+            raise ValueError("Hanya Purchase Order berstatus draft yang bisa diterbitkan.")
         _spo_validate_items(con, row["supplier_id"], [
             {"preorder_item_id": i["preorder_item_id"], "product_name": i["product_name"],
              "quantity": i["quantity"], "est_unit_price": i["est_unit_price"], "discount_pct": i["discount_pct"]}
@@ -6358,7 +6359,7 @@ def set_supplier_po_stage(supplier_po_id: str, to_stage: str, note: str, changed
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] != "dipesan":
             raise ValueError("Status order hanya bisa diubah untuk PO yang sudah diterbitkan dan belum ada barang diterima.")
         if row["stage"] == to_stage:
@@ -6373,7 +6374,7 @@ def set_supplier_po_tracking(supplier_po_id: str, lines: list[dict], changed_by:
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] in ("draft", "batal"):
             raise ValueError("Tracking hanya untuk PO yang sudah diterbitkan.")
         for line in lines:
@@ -6423,7 +6424,7 @@ def update_supplier_po_item_shipping(
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] not in ("dipesan", "sebagian_diterima"):
             raise ValueError("Status pengiriman hanya bisa diubah pada PO yang sudah diterbitkan dan belum selesai.")
         item = con.execute(
@@ -6473,9 +6474,9 @@ def save_spo_receive_draft(supplier_po_id: str, payload: dict, by: str | None = 
     with _conn() as con:
         row = con.execute("SELECT status FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] not in ("dipesan", "sebagian_diterima"):
-            raise ValueError("Draft penerimaan hanya untuk PO supplier yang sudah diterbitkan dan belum selesai.")
+            raise ValueError("Draft penerimaan hanya untuk Purchase Order yang sudah diterbitkan dan belum selesai.")
         con.execute(
             "INSERT INTO spo_receive_drafts (supplier_po_id, payload, saved_by, saved_at) VALUES (?,?,?,?) "
             "ON CONFLICT(supplier_po_id) DO UPDATE SET payload=excluded.payload, saved_by=excluded.saved_by, saved_at=excluded.saved_at",
@@ -6488,7 +6489,7 @@ def save_spo_receive_draft(supplier_po_id: str, payload: dict, by: str | None = 
 def delete_spo_receive_draft(supplier_po_id: str) -> dict:
     with _conn() as con:
         if con.execute("SELECT 1 FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone() is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         con.execute("DELETE FROM spo_receive_drafts WHERE supplier_po_id=?", (supplier_po_id,))
     return get_supplier_po(supplier_po_id)
 
@@ -6510,9 +6511,9 @@ def receive_supplier_po(
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] not in ("dipesan", "sebagian_diterima"):
-            raise ValueError("Barang hanya bisa diterima untuk PO supplier yang sudah diterbitkan dan belum selesai.")
+            raise ValueError("Barang hanya bisa diterima untuk Purchase Order yang sudah diterbitkan dan belum selesai.")
         arrived = [r for r in receipts if r["quantity"] > 0]
         if not arrived:
             raise ValueError("Isi jumlah barang yang diterima.")
@@ -6564,7 +6565,7 @@ def receive_supplier_po(
                 slot["qty_in"] += qty
             if by_master:
                 doc_number = _next_doc_number(con, date.today().strftime("%Y%m%d"))
-                notes_txt = f"Dari PO Supplier {row['po_number']}" + (f", surat jalan {surat_jalan_no}" if surat_jalan_no else "")
+                notes_txt = f"Dari Purchase Order {row['po_number']}" + (f", surat jalan {surat_jalan_no}" if surat_jalan_no else "")
                 doc = con.execute(
                     """INSERT INTO inbound_documents
                        (doc_number, supplier_id, received_date, supplier_invoice_no, notes, status, total_value, created_at)
@@ -6585,7 +6586,7 @@ def _spo_add_payment(
 ) -> None:
     row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
     if row is None:
-        raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+        raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
     if row["status"] in ("draft", "batal"):
         raise ValueError("Pembayaran hanya untuk PO yang sudah diterbitkan.")
     if amount <= 0:
@@ -6628,7 +6629,7 @@ def cancel_supplier_po_item(
     supplier_po_id: str, item_id: int, quantity: int, reason: str, action: str,
     note: str | None = None, by: str | None = None,
 ) -> dict:
-    """Batalkan Item PO Supplier: drops `quantity` of a line that is still to come. The quantity goes
+    """Batalkan Item Purchase Order: drops `quantity` of a line that is still to come. The quantity goes
     back to the customer line it served (it can be ordered again), the bill shrinks, and the cancellation
     is logged with its reason and what to do next."""
     if not reason or not reason.strip():
@@ -6639,7 +6640,7 @@ def cancel_supplier_po_item(
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] not in ("dipesan", "sebagian_diterima"):
             raise ValueError("Item hanya bisa dibatalkan pada PO yang sudah diterbitkan dan belum selesai.")
         item = con.execute(
@@ -6717,15 +6718,15 @@ def cancel_supplier_po(supplier_po_id: str, by: str | None = None) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
         if row is None:
-            raise LookupError(f"PO supplier {supplier_po_id} tidak ditemukan.")
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
         if row["status"] not in ("draft", "dipesan"):
-            raise ValueError("PO supplier ini tidak bisa dibatalkan (sudah ada barang diterima atau sudah dibatalkan).")
+            raise ValueError("Purchase Order ini tidak bisa dibatalkan (sudah ada barang diterima atau sudah dibatalkan).")
         if con.execute(
             "SELECT 1 FROM supplier_po_items WHERE supplier_po_id=? AND qty_received > 0", (supplier_po_id,)
         ).fetchone():
-            raise ValueError("PO supplier ini sudah menerima barang, tidak bisa dibatalkan.")
+            raise ValueError("Purchase Order ini sudah menerima barang, tidak bisa dibatalkan.")
         if row["paid_amount"] > 0:
-            raise ValueError("PO supplier ini sudah ada pembayaran, tidak bisa dibatalkan.")
+            raise ValueError("Purchase Order ini sudah ada pembayaran, tidak bisa dibatalkan.")
         con.execute("UPDATE supplier_pos SET status='batal', updated_at=? WHERE id=?", (now, supplier_po_id))
         _spo_event(con, supplier_po_id, "cancel", "PO dibatalkan", by)
     return get_supplier_po(supplier_po_id)
@@ -7042,7 +7043,7 @@ def import_categories(rows: list[dict], by: str | None) -> dict:
 
 
 def get_receipt_preorders(receipt_id: str) -> list[dict]:
-    """PO Customer yang terkait ke sebuah nota: lewat alokasi DP atau barisnya yang sudah dijadikan nota."""
+    """Sales Order yang terkait ke sebuah nota: lewat alokasi DP atau barisnya yang sudah dijadikan nota."""
     with _conn() as con:
         rows = con.execute(
             """SELECT p.id, p.po_number, p.customer_name,

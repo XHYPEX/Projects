@@ -133,7 +133,7 @@ def _validate_received_date(received_date: str) -> None:
 
 
 def _validate_inbound_po(req) -> None:
-    """A document against a PO Supplier: same supplier, PO issued, every PO line belongs to it and fits its remainder."""
+    """A document against a Purchase Order: same supplier, PO issued, every PO line belongs to it and fits its remainder."""
     if req.source is not None and req.source not in ("po_supplier", "manual"):
         raise HTTPException(status_code=422, detail="Sumber harus po_supplier atau manual.")
     if req.source == "manual" and not (req.manual_reason or "").strip():
@@ -143,24 +143,24 @@ def _validate_inbound_po(req) -> None:
             raise HTTPException(status_code=422, detail="Kondisi barang harus baik, rusak, atau tidak_sesuai.")
     if not req.supplier_po_id:
         if any(i.spo_item_id for i in req.items):
-            raise HTTPException(status_code=422, detail="Baris PO Supplier butuh PO Supplier terpilih.")
+            raise HTTPException(status_code=422, detail="Baris Purchase Order butuh Purchase Order terpilih.")
         return
     po = get_supplier_po(req.supplier_po_id)
     if po is None:
-        raise HTTPException(status_code=422, detail="PO Supplier tidak ditemukan.")
+        raise HTTPException(status_code=422, detail="Purchase Order tidak ditemukan.")
     if po["supplier_id"] != req.supplier_id:
         raise HTTPException(status_code=422, detail="Supplier dokumen berbeda dari supplier PO.")
     if po["status"] not in ("dipesan", "sebagian_diterima"):
-        raise HTTPException(status_code=422, detail="PO Supplier belum diterbitkan atau sudah selesai/dibatalkan.")
+        raise HTTPException(status_code=422, detail="Purchase Order belum diterbitkan atau sudah selesai/dibatalkan.")
     lines = {i["id"]: i for i in po["items"]}
     for it in req.items:
         if it.spo_item_id is None:
             continue
         line = lines.get(it.spo_item_id)
         if line is None:
-            raise HTTPException(status_code=422, detail="Baris PO Supplier bukan bagian dari PO ini.")
+            raise HTTPException(status_code=422, detail="Baris Purchase Order bukan bagian dari PO ini.")
         if line["master_item_id"] != it.master_item_id:
-            raise HTTPException(status_code=422, detail="Barang tidak sesuai dengan baris PO Supplier.")
+            raise HTTPException(status_code=422, detail="Barang tidak sesuai dengan baris Purchase Order.")
         left = line["quantity"] - line["qty_cancelled"] - line["qty_received"]
         if it.qty_in > left:
             raise HTTPException(status_code=422, detail=f"Jumlah untuk {line['product_name']} melebihi sisa pesanan PO ({left}).")

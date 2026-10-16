@@ -668,7 +668,7 @@ async def list_receipt_returns(receipt_id: str):
 
 @router.get("/receipts/{receipt_id}/preorders")
 async def list_receipt_preorders(receipt_id: str):
-    """Terkait PO Customer: pesanan yang menjadi sumber barang atau DP nota ini."""
+    """Terkait Sales Order: pesanan yang menjadi sumber barang atau DP nota ini."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")

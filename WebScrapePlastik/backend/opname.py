@@ -23,7 +23,7 @@ def number_preview(day: str) -> str:
         return _next_no(con, day)
 
 
-# A PO Customer line still open: not yet on a nota, or on the PO's own invoice. (Lines of an older PO
+# A Sales Order line still open: not yet on a nota, or on the PO's own invoice. (Lines of an older PO
 # that were turned into a separate nota are counted under Kasir instead.)
 _OPEN_PO_LINE = "(pi.receipt_id IS NULL OR pi.receipt_id = (SELECT p.receipt_id FROM preorders p WHERE p.id = pi.preorder_id))"
 

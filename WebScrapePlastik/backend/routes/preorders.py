@@ -344,7 +344,7 @@ async def add_payment(
 async def convert_to_receipt(
     preorder_id: str, req: PreorderConvertRequest, user: dict = Depends(get_current_user)
 ):
-    """PO Customer -> nota. Takes the lines that have arrived, opens a nota (Siap Pembayaran)
+    """Sales Order -> nota. Takes the lines that have arrived, opens a nota (Siap Pembayaran)
     and applies the PO's unallocated DP to it once, through the allocation ledger."""
     loop = asyncio.get_event_loop()
     po = await loop.run_in_executor(None, get_preorder, preorder_id)

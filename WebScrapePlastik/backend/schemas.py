@@ -145,7 +145,7 @@ class ReceiptItemOut(BaseModel):
     added_at: str | None = None
     added_by: str | None = None
     added_during_work: bool = False
-    # Set when the line belongs to a PO Customer: it is changed there, not on the nota.
+    # Set when the line belongs to a Sales Order: it is changed there, not on the nota.
     preorder_item_id: int | None = None
     returned_qty: int = 0  # how many of `quantity` the customer brought back (Retur Barang)
 
@@ -177,7 +177,7 @@ class ReceiptOut(ReceiptExtra):
     transfer_sender: str | None = None  # for a transfer: the name on the sending account
     transfer_account: str | None = None  # for a transfer: the shop account it was paid into
     work_status: str = "belum"  # draft | menunggu | belum | pengerjaan | selesai
-    # Set on the invoice of a PO Customer.
+    # Set on the invoice of a Sales Order.
     preorder_id: str | None = None
     po_number: str | None = None
     return_total: int = 0  # what Retur Barang took off the total
@@ -562,7 +562,7 @@ class InboundItemRequest(BaseModel):
     pending_sell_price: int | None = None
     qty_in: int
     cost_price: int
-    spo_item_id: int | None = None  # the PO Supplier line this quantity counts against
+    spo_item_id: int | None = None  # the Purchase Order line this quantity counts against
     condition: str | None = None  # baik | rusak | tidak_sesuai
     location: str | None = None
 
@@ -597,7 +597,7 @@ class InboundDocumentCreateRequest(BaseModel):
     supplier_invoice_no: str | None = None
     notes: str | None = None
     items: list[InboundItemRequest]
-    supplier_po_id: str | None = None  # set when the goods come against a PO Supplier
+    supplier_po_id: str | None = None  # set when the goods come against a Purchase Order
     surat_jalan_no: str | None = None
     officer: str | None = None
     source: str | None = None  # po_supplier | manual
@@ -758,7 +758,7 @@ class StockLedgerOut(BaseModel):
     # activity timeline's name and link.
     actor: str | None = None
     ref_receipt_id: str | None = None
-    # The PO Supplier behind an inbound document that came from a Penerimaan Barang.
+    # The Purchase Order behind an inbound document that came from a Penerimaan Barang.
     supplier_po_number: str | None = None
     supplier_po_id: str | None = None
 
@@ -987,7 +987,7 @@ class PreorderItemOut(BaseModel):
     quantity: int
     unit_price: int
     status: str
-    # Set once the line is on a nota (PO Customer -> nota).
+    # Set once the line is on a nota (Sales Order -> nota).
     receipt_id: str | None = None
     ship_route: str | None = None
     priority: str = "normal"
@@ -1021,6 +1021,7 @@ class PreorderOut(BaseModel):
     # Derived from the line items: the least advanced stage among them.
     status: str
     item_count: int
+    item_names: list[str] = []
     created_at: str
     # Stored, not computed -- a parked/archived preorder, independent of `status`.
     is_draft: bool
@@ -1044,12 +1045,12 @@ class PreorderDetail(PreorderOut):
 
 
 # ---------------------------------------------------------------------------
-# PO Supplier (purchase orders to a supplier, built from customer preorder lines)
+# Purchase Order (purchase orders to a supplier, built from customer preorder lines)
 # ---------------------------------------------------------------------------
 
 
 class SupplierPoItemRequest(BaseModel):
-    # Set when the line comes from a customer preorder ("Ambil Barang dari PO Customer");
+    # Set when the line comes from a customer preorder ("Ambil Barang dari Sales Order");
     # omitted for a barang added by hand.
     preorder_item_id: int | None = None
     master_item_id: int | None = None

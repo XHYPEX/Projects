@@ -7074,28 +7074,44 @@ def get_categories_for_export() -> list[dict]:
 
 def import_categories(rows: list[dict], by: str | None) -> dict:
     """rows: kode (optional), nama, induk_kode (optional), status, deskripsi. A parent row must come
-    before its children or already exist. Each row succeeds or fails on its own."""
+    before its children or already exist. Each row succeeds or fails on its own.
+
+    A row whose name already exists at its level is skipped, but its `kode` is remembered as an alias
+    of the existing category: the shop may already have "Lampu & Penerangan" under another code, and
+    the subcategories that name K01 as their parent must still land under it."""
     created, skipped, errors = 0, 0, []
+    alias: dict[str, int] = {}  # kode in this file -> id of the existing category it matched by name
     for i, r in enumerate(rows, start=2):  # line 1 is the header
         name = (r.get("nama") or "").strip()
         if not name:
             errors.append({"line": i, "message": "Nama kosong."}); continue
+        code = (r.get("kode") or "").strip().upper()
         parent_code = (r.get("induk_kode") or "").strip().upper()
         parent_id = None
         if parent_code:
-            with _conn() as con:
-                p = con.execute("SELECT id FROM categories WHERE code=?", (parent_code,)).fetchone()
-            if p is None:
-                errors.append({"line": i, "message": f"Kode induk {parent_code} tidak ditemukan."}); continue
-            parent_id = p["id"]
+            parent_id = alias.get(parent_code)
+            if parent_id is None:
+                with _conn() as con:
+                    p = con.execute("SELECT id FROM categories WHERE code=?", (parent_code,)).fetchone()
+                if p is None:
+                    errors.append({"line": i, "message": f"Kode induk {parent_code} tidak ditemukan."}); continue
+                parent_id = p["id"]
         status = (r.get("status") or "aktif").strip().lower()
         try:
-            create_category(name, (r.get("kode") or "").strip() or None, parent_id,
+            create_category(name, code or None, parent_id,
                             status if status in ("aktif", "nonaktif") else "aktif", None, r.get("deskripsi"), by)
             created += 1
         except ValueError as e:
             if "Sudah ada" in str(e) or "sudah dipakai" in str(e):
                 skipped += 1
+                if code:
+                    key = _category_name_key(name)
+                    with _conn() as con:
+                        same = next((c["id"] for c in con.execute(
+                            "SELECT id, name FROM categories WHERE parent_id IS ?", (parent_id,)
+                        ).fetchall() if _category_name_key(c["name"]) == key), None)
+                    if same is not None:
+                        alias[code] = same
             else:
                 errors.append({"line": i, "message": str(e)})
     return {"created": created, "skipped": skipped, "errors": errors}

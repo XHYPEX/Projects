@@ -1,723 +1,1084 @@
 {
+ "source": "[REVISI] MASTER_KATEGORI_SINAR_GALAKSI_REVISI_22_INDUK.xlsm, sheet 01 Hierarki Final",
  "parents": [
   {
-   "code": "K01",
-   "name": "Lampu & Penerangan"
+   "code": "01",
+   "name": "LAMPU & PENERANGAN"
   },
   {
-   "code": "K02",
-   "name": "Audio & Multimedia"
+   "code": "02",
+   "name": "AUDIO & MULTIMEDIA"
   },
   {
-   "code": "K03",
-   "name": "Kamera & Sistem Parkir"
+   "code": "03",
+   "name": "KAMERA & SISTEM PARKIR"
   },
   {
-   "code": "K04",
-   "name": "Alarm & Keamanan"
+   "code": "04",
+   "name": "ALARM & KEAMANAN"
   },
   {
-   "code": "K05",
-   "name": "Kelistrikan & Modul Elektronik"
+   "code": "05",
+   "name": "KELISTRIKAN & MODUL ELEKTRONIK"
   },
   {
-   "code": "K06",
-   "name": "Interior & Aksesori Kabin"
+   "code": "06",
+   "name": "INTERIOR & AKSESORI KABIN"
   },
   {
-   "code": "K07",
-   "name": "Jok & Pelapis Interior"
+   "code": "07",
+   "name": "JOK & PELAPIS INTERIOR"
   },
   {
-   "code": "K08",
-   "name": "Karpet & Alas Lantai"
+   "code": "08",
+   "name": "KARPET & ALAS LANTAI"
   },
   {
-   "code": "K09",
-   "name": "Kaca Film & Pelindung Kaca"
+   "code": "09",
+   "name": "KACA FILM & PELINDUNG KACA"
   },
   {
-   "code": "K10",
-   "name": "Wiper & Perlengkapan Kaca"
+   "code": "10",
+   "name": "WIPER & PERLENGKAPAN KACA"
   },
   {
-   "code": "K11",
-   "name": "Eksterior & Body Kit"
+   "code": "11",
+   "name": "EKSTERIOR & BODY KIT"
   },
   {
-   "code": "K12",
-   "name": "Pelindung & Aksesori Bodi"
+   "code": "12",
+   "name": "PELINDUNG & AKSESORI BODI"
   },
   {
-   "code": "K13",
-   "name": "Rak Atap & Aksesori Bagasi"
+   "code": "13",
+   "name": "RAK ATAP, BAGASI & BAK PICKUP"
   },
   {
-   "code": "K14",
-   "name": "Velg & Aksesori Roda"
+   "code": "14",
+   "name": "VELG & AKSESORI RODA"
   },
   {
-   "code": "K15",
-   "name": "Klakson & Aksesori Bunyi"
+   "code": "15",
+   "name": "KLAKSON & PERINGATAN SUARA"
   },
   {
-   "code": "K16",
-   "name": "Perawatan & Kebersihan"
+   "code": "16",
+   "name": "PERAWATAN & KEBERSIHAN"
   },
   {
-   "code": "K17",
-   "name": "Keselamatan & Perlengkapan Darurat"
+   "code": "17",
+   "name": "KESELAMATAN & PERLENGKAPAN DARURAT"
   },
   {
-   "code": "K18",
-   "name": "Bahan & Perlengkapan Pemasangan"
+   "code": "18",
+   "name": "BAHAN & PERLENGKAPAN PEMASANGAN"
   },
   {
-   "code": "K19",
-   "name": "Suspensi & Kaki-Kaki"
+   "code": "19",
+   "name": "SUSPENSI & KAKI-KAKI"
   },
   {
-   "code": "K20",
-   "name": "Sistem Pintu, Jendela & Spion"
+   "code": "20",
+   "name": "SISTEM PINTU, JENDELA & SPION"
   },
   {
-   "code": "K21",
-   "name": "Suku Cadang Mesin, Rem & Transmisi"
+   "code": "21",
+   "name": "SPAREPART MESIN, REM & TRANSMISI"
   },
   {
-   "code": "K22",
-   "name": "Knalpot & Aksesori Exhaust"
+   "code": "22",
+   "name": "KNALPOT & AKSESORI EXHAUST"
   }
  ],
  "subs": [
   {
-   "parent": "K01",
-   "code": "K01-01",
-   "name": "Bohlam LED & Halogen"
+   "parent": "01",
+   "code": "01.01",
+   "name": "Bohlam LED"
   },
   {
-   "parent": "K01",
-   "code": "K01-02",
+   "parent": "01",
+   "code": "01.02",
+   "name": "Bohlam Halogen"
+  },
+  {
+   "parent": "01",
+   "code": "01.03",
    "name": "Lampu Lainnya"
   },
   {
-   "parent": "K01",
-   "code": "K01-03",
-   "name": "Foglamp Assy & Variasi"
+   "parent": "01",
+   "code": "01.04",
+   "name": "Foglamp Assy"
   },
   {
-   "parent": "K01",
-   "code": "K01-04",
+   "parent": "01",
+   "code": "01.05",
    "name": "DRL & Lampu Bumper"
   },
   {
-   "parent": "K01",
-   "code": "K01-05",
-   "name": "DRL, Angel Eyes & Devil Eyes"
+   "parent": "01",
+   "code": "01.06",
+   "name": "Angel Eyes & Devil Eyes"
   },
   {
-   "parent": "K01",
-   "code": "K01-06",
-   "name": "Projector LED"
+   "parent": "01",
+   "code": "01.07",
+   "name": "Projector Bi-LED & Modul"
   },
   {
-   "parent": "K01",
-   "code": "K01-07",
-   "name": "Stoplamp / Lampu Belakang"
+   "parent": "01",
+   "code": "01.08",
+   "name": "Stoplamp Assy"
   },
   {
-   "parent": "K01",
-   "code": "K01-08",
-   "name": "Lampu Kerja, Rotary & Kendaraan Niaga"
+   "parent": "01",
+   "code": "01.09",
+   "name": "Lampu Kerja & Rotary"
   },
   {
-   "parent": "K01",
-   "code": "K01-09",
-   "name": "Headlamp / Lampu Utama"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-10",
-   "name": "Lampu Sorot & Tambahan"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-11",
-   "name": "Bi-LED Headlamp / Projector"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-12",
-   "name": "Bi-LED Foglamp"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-13",
-   "name": "Lampu Sein & Corner Lamp"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-14",
-   "name": "Reflektor / Lampu Belakang"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-15",
-   "name": "Lampu Interior / Kabin"
-  },
-  {
-   "parent": "K01",
-   "code": "K01-16",
+   "parent": "01",
+   "code": "01.10",
    "name": "Headlamp Assy"
   },
   {
-   "parent": "K01",
-   "code": "K01-17",
-   "name": "Lampu Ambient Interior"
+   "parent": "01",
+   "code": "01.11",
+   "name": "Lampu Sorot & Tambahan"
   },
   {
-   "parent": "K02",
-   "code": "K02-01",
-   "name": "Head Unit & Receiver"
+   "parent": "01",
+   "code": "01.12",
+   "name": "Bi-LED Foglamp"
   },
   {
-   "parent": "K02",
-   "code": "K02-02",
+   "parent": "01",
+   "code": "01.13",
+   "name": "Lampu Sein & Corner"
+  },
+  {
+   "parent": "01",
+   "code": "01.14",
+   "name": "Reflektor Belakang"
+  },
+  {
+   "parent": "01",
+   "code": "01.15",
+   "name": "Lampu Interior"
+  },
+  {
+   "parent": "01",
+   "code": "01.16",
+   "name": "Ambient Light Interior"
+  },
+  {
+   "parent": "01",
+   "code": "01.17",
+   "name": "Lampu Plat Nomor"
+  },
+  {
+   "parent": "01",
+   "code": "01.18",
+   "name": "Lampu Spoiler"
+  },
+  {
+   "parent": "01",
+   "code": "01.19",
+   "name": "Lampu Strobe"
+  },
+  {
+   "parent": "01",
+   "code": "01.20",
+   "name": "Alis Lampu RGB"
+  },
+  {
+   "parent": "01",
+   "code": "01.21",
+   "name": "Reflektor LED Bumper"
+  },
+  {
+   "parent": "01",
+   "code": "01.22",
+   "name": "Shroud Projector Bi-LED"
+  },
+  {
+   "parent": "01",
+   "code": "01.23",
+   "name": "Lampu Trunklid LED"
+  },
+  {
+   "parent": "01",
+   "code": "01.24",
+   "name": "Bohlam HID / Xenon"
+  },
+  {
+   "parent": "02",
+   "code": "02.01",
+   "name": "Head Unit"
+  },
+  {
+   "parent": "02",
+   "code": "02.02",
    "name": "Frame Head Unit"
   },
   {
-   "parent": "K02",
-   "code": "K02-03",
+   "parent": "02",
+   "code": "02.03",
    "name": "Speaker & Tweeter"
   },
   {
-   "parent": "K02",
-   "code": "K02-04",
+   "parent": "02",
+   "code": "02.04",
    "name": "Antena Mobil"
   },
   {
-   "parent": "K02",
-   "code": "K02-05",
+   "parent": "02",
+   "code": "02.05",
    "name": "DSP & Audio Processor"
   },
   {
-   "parent": "K02",
-   "code": "K02-06",
-   "name": "Amplifier"
+   "parent": "02",
+   "code": "02.06",
+   "name": "Power Amplifier"
   },
   {
-   "parent": "K02",
-   "code": "K02-07",
+   "parent": "02",
+   "code": "02.07",
    "name": "Kabel & Aksesori Audio"
   },
   {
-   "parent": "K02",
-   "code": "K02-08",
+   "parent": "02",
+   "code": "02.08",
    "name": "Subwoofer"
   },
   {
-   "parent": "K02",
-   "code": "K02-09",
+   "parent": "02",
+   "code": "02.09",
    "name": "Kontrol Audio Setir"
   },
   {
-   "parent": "K03",
-   "code": "K03-01",
+   "parent": "02",
+   "code": "02.10",
+   "name": "Soket & Harness Head Unit"
+  },
+  {
+   "parent": "02",
+   "code": "02.11",
+   "name": "Sekring Audio & Fuse Holder"
+  },
+  {
+   "parent": "03",
+   "code": "03.01",
    "name": "Dashcam & DVR"
   },
   {
-   "parent": "K03",
-   "code": "K03-02",
+   "parent": "03",
+   "code": "03.02",
    "name": "Kamera Mundur"
   },
   {
-   "parent": "K03",
-   "code": "K03-03",
+   "parent": "03",
+   "code": "03.03",
    "name": "Sensor Parkir"
   },
   {
-   "parent": "K03",
-   "code": "K03-04",
+   "parent": "03",
+   "code": "03.04",
    "name": "Modul & Aksesori Kamera"
   },
   {
-   "parent": "K04",
-   "code": "K04-01",
+   "parent": "03",
+   "code": "03.05",
+   "name": "Kamera 360° & Surround View"
+  },
+  {
+   "parent": "04",
+   "code": "04.01",
    "name": "Alarm & Immobilizer"
   },
   {
-   "parent": "K04",
-   "code": "K04-02",
+   "parent": "04",
+   "code": "04.02",
    "name": "Keyless & Push Start"
   },
   {
-   "parent": "K04",
-   "code": "K04-03",
+   "parent": "04",
+   "code": "04.03",
    "name": "GPS Tracker"
   },
   {
-   "parent": "K04",
-   "code": "K04-04",
+   "parent": "04",
+   "code": "04.04",
    "name": "Kunci Pengaman Setir"
   },
   {
-   "parent": "K05",
-   "code": "K05-01",
+   "parent": "05",
+   "code": "05.01",
    "name": "Charger, USB & Soket Power"
   },
   {
-   "parent": "K05",
-   "code": "K05-02",
+   "parent": "05",
+   "code": "05.02",
    "name": "Clock Spring & Kabel Spiral"
   },
   {
-   "parent": "K05",
-   "code": "K05-03",
+   "parent": "05",
+   "code": "05.03",
    "name": "Modul Elektronik & CANBUS"
   },
   {
-   "parent": "K05",
-   "code": "K05-04",
+   "parent": "05",
+   "code": "05.04",
    "name": "Sakelar & Tombol"
   },
   {
-   "parent": "K05",
-   "code": "K05-05",
+   "parent": "05",
+   "code": "05.05",
    "name": "Relay, Sekring & Fuse Box"
   },
   {
-   "parent": "K05",
-   "code": "K05-06",
-   "name": "Sakelar Kendaraan"
-  },
-  {
-   "parent": "K05",
-   "code": "K05-07",
+   "parent": "05",
+   "code": "05.06",
    "name": "Aki & Baterai"
   },
   {
-   "parent": "K05",
-   "code": "K05-08",
+   "parent": "05",
+   "code": "05.07",
    "name": "Adaptor & Aksesori Elektrik"
   },
   {
-   "parent": "K05",
-   "code": "K05-09",
-   "name": "Aksesori Baterai Kendaraan"
+   "parent": "05",
+   "code": "05.08",
+   "name": "Aksesori Baterai"
   },
   {
-   "parent": "K05",
-   "code": "K05-10",
+   "parent": "05",
+   "code": "05.09",
    "name": "Inverter & Konverter Tegangan"
   },
   {
-   "parent": "K06",
-   "code": "K06-01",
+   "parent": "05",
+   "code": "05.10",
+   "name": "Sakelar AC & Kontrol Iklim"
+  },
+  {
+   "parent": "05",
+   "code": "05.11",
+   "name": "Switch Lampu Kendaraan"
+  },
+  {
+   "parent": "05",
+   "code": "05.12",
+   "name": "Aksesori Motor Elektrik"
+  },
+  {
+   "parent": "05",
+   "code": "05.13",
+   "name": "TPMS & Sensor Tekanan Ban"
+  },
+  {
+   "parent": "06",
+   "code": "06.01",
    "name": "Cover & Alas Dashboard"
   },
   {
-   "parent": "K06",
-   "code": "K06-02",
+   "parent": "06",
+   "code": "06.02",
    "name": "Bantal & Sandaran Kabin"
   },
   {
-   "parent": "K06",
-   "code": "K06-03",
+   "parent": "06",
+   "code": "06.03",
    "name": "Cover & Aksesori Setir"
   },
   {
-   "parent": "K06",
-   "code": "K06-04",
+   "parent": "06",
+   "code": "06.04",
    "name": "Holder HP & Gadget"
   },
   {
-   "parent": "K06",
-   "code": "K06-05",
+   "parent": "06",
+   "code": "06.05",
    "name": "Cover Kunci & Remote"
   },
   {
-   "parent": "K06",
-   "code": "K06-06",
+   "parent": "06",
+   "code": "06.06",
    "name": "Panel & Garnish Interior"
   },
   {
-   "parent": "K06",
-   "code": "K06-07",
+   "parent": "06",
+   "code": "06.07",
    "name": "Cover & Aksesori Pedal"
   },
   {
-   "parent": "K06",
-   "code": "K06-08",
+   "parent": "06",
+   "code": "06.08",
    "name": "Organizer Kabin"
   },
   {
-   "parent": "K06",
-   "code": "K06-09",
+   "parent": "06",
+   "code": "06.09",
    "name": "Kipas & Aksesori Kabin"
   },
   {
-   "parent": "K06",
-   "code": "K06-10",
+   "parent": "06",
+   "code": "06.10",
    "name": "Aksesori Tuas Transmisi"
   },
   {
-   "parent": "K06",
-   "code": "K06-11",
+   "parent": "06",
+   "code": "06.11",
    "name": "Aksesori Kabin Lainnya"
   },
   {
-   "parent": "K06",
-   "code": "K06-12",
+   "parent": "06",
+   "code": "06.12",
    "name": "Aksesori Pegangan Kabin"
   },
   {
-   "parent": "K06",
-   "code": "K06-13",
+   "parent": "06",
+   "code": "06.13",
    "name": "Tirai & Sunshade"
   },
   {
-   "parent": "K07",
-   "code": "K07-01",
+   "parent": "06",
+   "code": "06.14",
+   "name": "Kasur & Alas Tidur Mobil"
+  },
+  {
+   "parent": "06",
+   "code": "06.15",
+   "name": "Aksesori Dekorasi Dashboard"
+  },
+  {
+   "parent": "06",
+   "code": "06.16",
+   "name": "Tempat Sampah & Tisu Mobil"
+  },
+  {
+   "parent": "06",
+   "code": "06.17",
+   "name": "Aksesori E-Toll & Kartu"
+  },
+  {
+   "parent": "06",
+   "code": "06.18",
+   "name": "Setir Assy (Steering Wheel)"
+  },
+  {
+   "parent": "07",
+   "code": "07.01",
    "name": "Sarung & Cover Jok"
   },
   {
-   "parent": "K07",
-   "code": "K07-02",
+   "parent": "07",
+   "code": "07.02",
    "name": "Mekanisme & Perlengkapan Jok"
   },
   {
-   "parent": "K08",
-   "code": "K08-01",
-   "name": "Karpet Mobil"
+   "parent": "07",
+   "code": "07.03",
+   "name": "Bekleed & Jok Paten"
   },
   {
-   "parent": "K10",
-   "code": "K10-01",
+   "parent": "07",
+   "code": "07.04",
+   "name": "Jok Mobil Assy"
+  },
+  {
+   "parent": "08",
+   "code": "08.01",
+   "name": "Karpet & Alas Lantai"
+  },
+  {
+   "parent": "08",
+   "code": "08.02",
+   "name": "Karpet Dasar"
+  },
+  {
+   "parent": "09",
+   "code": "09.01",
+   "name": "Kaca Film"
+  },
+  {
+   "parent": "10",
+   "code": "10.01",
    "name": "Wiper & Aksesori"
   },
   {
-   "parent": "K10",
-   "code": "K10-02",
+   "parent": "10",
+   "code": "10.02",
    "name": "Pompa & Perlengkapan Washer"
   },
   {
-   "parent": "K11",
-   "code": "K11-01",
+   "parent": "10",
+   "code": "10.03",
+   "name": "Motor Wiper"
+  },
+  {
+   "parent": "11",
+   "code": "11.01",
    "name": "Spoiler & Wing"
   },
   {
-   "parent": "K11",
-   "code": "K11-02",
-   "name": "Grille Mobil"
+   "parent": "11",
+   "code": "11.02",
+   "name": "Grille"
   },
   {
-   "parent": "K11",
-   "code": "K11-03",
-   "name": "Bumper Belakang"
+   "parent": "11",
+   "code": "11.03",
+   "name": "Bemper Belakang (Rear Bumper)"
   },
   {
-   "parent": "K11",
-   "code": "K11-04",
-   "name": "Lip Bumper, Side Skirt & Diffuser"
+   "parent": "11",
+   "code": "11.04",
+   "name": "Lip Bumper"
   },
   {
-   "parent": "K11",
-   "code": "K11-05",
-   "name": "Bumper Depan"
+   "parent": "11",
+   "code": "11.05",
+   "name": "Side Skirt"
   },
   {
-   "parent": "K11",
-   "code": "K11-06",
-   "name": "Over Fender / Fender Flare"
+   "parent": "11",
+   "code": "11.06",
+   "name": "Diffuser"
   },
   {
-   "parent": "K11",
-   "code": "K11-07",
+   "parent": "11",
+   "code": "11.07",
+   "name": "Bemper Depan (Front Bumper)"
+  },
+  {
+   "parent": "11",
+   "code": "11.08",
+   "name": "Over Fender"
+  },
+  {
+   "parent": "11",
+   "code": "11.09",
    "name": "Body Kit Set"
   },
   {
-   "parent": "K11",
-   "code": "K11-08",
-   "name": "Air Flow / Hood Scoop"
+   "parent": "11",
+   "code": "11.10",
+   "name": "Hood Scoop & Air Vent"
   },
   {
-   "parent": "K12",
-   "code": "K12-01",
+   "parent": "11",
+   "code": "11.11",
+   "name": "Trunklid Assy & Panel Bagasi"
+  },
+  {
+   "parent": "12",
+   "code": "12.01",
    "name": "Cover Tutup Tangki"
   },
   {
-   "parent": "K12",
-   "code": "K12-02",
+   "parent": "12",
+   "code": "12.02",
    "name": "Cover Handle Pintu"
   },
   {
-   "parent": "K12",
-   "code": "K12-03",
-   "name": "Sill Plate / Pelindung Pijakan Pintu"
+   "parent": "12",
+   "code": "12.03",
+   "name": "Sill Plate & Pelindung Pijakan Pintu"
   },
   {
-   "parent": "K12",
-   "code": "K12-04",
+   "parent": "12",
+   "code": "12.04",
    "name": "Garnish & Cover Lampu"
   },
   {
-   "parent": "K12",
-   "code": "K12-05",
-   "name": "Talang Air / Window Visor"
+   "parent": "12",
+   "code": "12.05",
+   "name": "Talang Air & Window Visor"
   },
   {
-   "parent": "K12",
-   "code": "K12-06",
+   "parent": "12",
+   "code": "12.06",
    "name": "Garnish Bagasi & Kap"
   },
   {
-   "parent": "K12",
-   "code": "K12-07",
+   "parent": "12",
+   "code": "12.07",
    "name": "Cover Spion"
   },
   {
-   "parent": "K12",
-   "code": "K12-08",
-   "name": "Mud Guard / Kepet Lumpur"
+   "parent": "12",
+   "code": "12.08",
+   "name": "Mud Guard"
   },
   {
-   "parent": "K12",
-   "code": "K12-09",
+   "parent": "12",
+   "code": "12.09",
    "name": "Emblem & Logo Mobil"
   },
   {
-   "parent": "K12",
-   "code": "K12-10",
-   "name": "Door Guard / Pelindung Pintu"
+   "parent": "12",
+   "code": "12.10",
+   "name": "Door Guard"
   },
   {
-   "parent": "K12",
-   "code": "K12-11",
+   "parent": "12",
+   "code": "12.11",
    "name": "Aksesori & Cover Bodi"
   },
   {
-   "parent": "K12",
-   "code": "K12-12",
+   "parent": "12",
+   "code": "12.12",
    "name": "List & Garnish Kaca"
   },
   {
-   "parent": "K12",
-   "code": "K12-13",
+   "parent": "12",
+   "code": "12.13",
    "name": "Garnish & List Bodi"
   },
   {
-   "parent": "K12",
-   "code": "K12-14",
-   "name": "Cover / Sarung Mobil"
+   "parent": "12",
+   "code": "12.14",
+   "name": "Cover & Sarung Mobil"
   },
   {
-   "parent": "K12",
-   "code": "K12-15",
+   "parent": "12",
+   "code": "12.15",
    "name": "Bingkai & Cover Plat Nomor"
   },
   {
-   "parent": "K12",
-   "code": "K12-16",
+   "parent": "12",
+   "code": "12.16",
    "name": "Garnish Grille & Radiator"
   },
   {
-   "parent": "K12",
-   "code": "K12-17",
+   "parent": "12",
+   "code": "12.17",
    "name": "Karet & List Kaca"
   },
   {
-   "parent": "K12",
-   "code": "K12-18",
+   "parent": "12",
+   "code": "12.18",
    "name": "Pelindung Kolong & Fender"
   },
   {
-   "parent": "K12",
-   "code": "K12-19",
+   "parent": "12",
+   "code": "12.19",
    "name": "Peredam & Pelindung Kap"
   },
   {
-   "parent": "K12",
-   "code": "K12-20",
+   "parent": "12",
+   "code": "12.20",
    "name": "Aksesori Bumper & Towing"
   },
   {
-   "parent": "K12",
-   "code": "K12-21",
+   "parent": "12",
+   "code": "12.21",
    "name": "Stiker & Aksesori Bodi"
   },
   {
-   "parent": "K12",
-   "code": "K12-22",
+   "parent": "12",
+   "code": "12.22",
    "name": "Cover Ban Serep"
   },
   {
-   "parent": "K12",
-   "code": "K12-23",
-   "name": "Foot Step / Pijakan Samping"
+   "parent": "12",
+   "code": "12.23",
+   "name": "Foot Step & Pijakan Samping"
   },
   {
-   "parent": "K12",
-   "code": "K12-24",
+   "parent": "12",
+   "code": "12.24",
    "name": "Cover & Pelindung Bumper"
   },
   {
-   "parent": "K12",
-   "code": "K12-25",
+   "parent": "12",
+   "code": "12.25",
    "name": "Garnish Pilar"
   },
   {
-   "parent": "K14",
-   "code": "K14-01",
-   "name": "Cover Kaliper / Rem Variasi"
+   "parent": "12",
+   "code": "12.26",
+   "name": "Karet Seal Pintu & Weatherstrip"
   },
   {
-   "parent": "K14",
-   "code": "K14-02",
+   "parent": "12",
+   "code": "12.27",
+   "name": "Hood Molding"
+  },
+  {
+   "parent": "13",
+   "code": "13.01",
+   "name": "Rak Atap & Roof Rack"
+  },
+  {
+   "parent": "13",
+   "code": "13.02",
+   "name": "Roof Rail"
+  },
+  {
+   "parent": "13",
+   "code": "13.03",
+   "name": "Roll Bar Bak Pickup"
+  },
+  {
+   "parent": "13",
+   "code": "13.04",
+   "name": "Roller Lid Bak Pickup"
+  },
+  {
+   "parent": "14",
+   "code": "14.01",
+   "name": "Cover Kaliper & Rem Variasi"
+  },
+  {
+   "parent": "14",
+   "code": "14.02",
    "name": "Velg & Aksesori Roda"
   },
   {
-   "parent": "K15",
-   "code": "K15-01",
+   "parent": "14",
+   "code": "14.03",
+   "name": "Mur Roda (Lug Nut)"
+  },
+  {
+   "parent": "14",
+   "code": "14.04",
+   "name": "Dop Roda & Tutup Velg"
+  },
+  {
+   "parent": "15",
+   "code": "15.01",
    "name": "Klakson & Sirene"
   },
   {
-   "parent": "K15",
-   "code": "K15-02",
-   "name": "Alarm Mundur / Bunyi Peringatan"
+   "parent": "15",
+   "code": "15.02",
+   "name": "Alarm Mundur & Peringatan Suara"
   },
   {
-   "parent": "K16",
-   "code": "K16-01",
+   "parent": "15",
+   "code": "15.03",
+   "name": "Relay & Aksesori Klakson"
+  },
+  {
+   "parent": "16",
+   "code": "16.01",
    "name": "Parfum & Pengharum Mobil"
   },
   {
-   "parent": "K16",
-   "code": "K16-02",
+   "parent": "16",
+   "code": "16.02",
    "name": "Cairan & Alat Perawatan"
   },
   {
-   "parent": "K16",
-   "code": "K16-03",
+   "parent": "16",
+   "code": "16.03",
    "name": "Air Purifier & Pengharum Elektrik"
   },
   {
-   "parent": "K17",
-   "code": "K17-01",
+   "parent": "16",
+   "code": "16.04",
+   "name": "Anti Bocor Ban"
+  },
+  {
+   "parent": "16",
+   "code": "16.05",
+   "name": "Perawatan & Detailing Eksterior"
+  },
+  {
+   "parent": "16",
+   "code": "16.06",
+   "name": "Pelumas & Oli"
+  },
+  {
+   "parent": "16",
+   "code": "16.07",
+   "name": "Vacuum Cleaner Mobil"
+  },
+  {
+   "parent": "16",
+   "code": "16.08",
+   "name": "Perawatan Anti Karat"
+  },
+  {
+   "parent": "16",
+   "code": "16.09",
+   "name": "Cairan Pembersih Kaca"
+  },
+  {
+   "parent": "16",
+   "code": "16.10",
+   "name": "Cairan Pembersih AC"
+  },
+  {
+   "parent": "16",
+   "code": "16.11",
+   "name": "Lap Chamois & Kanebo"
+  },
+  {
+   "parent": "17",
+   "code": "17.01",
+   "name": "Safety Whip & Bendera Keselamatan"
+  },
+  {
+   "parent": "17",
+   "code": "17.02",
    "name": "Sabuk Pengaman & Aksesori"
   },
   {
-   "parent": "K17",
-   "code": "K17-02",
+   "parent": "17",
+   "code": "17.03",
    "name": "Perlengkapan Keselamatan"
   },
   {
-   "parent": "K18",
-   "code": "K18-01",
-   "name": "Bracket & Dudukan Universal"
+   "parent": "17",
+   "code": "17.04",
+   "name": "Kunci Pengaman Kendaraan"
   },
   {
-   "parent": "K18",
-   "code": "K18-02",
+   "parent": "18",
+   "code": "18.01",
+   "name": "Bracket, Klip & Dudukan Pemasangan"
+  },
+  {
+   "parent": "18",
+   "code": "18.02",
    "name": "Kabel & Konektor Instalasi"
   },
   {
-   "parent": "K18",
-   "code": "K18-03",
-   "name": "Bracket, Klip & Perlengkapan Instalasi"
+   "parent": "18",
+   "code": "18.03",
+   "name": "Lem, Silikon & Sealant"
   },
   {
-   "parent": "K18",
-   "code": "K18-04",
-   "name": "Lem, Silikon & Sealant Pemasangan"
+   "parent": "18",
+   "code": "18.04",
+   "name": "Mur, Baut & Fastener"
   },
   {
-   "parent": "K19",
-   "code": "K19-01",
+   "parent": "19",
+   "code": "19.01",
    "name": "Balance Arm & Stabilizer"
   },
   {
-   "parent": "K20",
-   "code": "K20-01",
+   "parent": "19",
+   "code": "19.02",
+   "name": "Bearing & Support Shock"
+  },
+  {
+   "parent": "19",
+   "code": "19.03",
+   "name": "Shockbreaker & Komponen Suspensi"
+  },
+  {
+   "parent": "20",
+   "code": "20.01",
    "name": "Kaca Spion & Komponen"
   },
   {
-   "parent": "K20",
-   "code": "K20-02",
+   "parent": "20",
+   "code": "20.02",
    "name": "Retract Spion & Motor Lipat"
   },
   {
-   "parent": "K20",
-   "code": "K20-03",
+   "parent": "20",
+   "code": "20.03",
    "name": "Penyangga Kap & Bagasi"
   },
   {
-   "parent": "K20",
-   "code": "K20-04",
-   "name": "Spion & Aksesori Pengganti"
+   "parent": "20",
+   "code": "20.04",
+   "name": "Spion Assy & Pengganti"
   },
   {
-   "parent": "K20",
-   "code": "K20-05",
+   "parent": "20",
+   "code": "20.05",
    "name": "Door Lock & Central Lock"
   },
   {
-   "parent": "K20",
-   "code": "K20-06",
+   "parent": "20",
+   "code": "20.06",
    "name": "Handle Pintu Pengganti"
   },
   {
-   "parent": "K20",
-   "code": "K20-07",
+   "parent": "20",
+   "code": "20.07",
    "name": "Power Window & Sakelar"
   },
   {
-   "parent": "K20",
-   "code": "K20-08",
+   "parent": "20",
+   "code": "20.08",
    "name": "Power Back Door"
   },
   {
-   "parent": "K21",
-   "code": "K21-01",
+   "parent": "20",
+   "code": "20.09",
+   "name": "Kunci Kontak & Silinder"
+  },
+  {
+   "parent": "20",
+   "code": "20.10",
+   "name": "Modul Window Up"
+  },
+  {
+   "parent": "20",
+   "code": "20.11",
+   "name": "Sein Spion"
+  },
+  {
+   "parent": "20",
+   "code": "20.12",
+   "name": "Switch Retract Spion"
+  },
+  {
+   "parent": "21",
+   "code": "21.01",
    "name": "Injektor & Sistem Bahan Bakar"
   },
   {
-   "parent": "K21",
-   "code": "K21-02",
-   "name": "Kampas Rem / Brake Pad"
+   "parent": "21",
+   "code": "21.02",
+   "name": "Kampas Rem"
   },
   {
-   "parent": "K21",
-   "code": "K21-03",
+   "parent": "21",
+   "code": "21.03",
    "name": "Pendingin Mesin & Radiator"
   },
   {
-   "parent": "K21",
-   "code": "K21-04",
+   "parent": "21",
+   "code": "21.04",
    "name": "Pompa Mesin"
   },
   {
-   "parent": "K21",
-   "code": "K21-05",
+   "parent": "21",
+   "code": "21.05",
    "name": "CV Joint & Penggerak Roda"
   },
   {
-   "parent": "K21",
-   "code": "K21-06",
-   "name": "Filter Mesin"
+   "parent": "21",
+   "code": "21.06",
+   "name": "Filter Udara"
   },
   {
-   "parent": "K21",
-   "code": "K21-07",
+   "parent": "21",
+   "code": "21.07",
+   "name": "Filter Oli"
+  },
+  {
+   "parent": "21",
+   "code": "21.08",
+   "name": "Filter Bahan Bakar"
+  },
+  {
+   "parent": "21",
+   "code": "21.09",
    "name": "Tensioner & V-Belt"
   },
   {
-   "parent": "K21",
-   "code": "K21-08",
+   "parent": "21",
+   "code": "21.10",
    "name": "Sensor Mesin"
   },
   {
-   "parent": "K22",
-   "code": "K22-01",
+   "parent": "21",
+   "code": "21.11",
+   "name": "Back Up Switch"
+  },
+  {
+   "parent": "21",
+   "code": "21.12",
+   "name": "Bearing Mesin & Transmisi"
+  },
+  {
+   "parent": "21",
+   "code": "21.13",
+   "name": "Bos Kit & Bushing Mekanis"
+  },
+  {
+   "parent": "21",
+   "code": "21.14",
+   "name": "Master Rem & Kaliper"
+  },
+  {
+   "parent": "21",
+   "code": "21.15",
+   "name": "Busi"
+  },
+  {
+   "parent": "21",
+   "code": "21.16",
+   "name": "Koil & CDI"
+  },
+  {
+   "parent": "21",
+   "code": "21.17",
+   "name": "Engine Mounting & Karet"
+  },
+  {
+   "parent": "21",
+   "code": "21.18",
+   "name": "Kopling & Komponen Transmisi"
+  },
+  {
+   "parent": "21",
+   "code": "21.19",
+   "name": "Metal Bearing Mesin"
+  },
+  {
+   "parent": "21",
+   "code": "21.20",
+   "name": "Piston & Komponen"
+  },
+  {
+   "parent": "21",
+   "code": "21.21",
+   "name": "Selang & Komponen Rem"
+  },
+  {
+   "parent": "21",
+   "code": "21.22",
+   "name": "Sensor Transmisi & Kecepatan"
+  },
+  {
+   "parent": "21",
+   "code": "21.23",
+   "name": "Switch & Sensor Tekanan Mesin"
+  },
+  {
+   "parent": "21",
+   "code": "21.24",
+   "name": "Starter & Komponen"
+  },
+  {
+   "parent": "21",
+   "code": "21.25",
+   "name": "Thermostat & Pengatur Suhu"
+  },
+  {
+   "parent": "21",
+   "code": "21.26",
+   "name": "Pompa Oli"
+  },
+  {
+   "parent": "21",
+   "code": "21.27",
+   "name": "Pelumas & Cairan Kendaraan"
+  },
+  {
+   "parent": "21",
+   "code": "21.28",
+   "name": "Seal & Gasket Mesin"
+  },
+  {
+   "parent": "21",
+   "code": "21.29",
+   "name": "Komponen Valve Mesin"
+  },
+  {
+   "parent": "22",
+   "code": "22.01",
    "name": "Muffler & Ujung Knalpot"
   }
  ]

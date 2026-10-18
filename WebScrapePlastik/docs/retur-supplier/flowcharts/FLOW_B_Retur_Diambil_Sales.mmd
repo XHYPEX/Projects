@@ -1,0 +1,28 @@
+%% Kode: FLOW B
+%% Judul: Retur diambil sales supplier di toko
+%% Tujuan: Menyerahkan barang retur langsung ke sales supplier tanpa resi, dengan Bukti Serah Terima bertanda tangan sebagai bukti sah.
+%% Dimulai dari: Wizard Buat Retur Supplier langkah 4 → metode B "Diambil sales supplier di toko".
+%% Aturan stok: Disetujui: QUAR. Saat sales datang dan Serah Terima dicatat: OUT sekali. Sales tidak datang: tidak ada perubahan stok.
+%% Aturan keuangan: Sama dengan FLOW A: tidak ada efek keuangan sampai supplier memutuskan.
+%% Warning: Nama pengambil berbeda dari rencana; jadwal ambil terlewat (tanda lewat jadwal H+1); foto serah terima belum ada; identitas sales belum dikonfirmasi ke kantor supplier.
+%% Catatan Programmer: Tidak ada field resi yang wajib. Bukti = BST-{no retur} (cetak LX-310) + foto + nama/HP pengambil. CAS handover_status 'menunggu_ambil'→'diserahkan_sales'. "Diserahkan ke sales" belum sama dengan "Diterima supplier".
+flowchart TB
+  S([Retur disetujui · metode B<br/>QUAR: barang di rak karantina]):::so --> T1[[Menunggu Pengambilan<br/>nama sales, HP, jadwal · identitas dikonfirmasi ke kantor supplier]]:::tunggu
+  T1 --> C1{Sales datang<br/>sesuai jadwal?}:::cek
+  C1 -- Tidak --> W1[Tanda lewat jadwal H+1<br/>stok tidak berubah]:::tunggu
+  W1 --> C2{Admin memilih}:::cek
+  C2 -- Jadwal ulang --> T1
+  C2 -- Ganti ke metode kirim --> FA[/FLOW A: Siap Dikirim/]:::sub
+  C2 -- Batalkan retur --> X1[UNQUAR · alasan wajib]:::off
+  C1 -- Ya --> C3{Nama pengambil sama<br/>dengan rencana?}:::cek
+  C3 -- Tidak --> W2[Peringatan: catat nama asli +<br/>konfirmasi supplier · admin boleh lanjut]:::tunggu
+  C3 -- Ya --> A2
+  W2 --> A2[Cek isi paket bersama sales · cetak BST LX-310<br/>tanda tangan sales + petugas]:::aksi
+  A2 --> A3[Catat Serah Terima Sales<br/>jam, nama, foto, upload BST · tanpa resi]:::aksi
+  A3 --> P2[OUT sekali: fisik & karantina turun<br/>status: Sudah Diserahkan ke Sales]:::so
+  P2 --> C4{Supplier konfirmasi barang<br/>sampai di kantor?}:::cek
+  C4 -- Belum 7 hari --> W3[Reminder ke admin]:::tunggu
+  W3 --> C4
+  C4 -- Sales menyangkal / hilang --> E1[Bermasalah: BST + foto<br/>jadi dasar klaim ke supplier]:::err
+  C4 -- Ya --> T3[[Diterima Supplier]]:::ok
+  T3 --> N1[/Lanjut: Keputusan Supplier → FLOW C & D/]:::sub

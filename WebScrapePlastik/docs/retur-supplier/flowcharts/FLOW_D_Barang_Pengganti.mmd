@@ -1,0 +1,38 @@
+%% Kode: FLOW D
+%% Judul: Penyelesaian: barang pengganti, refund, dan nota kredit
+%% Tujuan: Menyelesaikan bagian yang disetujui supplier tanpa menggeser HPP, tanpa mengedit faktur lama, dan mendukung penerimaan bertahap.
+%% Dimulai dari: Detail Retur → Terima Barang Pengganti / Catat Nota Kredit / Refund.
+%% Aturan stok: Pengganti = Barang Masuk baru (source retur_pengganti) tertaut ke item retur; qty ≤ disetujui ganti − sudah diterima; HPP = harga beli unit asal. Pengganti rusak masuk karantina. Refund & nota kredit tidak mengubah stok.
+%% Aturan keuangan: Nota kredit ≤ nilai disetujui − sudah dikredit − sudah direfund. Dipotong ke faktur belum lunas lewat alokasi (faktur tidak diedit), atau disimpan sebagai saldo kredit supplier. Refund mencatat nilai disetujui dan setiap uang yang benar-benar diterima.
+%% Warning: Pengganti melebihi qty disetujui; spesifikasi berbeda dengan harga berbeda; refund diterima melebihi nilai disetujui; faktur belum ada saat nota kredit dibuat.
+%% Catatan Programmer: Satu tabel nilai per item: approved_value, replaced_qty, credited_value, refunded_value. Alokasi kredit ke dokumen hutang melalui (doc_type, doc_id) agar cocok dengan keputusan K-12. Pembatalan nota kredit membuat baris pembalik, bukan delete.
+flowchart TB
+  S([Bagian disetujui supplier]):::ok --> C0{Bentuk penyelesaian}:::cek
+  C0 -- Ganti barang --> G1[Terima Barang Pengganti<br/>tgl, surat jalan, qty, kondisi, rak]:::aksi
+  C0 -- Nota kredit --> K1[Catat Nota Kredit Supplier<br/>CN-SUP-YYYYMMDD-NNN]:::aksi
+  C0 -- Refund --> F1[Catat refund disetujui<br/>nilai, janji tanggal]:::aksi
+  G1 --> CG1{Qty ≤ disetujui −<br/>sudah diterima?}:::cek
+  CG1 -- Tidak --> E1[Ditolak: kelebihan pengganti<br/>sisa dicatat sebagai pembelian biasa]:::err
+  CG1 -- Ya --> CG2{Barang sama?}:::cek
+  CG2 -- Ya --> G2[Barang Masuk retur_pengganti<br/>HPP = harga unit asal · IN]:::so
+  CG2 -- Spesifikasi beda --> G3[Barang Masuk item lain<br/>selisih nilai dicatat]:::so
+  G3 --> CG3{Pengganti lebih murah?}:::cek
+  CG3 -- Ya --> K1
+  CG3 -- Lebih mahal --> G4[Tambahan tagihan supplier<br/>dokumen terpisah]:::tunggu
+  G2 --> CG4{Kondisi pengganti baik?}:::cek
+  CG4 -- Tidak --> Q1[IN + QUAR · retur ulang]:::err
+  CG4 -- Ya --> G5[Stok bisa dijual naik<br/>kekurangan SO otomatis tertutup]:::ok
+  G5 --> W1{Masih ada qty<br/>menunggu pengganti?}:::cek
+  W1 -- Ya --> G1
+  K1 --> CK1{Ada faktur supplier<br/>belum lunas?}:::cek
+  CK1 -- Ya --> K2[Alokasi potongan ke faktur<br/>sisa tagihan turun · faktur tidak diedit]:::so
+  CK1 -- Belum ada faktur --> K3[Kredit menunggu · disarankan<br/>saat faktur dibuat]:::tunggu
+  CK1 -- Sudah lunas semua --> K4[Saldo kredit supplier<br/>atau ubah jadi refund]:::tunggu
+  F1 --> F2[Catat tiap uang diterima<br/>tgl, metode, bukti · boleh bertahap]:::aksi
+  F2 --> CF1{Diterima = disetujui?}:::cek
+  CF1 -- Belum --> F3[[Refund diterima sebagian]]:::tunggu
+  F3 --> F2
+  CF1 -- Ya --> F4[[Refund diterima penuh]]:::ok
+  W1 -- Tidak --> Z([Item selesai → cek dokumen Selesai]):::ok
+  K2 --> Z
+  F4 --> Z

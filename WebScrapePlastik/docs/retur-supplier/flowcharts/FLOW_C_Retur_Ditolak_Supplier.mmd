@@ -1,0 +1,34 @@
+%% Kode: FLOW C
+%% Judul: Keputusan supplier: disetujui, sebagian, atau ditolak
+%% Tujuan: Mencatat keputusan supplier per barang dan per qty, lalu mengurus barang yang ditolak tanpa merusak stok dan tagihan.
+%% Dimulai dari: Detail Retur → Catat Keputusan Supplier (setelah Diterima Supplier).
+%% Aturan stok: Mencatat keputusan tidak mengubah stok. Barang ditolak yang dikirim balik: Terima Kembali = IN + QUAR (fisik naik, tetap karantina). Admin lalu lepas ke stok jual (UNQUAR), hapus buku (OUT write-off), atau ajukan retur baru.
+%% Aturan keuangan: Bagian ditolak tidak menghasilkan nota kredit / refund. Ongkir kirim balik dicatat sebagai biaya toko kecuali disepakati lain. Bila faktur sudah lunas dan semua ditolak, tidak ada perubahan tagihan.
+%% Warning: Qty disetujui + ditolak tidak boleh melebihi qty yang dikirim; keputusan > 14 hari belum dicatat; barang ditolak belum kembali > 14 hari.
+%% Catatan Programmer: supplier_return_responses per item: qty_approved, qty_rejected, settlement_type, reject_reason, rejected_goods_fate. Boleh disimpan bertahap (qty belum diputuskan tetap Menunggu). Dokumen Selesai hanya jika setiap unit punya penyelesaian akhir.
+flowchart TB
+  S([Diterima Supplier]):::ok --> A1[Catat Keputusan Supplier<br/>tanggal, saluran, no. RMA, lampiran]:::aksi
+  A1 --> C1{Keputusan per barang}:::cek
+  C1 -- Disetujui penuh --> D1[Pilih penyelesaian:<br/>Ganti / Refund / Nota Kredit]:::ok
+  C1 -- Disetujui sebagian --> D2[Pisah qty: bagian disetujui<br/>dan bagian ditolak]:::tunggu
+  C1 -- Ditolak --> R0[Alasan tolak wajib]:::err
+  C1 -- Belum diputuskan --> W1[Tetap Menunggu<br/>reminder 14 hari]:::tunggu
+  D2 --> D1
+  D2 --> R0
+  D1 --> FD[/FLOW D: Barang Pengganti<br/>atau Refund / Nota Kredit/]:::sub
+  R0 --> C2{Nasib barang ditolak}:::cek
+  C2 -- Dikirim balik ke toko --> T1[[Menunggu barang kembali]]:::tunggu
+  C2 -- Dimusnahkan / ditahan supplier --> H1[Hapus buku: tidak ada stok masuk<br/>nilai = kerugian toko]:::off
+  T1 --> A2[Terima Kembali:<br/>IN + QUAR · fisik naik, tetap karantina]:::so
+  A2 --> C3{Admin memutuskan}:::cek
+  C3 -- Masih layak jual --> U1[UNQUAR: lepas ke stok jual<br/>alasan wajib]:::ok
+  C3 -- Rusak permanen --> U2[OUT write-off<br/>hapus buku + alasan]:::off
+  C3 -- Ajukan ulang --> U3[Retur supplier baru<br/>sumber: Stok Karantina]:::aksi
+  H1 --> Z
+  U1 --> Z
+  U2 --> Z
+  U3 --> Z
+  FD --> Z{Semua unit sudah<br/>punya penyelesaian akhir?}:::cek
+  W1 --> A1
+  Z -- Ya --> F1([Dokumen Selesai]):::ok
+  Z -- Belum --> F2[[Tetap Diproses]]:::tunggu

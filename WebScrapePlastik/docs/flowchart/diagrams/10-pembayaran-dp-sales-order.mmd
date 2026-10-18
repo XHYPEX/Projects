@@ -8,7 +8,7 @@
 %% Warning: Nominal DP yang baru diketik / transfer yang belum masuk bukan uang masuk. DP tidak boleh tercatat dua kali sebagai uang masuk (di SO dan di invoice). DP melebihi total SO ditolak. Transfer wajib nama pengirim dan rekening tujuan.
 %% Modul Terkait: Sales Order, Cashier/Invoice, Riwayat Invoice, Dashboard (penjualan bulan ini dihitung dari pembayaran).
 %% Catatan Programmer: SO draft → preorder_payments. SO terbit → _po_move_payments_to_invoice menulis receipt_payments (tanggal & metode asli) + preorder_payment_allocations sekali saja. Pembayaran berikutnya lewat POST /preorders/{id}/payments langsung ke invoice. Header Idempotency-Key mencegah simpan ganda.
-%% Status Implementasi: Sudah ada: DP awal, pindah otomatis ke invoice tanpa dobel, pembayaran lanjutan masuk invoice, metode tunai/transfer/QRIS/debit. K-03 SUDAH: SO hanya bisa terbit bila DP tercatat ≥ 50% total, tanpa pengecualian (dicek saat terbit saja; perubahan SO sesudah terbit tidak dicek ulang). BELUM: status pembayaran PENDING — saat ini setiap pembayaran yang disimpan langsung dihitung uang masuk, tanpa konfirmasi dana diterima (K-18).
+%% Status Implementasi: Sudah ada: DP awal, pindah otomatis ke invoice tanpa dobel, pembayaran lanjutan masuk invoice, metode tunai/transfer/QRIS/debit. K-03 SUDAH: SO hanya bisa terbit bila DP tercatat ≥ 30% total, tanpa pengecualian (dicek saat terbit saja; perubahan SO sesudah terbit tidak dicek ulang). BELUM: status pembayaran PENDING — saat ini setiap pembayaran yang disimpan langsung dihitung uang masuk, tanpa konfirmasi dana diterima (K-18).
 flowchart TB
   subgraph T1["1 · Input DP"]
     direction LR
@@ -38,7 +38,7 @@ flowchart TB
     R2 -->|"= Total"| B0["BELUM BAYAR"]:::err
     R2 -->|"Lebih dari 0"| B1["SEBAGIAN"]:::tunggu
     R2 -->|"0"| B2["LUNAS<br/>(pengerjaan TIDAK ikut berubah)"]:::ok
-    G{"Mau menerbitkan SO:<br/>DP ≥ 50% total?"}:::cek
+    G{"Mau menerbitkan SO:<br/>DP ≥ 30% total?"}:::cek
     G -->|YA| G1["SO terbit: invoice, cadangan stok,<br/>Draft PO kekurangan"]:::ok
     G -->|TIDAK| G2["Ditolak: tetap Draft<br/>(draft boleh tanpa DP)"]:::err
   end

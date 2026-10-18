@@ -1,0 +1,28 @@
+%% Kode: FLOW A
+%% Judul: Retur dikirim ke supplier lewat ekspedisi
+%% Tujuan: Mengembalikan barang bermasalah lewat JNE/J&T/kurir dengan resi sebagai bukti, tanpa stok keluar dua kali.
+%% Dimulai dari: Retur Supplier → + Buat Retur Supplier (sumber Barang Masuk / PO, Stok Karantina, atau tanpa dokumen oleh admin).
+%% Aturan stok: Draft & Diajukan: tidak ada. Disetujui: QUAR (fisik tetap, bisa dijual turun). Konfirmasi Barang Keluar: OUT sekali (fisik turun, karantina turun). Dalam Pengiriman ≠ Diterima Supplier.
+%% Aturan keuangan: Tidak ada efek keuangan sampai keputusan supplier dicatat. Ongkir "ditanggung supplier" ikut diklaim lewat nota kredit / refund.
+%% Warning: Barang dicadangkan untuk Sales Order (K-02); resi sudah dipakai di retur lain; foto sesudah dikemas belum ada; resi belum diisi 2 hari setelah rencana kirim; supplier belum konfirmasi 7 hari setelah kirim.
+%% Catatan Programmer: Konfirmasi Barang Keluar = BEGIN IMMEDIATE + compare-and-set handover_status 'siap'→'dikirim' + Idempotency-Key. OUT di stock_ledger ref_type='supplier_return', ref_id=return_id. Paket hilang = status Bermasalah (klaim ekspedisi / hapus buku), stok tidak dikembalikan otomatis.
+flowchart TB
+  S([Staff: Buat Retur Supplier<br/>sumber BM / PO · karantina · tanpa dokumen]):::aksi --> A2[Barang & alasan per item<br/>qty ≤ diterima − sudah/sedang diretur]:::aksi
+  A2 --> C1{Barang dicadangkan<br/>untuk Sales Order?}:::cek
+  C1 -- Ya --> W1[Peringatan: SO & customer yang kena<br/>lanjut + tandai kekurangan, atau tunda]:::tunggu
+  C1 -- Tidak --> A3
+  W1 --> A3[Packing Note + Metode A<br/>koli, bahan, foto · ekspedisi, alamat, ongkir]:::aksi
+  A3 --> C2{Diajukan · admin menyetujui?<br/>stok & tagihan belum berubah}:::cek
+  C2 -- Kembalikan ke draft --> A2
+  C2 -- Tolak / batal --> X1([Dibatalkan · tidak ada efek]):::off
+  C2 -- Setujui --> P1[QUAR: masuk Stok Karantina<br/>fisik tetap · bisa dijual turun<br/>status: Siap Dikirim]:::so
+  P1 --> C3{Dibatalkan admin<br/>sebelum diserahkan?}:::cek
+  C3 -- Ya --> X2[UNQUAR atau tetap karantina<br/>alasan wajib]:::off
+  C3 -- Tidak --> K1[Konfirmasi Barang Keluar<br/>resi, jam serah, foto resi + paket]:::aksi
+  K1 --> C4{Resi unik &<br/>status masih Siap?}:::cek
+  C4 -- Tidak --> E1[Ditolak: resi ganda /<br/>sudah dikonfirmasi orang lain]:::err
+  C4 -- Ya --> P2[OUT sekali: fisik & karantina turun<br/>ledger supplier_return<br/>status: Dalam Pengiriman]:::so
+  P2 --> C5{Paket sampai?}:::cek
+  C5 -- Tidak / hilang --> E2[Bermasalah: klaim ekspedisi atau hapus buku<br/>stok tidak kembali otomatis]:::err
+  C5 -- Ya --> T3[[Diterima Supplier<br/>konfirmasi WA / email / cek resi]]:::ok
+  T3 --> N1[/Lanjut: Keputusan Supplier → FLOW C & D/]:::sub

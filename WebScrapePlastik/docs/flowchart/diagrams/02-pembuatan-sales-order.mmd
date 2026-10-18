@@ -5,10 +5,10 @@
 %% Dimulai dari: Admin membuka menu Sales Order lalu klik + Sales Order Baru.
 %% Proses Utama: Pilih customer → plat → barang, qty, harga → sumber & supplier per item → DP → Simpan Draft atau Konfirmasi.
 %% Hasil: SO Draft (belum mengikat apa pun) atau SO Terkonfirmasi (invoice SO dibuat, draft PO dibuat, alokasi stok diminta).
-%% Warning: Nominal DP yang diketik belum dianggap uang masuk sampai pembayaran tercatat. SO baru boleh diterbitkan bila DP ≥ 50% total (dibulatkan ke atas); draft boleh tanpa DP. Tombol Simpan dikunci saat proses berjalan.
+%% Warning: Nominal DP yang diketik belum dianggap uang masuk sampai pembayaran tercatat. SO baru boleh diterbitkan bila DP ≥ 30% total (dibulatkan ke atas); draft boleh tanpa DP. Tombol Simpan dikunci saat proses berjalan.
 %% Modul Terkait: Master Customer, Master Barang, Purchase Order, Kasir/Invoice, Stok.
 %% Catatan Programmer: Konfirmasi SO harus satu transaksi database: invoice SO, draft PO, dan alokasi dibuat bersama atau tidak sama sekali.
-%% Status Implementasi: Sudah ada: draft/terbit, plat 3 kotak, DP awal, invoice SO otomatis, draft PO otomatis, supplier di header SO. Belum ada: sumber pemenuhan per item, supplier per item, (K-03 sudah: terbit hanya jika DP ≥ 50% total, tanpa pengecualian; alokasi stok K-02 sudah).
+%% Status Implementasi: Sudah ada: draft/terbit, plat 3 kotak, DP awal, invoice SO otomatis, draft PO otomatis, sumber per barang (Pesan Supplier / Stok Tersedia / Manual-Jasa) dan supplier tujuan per barang (K-04/K-05), preview & review draft PO sebelum terbit, K-03 (terbit hanya jika DP ≥ 30% total, tanpa pengecualian), alokasi stok K-02.
 flowchart TB
   subgraph T1["1 · Admin / Kasir — isi data pesanan"]
     direction LR
@@ -31,7 +31,7 @@ flowchart TB
     V1 -->|TIDAK| ER["Error di form,<br/>tidak ada yang disimpan<br/>→ perbaiki di langkah 1"]:::err
     V2 -->|TIDAK| ER
     V2 -->|"YA, mode Draft"| DR["Simpan SO DRAFT<br/>tanpa invoice, PO, alokasi"]:::tunggu
-    V2 -->|"YA, mode Konfirmasi"| V3{"DP tercatat ≥ 50% total?<br/>(K-03, tanpa pengecualian)"}:::cek
+    V2 -->|"YA, mode Konfirmasi"| V3{"DP tercatat ≥ 30% total?<br/>(K-03, tanpa pengecualian)"}:::cek
     V3 -->|TIDAK| WD["Ditolak, tetap Draft:<br/>tambah DP lalu terbitkan"]:::err
     V3 -->|YA| OK["SO TERKONFIRMASI"]:::ok
   end

@@ -469,6 +469,8 @@ class MasterItemOut(BaseModel):
     avg_cost_price: int
     sell_price: int
     stock_qty: int
+    # Not sellable, kept apart (Stok Karantina); physical stock = stock_qty + quarantine_qty.
+    quarantine_qty: int = 0
     # K-02: part of stock_qty held for Sales Order customers, and what is left to sell (stock − reserved).
     reserved_qty: int = 0
     available_qty: int | None = None
@@ -854,6 +856,8 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
     created_at: str
+    # Owner: an admin who gives the final approval for losses (quarantine write-off).
+    is_owner: bool = False
 
 
 class UserCreateRequest(BaseModel):
@@ -865,6 +869,24 @@ class UserCreateRequest(BaseModel):
 class UserUpdateRequest(BaseModel):
     role: str | None = None
     is_active: bool | None = None
+    is_owner: bool | None = None
+
+
+class QuarantineQtyRequest(BaseModel):
+    qty: int
+    reason: str
+
+
+class QuarantineFromStockRequest(BaseModel):
+    master_item_id: int
+    qty: int
+    condition: str = "rusak"  # rusak | tidak_sesuai | perlu_cek
+    note: str
+
+
+class QuarantineDecisionRequest(BaseModel):
+    approve: bool
+    note: str | None = None
 
 
 class PasswordResetRequest(BaseModel):
@@ -891,6 +913,11 @@ class PreorderItemRequest(BaseModel):
     ship_route: str | None = None  # udara|laut|darat|ambil_sendiri|lainnya
     priority: str = "normal"  # normal|urgent
     eta_date: str | None = None
+    # Where the goods come from: supplier (bought for this order) | stok (from the shelf) | jasa
+    # (a service, no goods). Null = decided automatically (stock first, the rest bought).
+    source: str | None = None
+    # The supplier to buy from, for source 'supplier'. Empty means it still has to be chosen.
+    supplier_id: int | None = None
 
 
 class PreorderRequest(BaseModel):
@@ -1005,6 +1032,9 @@ class PreorderItemOut(BaseModel):
     ship_route: str | None = None
     priority: str = "normal"
     eta_date: str | None = None
+    source: str | None = None  # supplier | stok | jasa | null (automatic)
+    supplier_id: int | None = None
+    supplier_name: str | None = None
     # K-02: held for this line on the shelf, still coming from a supplier, and needed but not covered.
     reserved_qty: int = 0
     coming_qty: int = 0
@@ -1063,6 +1093,12 @@ class PreorderOut(BaseModel):
     cancelled_by: str | None = None
     cancel_kind: str | None = None  # pelanggan | gagal_memenuhi | barang_salah | pelanggaran_pengiriman
     cancel_reason: str | None = None
+    # Derived for the list: draft | menunggu | dipesan | tiba_sebagian | siap | selesai | dibatalkan
+    procurement_status: str = "menunggu"
+    payment_status: str = "belum"  # belum | dp | lunas
+    # 'Pesan Supplier' lines that still have no supplier, and the suppliers chosen on the lines.
+    missing_supplier_count: int = 0
+    line_suppliers: list[str] = []
 
 
 class PreorderDetail(PreorderOut):

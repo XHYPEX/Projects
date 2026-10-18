@@ -841,7 +841,59 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_spo_item_shipments_po ON spo_item_shipments(supplier_po_id);
         """)
+        # Stok Karantina: goods that are in the shop but may not be sold (damaged / wrong at Terima Barang,
+        # customer returns meant for the supplier or broken). master_items.stock_qty stays the sellable
+        # stock every check already uses; quarantine_qty sits beside it (physical = both). Each batch is a
+        # lot that remembers where it came from, so it can be released, written off or returned later.
+        con.executescript("""
+            CREATE TABLE IF NOT EXISTS quarantine_lots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                master_item_id INTEGER REFERENCES master_items(id),
+                product_name TEXT NOT NULL,
+                supplier_id INTEGER REFERENCES suppliers(id),
+                quantity INTEGER NOT NULL,
+                qty_left INTEGER NOT NULL,
+                unit_cost INTEGER NOT NULL DEFAULT 0,
+                condition TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                source_ref TEXT,
+                source_id TEXT,
+                retur_candidate INTEGER NOT NULL DEFAULT 0,
+                note TEXT,
+                created_by TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_quarantine_lots_item ON quarantine_lots(master_item_id);
+            CREATE INDEX IF NOT EXISTS idx_quarantine_lots_source ON quarantine_lots(source_type, source_id);
+            CREATE TABLE IF NOT EXISTS quarantine_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lot_id INTEGER NOT NULL REFERENCES quarantine_lots(id),
+                action TEXT NOT NULL,
+                qty INTEGER NOT NULL DEFAULT 0,
+                note TEXT,
+                by_user TEXT,
+                at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_quarantine_events_lot ON quarantine_events(lot_id);
+            CREATE TABLE IF NOT EXISTS quarantine_writeoffs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lot_id INTEGER NOT NULL REFERENCES quarantine_lots(id),
+                qty INTEGER NOT NULL,
+                value INTEGER NOT NULL DEFAULT 0,
+                reason TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('diajukan','direkomendasikan','disetujui','ditolak')),
+                requested_by TEXT, requested_at TEXT NOT NULL,
+                recommended_by TEXT, recommended_at TEXT, recommend_note TEXT,
+                decided_by TEXT, decided_at TEXT, decision_note TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_quarantine_writeoffs_lot ON quarantine_writeoffs(lot_id);
+        """)
         for table, cols in (
+            ("master_items", (("quarantine_qty", "INTEGER NOT NULL DEFAULT 0"),)),
+            # Owner: an admin who gives the final approval for losses (quarantine write-off).
+            ("users", (("is_owner", "INTEGER NOT NULL DEFAULT 0"),)),
+            # Received in bad condition (went to quarantine): not usable for the Sales Order line.
+            ("supplier_po_items", (("qty_bad", "INTEGER NOT NULL DEFAULT 0"),)),
             ("spo_receipts", (("gr_number", "TEXT"), ("officer", "TEXT"))),
             ("spo_receipt_lines", (("condition", "TEXT NOT NULL DEFAULT 'baik'"), ("location", "TEXT"))),
             ("spo_payments", (("reference_no", "TEXT"), ("bank_account", "TEXT"))),
@@ -850,7 +902,10 @@ def init_db() -> None:
             # K-13: when the order was confirmed (the 24-hour cancellation clock) and how it was cancelled.
             ("preorders", (("published_at", "TEXT"), ("cancelled_at", "TEXT"), ("cancelled_by", "TEXT"),
                            ("cancel_kind", "TEXT"), ("cancel_reason", "TEXT"))),
-            ("preorder_items", (("cancelled_at", "TEXT"), ("cancelled_by", "TEXT"),
+            # Per line: where the goods come from (supplier | stok | jasa; NULL = decided automatically, the
+            # rule before this column) and, for 'supplier', which supplier.
+            ("preorder_items", (("source", "TEXT"), ("supplier_id", "INTEGER REFERENCES suppliers(id)"),
+                                ("cancelled_at", "TEXT"), ("cancelled_by", "TEXT"),
                                 ("cancel_kind", "TEXT"), ("cancel_reason", "TEXT"))),
         ):
             have = {row["name"] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -1403,7 +1458,7 @@ def _reservation_lines(con: sqlite3.Connection, master_item_ids=None) -> list[di
         item_sql = f" AND pi.master_item_id IN ({_placeholders(ids)})"
         params = list(ids)
     rows = con.execute(
-        f"""SELECT pi.id, pi.preorder_id, pi.master_item_id, pi.product_name, pi.quantity, pi.status,
+        f"""SELECT pi.id, pi.preorder_id, pi.master_item_id, pi.product_name, pi.quantity, pi.status, pi.source,
                    p.po_number, p.customer_name,
                    COALESCE((SELECT SUM(spi.quantity - spi.qty_cancelled) FROM supplier_po_items spi
                              JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
@@ -1413,11 +1468,12 @@ def _reservation_lines(con: sqlite3.Connection, master_item_ids=None) -> list[di
                              JOIN inbound_documents d ON d.id = sr.inbound_document_id
                              JOIN supplier_po_items spi ON spi.id = srl.item_id
                              JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
-                             WHERE spi.preorder_item_id = pi.id AND d.status = 'posted' AND sp.status <> 'batal'), 0) AS posted
+                             WHERE spi.preorder_item_id = pi.id AND d.status = 'posted' AND sp.status <> 'batal'
+                               AND COALESCE(srl.condition, 'baik') NOT IN ('rusak', 'tidak_sesuai')), 0) AS posted
             FROM preorder_items pi
             JOIN preorders p ON p.id = pi.preorder_id
             LEFT JOIN receipts r ON r.id = p.receipt_id
-            WHERE p.is_draft = 0 AND pi.master_item_id IS NOT NULL
+            WHERE p.is_draft = 0 AND pi.master_item_id IS NOT NULL AND COALESCE(pi.source, '') <> 'jasa'
               AND pi.status NOT IN ({_placeholders(PO_CLOSED_LINE_STATUSES)})
               AND COALESCE(r.status, '') <> 'void'
               AND (pi.receipt_id IS NULL OR pi.receipt_id = p.receipt_id){item_sql}
@@ -1438,7 +1494,8 @@ def _reservation_lines(con: sqlite3.Connection, master_item_ids=None) -> list[di
         ln["reserved"] = 0
     for part in ("arrived", "ready"):
         for ln in lines:
-            want = ln["arrived"] if part == "arrived" else ln["wanted"] - ln["arrived"]
+            # A line set to 'Pesan Supplier' waits for its own goods; it never takes ready stock.
+            want = ln["arrived"] if part == "arrived" else (0 if ln["source"] == "supplier" else ln["wanted"] - ln["arrived"])
             got = min(want, pool.get(ln["master_item_id"], 0))
             if got > 0:
                 pool[ln["master_item_id"]] -= got
@@ -2578,6 +2635,18 @@ def return_receipt_item(
              cash_out, method if cash_out else None, destination, reason_text, by, now,
              kind, reason_code, restock_qty, supplier_qty, damaged_qty),
         )
+        # Units not put back on the shelf are still in the shop: they wait in Stok Karantina. Those meant
+        # for the supplier become a supplier-return candidate (decision 10); nothing is sent automatically.
+        if item["master_item_id"] is not None and (supplier_qty or damaged_qty):
+            mi = con.execute("SELECT supplier_id, avg_cost_price, last_cost_price FROM master_items WHERE id=?",
+                             (item["master_item_id"],)).fetchone()
+            if mi is not None:
+                cost = mi["avg_cost_price"] or mi["last_cost_price"] or 0
+                for qty, cond, cand in ((supplier_qty, "perlu_cek", True), (damaged_qty, "rusak", False)):
+                    _quarantine_in(
+                        con, master_item_id=item["master_item_id"], product_name=item["product_name"], qty=qty,
+                        condition=cond, source_type="retur_customer", source_ref=rec["receipt_no"], source_id=receipt_id,
+                        supplier_id=mi["supplier_id"], unit_cost=cost, candidate=cand, note=reason_text, by=by)
         fmt = lambda n: f"Rp {n:,}".replace(",", ".")
         where = ", ".join(f"{n} {RETURN_DESTINATIONS[d]}" for d, n in
                           (("stok", restock_qty), ("supplier", supplier_qty), ("rusak", damaged_qty)) if n)
@@ -4376,7 +4445,9 @@ def _spo_apply_inbound_receipt(con: sqlite3.Connection, header, lines: list[dict
     )
     total = 0
     for i in lines:
-        con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ? WHERE id=?", (i["qty_in"], i["spo_item_id"]))
+        bad = (i.get("condition") or "baik") in BAD_RECEIVE_CONDITIONS
+        con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ?, qty_bad = qty_bad + ? WHERE id=?",
+                    (i["qty_in"], i["qty_in"] if bad else 0, i["spo_item_id"]))
         con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location) VALUES (?, ?, ?, ?, ?)",
                     (cur.lastrowid, i["spo_item_id"], i["qty_in"], i.get("condition") or "baik", i.get("location")))
         total += i["qty_in"]
@@ -4485,18 +4556,27 @@ def post_inbound_document(document_id: int, by: str | None = None) -> dict:
                 item["master_item_id"] = master_item_id
 
         # Step 6: stamp qty_remaining/received_date — this is the moment each row
-        # becomes a real batch.
+        # becomes a real batch. A line received damaged / wrong is not a sellable batch: it goes to
+        # Stok Karantina instead (decision 3), so it adds nothing to stock or to the average cost.
         for item in items:
+            item["bad"] = (item.get("condition") or "baik") in BAD_RECEIVE_CONDITIONS
             con.execute(
                 "UPDATE inbound_items SET qty_remaining=?, received_date=? WHERE id=?",
-                (item["qty_in"], received_date, item["id"]),
+                (0 if item["bad"] else item["qty_in"], received_date, item["id"]),
             )
+            if item["bad"]:
+                mi_row = con.execute("SELECT name FROM master_items WHERE id=?", (item["master_item_id"],)).fetchone()
+                _quarantine_in(
+                    con, master_item_id=item["master_item_id"], product_name=mi_row["name"] if mi_row else "?",
+                    qty=item["qty_in"], condition=item["condition"], source_type="barang_masuk",
+                    source_ref=header["doc_number"], source_id=str(document_id), supplier_id=header["supplier_id"],
+                    unit_cost=item["cost_price"], candidate=True, note=None, by=by)
 
         # Step 7+8: recompute costing per distinct master item touched, write ledger.
-        touched_ids = sorted(set(item["master_item_id"] for item in items))
+        touched_ids = sorted(set(item["master_item_id"] for item in items if not item["bad"]))
         for master_item_id in touched_ids:
             mi = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
-            doc_items_for_mi = [i for i in items if i["master_item_id"] == master_item_id]
+            doc_items_for_mi = [i for i in items if i["master_item_id"] == master_item_id and not i["bad"]]
             qty_in_total = sum(i["qty_in"] for i in doc_items_for_mi)
             this_doc_cost_price = doc_items_for_mi[-1]["cost_price"]
 
@@ -4528,7 +4608,10 @@ def post_inbound_document(document_id: int, by: str | None = None) -> dict:
                 "SELECT 1 FROM spo_receipts WHERE inbound_document_id=?", (document_id,)).fetchone():
             _spo_apply_inbound_receipt(con, header, po_lines, by)
         con.execute("UPDATE inbound_documents SET posted_by=?, posted_at=? WHERE id=?", (by, _now(), document_id))
-        _inbound_event(con, document_id, "posted", f"Posting berhasil, stok bertambah {sum(i['qty_in'] for i in items)} pcs", by)
+        bad_total = sum(i["qty_in"] for i in items if i["bad"])
+        _inbound_event(con, document_id, "posted",
+                       f"Posting berhasil, stok bertambah {sum(i['qty_in'] for i in items if not i['bad'])} pcs"
+                       + (f"; {bad_total} pcs rusak/tidak sesuai masuk Stok Karantina" if bad_total else ""), by)
         updated = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         return dict(updated)
 
@@ -4560,9 +4643,13 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
         ]
         # qty_remaining is never drawn down by sales, so check the live stock instead: taking this
         # document's quantity back out must not leave any item below zero.
+        for item in items:
+            item["bad"] = (item.get("condition") or "baik") in BAD_RECEIVE_CONDITIONS
+        _quarantine_cancel_source(con, "barang_masuk", str(document_id), by, f"Barang Masuk {header['doc_number']} dibatalkan: {reason}")
         taking: dict[int, int] = {}
         for item in items:
-            taking[item["master_item_id"]] = taking.get(item["master_item_id"], 0) + item["qty_in"]
+            if not item["bad"]:
+                taking[item["master_item_id"]] = taking.get(item["master_item_id"], 0) + item["qty_in"]
         for item in items:
             mid = item["master_item_id"]
             if mid not in taking:
@@ -4579,6 +4666,8 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
         for item in items:
             master_item_id = item["master_item_id"]
             con.execute("UPDATE inbound_items SET qty_remaining=0 WHERE id=?", (item["id"],))
+            if item["bad"]:
+                continue  # it never entered stock; its quarantine lot was cancelled above
             mi = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
             new_stock_qty = mi["stock_qty"] - item["qty_in"]
             costing = _recompute_master_item_costing(con, master_item_id)
@@ -4595,9 +4684,13 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
         # The receipt this document counted against its PO is taken back too, so the PO shows what is really in.
         rcpt = con.execute("SELECT * FROM spo_receipts WHERE inbound_document_id=?", (document_id,)).fetchone()
         if rcpt is not None:
-            for ln in con.execute("SELECT item_id, quantity FROM spo_receipt_lines WHERE receipt_id=?", (rcpt["id"],)).fetchall():
-                con.execute("UPDATE supplier_po_items SET qty_received = MAX(qty_received - ?, 0) WHERE id=?",
-                            (ln["quantity"], ln["item_id"]))
+            # Damaged goods of that receipt went to quarantine at Terima Barang; they are undone with it.
+            _quarantine_cancel_source(con, "terima_barang", str(rcpt["id"]), by,
+                                      f"Penerimaan {rcpt['gr_number'] or ''} dibatalkan (Barang Masuk {header['doc_number']} void)")
+            for ln in con.execute("SELECT item_id, quantity, condition FROM spo_receipt_lines WHERE receipt_id=?", (rcpt["id"],)).fetchall():
+                bad = (ln["condition"] or "baik") in BAD_RECEIVE_CONDITIONS
+                con.execute("UPDATE supplier_po_items SET qty_received = MAX(qty_received - ?, 0), qty_bad = MAX(qty_bad - ?, 0) WHERE id=?",
+                            (ln["quantity"], ln["quantity"] if bad else 0, ln["item_id"]))
             _spo_finish_if_settled(con, rcpt["supplier_po_id"])
             _spo_event(con, rcpt["supplier_po_id"], "receive",
                        f"Penerimaan {rcpt['gr_number'] or ''} dibatalkan (Barang Masuk {header['doc_number']} void)", by)
@@ -4606,6 +4699,292 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
         con.execute("UPDATE inbound_documents SET status='void' WHERE id=?", (document_id,))
         updated = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         return dict(updated)
+
+
+# --- Stok Karantina ------------------------------------------------------
+
+QUARANTINE_CONDITIONS = {"rusak": "Rusak", "tidak_sesuai": "Tidak sesuai", "perlu_cek": "Perlu dicek"}
+QUARANTINE_SOURCES = {
+    "terima_barang": "Terima Barang PO", "barang_masuk": "Barang Masuk", "retur_customer": "Retur Pelanggan",
+    "manual": "Dipindah dari stok",
+}
+# Receiving conditions that keep goods off the sellable shelf.
+BAD_RECEIVE_CONDITIONS = ("rusak", "tidak_sesuai")
+WRITEOFF_OPEN = ("diajukan", "direkomendasikan")
+
+
+def _q_event(con: sqlite3.Connection, lot_id: int, action: str, qty: int, note: str | None, by: str | None) -> None:
+    con.execute("INSERT INTO quarantine_events (lot_id, action, qty, note, by_user, at) VALUES (?, ?, ?, ?, ?, ?)",
+                (lot_id, action, qty, note, by, _now()))
+
+
+def _quarantine_in(
+    con: sqlite3.Connection, *, master_item_id: int | None, product_name: str, qty: int, condition: str,
+    source_type: str, source_ref: str | None, source_id: str | None, supplier_id: int | None, unit_cost: int,
+    candidate: bool, note: str | None, by: str | None,
+) -> int:
+    """Puts `qty` units into quarantine as one lot. Never touches stock_qty: the goods were never sellable
+    (receiving) or are taken off the shelf by the caller (manual)."""
+    if qty <= 0:
+        return 0
+    cur = con.execute(
+        """INSERT INTO quarantine_lots (master_item_id, product_name, supplier_id, quantity, qty_left, unit_cost,
+               condition, source_type, source_ref, source_id, retur_candidate, note, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (master_item_id, product_name, supplier_id, qty, qty, unit_cost or 0, condition, source_type, source_ref,
+         source_id, 1 if candidate else 0, note, by, _now()),
+    )
+    if master_item_id is not None:
+        con.execute("UPDATE master_items SET quarantine_qty = quarantine_qty + ? WHERE id=?", (qty, master_item_id))
+    _q_event(con, cur.lastrowid, "masuk", qty,
+             f"Masuk karantina ({QUARANTINE_CONDITIONS.get(condition, condition)}) dari "
+             f"{QUARANTINE_SOURCES.get(source_type, source_type)}{' ' + source_ref if source_ref else ''}", by)
+    return cur.lastrowid
+
+
+def _q_lot(con: sqlite3.Connection, lot_id: int) -> dict:
+    row = con.execute("SELECT * FROM quarantine_lots WHERE id=?", (lot_id,)).fetchone()
+    if row is None:
+        raise LookupError("Barang karantina tidak ditemukan.")
+    return dict(row)
+
+
+def _q_pending(con: sqlite3.Connection, lot_id: int, excluding: int | None = None) -> int:
+    return con.execute(
+        f"SELECT COALESCE(SUM(qty), 0) AS n FROM quarantine_writeoffs WHERE lot_id=? AND status IN ({_placeholders(WRITEOFF_OPEN)})"
+        + (" AND id<>?" if excluding else ""),
+        (lot_id, *WRITEOFF_OPEN, *([excluding] if excluding else [])),
+    ).fetchone()["n"]
+
+
+def _quarantine_take(con: sqlite3.Connection, lot: dict, qty: int, action: str, note: str | None, by: str | None) -> None:
+    """Takes `qty` out of a lot (released, written off, cancelled). The caller decides where it goes."""
+    con.execute("UPDATE quarantine_lots SET qty_left = qty_left - ? WHERE id=? AND qty_left >= ?", (qty, lot["id"], qty))
+    if lot["master_item_id"] is not None:
+        con.execute("UPDATE master_items SET quarantine_qty = MAX(quarantine_qty - ?, 0) WHERE id=?",
+                    (qty, lot["master_item_id"]))
+    _q_event(con, lot["id"], action, qty, note, by)
+
+
+def _quarantine_cancel_source(con: sqlite3.Connection, source_type: str, source_id: str, by: str | None, why: str) -> None:
+    """The document that put goods into quarantine is undone: its lots go too, as long as nothing was
+    done with them yet."""
+    for lot in [dict(r) for r in con.execute(
+            "SELECT * FROM quarantine_lots WHERE source_type=? AND source_id=?", (source_type, source_id))]:
+        if lot["qty_left"] != lot["quantity"] or _q_pending(con, lot["id"]):
+            raise ValueError(
+                f"Barang karantina “{lot['product_name']}” dari dokumen ini sudah diproses (dilepas / dihapus / diajukan hapus). "
+                "Selesaikan di halaman Stok Karantina dulu."
+            )
+        if lot["qty_left"]:
+            _quarantine_take(con, lot, lot["qty_left"], "batal", why, by)
+
+
+def _q_row(con: sqlite3.Connection, lot: dict) -> dict:
+    pending = _q_pending(con, lot["id"])
+    lot["pending_writeoff_qty"] = pending
+    lot["free_qty"] = lot["qty_left"] - pending
+    lot["cost_value"] = lot["qty_left"] * (lot["unit_cost"] or 0)
+    lot["condition_label"] = QUARANTINE_CONDITIONS.get(lot["condition"], lot["condition"])
+    lot["source_label"] = QUARANTINE_SOURCES.get(lot["source_type"], lot["source_type"])
+    return lot
+
+
+_Q_SELECT = """SELECT q.*, mi.sku, mi.unit, s.name AS supplier_name FROM quarantine_lots q
+               LEFT JOIN master_items mi ON mi.id = q.master_item_id
+               LEFT JOIN suppliers s ON s.id = q.supplier_id"""
+
+
+def list_quarantine(view: str = "aktif", query: str | None = None) -> dict:
+    """view: aktif (still in quarantine) | kandidat (active and marked for a supplier return) | selesai."""
+    where, params = [], []
+    if view == "aktif":
+        where.append("q.qty_left > 0")
+    elif view == "kandidat":
+        where.append("q.qty_left > 0 AND q.retur_candidate = 1")
+    elif view == "selesai":
+        where.append("q.qty_left = 0")
+    if query:
+        like = f"%{query.strip()}%"
+        where.append("(q.product_name LIKE ? OR mi.sku LIKE ? OR q.source_ref LIKE ? OR s.name LIKE ?)")
+        params += [like] * 4
+    with _conn() as con:
+        rows = [_q_row(con, dict(r)) for r in con.execute(
+            _Q_SELECT + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY q.created_at DESC, q.id DESC", params)]
+        active = [dict(r) for r in con.execute("SELECT qty_left, unit_cost, retur_candidate FROM quarantine_lots WHERE qty_left > 0")]
+        open_wo = con.execute(
+            f"SELECT COUNT(*) AS n, COALESCE(SUM(value), 0) AS v FROM quarantine_writeoffs WHERE status IN ({_placeholders(WRITEOFF_OPEN)})",
+            WRITEOFF_OPEN).fetchone()
+    return {
+        "items": rows,
+        "summary": {
+            "lots": len(active), "qty": sum(a["qty_left"] for a in active),
+            "cost_value": sum(a["qty_left"] * a["unit_cost"] for a in active),
+            "candidates": sum(1 for a in active if a["retur_candidate"]),
+            "writeoffs_open": open_wo["n"], "writeoffs_cost_value": open_wo["v"],
+        },
+    }
+
+
+def get_quarantine_lot(lot_id: int) -> dict:
+    with _conn() as con:
+        row = con.execute(_Q_SELECT + " WHERE q.id=?", (lot_id,)).fetchone()
+        if row is None:
+            raise LookupError("Barang karantina tidak ditemukan.")
+        lot = _q_row(con, dict(row))
+        lot["events"] = [dict(r) for r in con.execute(
+            "SELECT * FROM quarantine_events WHERE lot_id=? ORDER BY at ASC, id ASC", (lot_id,))]
+        lot["writeoffs"] = [dict(r) for r in con.execute(
+            "SELECT id, lot_id, qty, value AS cost_value, reason, status, requested_by, requested_at, recommended_by, "
+            "recommended_at, recommend_note, decided_by, decided_at, decision_note FROM quarantine_writeoffs "
+            "WHERE lot_id=? ORDER BY requested_at DESC, id DESC", (lot_id,))]
+    return lot
+
+
+def list_quarantine_writeoffs(status: str | None = None) -> list[dict]:
+    with _conn() as con:
+        sql = """SELECT w.id, w.lot_id, w.qty, w.value AS cost_value, w.reason, w.status, w.requested_by, w.requested_at,
+                        w.recommended_by, w.recommended_at, w.recommend_note, w.decided_by, w.decided_at, w.decision_note,
+                        q.product_name, q.condition, q.source_type, q.source_ref, q.unit_cost, mi.sku, s.name AS supplier_name
+                 FROM quarantine_writeoffs w JOIN quarantine_lots q ON q.id = w.lot_id
+                 LEFT JOIN master_items mi ON mi.id = q.master_item_id LEFT JOIN suppliers s ON s.id = q.supplier_id"""
+        if status == "terbuka":
+            rows = con.execute(sql + f" WHERE w.status IN ({_placeholders(WRITEOFF_OPEN)}) ORDER BY w.requested_at ASC", WRITEOFF_OPEN)
+        else:
+            rows = con.execute(sql + " ORDER BY w.requested_at DESC LIMIT 200")
+        return [dict(r) for r in rows]
+
+
+def _q_reason(reason: str | None, what: str) -> str:
+    reason = (reason or "").strip()
+    if len(reason) < 3:
+        raise ValueError(f"Alasan {what} wajib diisi (minimal 3 karakter).")
+    return reason
+
+
+def quarantine_from_stock(master_item_id: int, qty: int, condition: str, note: str | None, by: str | None) -> dict:
+    """Admin moves sellable stock into quarantine (found damaged on the shelf)."""
+    if condition not in QUARANTINE_CONDITIONS:
+        raise ValueError("Kondisi harus Rusak, Tidak sesuai, atau Perlu dicek.")
+    note = _q_reason(note, "karantina")
+    if qty <= 0:
+        raise ValueError("Jumlah harus lebih dari 0.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        mi = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        if mi is None:
+            raise LookupError("Barang tidak ditemukan.")
+        if mi["stock_qty"] < qty:
+            raise ValueError(f"Stok {mi['name']} hanya {mi['stock_qty']}.")
+        new_qty = mi["stock_qty"] - qty
+        con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_qty, master_item_id))
+        lot_id = _quarantine_in(
+            con, master_item_id=master_item_id, product_name=mi["name"], qty=qty, condition=condition,
+            source_type="manual", source_ref=None, source_id=None, supplier_id=mi["supplier_id"],
+            unit_cost=mi["avg_cost_price"] or mi["last_cost_price"] or 0, candidate=False, note=note, by=by)
+        con.execute(
+            """INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at, created_by)
+               VALUES (?, 'KARANTINA', ?, ?, 'quarantine', ?, ?, ?, ?)""",
+            (master_item_id, -qty, new_qty, lot_id, f"Dipindah ke karantina: {note}", _now(), by),
+        )
+    return get_quarantine_lot(lot_id)
+
+
+def release_quarantine(lot_id: int, qty: int, reason: str, by: str | None) -> dict:
+    """Admin: the goods passed inspection and go back to sellable stock."""
+    reason = _q_reason(reason, "pelepasan")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        lot = _q_lot(con, lot_id)
+        if lot["master_item_id"] is None:
+            raise ValueError("Barang ini tidak tertaut ke Master Barang, jadi tidak bisa masuk stok.")
+        free = lot["qty_left"] - _q_pending(con, lot_id)
+        if qty <= 0 or qty > free:
+            raise ValueError(f"Jumlah yang bisa dilepas 1 sampai {free}.")
+        _quarantine_take(con, lot, qty, "lepas", f"Lolos pemeriksaan, kembali ke stok: {reason}", by)
+        mi = con.execute("SELECT stock_qty FROM master_items WHERE id=?", (lot["master_item_id"],)).fetchone()
+        new_qty = mi["stock_qty"] + qty
+        con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_qty, lot["master_item_id"]))
+        con.execute(
+            """INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at, created_by)
+               VALUES (?, 'LEPAS_KARANTINA', ?, ?, 'quarantine', ?, ?, ?, ?)""",
+            (lot["master_item_id"], qty, new_qty, lot_id, f"Lepas karantina: {reason}", _now(), by),
+        )
+    return get_quarantine_lot(lot_id)
+
+
+def request_quarantine_writeoff(lot_id: int, qty: int, reason: str, user: dict) -> dict:
+    """Decision 8: staff asks, an admin recommends, the Owner approves. An admin's own request starts
+    as recommended."""
+    reason = _q_reason(reason, "penghapusan")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        lot = _q_lot(con, lot_id)
+        free = lot["qty_left"] - _q_pending(con, lot_id)
+        if qty <= 0 or qty > free:
+            raise ValueError(f"Jumlah yang bisa diajukan 1 sampai {free}.")
+        now = _now()
+        admin = user.get("role") == "admin"
+        cur = con.execute(
+            """INSERT INTO quarantine_writeoffs (lot_id, qty, value, reason, status, requested_by, requested_at,
+                   recommended_by, recommended_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (lot_id, qty, qty * (lot["unit_cost"] or 0), reason, "direkomendasikan" if admin else "diajukan",
+             user["username"], now, user["username"] if admin else None, now if admin else None),
+        )
+        _q_event(con, lot_id, "hapus_ajukan", qty, f"Pengajuan hapus #{cur.lastrowid}: {reason}", user["username"])
+    return get_quarantine_lot(lot_id)
+
+
+def review_quarantine_writeoff(writeoff_id: int, recommend: bool, note: str | None, by: str | None) -> dict:
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        w = con.execute("SELECT * FROM quarantine_writeoffs WHERE id=?", (writeoff_id,)).fetchone()
+        if w is None:
+            raise LookupError("Pengajuan hapus tidak ditemukan.")
+        if w["status"] != "diajukan":
+            raise ValueError("Pengajuan ini sudah diperiksa.")
+        if not recommend:
+            note = _q_reason(note, "penolakan")
+        con.execute(
+            """UPDATE quarantine_writeoffs SET status=?, recommended_by=?, recommended_at=?, recommend_note=?
+                   %s WHERE id=? AND status='diajukan'""" % (", decided_by=?, decided_at=?" if not recommend else ""),
+            ("direkomendasikan" if recommend else "ditolak", by, _now(), (note or "").strip() or None,
+             *((by, _now()) if not recommend else ()), writeoff_id),
+        )
+        _q_event(con, w["lot_id"], "hapus_rekomendasi" if recommend else "hapus_tolak", w["qty"],
+                 f"Pengajuan hapus #{writeoff_id} {'direkomendasikan admin' if recommend else 'ditolak admin'}"
+                 + (f": {note.strip()}" if note and note.strip() else ""), by)
+        lot_id = w["lot_id"]
+    return get_quarantine_lot(lot_id)
+
+
+def decide_quarantine_writeoff(writeoff_id: int, approve: bool, note: str | None, by: str | None) -> dict:
+    """Owner: the final word. Approved, the units leave quarantine as a loss (they were never in the
+    sellable stock, so stock_qty is untouched)."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        w = con.execute("SELECT * FROM quarantine_writeoffs WHERE id=?", (writeoff_id,)).fetchone()
+        if w is None:
+            raise LookupError("Pengajuan hapus tidak ditemukan.")
+        if w["status"] not in WRITEOFF_OPEN:
+            raise ValueError("Pengajuan ini sudah diputuskan.")
+        if not approve:
+            note = _q_reason(note, "penolakan")
+        lot = _q_lot(con, w["lot_id"])
+        if approve and w["qty"] > lot["qty_left"]:
+            raise ValueError(f"Sisa barang di karantina tinggal {lot['qty_left']}.")
+        con.execute(
+            "UPDATE quarantine_writeoffs SET status=?, decided_by=?, decided_at=?, decision_note=? WHERE id=?",
+            ("disetujui" if approve else "ditolak", by, _now(), (note or "").strip() or None, writeoff_id),
+        )
+        if approve:
+            _quarantine_take(con, lot, w["qty"], "hapus",
+                             f"Dihapus (disetujui owner), pengajuan #{writeoff_id}: {w['reason']}"
+                             + (f" — {note.strip()}" if note and note.strip() else ""), by)
+        else:
+            _q_event(con, lot["id"], "hapus_tolak", w["qty"], f"Pengajuan hapus #{writeoff_id} ditolak owner: {note.strip()}", by)
+    return get_quarantine_lot(w["lot_id"])
 
 
 # --- Stock adjustments / ledger ---------------------------------------
@@ -5076,9 +5455,29 @@ def update_user_role(user_id: int, role: str) -> dict:
             raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
         if row["role"] == "admin" and role != "admin" and row["is_active"] and _active_admin_count(con, user_id) == 0:
             raise ValueError("Admin terakhir tidak bisa diturunkan perannya")
-        con.execute("UPDATE users SET role=?, updated_at=? WHERE id=?", (role, _now(), user_id))
+        # An Owner is always an admin: losing admin drops the Owner flag too.
+        con.execute("UPDATE users SET role=?, is_owner=CASE WHEN ?='admin' THEN is_owner ELSE 0 END, updated_at=? WHERE id=?",
+                    (role, role, _now(), user_id))
         updated = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         return dict(updated)
+
+
+def set_user_owner(user_id: int, is_owner: bool, by_user: dict) -> dict:
+    """The Owner flag (final approval of losses). Only an admin can carry it. While an active Owner
+    exists only an Owner may change it; with none, any admin may grant it (first-time setup)."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"Pengguna {user_id} tidak ditemukan.")
+        if is_owner and row["role"] != "admin":
+            raise ValueError("Owner harus berperan admin.")
+        owners = con.execute("SELECT COUNT(*) AS n FROM users WHERE is_owner=1 AND is_active=1").fetchone()["n"]
+        me = con.execute("SELECT is_owner FROM users WHERE id=?", (by_user["id"],)).fetchone()
+        if owners and not (me and me["is_owner"]):
+            raise ValueError("Hanya Owner yang boleh mengubah status Owner.")
+        con.execute("UPDATE users SET is_owner=?, updated_at=? WHERE id=?", (1 if is_owner else 0, _now(), user_id))
+        return dict(con.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone())
 
 
 def set_user_active(user_id: int, is_active: bool) -> dict:
@@ -5115,7 +5514,7 @@ def create_session_row(session_id: str, user_id: int, expires_at: str) -> None:
 def get_session(session_id: str) -> dict | None:
     with _conn() as con:
         row = con.execute(
-            """SELECT s.id, s.user_id, s.expires_at, u.username, u.role, u.is_active
+            """SELECT s.id, s.user_id, s.expires_at, u.username, u.role, u.is_active, u.is_owner
                FROM sessions s JOIN users u ON u.id = s.user_id
                WHERE s.id=?""",
             (session_id,),
@@ -5277,9 +5676,10 @@ def _shop_local_date(created_at: str) -> str:
 
 
 def _next_po_no(con: sqlite3.Connection, po_date: str) -> str:
-    """PO-YYYYMMDD-NNNN: a counter per PO date, restarting at 0001. Called inside the
-    inserting transaction, so two saves can't take the same number."""
-    prefix = f"PO-{po_date.replace('-', '')}-"
+    """SO-YYYYMMDD-NNNN: a counter per Sales Order date, restarting at 0001. Called inside the
+    inserting transaction, so two saves can't take the same number. Orders numbered before the
+    rename keep their PO-YYYYMMDD-NNNN number (it is printed on notas already handed out)."""
+    prefix = f"SO-{po_date.replace('-', '')}-"
     row = con.execute(
         "SELECT MAX(CAST(SUBSTR(po_number, ?) AS INTEGER)) AS n FROM preorders WHERE po_number LIKE ?",
         (len(prefix) + 1, prefix + "%"),
@@ -5318,7 +5718,36 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | N
             "receipt_no": invoice["receipt_no"], "invoice_total": invoice["total"],
             "invoice_status": invoice["status"], "invoice_work_status": invoice["work_status"],
         })
+    live = [i for i in items if i["status"] != PO_LINE_CANCELLED]
+    out["procurement_status"] = _preorder_procurement_status(row, live)
+    due = out["invoice_total"] if out["invoice_total"] is not None else total
+    out["payment_status"] = "belum" if out["deposit"] <= 0 else ("lunas" if out["deposit"] >= due else "dp")
+    out["missing_supplier_count"] = sum(
+        1 for i in live if i.get("source") == "supplier" and i.get("supplier_id") is None
+        and i["status"] not in PO_ARRIVED_STATUSES
+    )
+    out["line_suppliers"] = sorted({i["supplier_name"] for i in live if i.get("supplier_name")})
     return out
+
+
+def _preorder_procurement_status(row: dict, live: list[dict]) -> str:
+    """One word for the list's 'Status Pengadaan': how far the goods of the order have got."""
+    if row.get("cancelled_at") or (not live and row.get("published_at")):
+        return "dibatalkan"
+    if row.get("is_draft"):
+        return "draft"
+    if not live:
+        return "menunggu"
+    if all(i["status"] == "terpasang" for i in live):
+        return "selesai"
+    arrived = sum(1 for i in live if i["status"] in PO_ARRIVED_STATUSES)
+    if arrived == len(live):
+        return "siap"
+    if arrived:
+        return "tiba_sebagian"
+    if any(i["status"] != "pesanan_dibuat" for i in live):
+        return "dipesan"
+    return "menunggu"
 
 
 PREORDER_PRIORITIES = ("normal", "urgent")
@@ -5341,16 +5770,36 @@ def _preorder_item_logistics(item: dict) -> tuple:
     return route, priority, eta
 
 
+PREORDER_SOURCES = ("supplier", "stok", "jasa")
+PREORDER_SOURCE_LABELS = {"supplier": "Pesan Supplier", "stok": "Stok Tersedia", "jasa": "Manual / Jasa"}
+
+
+def _preorder_item_source(con: sqlite3.Connection, item: dict) -> tuple[str | None, int | None]:
+    """(source, supplier_id) of a Sales Order line, validated. 'stok' needs a Master Barang item; the
+    supplier only matters for 'supplier' lines (it may still be empty: then the line waits for one)."""
+    source = item.get("source") or None
+    if source is not None and source not in PREORDER_SOURCES:
+        raise ValueError("Sumber barang harus Pesan Supplier, Stok Tersedia, atau Manual / Jasa.")
+    if source == "stok" and not item.get("master_item_id"):
+        raise ValueError(f"“{item['product_name']}”: Stok Tersedia hanya untuk barang dari Master Barang.")
+    supplier_id = item.get("supplier_id") if source == "supplier" else None
+    if supplier_id is not None:
+        sup = con.execute("SELECT is_active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
+        if sup is None or not sup["is_active"]:
+            raise ValueError(f"“{item['product_name']}”: supplier tidak ditemukan atau tidak aktif.")
+    return source, supplier_id
+
+
 def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict, position: int, now: str) -> int:
     cur = con.execute(
         """INSERT INTO preorder_items
            (preorder_id, master_item_id, product_name, unit, quantity, unit_price, status, position, created_at,
-            ship_route, priority, eta_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ship_route, priority, eta_date, source, supplier_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             preorder_id, item.get("master_item_id"), item["product_name"], item.get("unit"),
             item["quantity"], item["unit_price"], item.get("status") or PREORDER_STATUSES[0],
-            position, now, *_preorder_item_logistics(item),
+            position, now, *_preorder_item_logistics(item), *_preorder_item_source(con, item),
         ),
     )
     item_id = cur.lastrowid
@@ -5402,7 +5851,13 @@ def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, b
     res_lines = _reservation_lines(con, [r["master_item_id"] for r in candidates])
     short = {ln["id"]: ln["shortfall"] for ln in res_lines}
     for r in candidates:
-        qty = r["qty_left"] if r["master_item_id"] is None else min(r["qty_left"], short.get(r["preorder_item_id"], 0))
+        if r["source"] == "supplier":
+            # Chosen per line: the whole quantity is bought, and nothing is drafted until a supplier is picked.
+            if r["supplier_id"] is None:
+                continue
+            qty = r["qty_left"]
+        else:
+            qty = r["qty_left"] if r["master_item_id"] is None else min(r["qty_left"], short.get(r["preorder_item_id"], 0))
         if qty <= 0:
             continue
         sid = r["supplier_id"] if r["supplier_id"] is not None else _general_supplier(con)["id"]
@@ -5431,6 +5886,9 @@ def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, b
     # delivered one (and lets the invoice leave Menunggu Barang).
     ready = [ln for ln in res_lines if ln["preorder_id"] == preorder_id and ln["status"] == "pesanan_dibuat"
              and ln["coming"] == 0 and ln["reserved"] >= ln["quantity"]]
+    # A service (jasa) needs no goods: it is ready to be done as soon as the order is published.
+    ready += [dict(r) for r in con.execute(
+        "SELECT * FROM preorder_items WHERE preorder_id=? AND source='jasa' AND status='pesanan_dibuat'", (preorder_id,))]
     if ready:
         now = _now()
         for ln in ready:
@@ -5488,13 +5946,17 @@ def create_preorder(
     return get_preorder(preorder_id)
 
 
+_PREORDER_ITEMS_SQL = """SELECT pi.*, s.name AS supplier_name FROM preorder_items pi
+                         LEFT JOIN suppliers s ON s.id = pi.supplier_id"""
+
+
 def get_preorder(preorder_id: str) -> dict | None:
     with _conn() as con:
         row = con.execute("SELECT *, (SELECT name FROM suppliers WHERE id=preorders.supplier_id) AS supplier_name FROM preorders WHERE id=?", (preorder_id,)).fetchone()
         if row is None:
             return None
         items = [dict(r) for r in con.execute(
-            "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
+            f"{_PREORDER_ITEMS_SQL} WHERE pi.preorder_id=? ORDER BY pi.position ASC, pi.id ASC", (preorder_id,)
         ).fetchall()]
         paid = con.execute(
             "SELECT COALESCE(SUM(amount), 0) AS paid FROM preorder_payments WHERE preorder_id=?", (preorder_id,)
@@ -5508,9 +5970,10 @@ def get_preorder_items(preorder_id: str) -> list[dict]:
     tied to Master Barang; it is null for a free-text line."""
     with _conn() as con:
         rows = con.execute(
-            """SELECT preorder_items.*, master_items.sku AS sku
+            """SELECT preorder_items.*, master_items.sku AS sku, suppliers.name AS supplier_name
                FROM preorder_items
                LEFT JOIN master_items ON master_items.id = preorder_items.master_item_id
+               LEFT JOIN suppliers ON suppliers.id = preorder_items.supplier_id
                WHERE preorder_id=? ORDER BY position ASC, preorder_items.id ASC""",
             (preorder_id,),
         ).fetchall()
@@ -5620,7 +6083,7 @@ def apply_preorder_dp(preorder_id: str, receipt_id: str, item_ids: list[int], by
                 (receipt_id, iid, preorder_id),
             ).rowcount
         if marked != len(item_ids):
-            raise ValueError("Item PO ini baru saja dipakai di nota lain. Muat ulang lalu coba lagi.")
+            raise ValueError("Barang Sales Order ini baru saja dipakai di nota lain. Muat ulang lalu coba lagi.")
         amount = min(preorder_unallocated_dp(con, preorder_id), rec["total"])
         if amount > 0:
             con.execute(
@@ -5714,7 +6177,7 @@ def _po_invoice_snapshot(con: sqlite3.Connection, preorder_id: str) -> dict[int,
 def _po_create_invoice(con: sqlite3.Connection, po: dict, by: str | None) -> str:
     plate = split_plate(po["plate_full"])
     if plate is None:
-        raise ValueError("Plat mobil di PO harus berformat seperti B 1234 ABC supaya invoicenya bisa dibuat.")
+        raise ValueError("Plat mobil di Sales Order harus berformat seperti B 1234 ABC supaya invoicenya bisa dibuat.")
     from uuid import uuid4
     receipt_id = str(uuid4())
     created_at = _now()
@@ -5800,15 +6263,16 @@ def _po_invoice_sync(
             con.execute(
                 """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
                        item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id)
-                   VALUES (?, ?, ?, ?, NULL, ?, 'barang', 0, ?, ?, ?, ?)""",
-                (receipt_id, pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"], now, by,
+                   VALUES (?, ?, ?, ?, NULL, ?, ?, 0, ?, ?, ?, ?)""",
+                (receipt_id, pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"],
+                 "jasa" if pi.get("source") == "jasa" else "barang", now, by,
                  0 if created or rec["work_status"] in ("menunggu", "belum") else 1, pi["id"]),
             )
             added.append(pi["product_name"])
         elif (ln["product_name"], ln["quantity"], ln["unit_price"], ln["master_item_id"]) != \
                 (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"]):
             if ln["returned_qty"]:
-                raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa diubah lagi di PO.")
+                raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa diubah lagi di Sales Order.")
             con.execute(
                 "UPDATE receipt_items SET product_name=?, quantity=?, unit_price=?, master_item_id=? WHERE id=?",
                 (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"], ln["id"]),
@@ -5821,11 +6285,11 @@ def _po_invoice_sync(
             changed.append(f"{pi['product_name']}" + (f": {', '.join(bits)}" if bits else " diubah"))
     for ln in lines.values():
         if ln["returned_qty"]:
-            raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa dihapus dari PO.")
+            raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa dihapus dari Sales Order.")
         con.execute("DELETE FROM receipt_items WHERE id=?", (ln["id"],))
         changed.append(f"{ln['product_name']} dibatalkan")
     if (added or changed) and not created and _is_closed(rec):
-        raise ValueError("Invoice PO ini sudah lunas dan selesai (ditutup). Minta admin membukanya kembali dulu.")
+        raise ValueError("Invoice Sales Order ini sudah lunas dan selesai (ditutup). Minta admin membukanya kembali dulu.")
     con.execute("UPDATE preorder_items SET receipt_id=? WHERE preorder_id=?", (receipt_id, preorder_id))
 
     items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,)).fetchall()]
@@ -5838,13 +6302,13 @@ def _po_invoice_sync(
         work = "belum"
     con.execute("UPDATE receipts SET subtotal=?, discount=?, total=?, status=?, work_status=? WHERE id=?",
                 (subtotal, discount, total, status, work, receipt_id))
-    tag = f" (PO {po['po_number']})"
+    tag = f" (Sales Order {po['po_number']})"
     if added and not created:
         _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added) + tag, by)
     if changed:
         _log_receipt_event(con, receipt_id, "item_changed", "Item diubah: " + "; ".join(changed) + tag, by)
     if work != rec["work_status"]:
-        _log_receipt_event(con, receipt_id, "status", "Status: Belum Dikerjakan — semua barang PO sudah sampai", by)
+        _log_receipt_event(con, receipt_id, "status", "Status: Belum Dikerjakan — semua barang Sales Order sudah sampai", by)
     if total < rec["amount_paid"] and total != rec["total"]:
         _log_receipt_event(
             con, receipt_id, "overpaid",
@@ -5866,7 +6330,7 @@ def po_invoice_payment(
             raise ValueError("Preorder tidak ditemukan.")
         receipt_id = row["receipt_id"]
     if not receipt_id:
-        raise ValueError("PO ini belum punya invoice (masih draft).")
+        raise ValueError("Sales Order ini belum punya invoice (masih draft).")
     add_receipt_payment(receipt_id, amount, method, note, transfer_sender, transfer_account, by)
     return receipt_id
 
@@ -5955,7 +6419,7 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
         ).fetchall()]
         items_by_order: dict[str, list[dict]] = {}
         for item in con.execute(
-            "SELECT * FROM preorder_items ORDER BY position ASC, id ASC"
+            f"{_PREORDER_ITEMS_SQL} ORDER BY pi.position ASC, pi.id ASC"
         ).fetchall():
             items_by_order.setdefault(item["preorder_id"], []).append(dict(item))
         paid_by_order = _preorder_paid_by_order(con)
@@ -5968,7 +6432,7 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
     return result
 
 
-def _release_preorder_line_from_pos(con: sqlite3.Connection, line: dict, by: str | None) -> None:
+def _release_preorder_line_from_pos(con: sqlite3.Connection, line: dict, by: str | None, changing: bool = False) -> None:
     """A Sales Order line is being removed. Draft Purchase Orders are only plans, so the line is taken
     off them (an emptied draft is cancelled). Once a PO has gone to the supplier the goods are really
     coming, so the removal is refused until that PO item is cancelled the proper way."""
@@ -5983,7 +6447,8 @@ def _release_preorder_line_from_pos(con: sqlite3.Connection, line: dict, by: str
         if r["status"] not in ("draft", "batal") and r["quantity"] - r["qty_cancelled"] > 0:
             raise ValueError(
                 f"Barang “{line['product_name']}” sudah dipesan di Purchase Order {r['po_number']}. "
-                "Batalkan item itu di Purchase Order dulu, baru hapus dari Sales Order."
+                + ("Sumber/supplier-nya tidak bisa diganti lagi; batalkan item itu di Purchase Order dulu."
+                   if changing else "Batalkan item itu di Purchase Order dulu, baru hapus dari Sales Order.")
             )
     for r in refs:
         if r["status"] != "draft":
@@ -5994,16 +6459,16 @@ def _release_preorder_line_from_pos(con: sqlite3.Connection, line: dict, by: str
         if left == 0:
             con.execute("UPDATE supplier_pos SET status='batal', updated_at=? WHERE id=?", (_now(), r["supplier_po_id"]))
         _spo_event(con, r["supplier_po_id"], "cancel" if left == 0 else "edit",
-                   f"Baris “{line['product_name']}” dihapus dari Sales Order"
+                   f"Baris “{line['product_name']}” " + ("sumber/supplier-nya diganti di Sales Order" if changing else "dihapus dari Sales Order")
                    + (" — draft kosong, dibatalkan" if left == 0 else ""), by)
 
 
-SO_MIN_DP_PERCENT = 50
+SO_MIN_DP_PERCENT = 30
 
 
 def _require_publish_dp(con: sqlite3.Connection, preorder_id: str) -> None:
-    """K-03: a Sales Order is published only once the customer has paid at least half its total
-    as down payment. No exceptions; until then it stays a draft. Checked at the moment of
+    """K-03: a Sales Order is published only once the customer has paid at least SO_MIN_DP_PERCENT
+    of its total as down payment. No exceptions; until then it stays a draft. Checked at the moment of
     publishing only, so later edits to a published order are not blocked by it."""
     total = con.execute(
         "SELECT COALESCE(SUM(quantity*unit_price),0) AS t FROM preorder_items WHERE preorder_id=?", (preorder_id,)
@@ -6056,7 +6521,7 @@ def update_preorder(
         if is_draft and not existing["is_draft"] and existing.get("receipt_id"):
             inv = con.execute("SELECT status, work_status FROM receipts WHERE id=?", (existing["receipt_id"],)).fetchone()
             if inv is not None and inv["status"] != "void" and not _is_closed(inv):
-                raise ValueError("PO ini punya invoice yang masih aktif. Selesaikan atau void invoicenya dulu sebelum diarsipkan.")
+                raise ValueError("Sales Order ini punya invoice yang masih aktif. Selesaikan atau void invoicenya dulu sebelum diarsipkan.")
 
         con.execute(
             """UPDATE preorders SET customer_name=?, customer_phone=?, plate_full=?, po_date=?, notes=?,
@@ -6091,13 +6556,18 @@ def update_preorder(
                     new_status = item.get("status") or prev["status"]
                     if new_status == PO_LINE_CANCELLED:
                         raise ValueError("Barang hanya bisa dibatalkan lewat tombol Batalkan Sales Order / Pembatalan Khusus.")
+                    source, supplier_id = _preorder_item_source(con, item)
+                    if (prev.get("source"), prev.get("supplier_id")) != (source, supplier_id) and prev["status"] not in PO_CLOSED_LINE_STATUSES:
+                        # Draft Purchase Orders made for the old choice are dropped (an issued one refuses).
+                        _release_preorder_line_from_pos(con, prev, changed_by, changing=True)
                     con.execute(
                         """UPDATE preorder_items SET master_item_id=?, product_name=?, unit=?,
-                           quantity=?, unit_price=?, status=?, position=?, ship_route=?, priority=?, eta_date=? WHERE id=?""",
+                           quantity=?, unit_price=?, status=?, position=?, ship_route=?, priority=?, eta_date=?,
+                           source=?, supplier_id=? WHERE id=?""",
                         (
                             item.get("master_item_id"), item["product_name"], item.get("unit"),
                             item["quantity"], item["unit_price"], new_status, position,
-                            *_preorder_item_logistics(item), item_id,
+                            *_preorder_item_logistics(item), source, supplier_id, item_id,
                         ),
                     )
                     if new_status != prev["status"]:
@@ -6219,7 +6689,12 @@ def _so_line_kinds(con: sqlite3.Connection, lines: list[dict]) -> dict[int, str]
     out = {}
     for ln in lines:
         h = held.get(ln["id"])
-        supplier = ln["master_item_id"] is None or ln["id"] in on_po or (h is not None and (h["coming"] or h["shortfall"]))
+        if ln.get("source") in ("stok", "jasa"):
+            supplier = ln["id"] in on_po  # chosen from stock / a service; only a PO makes it indent
+        elif ln.get("source") == "supplier":
+            supplier = True
+        else:
+            supplier = ln["master_item_id"] is None or ln["id"] in on_po or (h is not None and (h["coming"] or h["shortfall"]))
         out[ln["id"]] = "inden" if supplier else "stok"
     return out
 
@@ -6543,8 +7018,9 @@ _SPO_QTY_LEFT_SQL = "(spi.quantity - spi.qty_cancelled)"
 
 
 def _next_supplier_po_no(con: sqlite3.Connection, po_date: str) -> str:
-    """PO-SUP-NNN: one running counter. (Older POs were numbered POS-YYYYMMDD-NNNN and keep that.)"""
-    prefix = "PO-SUP-"
+    """PO-SUP-YYYYMMDD-NNN: a counter per PO date, restarting at 001. (Older POs keep their number:
+    PO-SUP-NNN, or POS-YYYYMMDD-NNNN before that.)"""
+    prefix = f"PO-SUP-{po_date.replace('-', '')}-"
     row = con.execute(
         "SELECT MAX(CAST(SUBSTR(po_number, ?) AS INTEGER)) AS n FROM supplier_pos WHERE po_number LIKE ?",
         (len(prefix) + 1, prefix + "%"),
@@ -6582,7 +7058,8 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
     if exclude_po:
         exclude_sql = " AND sp.id != ?"
         params.append(exclude_po)
-    where = ["p.is_draft=0", "pi.status NOT IN ('sampai_di_toko','terpasang','dibatalkan')"]
+    where = ["p.is_draft=0", "pi.status NOT IN ('sampai_di_toko','terpasang','dibatalkan')",
+             "COALESCE(pi.source, '') NOT IN ('jasa', 'stok')"]
     if query:
         where.append(
             "(p.po_number LIKE ? OR p.customer_name LIKE ? OR p.plate_full LIKE ? OR p.customer_phone LIKE ? "
@@ -6593,7 +7070,7 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
         f"""SELECT pi.id AS preorder_item_id, pi.preorder_id, p.po_number AS customer_po_number,
                    p.customer_name, p.plate_full, pi.product_name, pi.unit, pi.quantity AS qty_ordered_by_customer,
                    pi.master_item_id, COALESCE(o.ordered, 0) AS qty_bought,
-                   pi.ship_route, pi.priority, pi.eta_date, s.id AS supplier_id, s.name AS supplier_name, COALESCE(m.last_cost_price, 0) AS est_unit_price
+                   pi.ship_route, pi.priority, pi.eta_date, pi.source, s.id AS supplier_id, s.name AS supplier_name, COALESCE(m.last_cost_price, 0) AS est_unit_price
             FROM preorder_items pi
             JOIN preorders p ON p.id = pi.preorder_id
             LEFT JOIN (
@@ -6603,7 +7080,8 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
                 GROUP BY spi.preorder_item_id
             ) o ON o.preorder_item_id = pi.id
             LEFT JOIN master_items m ON m.id = pi.master_item_id
-            LEFT JOIN suppliers s ON s.id = COALESCE(p.supplier_id, m.supplier_id)
+            LEFT JOIN suppliers s ON s.id = CASE WHEN pi.source = 'supplier' THEN COALESCE(pi.supplier_id, p.supplier_id)
+                                                 ELSE COALESCE(p.supplier_id, m.supplier_id) END
             WHERE {' AND '.join(where)}
             ORDER BY p.created_at DESC, pi.position ASC, pi.id ASC""",
         params,
@@ -6929,7 +7407,7 @@ def _sync_preorder_line(con: sqlite3.Connection, preorder_item_id: int, changed_
         return
     agg = con.execute(
         f"""SELECT COALESCE(SUM(spi.quantity - spi.qty_cancelled), 0) AS ordered,
-                   COALESCE(SUM(spi.qty_received), 0) AS received
+                   COALESCE(SUM(spi.qty_received - spi.qty_bad), 0) AS received
             FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
             WHERE spi.preorder_item_id=? AND sp.status IN ({_placeholders(_SPO_ISSUED)})""",
         (preorder_item_id, *_SPO_ISSUED),
@@ -7331,21 +7809,34 @@ def receive_supplier_po(
             left = item["quantity"] - item["qty_cancelled"] - item["qty_received"]
             if r["quantity"] > left:
                 raise ValueError(f"Jumlah diterima untuk “{item['product_name']}” melebihi sisa ({left}).")
-            con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ? WHERE id=?",
-                        (r["quantity"], r["item_id"]))
+            cond = r.get("condition") or "baik"
+            bad = cond in BAD_RECEIVE_CONDITIONS
+            con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ?, qty_bad = qty_bad + ? WHERE id=?",
+                        (r["quantity"], r["quantity"] if bad else 0, r["item_id"]))
             con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location) VALUES (?, ?, ?, ?, ?)",
-                        (receipt_id, r["item_id"], r["quantity"], r.get("condition") or "baik",
-                         r.get("location") or warehouse_location))
-            got_lines.append((dict(item), r["quantity"]))
+                        (receipt_id, r["item_id"], r["quantity"], cond, r.get("location") or warehouse_location))
+            if bad:
+                # Decision 3: damaged / wrong goods never reach the sellable shelf; they wait in quarantine
+                # as a candidate for a return to this supplier.
+                gross = item["est_unit_price"]
+                _quarantine_in(
+                    con, master_item_id=item["master_item_id"], product_name=item["product_name"], qty=r["quantity"],
+                    condition=cond, source_type="terima_barang", source_ref=f"{gr_number} / {row['po_number']}",
+                    source_id=str(receipt_id), supplier_id=row["supplier_id"],
+                    unit_cost=gross - round(gross * (item["discount_pct"] or 0) / 100), candidate=True,
+                    note=r.get("note") or note, by=changed_by)
+            got_lines.append((dict(item), r["quantity"], bad))
         _spo_finish_if_settled(con, supplier_po_id)
-        total_got = sum(q for _, q in got_lines)
+        total_got = sum(q for _, q, _ in got_lines)
+        total_bad = sum(q for _, q, b in got_lines if b)
         _spo_event(con, supplier_po_id, "receive",
-                   f"Barang diterima {gr_number} ({total_got} pcs)" + (f", surat jalan {surat_jalan_no}" if surat_jalan_no else ""),
+                   f"Barang diterima {gr_number} ({total_got} pcs)" + (f", surat jalan {surat_jalan_no}" if surat_jalan_no else "")
+                   + (f"; {total_bad} pcs rusak/tidak sesuai masuk Stok Karantina" if total_bad else ""),
                    changed_by)
         if create_inbound:
             by_master: dict[int, dict] = {}
-            for item, qty in got_lines:
-                if item["master_item_id"] is None:
+            for item, qty, bad in got_lines:
+                if item["master_item_id"] is None or bad:
                     continue
                 gross = item["est_unit_price"]
                 cost = gross - round(gross * (item["discount_pct"] or 0) / 100)
@@ -7567,7 +8058,7 @@ def release_idempotency_key(scope: str) -> None:
 # ---------------------------------------------------------------------------
 
 CATEGORY_STATUSES = ("aktif", "nonaktif", "arsip")
-_CATEGORY_CODE_RE = re.compile(r"^[A-Z0-9]+(-[A-Z0-9]+)*$")
+_CATEGORY_CODE_RE = re.compile(r"^[A-Z0-9]+([-.][A-Z0-9]+)*$")
 
 
 def _category_name_key(name: str) -> str:
@@ -7706,7 +8197,7 @@ def create_category(
     if not code:
         code = category_code_preview(name, parent_id)
     if not _CATEGORY_CODE_RE.match(code) or len(code) > 30:
-        raise ValueError("Kode hanya boleh huruf besar, angka dan tanda hubung (maks 30 karakter), contoh: KAT-LMP.")
+        raise ValueError("Kode hanya boleh huruf besar, angka, titik dan tanda hubung (maks 30 karakter), contoh: 01.04 atau KAT-LMP.")
     with _conn() as con:
         if con.execute("SELECT 1 FROM categories WHERE code=?", (code,)).fetchone():
             raise ValueError(f"Kode {code} sudah dipakai kategori lain.")

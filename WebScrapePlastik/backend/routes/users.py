@@ -1,14 +1,15 @@
 import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth import hash_password
+from backend.auth import get_current_user, hash_password
 from backend.database import (
     create_user,
     get_user_by_id,
     list_users,
     reset_user_password,
     set_user_active,
+    set_user_owner,
     update_user_role,
 )
 from backend.schemas import PasswordResetRequest, UserCreateRequest, UserOut, UserUpdateRequest
@@ -25,6 +26,7 @@ def _row_to_user(row: dict) -> UserOut:
         role=row["role"],
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
+        is_owner=bool(row.get("is_owner")),
     )
 
 
@@ -58,7 +60,7 @@ async def create_new_user(req: UserCreateRequest):
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-async def patch_user(user_id: int, req: UserUpdateRequest):
+async def patch_user(user_id: int, req: UserUpdateRequest, me: dict = Depends(get_current_user)):
     if req.role is not None and req.role not in _VALID_ROLES:
         raise HTTPException(status_code=422, detail=f"Peran harus salah satu dari: {', '.join(sorted(_VALID_ROLES))}.")
     loop = asyncio.get_event_loop()
@@ -70,6 +72,8 @@ async def patch_user(user_id: int, req: UserUpdateRequest):
             row = await loop.run_in_executor(None, update_user_role, user_id, req.role)
         if req.is_active is not None:
             row = await loop.run_in_executor(None, set_user_active, user_id, req.is_active)
+        if req.is_owner is not None:
+            row = await loop.run_in_executor(None, set_user_owner, user_id, req.is_owner, me)
     except ValueError as e:
         _raise_from_value_error(e)
     if row is None:

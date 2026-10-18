@@ -18,6 +18,7 @@ from backend.routes.customers import router as customers_router
 from backend.routes.inventory import router as inventory_router
 from backend.routes.opname import router as opname_router
 from backend.routes.preorders import router as preorders_router
+from backend.routes.quarantine import router as quarantine_router
 from backend.routes.supplier_pos import router as supplier_pos_router
 from backend.routes.purchase_invoices import router as purchase_invoices_router
 from backend.routes.receipts import router as receipts_router
@@ -71,6 +72,7 @@ app.include_router(inventory_router, prefix="/api", dependencies=[Depends(get_cu
 app.include_router(categories_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(opname_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(preorders_router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(quarantine_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(supplier_pos_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(purchase_invoices_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(receipts_router, prefix="/api", dependencies=[Depends(get_current_user)])

@@ -101,7 +101,7 @@ def _validate_po_date(raw: str) -> str:
     try:
         return parse_ymd(raw).isoformat()
     except ValueError:
-        raise HTTPException(status_code=422, detail="Tanggal PO harus berformat YYYY-MM-DD.")
+        raise HTTPException(status_code=422, detail="Tanggal Sales Order harus berformat YYYY-MM-DD.")
 
 
 def _validate_status(status: str, allow_cancelled: bool = False) -> str:
@@ -152,6 +152,9 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         ship_route=row.get("ship_route"),
         priority=row.get("priority") or "normal",
         eta_date=row.get("eta_date"),
+        source=row.get("source"),
+        supplier_id=row.get("supplier_id"),
+        supplier_name=row.get("supplier_name"),
         reserved_qty=row.get("reserved_qty") or 0,
         coming_qty=row.get("coming_qty") or 0,
         shortfall_qty=row.get("shortfall_qty") or 0,
@@ -426,19 +429,19 @@ async def convert_to_receipt(
     if po is None:
         raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
     if po.get("receipt_id"):
-        raise HTTPException(status_code=409, detail="PO ini sudah punya invoice. Buka invoicenya untuk pembayaran.")
+        raise HTTPException(status_code=409, detail="Sales Order ini sudah punya invoice. Buka invoicenya untuk pembayaran.")
     lines = await loop.run_in_executor(None, preorder_convertible_items, preorder_id, req.item_ids)
     if req.item_ids is not None and len(lines) != len(set(req.item_ids)):
         raise HTTPException(status_code=409, detail="Ada item yang belum sampai di toko atau sudah masuk nota.")
     if not lines:
-        raise HTTPException(status_code=409, detail="Belum ada item PO yang sampai di toko dan belum masuk nota.")
+        raise HTTPException(status_code=409, detail="Belum ada barang Sales Order yang sampai di toko dan belum masuk nota.")
 
     parts = (po["plate_full"] or "").split()
     region = (req.plate_region or (parts[0] if len(parts) == 3 else "")).upper()
     number = req.plate_number or (parts[1] if len(parts) == 3 else "")
     suffix = (req.plate_suffix or (parts[2] if len(parts) == 3 else "")).upper()
     if not (region and number and suffix):
-        raise HTTPException(status_code=422, detail="Plat nomor belum ada di PO ini. Isi plat untuk membuat nota.")
+        raise HTTPException(status_code=422, detail="Plat nomor belum ada di Sales Order ini. Isi plat untuk membuat nota.")
     from backend.routes.receipts import NUMBER_RE, PLATE_CODES, SUFFIX_RE
     if region not in PLATE_CODES or not NUMBER_RE.match(number) or not SUFFIX_RE.match(suffix):
         raise HTTPException(status_code=422, detail="Plat nomor tidak valid.")

@@ -257,6 +257,7 @@ def _row_to_master_item(row: dict, reserved: dict[int, int] | None = None) -> Ma
     return MasterItemOut(
         reserved_qty=held,
         available_qty=max(row["stock_qty"] - held, 0),
+        quarantine_qty=row.get("quarantine_qty") or 0,
         id=row["id"],
         sku=row["sku"],
         sku_prefix=row["sku_prefix"],

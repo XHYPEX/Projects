@@ -64,10 +64,18 @@ async def get_current_user(session_token: str | None = Cookie(default=None, alia
         raise HTTPException(status_code=401, detail="Sesi berakhir. Silakan login kembali.")
     if not session["is_active"]:
         raise HTTPException(status_code=401, detail="Akun sudah dinonaktifkan.")
-    return {"id": session["user_id"], "username": session["username"], "role": session["role"]}
+    return {"id": session["user_id"], "username": session["username"], "role": session["role"],
+            "is_owner": bool(session.get("is_owner"))}
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Hanya admin yang diizinkan.")
+    return user
+
+
+async def require_owner(user: dict = Depends(get_current_user)) -> dict:
+    """Final approval of losses (quarantine write-off): an admin carrying the Owner flag."""
+    if user["role"] != "admin" or not user.get("is_owner"):
+        raise HTTPException(status_code=403, detail="Hanya Owner yang boleh menyetujui ini.")
     return user

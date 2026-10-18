@@ -1,0 +1,48 @@
+%% Gambar: 23
+%% Judul: Master Barang
+%% Modul: Master Barang & Inventory
+%% Tujuan: Data produk lengkap (atribut, harga, supplier, stok) dengan stok yang hanya berubah lewat transaksi tercatat.
+%% Dimulai dari: Tambah Barang di Master Barang (atau tambah cepat).
+%% Proses Utama: Supplier + Brand + nama → SKU otomatis → Kategori Induk/Sub → Satuan → harga beli & jual → stok awal → simpan → riwayat harga.
+%% Hasil: Produk dengan SKU & barcode; tampil Stock In Hand, Dialokasikan, Stock Available.
+%% Warning: Mengedit nama/kategori/merek/supplier/harga TIDAK mengubah stok. Supplier hanya bisa diganti admin dan SKU tidak berubah. Stok yang dialokasikan untuk customer lain tidak boleh terjual (target).
+%% Modul Terkait: Master Kategori/Brand/Supplier/Satuan, Kasir, SO, PO, Barang Masuk, Stock Opname, Riwayat Stok.
+%% Catatan Programmer: SKU {kodeSupplier}-{kodeBrand}-{segmen}-{urut 3 digit}; (supplier, brand, nama ternormalisasi) unik. Barcode '20' + id 8 digit. Harga beli disembunyikan dari staff. Stok berubah hanya lewat stock_ledger: Barang Masuk, penjualan, opname, penyesuaian admin, stok awal.
+%% Status Implementasi: Sudah ada: CRUD, SKU/barcode, riwayat harga, arsip/nonaktif/pulihkan, hapus admin jika belum ada riwayat stok. Daftar & detail menampilkan stok dicadangkan dan stok bebas (K-02); cadangan ditegakkan di kasir.
+flowchart TB
+  subgraph T1["1 · Tambah barang"]
+    direction LR
+    A(["Tombol ‘+ Barang’"]):::aksi --> B[/"Supplier + Brand + nama"/]:::aksi --> C{"Kombinasi sudah ada?"}:::cek
+    C -->|YA| C1["Ditolak: barang duplikat"]:::err
+    C -->|TIDAK| D["SKU & barcode otomatis"]:::so --> E[/"Kategori Induk → Sub (aktif),<br/>Satuan, harga beli & jual, min stok"/]:::aksi --> F{"Stok awal?"}:::cek
+    F -->|YA| F1["Penyesuaian 'Stok awal'<br/>tercatat di riwayat stok"]:::data
+    F -->|TIDAK| F2["Stok 0"]:::tunggu
+    F1 --> G["Simpan + riwayat harga"]:::ok
+    F2 --> G
+  end
+  subgraph T2["2 · Update"]
+    direction LR
+    U{"Yang diubah?"}:::cek
+    U -->|"Nama / kategori / brand / satuan"| U1["Tersimpan — stok TIDAK berubah"]:::ok
+    U -->|"Harga jual"| U2["Riwayat harga + harga rata-rata"]:::data
+    U -->|"Supplier"| U3{"Admin?"}:::cek
+    U3 -->|TIDAK| U4["Ditolak"]:::err
+    U3 -->|YA| U5["Supplier berubah, SKU tetap"]:::ok
+    U -->|"Stok"| U6["Tidak bisa diketik langsung →<br/>Barang Masuk / Opname / Penyesuaian admin"]:::err
+  end
+  subgraph T3["3 · Tampilan stok"]
+    direction LR
+    S1["Stock In Hand<br/>(fisik)"]:::ok --> S2["− Dialokasikan untuk SO"]:::tunggu --> S3["= Stock Available"]:::so --> S4{"Kasir jual > Available?"}:::cek
+    S4 -->|"Target: tolak"| S5["Stok sudah dialokasikan<br/>customer lain"]:::off
+    S4 -->|"Saat ini: cek In Hand saja"| S6["Lolos jika In Hand cukup"]:::tunggu
+  end
+  subgraph T4["4 · Nonaktif / Arsip / Hapus"]
+    direction LR
+    N{"Aksi?"}:::cek
+    N -->|"Nonaktif / Arsip"| N1["Tidak bisa dijual / dipilih;<br/>arsip disembunyikan dari daftar"]:::tunggu
+    N -->|"Pulihkan"| N2["AKTIF"]:::ok
+    N -->|"Hapus (admin)"| N3{"Ada riwayat stok /<br/>Barang Masuk?"}:::cek
+    N3 -->|YA| N4["Ditolak: arsipkan saja"]:::err
+    N3 -->|TIDAK| N5["Dihapus"]:::off
+  end
+  T1 --> T2 --> T3 --> T4

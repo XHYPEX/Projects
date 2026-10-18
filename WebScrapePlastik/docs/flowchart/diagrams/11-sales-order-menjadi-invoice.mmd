@@ -1,0 +1,46 @@
+%% Gambar: 11
+%% Judul: Sales Order Menjadi Invoice Kasir
+%% Modul: Sales Order → Cashier
+%% Tujuan: Satu SO punya tepat satu invoice kasir; item, nilai, dan DP SO terbawa tanpa dobel.
+%% Dimulai dari: SO diterbitkan (bukan draft).
+%% Proses Utama: SO terbit → invoice terbentuk dengan referensi SO → baris SO dicerminkan ke invoice → DP masuk sebagai pembayaran → barang siap → pengerjaan → pelunasan → selesai → invoice final.
+%% Hasil: Contoh: Invoice Rp3.000.000, DP Rp1.000.000, pelunasan Rp2.000.000 → Dibayar Rp3.000.000, Sisa Rp0, LUNAS.
+%% Warning: Tidak boleh ada dua invoice untuk SO yang sama. Baris SO yang belum sampai tetap terlihat di invoice dan belum memotong stok. Lunas tidak menutup pengerjaan.
+%% Modul Terkait: Sales Order, Cashier, Riwayat Invoice, Purchase Order, Barang Masuk, Stok.
+%% Catatan Programmer: preorders.receipt_id = satu invoice. _po_invoice_sync menyamakan baris (receipt_items.preorder_item_id), total, stok. Invoice SO mulai di status pengerjaan 'Menunggu Barang' dan otomatis ke 'Belum Dikerjakan' saat semua baris sampai. Tombol lama 'Buat Nota Penjualan' hanya untuk SO tanpa invoice.
+%% Status Implementasi: Sudah ada dengan perbedaan alur: invoice dibuat OTOMATIS saat SO terbit (bukan tombol 'Lanjutkan ke Kasir'). 'Lunasi di Invoice' membuka invoice dengan sisa tagihan terisi. Satu-invoice-per-SO dijaga server. Invoice void tidak dibuat ulang otomatis dan melepas cadangan stok. Stok keluar saat baris Terpasang: 'Pengerjaan Selesai' menandai semua baris yang sudah datang Terpasang, dan ditolak bila masih ada baris belum datang (K-01). Penagihan parsial belum ada — K-19.
+flowchart TB
+  subgraph T1["1 · SO terbit → invoice terbentuk"]
+    direction LR
+    A(["SO diterbitkan"]):::so --> B{"SO sudah punya invoice?"}:::cek
+    B -->|YA| B1["Pakai invoice yang sama<br/>(tidak membuat invoice kedua)"]:::ok
+    B -->|TIDAK| B2["Buat invoice: referensi SO,<br/>customer, plat, kendaraan"]:::ok
+    B2 --> B3["Status pengerjaan:<br/>MENUNGGU BARANG"]:::tunggu
+    B1 --> SY
+    B3 --> SY[["Sinkron baris SO → invoice<br/>(tambah / ubah / hapus baris)"]]:::sub
+  end
+  subgraph T2["2 · DP & kesiapan barang"]
+    direction LR
+    D1[["DP SO masuk sebagai pembayaran<br/>sebelumnya (Gambar 10)"]]:::sub --> D2{"Semua baris SO<br/>sampai di toko?"}:::cek
+    D2 -->|"Sebagian"| D3["Baris yang sampai: potong stok<br/>baris lain: tetap tampil, belum potong stok"]:::tunggu
+    D2 -->|"Semua"| D4["Otomatis → BELUM DIKERJAKAN<br/>(siap dipasang)"]:::ok
+    D3 -->|"sisa datang"| D4
+    PF{"Satu baris SO boleh ditagih<br/>di beberapa invoice? (K-19)"}:::cek
+    PF -->|"Saat ini: TIDAK"| PF1["1 SO = 1 invoice; baris yang<br/>belum sampai tetap terbuka di sana"]:::tunggu
+    PF -->|"Opsi"| PF2["Invoice per pemenuhan;<br/>qty per invoice ≤ sisa belum ditagih"]:::off
+  end
+  subgraph T3["3 · Customer datang memasang"]
+    direction LR
+    C1(["Customer membawa mobil"]):::aksi --> C2["Buka SO → Lunasi di Invoice<br/>atau buka invoice dari Kasir"]:::aksi --> C3["Ubah pengerjaan:<br/>SEDANG DIKERJAKAN"]:::so --> C4[/"Pelunasan (sisa terisi otomatis)"/]:::aksi --> C5{"Sisa = 0?"}:::cek
+    C5 -->|TIDAK| C6["SEBAGIAN — tagihan tetap muncul"]:::tunggu
+    C5 -->|YA| C7["LUNAS"]:::ok
+  end
+  subgraph T4["4 · Final"]
+    direction LR
+    F1["Pengerjaan SELESAI"]:::ok --> F2["Barang & mobil diserahkan<br/>(Gambar 15)"]:::aksi --> F3{"Lunas + Selesai?"}:::cek
+    F3 -->|YA| F4(["Invoice final / tertutup<br/>(hanya admin bisa buka kembali)"]):::ok
+    F3 -->|TIDAK| F5["Tetap invoice berjalan"]:::tunggu
+    X{"Invoice SO di-void?"}:::cek
+    X -->|YA| X1["Tidak dibuat ulang otomatis —<br/>perlu tindakan admin"]:::err
+  end
+  T1 --> T2 --> T3 --> T4

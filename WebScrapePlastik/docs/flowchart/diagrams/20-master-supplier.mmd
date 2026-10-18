@@ -1,0 +1,36 @@
+%% Gambar: 20
+%% Judul: Master Supplier
+%% Modul: Master Supplier
+%% Tujuan: Daftar pemasok yang dipakai di Master Barang, Sales Order, Purchase Order, Barang Masuk, dan Faktur.
+%% Dimulai dari: Admin/staff menambah supplier.
+%% Proses Utama: Nama → kode 3 huruf otomatis → validasi duplikasi → simpan → dipakai SO/PO/barang.
+%% Hasil: Supplier aktif; supplier 'UMUM' dibuat otomatis untuk item SO tanpa supplier.
+%% Warning: Supplier (pemasok) tidak sama dengan ekspedisi (pengirim). Supplier yang sudah dipakai transaksi tidak boleh dihapus permanen. Kode supplier masuk ke SKU.
+%% Modul Terkait: Master Barang (SKU), Sales Order (supplier header), Purchase Order, Barang Masuk, Faktur Pembelian.
+%% Catatan Programmer: Hapus permanen (admin) saat ini hanya diblokir jika dipakai master_items, inbound_documents, purchase_invoices — supplier_pos & preorders BELUM dicek. UMUM: is_system = 0.
+%% Status Implementasi: Sudah ada: tambah, kode otomatis, tolak duplikat, nonaktif/aktifkan, hapus admin. CELAH: supplier yang hanya dipakai PO/SO masih bisa dihapus permanen; UMUM bisa diubah/dihapus karena bukan baris sistem; ekspedisi dicatat sebagai teks bebas di pengiriman PO.
+flowchart TB
+  subgraph T1["1 · Create"]
+    direction LR
+    A(["Tombol ‘+ Supplier’"]):::aksi --> B[/"Nama, kontak, alamat"/]:::aksi --> C["Kode 3 huruf otomatis"]:::so --> D{"Nama duplikat?"}:::cek
+    D -->|YA| D1["Ditolak"]:::err
+    D -->|TIDAK| F["Simpan: AKTIF"]:::ok
+    G(["Item SO tanpa supplier"]):::so --> G1["Supplier UMUM dibuat<br/>otomatis saat pertama dipakai"]:::tunggu
+  end
+  subgraph T2["2 · Update / Nonaktif / Aktifkan"]
+    direction LR
+    U{"Aksi?"}:::cek
+    U -->|"Ubah data"| U1["Tersimpan; SKU lama tetap"]:::ok
+    U -->|"Nonaktifkan"| U2["NONAKTIF: tidak bisa dipilih<br/>di PO / barang baru"]:::tunggu
+    U -->|"Aktifkan"| U3["AKTIF"]:::ok
+    U -->|"Hapus (admin)"| U4{"Dipakai barang / BM / faktur?"}:::cek
+    U4 -->|YA| U5["Ditolak: nonaktifkan saja"]:::err
+    U4 -->|TIDAK| U6{"Dipakai PO / SO?<br/>(target cek)"}:::cek
+    U6 -->|"YA — saat ini lolos"| U7["CELAH: perlu ditolak juga"]:::err
+    U6 -->|TIDAK| U8["Dihapus"]:::off
+  end
+  subgraph T3["3 · Dipakai"]
+    direction LR
+    P1["Master Barang:<br/>supplier default + SKU"]:::so ~~~ P2["Sales Order:<br/>supplier header / per item"]:::so ~~~ P3["Purchase Order:<br/>satu PO = satu supplier"]:::so ~~~ P4["Barang Masuk & Faktur"]:::so ~~~ P5["Ekspedisi BUKAN supplier:<br/>target master ekspedisi terpisah"]:::off
+  end
+  T1 --> T2 --> T3

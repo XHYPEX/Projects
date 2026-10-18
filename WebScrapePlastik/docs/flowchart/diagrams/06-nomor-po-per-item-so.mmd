@@ -1,0 +1,38 @@
+%% Gambar: 06
+%% Judul: Hubungan Nomor PO Supplier di Setiap Item SO
+%% Modul: Sales Order (detail) ↔ Purchase Order
+%% Tujuan: Menampilkan di setiap baris SO nomor PO, status PO, dan status penerimaan yang benar-benar terkait dengan baris itu.
+%% Dimulai dari: Admin membuka Detail Sales Order.
+%% Proses Utama: Untuk setiap baris SO → cari baris PO yang menautkannya → tampilkan nomor, qty alokasi, status; jika tidak ada → Belum Dibuat PO.
+%% Hasil: Contoh: Head Unit → PO-SUP-001 (Dipesan); Frame 9" → PO-SUP-002 (Draft); Kamera Mundur → — (Teralokasi dari stok).
+%% Warning: Jangan menampilkan satu nomor PO untuk semua baris. Jangan membuat nomor PO palsu. PO Draft harus terlihat sebagai Draft.
+%% Modul Terkait: Sales Order, Purchase Order, Barang Masuk.
+%% Catatan Programmer: Relasi many-to-many di tingkat baris & qty: supplier_po_items.preorder_item_id + quantity. Satu baris SO bisa punya beberapa baris PO; satu PO berisi baris dari beberapa SO.
+%% Status Implementasi: Sebagian. Relasi tingkat baris & qty sudah ada (supplier_po_items.preorder_item_id) dan API detail SO sudah mengirim supplier_pos per baris. Kolom "No. PO Supplier" yang bisa diklik di tabel item Detail SO perlu diperiksa/dilengkapi di UI.
+flowchart TB
+  subgraph T1["1 · Untuk setiap baris SO"]
+    direction LR
+    S(["Buka Detail SO"]):::aksi --> R["Ambil baris SO"]:::aksi --> Q{"Sumber baris?"}:::cek
+    Q -->|"Inventory"| INV["Tampilkan: Supplier —<br/>No. PO —<br/>Status: Teralokasi / Belum dialokasi"]:::ok
+    Q -->|"Pesan Supplier"| F["Cari baris PO yang menautkan<br/>baris SO ini (bukan Batal)"]:::so
+  end
+  subgraph T2["2 · Tampilkan PO terkait"]
+    direction LR
+    F2{"Ada baris PO?"}:::cek
+    F2 -->|TIDAK| NO["Status: BELUM DIBUAT PO<br/>(tanpa nomor)"]:::err
+    F2 -->|"YA, satu"| ONE["PO-SUP-001 (klik → detail PO)<br/>qty 1 · Status PO · Penerimaan"]:::so
+    F2 -->|"YA, beberapa"| MANY["Daftar semua PO:<br/>PO-SUP-001 qty 2 · Dipesan<br/>PO-SUP-005 qty 1 · Draft"]:::so
+    ONE --> ST{"Status PO?"}:::cek
+    MANY --> ST
+    ST -->|Draft| D1["Label DRAFT<br/>(belum dikirim ke supplier)"]:::tunggu
+    ST -->|"Dipesan / Sebagian diterima"| D2["Label status + qty diterima"]:::so
+    ST -->|Diterima| D3["Label DITERIMA"]:::ok
+    ST -->|Batal| D4["Disembunyikan dari total,<br/>riwayat tetap ada"]:::off
+  end
+  subgraph T3["3 · Ringkasan baris"]
+    direction LR
+    SUM["Qty dipesan = SUM qty PO aktif<br/>Qty diterima = SUM qty diterima<br/>Sisa belum dipesan = qty SO − qty dipesan"]:::data --> WARN{"Sisa belum dipesan > 0?"}:::cek
+    WARN -->|YA| W2["Badge: Belum dipesan N"]:::err
+    WARN -->|TIDAK| W3["Badge: Tercakup PO"]:::ok
+  end
+  T1 --> T2 --> T3

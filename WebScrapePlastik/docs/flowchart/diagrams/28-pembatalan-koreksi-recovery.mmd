@@ -1,0 +1,71 @@
+%% Gambar: 28
+%% Judul: Pembatalan, Koreksi, dan Recovery Transaksi
+%% Modul: Lintas modul — Kasir, Sales Order, Purchase Order, Barang Masuk, Faktur, Opname
+%% Tujuan: Setiap kesalahan diperbaiki dengan transaksi koreksi yang tercatat, bukan menghapus jejak; stok dan uang kembali konsisten.
+%% Dimulai dari: Customer membatalkan, salah input, barang rusak/tidak sesuai, atau error saat menyimpan.
+%% Proses Utama: Identifikasi transaksi → cek status & izin → alasan → koreksi (void / balik / retur / batal) → stok & uang disesuaikan → audit log.
+%% Hasil: Data asli tetap ada; koreksi muncul sebagai baris baru (pembayaran negatif, riwayat stok IN/VOID, event).
+%% Warning: Pembatalan satu customer tidak boleh menyentuh baris customer lain dalam PO yang sama. Barang Masuk yang sudah diposting tidak diposting ulang. Error di tengah simpan → semua dibatalkan.
+%% Modul Terkait: Semua modul transaksi, Riwayat Stok, Audit Log.
+%% Catatan Programmer: Kasir: void (staff tanpa uang / admin), balik bayar (admin, baris negatif reversed_of), refund kelebihan (admin), retur/void item (admin, tujuan stok/supplier/rusak), buka kembali (admin). PO: batal utuh (draft/dipesan, belum terima & bayar), batal item 2 langkah. BM: void (admin). Faktur: void (admin, belum dibayar). Opname: tolak/batal.
+%% Status Implementasi: Sudah ada sebagian besar. Pembatalan SO per barang sesuai K-13 (inden: 24 jam & PO terbit; stok toko: kapan saja sebelum terpasang; Pembatalan Khusus) sudah ada; hapus baris SO yang sudah di PO terbit ditolak; void BM ditolak bila stok sudah terpakai. CELAH: (1) void nota tidak menulis pembayaran negatif — uang dikembalikan di luar sistem; (2) 'tindakan' batal item PO tidak dijalankan otomatis; (3) balik bayar PO belum ada.
+flowchart LR
+  subgraph COL1[" "]
+  direction TB
+  subgraph K["Kasir / Invoice"]
+    direction LR
+    K0{"Apa yang salah?"}:::cek
+    K0 -->|"Batal semua, belum ada uang"| K1["VOID (staff, alasan)<br/>stok kembali"]:::err
+    K0 -->|"Batal semua, sudah ada uang"| K2["VOID (admin)<br/>stok kembali; uang dikembalikan<br/>(belum tercatat sbg baris negatif)"]:::err
+    K0 -->|"Salah catat pembayaran"| K3["Balik pembayaran (admin)<br/>baris negatif, asli tetap"]:::tunggu
+    K0 -->|"Kelebihan bayar"| K4["Refund (admin)<br/>maks = dibayar − total<br/>(penyetuju & kas: K-20)"]:::tunggu
+    K0 -->|"Satu barang dikembalikan"| K5["Retur / Void item (admin)<br/>tujuan: stok · supplier · rusak"]:::tunggu
+    K0 -->|"Invoice sudah ditutup"| K6["Buka Kembali (admin) + alasan"]:::tunggu
+  end
+  subgraph S["Sales Order — kebijakan pembatalan per barang (K-13)"]
+    direction TB
+    S0{"SO sudah dikonfirmasi (terbit)?"}:::cek
+    S0 -->|"Belum (Draft)"| SD["Arsipkan saja"]:::tunggu
+    S0 -->|YA| S1{"Penyebabnya?"}:::cek
+    S1 -->|"Permintaan pelanggan<br/>(dinilai per barang)"| SI{"Barang sudah terpasang /<br/>diserahkan?"}:::cek
+    SI -->|YA| SX["Tidak dibatalkan: tetap ditagih<br/>(pakai Retur Barang)"]:::err
+    SI -->|TIDAK| SK{"Jenis barang?"}:::cek
+    SK -->|"Stok toko"| S3[/"Admin: pilih barang, alasan,<br/>jumlah refund + metode"/]:::aksi
+    SK -->|"Inden (dari supplier)"| S2{"≤ 24 jam sejak terbit<br/>DAN PO-nya belum terbit?"}:::cek
+    S2 -->|TIDAK| SB["DITOLAK: barang terkunci<br/>tidak ada batal, refund,<br/>atau pelepasan stok"]:::err
+    S2 -->|YA| S3
+    S3 --> S4["Barang terpilih → Dibatalkan<br/>draft PO batal · cadangan stok dilepas<br/>refund (baris negatif) · sisa = biaya pembatalan<br/>SO batal bila tak ada barang terbuka"]:::ok
+    S1 -->|"Toko/supplier gagal,<br/>barang salah, janji kirim dilanggar"| S5[/"Admin: Pembatalan Khusus<br/>pilih barang + kategori + kronologi"/]:::aksi
+    S5 --> S6{"Barangnya sudah di toko<br/>untuk pelanggan ini?"}:::cek
+    S6 -->|YA| S7["Ditolak: retur ke supplier /<br/>serahkan dulu"]:::err
+    S6 -->|TIDAK| S8["Baris → Dibatalkan<br/>REFUND PENUH di luar barang yang tetap<br/>PO terbit TIDAK dibatalkan:<br/>ditandai 'Perlu tindakan'"]:::ok
+    S4 --> SL[("Audit: riwayat SO,<br/>event invoice, event PO")]:::data
+    S8 --> SL
+  end
+  K ~~~ S
+  end
+  subgraph COL2[" "]
+  direction TB
+  subgraph P["Purchase Order & Barang Masuk"]
+    direction LR
+    P0{"Koreksi apa?"}:::cek
+    P0 -->|"Batal PO utuh"| P1{"Belum diterima &<br/>belum dibayar?"}:::cek
+    P1 -->|YA| P2["PO BATAL<br/>baris SO bisa dipesan lagi"]:::err
+    P1 -->|TIDAK| P3["Ditolak: batal per item"]:::err
+    P0 -->|"Batal item"| P4["Ajukan → supplier setuju / tolak"]:::tunggu
+    P0 -->|"BM salah posting"| P5["Void BM (admin): riwayat VOID,<br/>stok berkurang, terima PO dibalik"]:::err
+    P0 -->|"Posting ulang BM"| P6["Ditolak: sudah diposting"]:::err
+  end
+  subgraph R["Recovery umum"]
+    direction LR
+    R1{"Error saat menyimpan?"}:::cek -->|YA| R2["Rollback: stok, uang, status<br/>kembali seperti sebelum"]:::err
+    R3{"Simpan ditekan dua kali?"}:::cek -->|YA| R4["Kunci idempoten /<br/>compare-and-set: diproses sekali"]:::ok
+    R5{"Diubah pengguna lain?"}:::cek -->|YA| R6["409: muat ulang"]:::err
+    R7["Semua koreksi → Audit Log"]:::data
+    R2 ~~~ R3
+    R4 ~~~ R5
+    R6 ~~~ R7
+  end
+  P ~~~ R
+  end
+  COL1 ~~~ COL2

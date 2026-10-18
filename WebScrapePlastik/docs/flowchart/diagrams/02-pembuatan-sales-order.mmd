@@ -1,0 +1,42 @@
+%% Gambar: 02
+%% Judul: Pembuatan Sales Order Customer
+%% Modul: Sales Order (menu lama: Preorder)
+%% Tujuan: Mencatat pesanan inden / booking customer dengan DP, sebelum barang diserahkan.
+%% Dimulai dari: Admin membuka menu Sales Order lalu klik + Sales Order Baru.
+%% Proses Utama: Pilih customer → plat → barang, qty, harga → sumber & supplier per item → DP → Simpan Draft atau Konfirmasi.
+%% Hasil: SO Draft (belum mengikat apa pun) atau SO Terkonfirmasi (invoice SO dibuat, draft PO dibuat, alokasi stok diminta).
+%% Warning: Nominal DP yang diketik belum dianggap uang masuk sampai pembayaran tercatat. SO baru boleh diterbitkan bila DP ≥ 50% total (dibulatkan ke atas); draft boleh tanpa DP. Tombol Simpan dikunci saat proses berjalan.
+%% Modul Terkait: Master Customer, Master Barang, Purchase Order, Kasir/Invoice, Stok.
+%% Catatan Programmer: Konfirmasi SO harus satu transaksi database: invoice SO, draft PO, dan alokasi dibuat bersama atau tidak sama sekali.
+%% Status Implementasi: Sudah ada: draft/terbit, plat 3 kotak, DP awal, invoice SO otomatis, draft PO otomatis, supplier di header SO. Belum ada: sumber pemenuhan per item, supplier per item, (K-03 sudah: terbit hanya jika DP ≥ 50% total, tanpa pengecualian; alokasi stok K-02 sudah).
+flowchart TB
+  subgraph T1["1 · Admin / Kasir — isi data pesanan"]
+    direction LR
+    S(["Mulai: + Sales Order Baru"]):::aksi --> C1{"Customer sudah ada<br/>di Master Customer?"}:::cek
+    C1 -->|YA| C2["Pilih customer"]:::aksi
+    C1 -->|TIDAK| C3["Buat customer baru<br/>nama + no. HP"]:::aksi
+    C2 --> P1[/"Plat: wilayah · nomor · huruf"/]:::aksi
+    C3 --> P1
+    P1 --> I1[/"Tambah barang: cari Master Barang<br/>atau ketik bebas"/]:::aksi --> I2[/"Qty, harga jual, satuan"/]:::aksi
+  end
+  subgraph T2["2 · Admin / Kasir — sumber barang, DP, simpan"]
+    direction LR
+    I3[["Sumber & supplier per item<br/>(Gambar 03)"]]:::sub --> E1[/"ETA, jalur kirim,<br/>prioritas (opsional)"/]:::aksi --> D1[/"DP customer + metode"/]:::aksi --> CH{"Klik tombol?"}:::cek
+    CH -->|"Simpan Draft"| K1["Mode DRAFT"]:::tunggu
+    CH -->|"Simpan Sales Order"| K2["Mode KONFIRMASI"]:::aksi
+  end
+  subgraph T3["3 · Sistem POS — validasi"]
+    direction LR
+    V1{"Nama, HP, plat valid?<br/>minimal 1 barang?"}:::cek -->|YA| V2{"DP ≤ total pesanan?"}:::cek
+    V1 -->|TIDAK| ER["Error di form,<br/>tidak ada yang disimpan<br/>→ perbaiki di langkah 1"]:::err
+    V2 -->|TIDAK| ER
+    V2 -->|"YA, mode Draft"| DR["Simpan SO DRAFT<br/>tanpa invoice, PO, alokasi"]:::tunggu
+    V2 -->|"YA, mode Konfirmasi"| V3{"DP tercatat ≥ 50% total?<br/>(K-03, tanpa pengecualian)"}:::cek
+    V3 -->|TIDAK| WD["Ditolak, tetap Draft:<br/>tambah DP lalu terbitkan"]:::err
+    V3 -->|YA| OK["SO TERKONFIRMASI"]:::ok
+  end
+  subgraph T4["4 · Sistem POS — efek konfirmasi (satu transaksi database)"]
+    direction LR
+    X1[["Invoice SO dibuat<br/>DP jadi pembayaran invoice"]]:::sub --> X2[["Draft PO per supplier<br/>(Gambar 05)"]]:::sub --> X3[["Alokasi stok item Inventory<br/>(Gambar 04)"]]:::sub --> LG[("Log aktivitas<br/>+ riwayat status")]:::data --> F(["Selesai: SO aktif"]):::ok
+  end
+  T1 --> T2 --> T3 --> T4

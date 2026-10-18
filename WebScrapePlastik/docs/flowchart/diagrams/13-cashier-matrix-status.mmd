@@ -1,0 +1,45 @@
+%% Gambar: 13
+%% Judul: Cashier: Matrix Status Pembayaran & Pengerjaan
+%% Modul: Cashier / Kasir
+%% Tujuan: Menunjukkan bahwa status pembayaran dan status pengerjaan adalah dua sumbu terpisah: 9 kombinasi, semuanya valid.
+%% Dimulai dari: Invoice tersimpan (bukan Draft).
+%% Proses Utama: Pembayaran bergerak Belum Bayar → Sebagian → Lunas (dari uang masuk). Pengerjaan bergerak Belum → Sedang → Selesai (dipilih karyawan). Keduanya tidak saling mengubah.
+%% Hasil: KSR-01 Belum Bayar+Sedang · KSR-02 Sebagian+Sedang · KSR-03 Lunas+Sedang · KSR-04 Belum Bayar+Belum · KSR-05 Sebagian+Belum · KSR-06 Lunas+Belum. Invoice tertutup hanya di sel Lunas + Selesai.
+%% Warning: Lunas TIDAK otomatis menjadi Selesai. Selesai TIDAK otomatis menjadi Lunas. Jadwal ambil mobil sore hari ≠ mobil sudah diserahkan.
+%% Modul Terkait: Cashier, Riwayat Invoice, Dashboard (invoice berjalan, piutang).
+%% Catatan Programmer: receipts.status (pending/done) diturunkan dari amount_paid ≥ total; receipts.work_status diubah hanya lewat POST /receipts/{id}/work-status. Transisi pengerjaan yang diizinkan: belum→sedang/selesai, sedang→belum/selesai, selesai→sedang.
+%% Status Implementasi: Sudah ada: 2 status terpisah, 9 kombinasi, tambah pembayaran tidak mengubah pengerjaan. PERLU KEPUTUSAN: tombol 'Tandai Selesai' (pelunasan) saat ini sekaligus mengisi Lunas DAN Pengerjaan Selesai → menutup invoice. Kasus 'sedang dikerjakan sebelum pemasangan' dan status 'Serah Terima Kendaraan' belum ada.
+flowchart LR
+  subgraph MX["MATRIX 3 × 3"]
+    direction TB
+    subgraph R1["BELUM DIKERJAKAN"]
+      direction LR
+      M11["Belum Bayar<br/>KSR-04"]:::err ~~~ M12["Sebagian<br/>KSR-05"]:::tunggu ~~~ M13["Lunas<br/>KSR-06"]:::ok
+    end
+    subgraph R2["SEDANG DIKERJAKAN"]
+      direction LR
+      M21["Belum Bayar<br/>KSR-01"]:::err ~~~ M22["Sebagian<br/>KSR-02"]:::tunggu ~~~ M23["Lunas<br/>KSR-03 — tetap Sedang"]:::ok
+    end
+    subgraph R3["SELESAI"]
+      direction LR
+      M31["Belum Bayar<br/>piutang, belum tutup"]:::err ~~~ M32["Sebagian<br/>sisa tagihan"]:::tunggu ~~~ M33["Lunas + Selesai<br/>INVOICE TERTUTUP"]:::ok
+    end
+    R1 -->|"mulai kerja"| R2 -->|"kerja selesai"| R3
+  end
+  subgraph AX["Dua sumbu terpisah"]
+    direction TB
+    PB["Uang masuk / dikoreksi"]:::aksi -->|"hanya mengubah"| PS["Belum Bayar → Sebagian → Lunas"]:::so
+    PK["Karyawan ubah pengerjaan"]:::aksi -->|"hanya mengubah"| PW["Belum → Sedang → Selesai<br/>(Selesai → Sedang jika dikerjakan ulang)"]:::so
+    TS{"Tombol 'Tandai Selesai'<br/>mengisi keduanya?"}:::cek
+    TS -->|"Saat ini: YA"| TS1["Lunas + Selesai sekaligus<br/>→ invoice tertutup"]:::tunggu
+    TS -->|"Usulan"| TS2["Pisah: 'Lunasi' dan<br/>'Pengerjaan Selesai'"]:::off
+  end
+  subgraph KH["PERLU KEPUTUSAN — sebelum pemasangan"]
+    direction TB
+    K0{"Persiapan / bongkar<br/>sudah dimulai?"}:::cek
+    K0 -->|"Opsi A"| KA["Tetap BELUM DIKERJAKAN<br/>sampai pasang fisik dimulai"]:::off
+    K0 -->|"Opsi B"| KB["Boleh SEDANG DIKERJAKAN"]:::off
+    K0 -->|"Opsi C (rekomendasi)"| KC["Tahap kerja terpisah:<br/>Persiapan → Pemasangan → QC"]:::off
+    SR{"Jam ambil sore tiba?"}:::cek -->|"Bukan bukti serah"| SR1["Serah terima kendaraan<br/>dicatat saat mobil diambil"]:::off
+  end
+  MX ~~~ AX ~~~ KH

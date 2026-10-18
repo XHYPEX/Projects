@@ -1,0 +1,41 @@
+%% Gambar: 21
+%% Judul: Master Satuan
+%% Modul: Master Satuan
+%% Tujuan: Satuan barang (PCS, SET, ROLL, ...) yang konsisten di Master Barang dan transaksi.
+%% Dimulai dari: Admin/staff menambah satuan.
+%% Proses Utama: Nama (UPPERCASE, maks 30) → cek duplikat tanpa beda huruf besar/kecil → simpan → dipakai barang & transaksi.
+%% Hasil: Satuan aktif yang bisa dipilih di Master Barang.
+%% Warning: Mengubah PCS menjadi METER bukan koreksi ejaan dan tidak boleh lewat ganti nama. Ganti nama satuan yang dipakai barang wajib konfirmasi. Satuan yang pernah dipakai tidak bisa dihapus permanen.
+%% Modul Terkait: Master Barang, Barang Masuk, Kasir, SO, PO (tampilan qty).
+%% Catatan Programmer: confirm_rename untuk satuan terpakai; nonaktif wajib alasan; hapus admin hanya jika tidak pernah dipakai produk/dokumen.
+%% Status Implementasi: Sudah ada: UPPERCASE, unik, konfirmasi ganti nama, nonaktif beralasan, hapus terbatas. Belum: penjaga perubahan ARTI satuan (PCS → METER) — saat ini ganti nama yang dikonfirmasi tetap diterima.
+flowchart TB
+  subgraph T1["1 · Create"]
+    direction LR
+    A(["Tombol ‘+ Satuan’"]):::aksi --> B[/"Nama → otomatis UPPERCASE"/]:::aksi --> C{"Kosong / > 30 karakter?"}:::cek
+    C -->|YA| C1["Ditolak"]:::err
+    C -->|TIDAK| D{"Sudah ada?<br/>(PCS = pcs)"}:::cek
+    D -->|YA| D1["Ditolak: duplikat"]:::err
+    D -->|TIDAK| F["Simpan: AKTIF"]:::ok
+  end
+  subgraph T2["2 · Update / Nonaktif / Hapus"]
+    direction LR
+    U{"Aksi?"}:::cek
+    U -->|"Ganti nama"| U1{"Dipakai barang?"}:::cek
+    U1 -->|YA| U2{"Konfirmasi ganti nama<br/>di semua barang?"}:::cek
+    U2 -->|TIDAK| U3["Batal"]:::off
+    U2 -->|YA| UM{"Arti satuan berubah?<br/>(PCS → METER)"}:::cek
+    UM -->|"Hanya ejaan"| U4["Tersimpan"]:::ok
+    UM -->|"Arti berubah"| UM1["Target: tolak — buat satuan baru;<br/>konversi = fitur terpisah"]:::off
+    U1 -->|TIDAK| U4
+    U -->|"Nonaktifkan"| U5[/"Alasan wajib"/]:::tunggu --> U6["NONAKTIF"]:::tunggu
+    U -->|"Aktifkan"| U7["AKTIF"]:::ok
+    U -->|"Hapus (admin)"| U8{"Pernah dipakai barang /<br/>dokumen?"}:::cek
+    U8 -->|YA| U9["Ditolak: nonaktifkan saja"]:::err
+    U8 -->|TIDAK| U10["Dihapus"]:::off
+  end
+  subgraph T3["3 · Dipakai"]
+    direction LR
+    P["Master Barang → Kasir, SO, PO,<br/>Barang Masuk, Opname"]:::so
+  end
+  T1 --> T2 --> T3

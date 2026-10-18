@@ -1,0 +1,40 @@
+%% Gambar: 27
+%% Judul: Pengguna, Hak Akses & Audit Log
+%% Modul: Pengguna, Role, Log Aktivitas
+%% Tujuan: Hanya pengguna berwenang yang bisa melakukan aksi berisiko, dan setiap perubahan tercatat.
+%% Dimulai dari: Pengguna login.
+%% Proses Utama: Login → cek sesi → cek role (admin/staff) → cek izin aksi → izinkan/tolak → tulis audit log.
+%% Hasil: Aksi sensitif hanya oleh admin; semua POST/PUT/PATCH/DELETE tercatat (termasuk yang gagal).
+%% Warning: Admin aktif terakhir tidak bisa diturunkan/dinonaktifkan. Menonaktifkan pengguna memutus sesinya. Harga beli disembunyikan dari staff.
+%% Modul Terkait: Semua modul.
+%% Catatan Programmer: Role admin/staff. require_admin: pengguna & log, ringkasan penjualan, nota (balik bayar, refund, buka kembali, retur, hapus, void nota berbayar), hapus master, arsip kategori & impor, penyesuaian stok, void Barang Masuk, setujui/tolak opname, void/hapus faktur. Middleware activity mencatat body (rahasia disamarkan, maks 8KB).
+%% Status Implementasi: Sudah ada. Celah: aksi PO dan SO (batal PO, ubah status) belum dibatasi admin; GET tidak dicatat; log tidak pernah dipangkas; izin per-aksi yang lebih rinci (selain admin/staff) belum ada.
+flowchart TB
+  subgraph T1["1 · Login & cek izin"]
+    direction LR
+    A(["Login"]):::aksi --> B{"Akun aktif &<br/>sandi benar?"}:::cek
+    B -->|TIDAK| B1["Ditolak"]:::err
+    B -->|YA| C["Sesi dibuat"]:::ok --> D[/"Pengguna melakukan aksi"/]:::aksi --> E{"Role?"}:::cek
+    E -->|Admin| F["Semua aksi"]:::ok
+    E -->|Staff| G{"Aksi khusus admin?"}:::cek
+    G -->|YA| G1["Ditolak: tidak memiliki izin<br/>(tetap tercatat di log)"]:::err
+    G -->|TIDAK| F
+  end
+  subgraph T2["2 · Khusus admin"]
+    direction LR
+    K1["Void nota yang sudah dibayar ·<br/>balik bayar · refund · buka kembali ·<br/>retur · hapus nota"]:::so ~~~ K2["Penyesuaian stok · void Barang Masuk ·<br/>setujui/tolak opname"]:::so ~~~ K3["Hapus master · arsip/impor kategori ·<br/>ganti supplier barang"]:::so ~~~ K4["Pengguna · log aktivitas ·<br/>void/hapus faktur · ringkasan penjualan"]:::so ~~~ K5["Matriks role-permission final<br/>(posting stok, ubah harga, void,<br/>refund, approval) — K-22"]:::off
+  end
+  subgraph T3["3 · Audit log"]
+    direction LR
+    L1["Setiap POST/PUT/PATCH/DELETE"]:::aksi --> L2[("Log: pengguna, waktu, aksi,<br/>entitas, ringkasan, status,<br/>isi (rahasia disamarkan)")]:::data
+    L3["Tercakup: pembuatan transaksi, ubah harga,<br/>pembayaran, pembatalan, posting BM,<br/>opname, ubah status, edit transaksi final"]:::ok
+    L4["Tidak dicatat: GET, replay idempoten"]:::off
+  end
+  subgraph T4["4 · Kelola pengguna (admin)"]
+    direction LR
+    U{"Aksi?"}:::cek
+    U -->|"Turunkan / nonaktifkan<br/>admin aktif terakhir"| U1["Ditolak"]:::err
+    U -->|"Nonaktifkan pengguna"| U2["Sesi diputus"]:::tunggu
+    U -->|"Tambah / ubah role"| U3["Tersimpan + log"]:::ok
+  end
+  T1 --> T2 --> T3 --> T4

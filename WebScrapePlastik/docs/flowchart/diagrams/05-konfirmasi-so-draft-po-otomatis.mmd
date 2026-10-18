@@ -1,0 +1,40 @@
+%% Gambar: 05
+%% Judul: Konfirmasi SO dan Pembuatan Draft PO Otomatis
+%% Modul: Sales Order → Purchase Order
+%% Tujuan: Setiap SO aktif yang memiliki barang Pesan Supplier otomatis punya draft PO, dikelompokkan per supplier, tanpa duplikat.
+%% Dimulai dari: SO dikonfirmasi, SO Draft diaktifkan, atau SO aktif diedit (qty naik / baris baru).
+%% Proses Utama: Hitung qty belum dipesan per baris → kelompokkan per supplier → buat 1 draft PO per supplier → tautkan tiap baris PO ke baris SO.
+%% Hasil: Contoh SO-001: PO-SUP-001 → ASTA JAYA (Head Unit), PO-SUP-002 → Supplier B (Frame). Kamera Mundur (stok toko) tidak dibuatkan PO.
+%% Warning: Simpan ulang SO tidak boleh membuat PO duplikat. Baris tanpa supplier menghentikan konfirmasi (Gambar 03).
+%% Modul Terkait: Sales Order, Purchase Order, Master Supplier, Dashboard.
+%% Catatan Programmer: Qty belum dipesan = qty SO − SUM(qty PO aktif termasuk Draft, dikurangi qty batal). Fungsi saat ini: _auto_supplier_pos_for_preorder (database.py), aman dipanggil berulang.
+%% Status Implementasi: Sudah ada: draft PO otomatis per supplier saat SO terbit/diaktifkan/diedit, tanpa duplikat, catatan "Otomatis dari Sales Order …", supplier header SO menang atas supplier barang, barang tanpa supplier → UMUM. Belum ada: pengecualian baris sumber Inventory (saat ini SEMUA baris yang belum sampai di toko dibuatkan PO); turunnya qty SO tidak mengurangi draft PO.
+flowchart TB
+  subgraph T1["1 · Pemicu"]
+    direction LR
+    A1(["SO dikonfirmasi"]):::so
+    A2(["SO Draft diaktifkan"]):::so
+    A3(["SO aktif diedit: qty naik / baris baru"]):::so
+    A1 --> J["Jalankan pembuatan draft PO<br/>(di transaksi yang sama)"]:::aksi
+    A2 --> J
+    A3 --> J
+  end
+  subgraph T2["2 · Hitung kebutuhan per baris SO"]
+    direction LR
+    L0["Ambil baris SO"]:::aksi --> L1{"Sumber = Pesan Supplier<br/>dan belum Sampai di Toko?"}:::cek
+    L1 -->|TIDAK| L2["Lewati baris<br/>(stok toko / sudah tiba)"]:::off
+    L1 -->|YA| L3["Qty belum dipesan =<br/>qty SO − qty di PO aktif/Draft"]:::so --> L4{"Qty belum dipesan > 0?"}:::cek
+    L4 -->|"TIDAK: sudah tercakup"| L5["Tidak buat apa pun<br/>(cegah duplikat)"]:::ok
+    L4 -->|YA| L6["Masuk daftar kebutuhan"]:::tunggu
+  end
+  subgraph T3["3 · Kelompokkan & buat draft"]
+    direction LR
+    G1["Kelompokkan kebutuhan per supplier<br/>(header SO → barang → UMUM)"]:::so --> G2{"Supplier aktif?"}:::cek
+    G2 -->|TIDAK| G3["Batalkan seluruh simpan:<br/>Supplier tidak aktif"]:::err
+    G2 -->|YA| G4["Buat 1 DRAFT PO per supplier<br/>nomor PO-SUP-NNN"]:::ok --> G5["Baris PO = qty belum dipesan<br/>tautan ke baris SO<br/>harga = harga modal terakhir"]:::ok --> G6[("Event PO: Draft dibuat otomatis<br/>dari Sales Order …")]:::data
+  end
+  subgraph T4["4 · Admin"]
+    direction LR
+    P1[["Buka Purchase Order:<br/>periksa & terbitkan (Gambar 07)"]]:::sub
+  end
+  T1 --> T2 --> T3 --> T4

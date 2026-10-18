@@ -1,0 +1,63 @@
+%% Gambar: 01
+%% Judul: Peta Integrasi Seluruh Sistem
+%% Modul: Semua modul
+%% Tujuan: Menunjukkan dokumen apa yang dibuat di tiap modul dan ke mana datanya mengalir.
+%% Dimulai dari: Master data dipakai oleh semua transaksi.
+%% Proses Utama: Sales Order → Purchase Order → Barang Masuk → Stok → Kasir/Invoice → Riwayat & Dashboard.
+%% Hasil: Setiap perubahan stok dan uang punya satu dokumen sumber yang bisa ditelusuri.
+%% Warning: Stok hanya berubah lewat Barang Masuk, Kasir/Invoice, Retur, dan Stock Opname. PO dan Pembayaran tidak mengubah stok.
+%% Modul Terkait: Semua.
+%% Catatan Programmer: Panah putus-putus = referensi data (tidak mengubah stok). Panah tebal = memindahkan stok atau uang.
+%% Status Implementasi: Semua modul pada peta ini sudah ada. Stock In Allocation sebagai angka terpisah belum ada (lihat Gambar 04).
+flowchart LR
+  subgraph M["MASTER DATA"]
+    MB["Master Barang<br/>SKU, harga, stok"]:::data
+    MK["Master Kategori<br/>Induk → Sub"]:::data
+    MBr["Master Brand"]:::data
+    MS["Master Supplier"]:::data
+    MSt["Master Satuan"]:::data
+    MC["Master Customer<br/>& Kendaraan"]:::data
+  end
+  subgraph T["TRANSAKSI PENJUALAN"]
+    SO["Sales Order<br/>pesanan/booking customer"]:::so
+    KS["Kasir<br/>Invoice berjalan"]:::aksi
+    RI["Riwayat Invoice<br/>& Cetak Nota"]:::aksi
+    RT["Retur / Void Barang"]:::err
+  end
+  subgraph P["PENGADAAN"]
+    PO["Purchase Order<br/>ke supplier"]:::so
+    BM["Barang Masuk<br/>Goods Receipt"]:::ok
+    FP["Faktur Pembelian<br/>& Bayar Supplier"]:::tunggu
+  end
+  subgraph I["INVENTORY & KONTROL"]
+    ST[("Stok & Riwayat Stok")]:::data
+    OP["Stock Opname"]:::tunggu
+    DB["Dashboard &<br/>Notice"]:::off
+    LG[("Log Aktivitas")]:::data
+  end
+  MK -.-> MB
+  MBr -.-> MB
+  MS -.-> MB
+  MSt -.-> MB
+  MC -.-> SO
+  MC -.-> KS
+  MB -.-> SO
+  MB -.-> KS
+  SO ==>|"konfirmasi: draft PO otomatis per supplier"| PO
+  SO ==>|"SO terbit: invoice SO dibuat"| KS
+  PO ==>|"barang tiba"| BM
+  PO -.->|"tagihan supplier"| FP
+  BM ==>|"posting: stok bertambah"| ST
+  BM -.->|"update status item SO"| SO
+  KS ==>|"barang keluar: stok berkurang"| ST
+  RT ==>|"barang kembali ke stok"| ST
+  OP ==>|"posting koreksi"| ST
+  KS --> RI
+  RI --> RT
+  ST -.-> DB
+  SO -.-> DB
+  PO -.-> DB
+  KS -.-> DB
+  KS -.-> LG
+  PO -.-> LG
+  BM -.-> LG

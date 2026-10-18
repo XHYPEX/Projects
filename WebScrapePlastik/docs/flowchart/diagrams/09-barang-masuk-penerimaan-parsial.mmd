@@ -1,0 +1,45 @@
+%% Gambar: 09
+%% Judul: Barang Masuk dan Penerimaan Parsial
+%% Modul: Barang Masuk (Goods Receipt)
+%% Tujuan: Menambah stok fisik hanya untuk barang yang benar-benar diterima, tepat satu kali.
+%% Dimulai dari: Barang dari supplier tiba di toko.
+%% Proses Utama: Pilih PO → pilih baris yang datang → qty & kondisi → simpan draft → validasi → posting → stok + riwayat → status PO & SO diperbarui.
+%% Hasil: Contoh PO 2 PCS: hari 1 datang 1 (PO Sebagian Diterima, stok +1), hari 2 datang 1 (PO Diterima, stok +1). Total stok bertambah 2, bukan 3 atau 4.
+%% Warning: Dokumen yang sudah diposting tidak bisa diposting lagi. Qty diterima tidak boleh melebihi sisa PO tanpa keputusan admin. Mode manual (tanpa PO) wajib alasan dan verifikasi.
+%% Modul Terkait: Purchase Order, Sales Order, Master Barang, Riwayat Stok, Faktur Pembelian.
+%% Catatan Programmer: Posting = satu transaksi: ubah status dokumen ke posted (WHERE status != posted) lalu tambah stok & tulis ledger. Rowcount 0 = sudah diposting → tolak.
+%% Status Implementasi: Sudah ada: mode PO & manual (alasan wajib, wajib diperiksa sebelum posting), tanggal terima ≤ 30 hari, posting → stok + riwayat + harga rata-rata, PO/SO diperbarui; kondisi baik/rusak/tidak sesuai di 'Terima Barang' PO; void dokumen (admin, ditolak bila stok sudah terpakai). Posting dikunci transaksi (BEGIN IMMEDIATE + compare-and-set). 'Terima Barang' di PO tidak menyentuh stok; barang yang diposting untuk baris SO langsung dicadangkan untuk SO itu.
+flowchart TB
+  subgraph T1["1 · Mulai penerimaan"]
+    direction LR
+    S(["Barang dari supplier tiba"]):::aksi --> M{"Ada PO Supplier?"}:::cek
+    M -->|YA| P1[/"Pilih PO → Ambil Barang dari PO<br/>(hanya baris yang datang hari ini)"/]:::aksi
+    M -->|TIDAK| P2[/"Mode MANUAL:<br/>alasan wajib"/]:::tunggu
+  end
+  subgraph T2["2 · Periksa fisik & isi qty"]
+    direction LR
+    Q1[/"Qty diterima + kondisi + lokasi"/]:::aksi --> K{"Kondisi barang?"}:::cek
+    K -->|Baik| OK1["Masuk qty baik"]:::ok
+    K -->|"Rusak"| RS["Catat rusak: tidak masuk stok jual<br/>→ klaim / retur supplier"]:::err
+    K -->|"Tidak sesuai pesanan"| NS["Jangan diterima di baris ini<br/>→ hubungi supplier"]:::err
+    OK1 --> Q2{"Qty vs sisa PO?"}:::cek
+    Q2 -->|"Sama"| L["Lengkap"]:::ok
+    Q2 -->|"Kurang"| SB["Sebagian: sisa tetap ditunggu"]:::tunggu
+    Q2 -->|"Lebih"| LB["Barang lebih: ditolak<br/>atau keputusan admin"]:::err
+  end
+  subgraph T3["3 · Simpan & posting"]
+    direction LR
+    D["Simpan Draft penerimaan"]:::tunggu --> V{"Mode manual?"}:::cek
+    V -->|YA| RV{"Disetujui verifikator?"}:::cek
+    RV -->|TIDAK| RJ["Ditolak: kembali ke draft"]:::err
+    RV -->|YA| PS
+    V -->|TIDAK| PS{"Dokumen sudah<br/>diposting sebelumnya?"}:::cek
+    PS -->|YA| DUP["Tolak: sudah diposting<br/>(cegah stok ganda)"]:::err
+    PS -->|TIDAK| PO["POSTING"]:::ok
+  end
+  subgraph T4["4 · Efek posting (satu transaksi)"]
+    direction LR
+    E1["Stock In Hand + qty baik"]:::ok --> E2[("Riwayat stok:<br/>Barang Masuk BM-xxx")]:::data --> E3["PO: Sebagian / Diterima"]:::so --> E4["Baris SO terkait → Sampai di Toko<br/>qty otomatis dicadangkan untuk SO itu"]:::so --> F(["Selesai"]):::ok
+    ERR["Posting gagal → semua dibatalkan<br/>(rollback), dokumen tetap Draft"]:::err
+  end
+  T1 --> T2 --> T3 --> T4

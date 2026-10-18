@@ -1,0 +1,50 @@
+%% Gambar: 12
+%% Judul: Cashier: Pembuatan Invoice Baru
+%% Modul: Cashier / Kasir
+%% Tujuan: Membuat invoice untuk customer yang datang langsung, dengan status pembayaran dan pengerjaan yang ditentukan terpisah.
+%% Dimulai dari: Customer datang membawa mobil dan memilih aksesoris.
+%% Proses Utama: Customer & plat → barang/jasa → cek stok → status pengerjaan → pembayaran (opsional) → simpan → stok keluar → invoice berjalan.
+%% Hasil: Invoice tersimpan dengan nomor tetap; status pembayaran dihitung dari uang masuk; status pengerjaan dipilih kasir.
+%% Warning: Draft tidak memotong stok dan tidak boleh menerima uang. Stok tidak cukup → simpan ditolak. Barang arsip tidak bisa dipilih. Customer nonaktif tidak bisa dipilih.
+%% Modul Terkait: Master Customer, Master Barang, Stok/Riwayat Stok, Riwayat Invoice, Dashboard.
+%% Catatan Programmer: POST /receipts dengan Idempotency-Key. Stok dipotong lewat _apply_receipt_stock_delta (satu-satunya titik penjualan memotong stok) dan ditulis ke stock_ledger. Status bayar diturunkan dari amount_paid vs total, tidak diisi manual.
+%% Status Implementasi: Sudah ada. Stok yang dicek = Stock Available (stok fisik − dicadangkan untuk SO). Bila melebihi: ditolak 'Stok sudah dicadangkan untuk pelanggan Sales Order'; admin dapat mengizinkan dengan alasan (dicatat di riwayat nota). Saran barang di kasir menampilkan 'Bebas X (dicadangkan Y)'.
+flowchart TB
+  subgraph T1["1 · Customer & kendaraan"]
+    direction LR
+    A(["Customer datang"]):::aksi --> B{"Customer sudah ada?<br/>(cari nomor HP)"}:::cek
+    B -->|YA| B1{"Customer aktif?"}:::cek
+    B1 -->|TIDAK| E0["Tidak bisa dipilih:<br/>aktifkan dulu di Master"]:::err
+    B1 -->|YA| C
+    B -->|TIDAK| B2["Customer baru otomatis<br/>dibuat saat simpan"]:::ok --> C[/"Plat nomor + merk, tipe,<br/>warna, tahun kendaraan"/]:::aksi
+  end
+  subgraph T2["2 · Barang & jasa"]
+    direction LR
+    I1[/"Pilih barang (scan / cari)"/]:::aksi --> I2{"Barang aktif<br/>(tidak diarsip)?"}:::cek
+    I2 -->|TIDAK| E1["Ditolak: barang diarsip"]:::err
+    I2 -->|YA| I3{"Stok cukup?"}:::cek
+    I3 -->|TIDAK| E2["Stok tidak cukup:<br/>kurangi qty / buat Sales Order"]:::err
+    I3 -->|YA| I4["Baris barang"]:::ok
+    J[/"Jasa pemasangan<br/>(tidak memakai stok)"/]:::aksi --> I4
+    I4 --> I5[/"Diskon per baris"/]:::aksi
+  end
+  subgraph T3["3 · Status & pembayaran"]
+    direction LR
+    W{"Status pengerjaan awal?"}:::cek
+    W -->|"Draft"| WD["DRAFT: tidak potong stok,<br/>tidak boleh bayar"]:::off
+    W -->|"Belum / Sedang / Selesai"| P{"Ada pembayaran sekarang?"}:::cek
+    P -->|TIDAK| P0["BELUM BAYAR"]:::err
+    P -->|YA| P1[/"Nominal + metode"/]:::aksi --> P2{"Nominal vs total"}:::cek
+    P2 -->|"Kurang dari total"| P3["SEBAGIAN"]:::tunggu
+    P2 -->|"= total"| P4["LUNAS"]:::ok
+  end
+  subgraph T4["4 · Simpan"]
+    direction LR
+    S{"Simpan ditekan dua kali?"}:::cek
+    S -->|YA| S1["Kunci idempoten: tetap 1 invoice"]:::ok
+    S -->|TIDAK| S2["Simpan dalam satu transaksi"]:::ok
+    S2 --> S3{"Berhasil?"}:::cek
+    S3 -->|TIDAK| S4["Error → semua dibatalkan,<br/>stok & uang tidak berubah"]:::err
+    S3 -->|YA| S5["Stok keluar + riwayat stok<br/>(kecuali Draft)"]:::ok --> S6(["Invoice berjalan<br/>muncul di Riwayat Invoice"]):::ok
+  end
+  T1 --> T2 --> T3 --> T4

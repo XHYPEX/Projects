@@ -1,0 +1,38 @@
+%% Gambar: 16
+%% Judul: Riwayat Invoice & Cetak Nota
+%% Modul: Riwayat Invoice / Riwayat Nota
+%% Tujuan: Mencari, memeriksa, menagih, dan mencetak (ulang) nota tanpa mengubah data transaksi.
+%% Dimulai dari: Kasir menyimpan invoice → otomatis muncul di Riwayat.
+%% Proses Utama: Cari (nomor / customer / plat) → filter status → buka detail → tambah pembayaran jika boleh → cetak / cetak ulang.
+%% Hasil: Nota tercetak pada Epson LX-310 continuous form; data transaksi tidak berubah karena mencetak.
+%% Warning: Mencetak tidak boleh mengubah status, nomor, atau angka. Nota void tetap bisa dilihat dan dicetak dengan tanda VOID. Orientasi 11 × 9,5 inci perlu kalibrasi printer fisik.
+%% Modul Terkait: Cashier, Sales Order (invoice SO), Master Customer, Dashboard.
+%% Catatan Programmer: Satu format cetak nota (continuous form 9,5 × 11 inci potret) dipakai untuk invoice kasir dan invoice SO. Nota SO punya cetak sendiri dengan pilihan kertas (9,5×11, 9,5×5,5, A5, A4) dan margin.
+%% Status Implementasi: Sudah ada: pencarian, filter Belum/Sebagian/Lunas dan Belum Selesai/Selesai/Void, detail, tambah pembayaran, cetak & cetak ulang. Perlu dicek: target layout 11 × 9,5 inci (lanskap) vs format saat ini 9,5 × 11 inci (potret); log 'cetak ulang' belum dicatat.
+flowchart TB
+  subgraph T1["1 · Cari & buka"]
+    direction LR
+    A(["Invoice tersimpan"]):::ok --> B[("Riwayat Invoice")]:::data --> C[/"Cari: nomor invoice /<br/>customer / plat"/]:::aksi --> D[/"Filter: Belum Bayar · Sebagian · Lunas<br/>Belum Selesai · Selesai · Void"/]:::aksi --> E["Buka detail"]:::aksi
+  end
+  subgraph T2["2 · Periksa status"]
+    direction LR
+    F{"Invoice void?"}:::cek
+    F -->|YA| F1["Hanya lihat / cetak<br/>bertanda VOID"]:::off
+    F -->|TIDAK| G{"Status bayar?"}:::cek
+    G -->|"Belum / Sebagian"| G1["Tombol Tambah Pembayaran<br/>(maks = sisa)"]:::tunggu
+    G -->|"Lunas"| G2["Tidak ada tagihan"]:::ok
+    H{"Status pengerjaan?"}:::cek
+    H -->|"Belum / Sedang"| H1["Invoice berjalan:<br/>bisa diubah (Gambar 14)"]:::so
+    H -->|"Selesai + Lunas"| H2["Tertutup: read-only"]:::ok
+    I{"Berasal dari SO?"}:::cek
+    I -->|YA| I1["Tampilkan nomor SO & DP<br/>baris SO tidak diubah di sini"]:::so
+  end
+  subgraph T3["3 · Cetak"]
+    direction LR
+    P1["Cetak nota"]:::aksi --> P2["Printer Epson LX-310<br/>continuous form"]:::data --> P3{"Hasil rapi?"}:::cek
+    P3 -->|TIDAK| P4["Kalibrasi kertas / margin<br/>(tidak mengubah data)"]:::tunggu
+    P3 -->|YA| P5(["Nota diserahkan"]):::ok
+    R["Cetak ulang kapan saja"]:::aksi --> P2
+    NB["Mencetak TIDAK mengubah<br/>status, nomor, atau nominal"]:::err
+  end
+  T1 --> T2 --> T3

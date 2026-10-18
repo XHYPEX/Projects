@@ -1,0 +1,44 @@
+%% Gambar: 17
+%% Judul: Faktur Pembelian & Pembayaran Supplier
+%% Modul: Faktur Pembelian / Utang Supplier
+%% Tujuan: Mencatat tagihan supplier, jatuh tempo, dan pembayaran (sebagian/lunas) tanpa mencampur status PO, pengiriman, dan penerimaan.
+%% Dimulai dari: Supplier menerbitkan faktur atas PO.
+%% Proses Utama: Catat faktur (no. faktur supplier, termin, jatuh tempo) → posting → catat pembayaran → utang diperbarui → sebagian/lunas → riwayat tersimpan.
+%% Hasil: Utang supplier per faktur dengan status Belum Bayar / Sebagian / Lunas / Lewat Jatuh Tempo.
+%% Warning: Nomor faktur supplier tidak boleh dicatat dua kali untuk supplier yang sama. Supplier sudah dibayar ≠ barang sudah tiba. Barang sudah tiba ≠ supplier sudah dibayar. Faktur tidak pernah mengubah stok. Pembayaran tidak boleh melebihi sisa utang.
+%% Modul Terkait: Purchase Order, Barang Masuk, Master Supplier, Dashboard (utang supplier).
+%% Catatan Programmer: Dua tempat saat ini: (1) data faktur & pembayaran di dalam PO (spo_payments, INV-SUP-…, termin, jatuh tempo, PPN, ongkir) dan (2) modul Faktur Pembelian terpisah (FP-YYYYMMDD-NNNN, draft/posted/void) tanpa kolom tautan ke PO/Barang Masuk.
+%% Status Implementasi: Sudah ada keduanya. PERLU KEPUTUSAN: satukan sumber utang (PO vs Faktur Pembelian). Faktur Pembelian belum punya tabel riwayat per pembayaran (hanya total dibayar); pembalikan pembayaran PO belum ada; void faktur ditolak jika sudah ada pembayaran; nomor faktur supplier belum dicek unik per supplier.
+flowchart TB
+  subgraph S4["Empat status terpisah (tidak digabung)"]
+    direction LR
+    Q1["Status PO:<br/>Draft · Dipesan · Sebagian Diterima ·<br/>Diterima · Batal"]:::so ~~~ Q2["Status Pengiriman:<br/>Belum Dikirim · Diproses ·<br/>Dalam Pengiriman · Tiba"]:::so ~~~ Q3["Status Penerimaan:<br/>Belum · Sebagian · Lengkap"]:::so ~~~ Q4["Status Bayar Supplier:<br/>Belum Ditagih · Belum Bayar · Sebagian ·<br/>Lunas · Lewat Jatuh Tempo"]:::so
+  end
+  subgraph T1["1 · Catat faktur"]
+    direction LR
+    A(["Supplier kirim faktur"]):::aksi --> B[/"No. faktur supplier, tanggal,<br/>termin (NET n), PPN, ongkir, diskon"/]:::aksi --> DU{"No. faktur sudah ada<br/>untuk supplier ini?"}:::cek
+    DU -->|YA| DU1["Tolak: faktur duplikat<br/>(target, saat ini belum dicek)"]:::off
+    DU -->|TIDAK| C{"Jatuh tempo ≥<br/>tanggal faktur?"}:::cek
+    C -->|TIDAK| C1["Ditolak"]:::err
+    C -->|YA| D["Total dihitung ulang server"]:::ok --> E{"Posting?"}:::cek
+    E -->|TIDAK| E1["Draft (bisa diubah / dihapus admin)"]:::tunggu
+    E -->|YA| E2["POSTED: utang tercatat<br/>(stok TIDAK berubah)"]:::ok
+  end
+  subgraph T2["2 · Bayar supplier"]
+    direction LR
+    P[/"Pembayaran: nominal, metode<br/>(transfer wajib no. referensi)"/]:::aksi --> P1{"Nominal ≤ sisa utang?"}:::cek
+    P1 -->|TIDAK| P2["Ditolak: melebihi utang"]:::err
+    P1 -->|YA| P3["Utang berkurang<br/>riwayat pembayaran tersimpan"]:::ok --> P4{"Sisa utang?"}:::cek
+    P4 -->|"Lebih dari 0"| P5["SEBAGIAN"]:::tunggu
+    P4 -->|"0"| P6["LUNAS"]:::ok
+    P7{"Lewat jatuh tempo<br/>dan belum lunas?"}:::cek -->|YA| P8["LEWAT JATUH TEMPO<br/>→ notice dashboard"]:::err
+  end
+  subgraph T3["3 · Koreksi"]
+    direction LR
+    V{"Faktur salah?"}:::cek
+    V -->|"Masih draft"| V1["Ubah / hapus (admin)"]:::tunggu
+    V -->|"Posted, belum dibayar"| V2["Void (admin) + alasan"]:::err
+    V -->|"Posted, sudah dibayar"| V3["Ditolak: balikkan pembayaran dulu<br/>(perlu keputusan alurnya)"]:::off
+  end
+  S4 ~~~ T1
+  T1 --> T2 --> T3

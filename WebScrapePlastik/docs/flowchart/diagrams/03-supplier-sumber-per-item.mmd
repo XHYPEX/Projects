@@ -1,0 +1,35 @@
+%% Gambar: 03
+%% Judul: Pemilihan Supplier dan Sumber Pemenuhan Per Item
+%% Modul: Sales Order
+%% Tujuan: Menentukan untuk setiap baris SO apakah dipenuhi dari stok toko atau dipesan ke supplier, dan ke supplier mana.
+%% Dimulai dari: Admin menambah barang di form Sales Order.
+%% Proses Utama: Cek Stock Available → pilih sumber → bila Pesan Supplier, pilih supplier (default dari Master Barang).
+%% Hasil: Tiap baris SO punya sumber (Inventory / Pesan Supplier / campuran) dan supplier tujuan.
+%% Warning: "Supplier belum dipilih untuk item ini." SO tidak bisa dikonfirmasi selama ada baris Pesan Supplier tanpa supplier. Barang dari stok toko tidak boleh masuk PO.
+%% Modul Terkait: Master Barang, Master Supplier, Purchase Order, Stok.
+%% Catatan Programmer: Simpan per baris SO: source (inventory|supplier|campuran), supplier_id, qty_from_stock, qty_to_order. Supplier di header SO (sudah ada) dipakai sebagai nilai default untuk semua baris.
+%% Status Implementasi: Sebagian. Sudah ada: satu supplier di header SO (berlaku untuk semua baris) atau ikut supplier Master Barang; barang ketik bebas ke UMUM. Belum ada: sumber per item, supplier per item, pemenuhan campuran stok + supplier.
+flowchart TB
+  subgraph T1["1 · Cek ketersediaan barang"]
+    direction LR
+    S(["Mulai: baris barang ditambahkan"]):::aksi --> M{"Dari Master Barang?"}:::cek
+    M -->|"TIDAK, ketik bebas"| FREE["Stok tidak dikenal<br/>→ wajib Pesan Supplier"]:::tunggu
+    M -->|YA| AV["Baca Stock Available<br/>= In Hand − Allocation"]:::so --> Q{"Stock Available ≥ qty?"}:::cek
+  end
+  subgraph T2["2 · Tentukan sumber pemenuhan"]
+    direction LR
+    Q2{"Hasil cek stok?"}:::cek
+    Q2 -->|"Cukup"| OVR{"Admin tetap ingin<br/>memesan ke supplier?"}:::cek
+    OVR -->|TIDAK| SRC1["Sumber: INVENTORY TOKO<br/>supplier tidak diperlukan,<br/>TIDAK masuk PO"]:::ok
+    OVR -->|YA| SRC2["Sumber: PESAN SUPPLIER"]:::so
+    Q2 -->|"Kurang, stok > 0"| MIX["Sumber: CAMPURAN<br/>qty stok dialokasikan,<br/>kekurangan dipesan"]:::tunggu
+    Q2 -->|"Stok 0 / ketik bebas"| SRC2
+  end
+  subgraph T3["3 · Tentukan supplier (hanya bagian yang dipesan)"]
+    direction LR
+    DEF["Isi default: supplier header SO<br/>→ jika kosong: supplier Master Barang<br/>→ jika kosong: UMUM"]:::so --> SUP{"Supplier sudah dipilih<br/>& aktif?"}:::cek
+    SUP -->|TIDAK| WARN["WARNING:<br/>Supplier belum dipilih untuk item ini<br/>(SO tidak bisa dikonfirmasi)"]:::err --> PICK[/"Admin memilih / mengganti supplier"/]:::aksi --> SUP2{"Dipilih?"}:::cek
+    SUP2 -->|YA| R(["Baris siap: sumber + supplier + qty"]):::ok
+    SUP -->|YA| R
+  end
+  T1 --> T2 --> T3

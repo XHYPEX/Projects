@@ -1,0 +1,42 @@
+%% Gambar: 24
+%% Judul: Riwayat Stok & Mutasi Inventori
+%% Modul: Riwayat Stok (stock ledger)
+%% Tujuan: Setiap perubahan stok punya satu baris riwayat dengan sumber, qty, saldo, pengguna, dan waktu.
+%% Dimulai dari: Transaksi apa pun yang menggerakkan stok.
+%% Proses Utama: Transaksi → hitung selisih → ubah stok → tulis baris riwayat (jenis, referensi, catatan, oleh) → tampil di Riwayat Stok barang.
+%% Hasil: Saldo stok bisa ditelusuri ulang dari riwayat; tidak ada perubahan stok tanpa jejak.
+%% Warning: Stok tidak boleh diubah langsung di Master Barang. Stok tidak boleh minus karena penjualan. Mencetak, mengedit nama, atau mengubah harga tidak menulis riwayat stok.
+%% Modul Terkait: Barang Masuk, Kasir, Sales Order (via invoice), Stock Opname, Master Barang.
+%% Catatan Programmer: stock_ledger jenis: IN (Barang Masuk), OUT/IN (nota: jual, ubah, void, hapus, retur ke stok), VOID (void Barang Masuk), ADJUSTMENT (manual admin, 'Stok awal', stock_opname). Penjualan menulis ref_type receipt, id nota di catatan.
+%% Status Implementasi: Sudah ada. Void Barang Masuk ditolak bila stok sudah terpakai. Cadangan SO tidak menulis riwayat (dihitung, bukan mutasi); stok keluar untuk SO tercatat saat baris Terpasang.
+flowchart LR
+  subgraph IN["Stok BERTAMBAH"]
+    direction TB
+    I1["Posting Barang Masuk<br/>IN · BM-xxx"]:::ok
+    I2["Void / hapus / kurangi qty nota<br/>IN · nota"]:::ok
+    I3["Retur ke stok<br/>IN · nota"]:::ok
+    I4["Opname: hitung > sistem<br/>ADJUSTMENT +"]:::ok
+    I5["Penyesuaian admin / Stok awal<br/>ADJUSTMENT +"]:::ok
+  end
+  subgraph OUT["Stok BERKURANG"]
+    direction TB
+    O1["Nota keluar dari Draft / tambah qty<br/>OUT · nota"]:::err
+    O2["Baris SO Terpasang<br/>OUT · invoice SO"]:::err
+    O3["Void Barang Masuk (admin)<br/>VOID · BM-xxx"]:::err
+    O4["Opname: hitung < sistem<br/>ADJUSTMENT −"]:::err
+    O5["Penyesuaian admin<br/>ADJUSTMENT −"]:::err
+  end
+  subgraph CORE["Satu titik pencatatan"]
+    direction TB
+    C1{"Stok cukup?<br/>(untuk pengurangan dari penjualan)"}:::cek
+    C1 -->|TIDAK| C2["Ditolak: 'Stok … tidak cukup'<br/>tidak ada yang berubah"]:::err
+    C1 -->|YA| C3["Ubah stock_qty"]:::ok --> C4[("Tulis riwayat:<br/>jenis · qty · saldo · referensi ·<br/>catatan · oleh · waktu")]:::data
+    C5["TIDAK menulis riwayat:<br/>edit nama/harga/kategori, cetak,<br/>PO dibuat, faktur, alokasi"]:::off
+  end
+  subgraph VIEW["Dilihat"]
+    direction TB
+    V1["Master Barang → Riwayat Stok"]:::so --> V2["In Hand · Dialokasikan · Available"]:::so --> V3["Telusuri per referensi<br/>(nota / BM / opname)"]:::so
+  end
+  IN --> CORE
+  OUT --> CORE
+  CORE --> VIEW

@@ -1,0 +1,37 @@
+%% Gambar: 30
+%% Judul: End-to-End Cashier Tanpa Sales Order
+%% Modul: Cashier (Flow D)
+%% Tujuan: Customer datang langsung, memilih barang yang tersedia, dipasang, dibayar, dan transaksi ditutup — satu invoice dari awal sampai akhir.
+%% Dimulai dari: Customer datang langsung ke toko membawa mobil.
+%% Proses Utama: Pilih aksesoris → invoice → cek stok → tentukan pengerjaan → catat pembayaran → tambah barang (opsional) → invoice diperbarui → pemasangan selesai → pelunasan → serah terima → invoice ditutup.
+%% Hasil: Satu invoice dengan nomor tetap; stok keluar sesuai barang; Lunas + Selesai → tertutup.
+%% Warning: Jangan membuat invoice baru saat customer menambah barang di pekerjaan yang sama. Stok tidak cukup → tawarkan Sales Order. Pembayaran tidak boleh melebihi sisa tagihan.
+%% Modul Terkait: Master Customer, Master Barang, Riwayat Stok, Riwayat Invoice, Dashboard.
+%% Catatan Programmer: Gabungan Gambar 12–16.
+%% Status Implementasi: Sudah ada. Belum: catatan serah terima kendaraan terpisah; cek stok belum mengurangi alokasi SO.
+flowchart TB
+  subgraph T1["1 · Datang & pilih"]
+    direction LR
+    A(["Customer datang langsung"]):::aksi --> B["Pilih aksesoris"]:::aksi --> C{"Stok cukup?"}:::cek
+    C -->|TIDAK| C1[["Buat Sales Order<br/>(Gambar 02)"]]:::sub
+    C -->|YA| D["Kasir membuat invoice<br/>customer + plat"]:::ok --> E{"Langsung dipasang?"}:::cek
+    E -->|YA| E1["SEDANG DIKERJAKAN"]:::so
+    E -->|TIDAK| E2["BELUM DIKERJAKAN"]:::tunggu
+  end
+  subgraph T2["2 · Bayar & tambah"]
+    direction LR
+    P{"Bayar sekarang?"}:::cek
+    P -->|"Tidak"| P0["BELUM BAYAR"]:::err
+    P -->|"Sebagian"| P1["SEBAGIAN"]:::tunggu
+    P -->|"Lunas"| P2["LUNAS"]:::ok
+    Q{"Customer menambah barang?"}:::cek
+    Q -->|YA| Q1["Invoice SAMA diperbarui<br/>total & status bayar dihitung ulang"]:::so
+    Q -->|TIDAK| Q2["Lanjut pengerjaan"]:::ok
+  end
+  subgraph T3["3 · Selesai & tutup"]
+    direction LR
+    F["Pemasangan SELESAI"]:::ok --> G{"Sisa tagihan?"}:::cek
+    G -->|"Lebih dari 0"| G1["Pelunasan"]:::aksi --> H
+    G -->|"0"| H["Barang & mobil diserahkan"]:::aksi --> I(["INVOICE DITUTUP<br/>Lunas + Selesai"]):::ok
+  end
+  T1 --> T2 --> T3

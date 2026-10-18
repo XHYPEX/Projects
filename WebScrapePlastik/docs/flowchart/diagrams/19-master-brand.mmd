@@ -1,0 +1,37 @@
+%% Gambar: 19
+%% Judul: Master Brand
+%% Modul: Master Brand / Merek
+%% Tujuan: Daftar merek dengan kode 3 huruf yang menjadi bagian SKU.
+%% Dimulai dari: Admin/staff menambah brand dari Master atau tambah cepat saat membuat barang.
+%% Proses Utama: Nama → kode otomatis 3 huruf → validasi duplikasi → simpan → dipakai di Master Barang (SKU).
+%% Hasil: Brand aktif yang bisa dipilih di Master Barang; 'Tanpa Merk' (NOB) selalu tersedia.
+%% Warning: Kode brand masuk ke SKU, jadi tidak diubah setelah dipakai. Brand yang sudah dipakai barang tidak bisa dihapus permanen; nonaktifkan saja.
+%% Modul Terkait: Master Barang, Barang Masuk (brand tertunda), SKU.
+%% Catatan Programmer: Baris is_system ('Tanpa Merk' NOB) tidak bisa diubah/dihapus. Hapus permanen hanya admin dan diblokir jika dipakai master_items atau inbound pending_brand.
+%% Status Implementasi: Sudah ada: tambah, kode otomatis, tolak duplikat, nonaktif/aktifkan (is_active), hapus admin dengan penjaga referensi.
+flowchart TB
+  subgraph T1["1 · Create"]
+    direction LR
+    A(["Tombol ‘+ Brand / tambah cepat’"]):::aksi --> B[/"Nama brand"/]:::aksi --> C["Kode 3 huruf otomatis<br/>(pratinjau)"]:::so --> D{"Nama sudah ada?"}:::cek
+    D -->|YA| D1["Ditolak: pakai brand yang ada"]:::err
+    D -->|TIDAK| D2{"Kode bentrok?"}:::cek
+    D2 -->|YA| D3["Kode alternatif dibuat"]:::tunggu --> F
+    D2 -->|TIDAK| F["Simpan: AKTIF"]:::ok
+  end
+  subgraph T2["2 · Update / Nonaktif / Aktifkan"]
+    direction LR
+    U{"Brand sistem<br/>(Tanpa Merk)?"}:::cek
+    U -->|YA| U1["Tidak bisa diubah / dihapus"]:::off
+    U -->|TIDAK| U2{"Aksi?"}:::cek
+    U2 -->|"Ubah nama"| U3["Tersimpan; SKU lama tetap"]:::ok
+    U2 -->|"Nonaktifkan"| U4["NONAKTIF: tidak muncul<br/>untuk barang baru"]:::tunggu
+    U2 -->|"Aktifkan"| U5["AKTIF"]:::ok
+    U2 -->|"Hapus (admin)"| U6{"Dipakai barang /<br/>Barang Masuk?"}:::cek
+    U6 -->|YA| U7["Ditolak: nonaktifkan saja"]:::err
+    U6 -->|TIDAK| U8["Dihapus"]:::off
+  end
+  subgraph T3["3 · Dipakai"]
+    direction LR
+    P["Master Barang"]:::so --> P1["SKU = Supplier-BRAND-segmen-urut"]:::data
+  end
+  T1 --> T2 --> T3

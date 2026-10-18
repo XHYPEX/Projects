@@ -1,0 +1,39 @@
+%% Gambar: 15
+%% Judul: Cashier: Penyelesaian Pengerjaan & Invoice
+%% Modul: Cashier / Kasir
+%% Tujuan: Menutup transaksi hanya jika pengerjaan selesai DAN pembayaran lunas, lalu mobil diserahkan.
+%% Dimulai dari: Karyawan selesai memasang atau customer datang mengambil mobil.
+%% Proses Utama: Pengerjaan Selesai → cek sisa tagihan → pelunasan → serah terima → invoice tertutup.
+%% Hasil: Invoice Lunas + Selesai menjadi read-only dan masuk laporan penjualan; cetak nota final.
+%% Warning: Pengerjaan selesai tidak berarti lunas. Mobil boleh diambil dengan piutang hanya atas keputusan admin/pemilik. Jam ambil yang dijadwalkan bukan bukti serah terima.
+%% Modul Terkait: Riwayat Invoice & Cetak Nota, Dashboard (piutang), Audit Log.
+%% Catatan Programmer: Tutup = status done AND work_status selesai (_is_closed). Reopen (admin) mengembalikan pengerjaan ke 'pengerjaan' dengan alasan. Pembayaran via POST /receipts/{id}/payments dibatasi maksimum sisa tagihan.
+%% Status Implementasi: Sudah ada: penutupan otomatis saat Lunas + Selesai, read-only, buka kembali (admin). Belum ada: status/tanggal Serah Terima Kendaraan terpisah; aturan 'mobil keluar dengan piutang' belum diputuskan.
+flowchart TB
+  subgraph T1["1 · Pengerjaan selesai"]
+    direction LR
+    A(["Karyawan selesai memasang"]):::aksi --> B["Ubah pengerjaan:<br/>SELESAI"]:::ok --> C{"Pekerjaan perlu diulang?"}:::cek
+    C -->|YA| C1["Kembali ke SEDANG DIKERJAKAN"]:::tunggu
+    C -->|TIDAK| D["Siap diambil"]:::ok
+  end
+  subgraph T2["2 · Cek pembayaran"]
+    direction LR
+    P{"Sisa tagihan?"}:::cek
+    P -->|"0 (LUNAS)"| P0["Lanjut serah terima"]:::ok
+    P -->|"Lebih dari 0"| P1[/"Pelunasan: nominal + metode<br/>(maks = sisa)"/]:::aksi --> P2{"Pembayaran berhasil?"}:::cek
+    P2 -->|TIDAK| P3["Pembayaran gagal:<br/>status tetap, ulangi"]:::err
+    P2 -->|YA| P4{"Sisa sekarang 0?"}:::cek
+    P4 -->|YA| P0
+    P4 -->|TIDAK| P5["SEBAGIAN"]:::tunggu --> P6{"Mobil boleh keluar<br/>dengan piutang?"}:::cek
+    P6 -->|"Izin admin (perlu keputusan)"| P7["Serah terima dengan piutang<br/>invoice tetap berjalan"]:::off
+    P6 -->|TIDAK| P8["Tahan sampai lunas"]:::tunggu
+  end
+  subgraph T3["3 · Serah terima & tutup"]
+    direction LR
+    S1["Mobil & barang diserahkan<br/>(target: dicatat terpisah)"]:::off --> S2{"Lunas + Selesai?"}:::cek
+    S2 -->|YA| S3["INVOICE TERTUTUP<br/>read-only, masuk laporan"]:::ok --> S4[["Cetak nota final<br/>(Gambar 16)"]]:::sub
+    S2 -->|TIDAK| S5["Tetap invoice berjalan<br/>tampil di piutang / dashboard"]:::tunggu
+    S3 --> S6{"Perlu koreksi setelah tutup?"}:::cek
+    S6 -->|YA| S7["Admin: Buka Kembali + alasan<br/>atau Retur per item"]:::tunggu
+  end
+  T1 --> T2 --> T3

@@ -1,0 +1,43 @@
+%% Gambar: 29
+%% Judul: End-to-End SO → PO → Barang Masuk → Kasir
+%% Modul: Integrasi Sales Order, Purchase Order, Barang Masuk, Cashier
+%% Tujuan: Menunjukkan Flow A (ready stock dibooking), Flow B (inden supplier), dan Flow C (beberapa customer satu PO) dari awal sampai invoice selesai.
+%% Dimulai dari: Customer memesan barang lewat Sales Order.
+%% Proses Utama: SO + DP → sumber per item → (stok: alokasi) / (inden: draft PO → terbit → kirim → Barang Masuk → posting) → barang siap → invoice SO → pemasangan → pelunasan → selesai.
+%% Hasil: Flow A: In Hand 10, SO RIRIN 6 → Available 4 → pasang → In Hand 4. Flow C: LEO 2 + BUDI 3 di satu PO ASTA JAYA; terima 3 lalu 2 → masing-masing SO maju sesuai referensinya, tidak tertukar.
+%% Warning: Alokasi customer tidak boleh tertukar. DP tidak dobel. Stok keluar satu kali di titik serah/pasang.
+%% Modul Terkait: Semua modul transaksi.
+%% Catatan Programmer: Referensi customer per baris PO = supplier_po_items.preorder_item_id. Qty diterima dibagikan ke baris PO yang bersangkutan, bukan dibagi rata.
+%% Status Implementasi: Flow A, B & C jalan. Draft PO otomatis hanya untuk kekurangan stok. 'Terima Barang' di PO tidak memotong stok; stok keluar saat baris SO Terpasang.
+flowchart TB
+  subgraph A["FLOW A · Ready stock dibooking"]
+    direction LR
+    A1["In Hand 10"]:::data --> A2["SO RIRIN 6 unit + DP"]:::so --> A3["SO dikonfirmasi"]:::so --> A4["Alokasi 6 → Available 4"]:::ok --> A5["Customer datang pasang"]:::aksi --> A6["Invoice dari SO<br/>stok keluar 6 → In Hand 4<br/>alokasi dilepas 6"]:::ok --> A7["Lunas + Selesai"]:::ok
+  end
+  subgraph B["FLOW B · Inden dari supplier"]
+    direction LR
+    B1["SO + DP<br/>supplier per item"]:::so --> B2["Draft PO otomatis<br/>per supplier"]:::tunggu --> B3["Admin terbitkan PO"]:::aksi --> B4["Supplier kirim<br/>tracking per item"]:::so --> B5["Barang Masuk<br/>posting: In Hand +"]:::ok --> B6["Baris SO: Sampai di Toko<br/>dicadangkan untuk SO"]:::so --> B7["Pasang · invoice SO<br/>DP diperhitungkan"]:::aksi --> B8["Invoice selesai"]:::ok
+  end
+  subgraph C["FLOW C · Beberapa customer satu PO"]
+    direction LR
+    C1["SO LEO: 2"]:::so --> C3["PO ASTA JAYA<br/>baris LEO 2 · baris BUDI 3"]:::tunggu
+    C2["SO BUDI: 3"]:::so --> C3
+    C3 --> C4["BM 1: terima 3<br/>LEO 2 ✓ · BUDI 1"]:::tunggu --> C5["BM 2: terima 2<br/>BUDI 3 ✓"]:::ok --> C6{"Qty diterima masuk ke<br/>baris customer yang benar?"}:::cek
+    C6 -->|YA| C7["SO LEO & SO BUDI maju<br/>sendiri-sendiri"]:::ok
+    C6 -->|TIDAK| C8["Ditolak: alokasi tertukar"]:::err
+  end
+  subgraph ERR["Titik keputusan & error"]
+    direction LR
+    E1{"DP belum diterima?"}:::cek -->|"YA"| E1a["Perlu keputusan:<br/>tahan konfirmasi?"]:::off
+    E2{"Supplier belum dipilih?"}:::cek -->|"YA"| E2a["Masuk UMUM / warning"]:::tunggu
+    E3{"PO duplikat?"}:::cek -->|"YA"| E3a["Tidak dibuat: qty sudah<br/>dihitung dipesan"]:::ok
+    E4{"Diterima > PO?"}:::cek -->|"YA"| E4a["Ditolak / keputusan admin"]:::err
+    E5{"SO batal setelah PO dikirim?"}:::cek -->|"YA"| E5a["Gambar 28"]:::sub
+    E1a ~~~ E2
+    E2a ~~~ E3
+    E3a ~~~ E4
+    E4a ~~~ E5
+  end
+  A ~~~ B
+  B ~~~ C
+  C ~~~ ERR

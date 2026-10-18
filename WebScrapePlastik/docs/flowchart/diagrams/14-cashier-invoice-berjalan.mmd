@@ -1,0 +1,46 @@
+%% Gambar: 14
+%% Judul: Cashier: Invoice Berjalan dan Tambah Barang
+%% Modul: Cashier / Kasir — ubah invoice
+%% Tujuan: Customer bisa menambah, mengganti, atau membatalkan barang selama pekerjaan yang sama, tanpa membuat invoice baru.
+%% Dimulai dari: Invoice berjalan dibuka dari Kasir atau Riwayat Invoice.
+%% Proses Utama: Buka invoice → cek boleh diubah → ubah baris → cek stok → hitung ulang total → hitung ulang status bayar → simpan → riwayat pembayaran tetap.
+%% Hasil: Contoh: total Rp2.000.000 sudah lunas, tambah barang Rp500.000 → Total Rp2.500.000, Dibayar Rp2.000.000, Sisa Rp500.000, SEBAGIAN, nomor invoice TETAP.
+%% Warning: Invoice tertutup (Lunas + Selesai) tidak bisa diubah kecuali admin membuka kembali dengan alasan. Dua kasir mengedit bersamaan → yang kedua ditolak. Baris dari SO dan baris yang sudah diretur tidak bisa diedit di kasir.
+%% Modul Terkait: Master Barang, Stok/Riwayat Stok, Riwayat Invoice, Sales Order, Audit Log.
+%% Catatan Programmer: PATCH /receipts/{id} dengan expected_revision → 409 jika basi. Stok diselisihkan sebelum/sesudah (_apply_receipt_stock_delta). Kelebihan bayar karena total turun dicatat sebagai event 'overpaid' dan dikembalikan admin lewat refund.
+%% Status Implementasi: Sudah ada seluruh cabang: tambah/ubah/hapus baris, jasa, diskon, refund kelebihan bayar (admin), void (staff jika belum ada uang, admin jika sudah), retur/void per item (admin), buka kembali (admin), penjaga edit bersamaan.
+flowchart TB
+  subgraph T1["1 · Buka & cek izin"]
+    direction LR
+    A(["Buka invoice berjalan"]):::aksi --> B{"Invoice void?"}:::cek
+    B -->|YA| B1["Hanya baca"]:::off
+    B -->|TIDAK| C{"Tertutup?<br/>(Lunas + Selesai)"}:::cek
+    C -->|YA| C1{"Admin?"}:::cek
+    C1 -->|TIDAK| C2["Ditolak: transaksi sudah ditutup"]:::err
+    C1 -->|YA| C3[/"Buka Kembali + alasan<br/>→ pengerjaan: Sedang<br/>(tercatat di riwayat)"/]:::tunggu --> ED
+    C -->|TIDAK| ED["Mode ubah"]:::ok
+  end
+  subgraph T2["2 · Jenis perubahan"]
+    direction LR
+    ED2{"Apa yang diubah?"}:::cek
+    ED2 -->|"Tambah barang"| X1{"Stok cukup?"}:::cek
+    X1 -->|TIDAK| X1E["Ditolak: stok tidak cukup<br/>(atau buat SO)"]:::err
+    X1 -->|YA| OKC["Baris berubah"]:::ok
+    ED2 -->|"Ganti aksesoris"| X2["Hapus baris lama (stok kembali)<br/>+ tambah baris baru (stok keluar)"]:::so --> OKC
+    ED2 -->|"Hapus / kurangi qty"| X3["Stok kembali sesuai selisih"]:::so --> OKC
+    ED2 -->|"Jasa pemasangan"| X4["Baris jasa (tanpa stok)"]:::so --> OKC
+    ED2 -->|"Diskon"| X5["Diskon per baris"]:::so --> OKC
+    ED2 -->|"Baris dari SO"| X6["Hanya diskon yang bisa diubah<br/>(qty ikut SO)"]:::tunggu
+    ED2 -->|"Barang sudah dipasang /<br/>dibawa pulang"| X7[["Retur / Void item (admin)<br/>(Gambar 28)"]]:::sub
+  end
+  subgraph T3["3 · Hitung ulang & simpan"]
+    direction LR
+    H1["Total baru = Σ baris − diskon"]:::ok --> H2{"Dibayar vs Total baru"}:::cek
+    H2 -->|"Dibayar < Total"| H3["SEBAGIAN / BELUM BAYAR<br/>sisa tagihan muncul"]:::tunggu
+    H2 -->|"Dibayar = Total"| H4["LUNAS"]:::ok
+    H2 -->|"Dibayar > Total"| H5["KELEBIHAN BAYAR<br/>→ admin Refund<br/>(penyetuju & catatan kas: K-20)"]:::err
+    S{"Invoice diubah kasir lain<br/>sejak dibuka?"}:::cek
+    S -->|YA| S1["409: 'Nota ini baru saja berubah'<br/>muat ulang, ulangi"]:::err
+    S -->|TIDAK| S2["Simpan: nomor invoice TETAP,<br/>riwayat pembayaran TETAP,<br/>stok diselisihkan, tercatat di log"]:::ok
+  end
+  T1 --> T2 --> T3

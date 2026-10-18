@@ -1,0 +1,49 @@
+%% Gambar: 26
+%% Judul: Dashboard & Notice Center
+%% Modul: Dashboard
+%% Tujuan: Menampilkan kondisi toko terbaru dan hal yang butuh tindakan, dari data transaksi (bukan input manual).
+%% Dimulai dari: Transaksi apa pun mengubah data.
+%% Proses Utama: Transaksi → data diperbarui → dashboard menghitung ulang saat dibuka → kartu & daftar → klik ke modul untuk bertindak.
+%% Hasil: Pemilik/admin melihat invoice berjalan, piutang, SO/PO aktif, stok, dan utang dalam satu layar.
+%% Warning: Dashboard hanya membaca; tidak mengubah data. Angka penjualan dihitung dari pembayaran, invoice void dikecualikan.
+%% Modul Terkait: Semua modul transaksi dan master.
+%% Catatan Programmer: get_inventory_overview. Kartu saat ini: SKU Aktif, Nilai Persediaan, Penjualan Bulan Ini, Tagihan Tertunda, SO Berjalan, Dokumen Masuk 30 hari. Daftar: Produk Terlaris, Barang Masuk Terbaru, Stok Menipis, SO Berjalan, Tagihan Tertunda.
+%% Status Implementasi: Sebagian. Definisi omzet belum diputuskan (K-21). Sudah: kartu & daftar di atas. BELUM (notice center): barang belum dipesan, supplier belum dipilih, pengiriman terlambat, barang datang sebagian, stok habis, Stock In Allocation, barang siap dipasang, utang supplier.
+flowchart LR
+  subgraph SRC["Transaksi"]
+    direction TB
+    T1["Kasir / Invoice"]:::aksi ~~~ T2["Sales Order"]:::aksi ~~~ T3["Purchase Order"]:::aksi ~~~ T4["Barang Masuk"]:::aksi ~~~ T5["Opname / Faktur"]:::aksi
+  end
+  subgraph CALC["Dihitung ulang"]
+    direction TB
+    C1[("Data sistem terbaru")]:::data --> C2["Hitung ringkasan<br/>(hanya baca)"]:::so
+    OM{"Omzet dihitung dari? (K-21)"}:::cek
+    OM -->|"Saat ini"| OM1["Pembayaran masuk<br/>(invoice void dikecualikan)"]:::tunggu
+    OM -->|"Opsi"| OM2["Invoice terbit / invoice final /<br/>serah terima"]:::off
+  end
+  subgraph NOW["Sudah ada"]
+    direction TB
+    N1["Invoice berjalan / Tagihan Tertunda<br/>(piutang customer)"]:::ok
+    N2["SO aktif (berjalan, sudah sampai)"]:::ok
+    N3["Stok Menipis (≤ min stok)"]:::ok
+    N4["Penjualan bulan ini · Nilai persediaan"]:::ok
+    N5["Barang masuk terbaru · Produk terlaris"]:::ok
+  end
+  subgraph TODO["Notice Center — belum ada"]
+    direction TB
+    X1["PO Supplier aktif"]:::off
+    X2["Barang belum dipesan · Supplier belum dipilih"]:::off
+    X3["Pengiriman terlambat (ETA lewat)"]:::off
+    X4["Barang datang sebagian"]:::off
+    X5["Stok habis · Available rendah · Stock In Allocation"]:::off
+    X6["Barang siap dipasang"]:::off
+    X7["Utang supplier / lewat jatuh tempo"]:::off
+  end
+  subgraph ACT["Tindakan"]
+    direction TB
+    A1{"Klik notice / baris"}:::cek --> A2["Buka modul terkait<br/>(dashboard tidak mengubah data)"]:::aksi
+  end
+  SRC --> CALC --> NOW
+  CALC --> TODO
+  NOW --> ACT
+  TODO --> ACT

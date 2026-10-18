@@ -1,0 +1,37 @@
+%% Gambar: 08
+%% Judul: Pengiriman & Tracking Supplier
+%% Modul: Purchase Order — status item pengiriman
+%% Tujuan: Melacak pengiriman per baris/paket karena satu PO bisa dikirim lewat jalur, ekspedisi, resi, dan waktu yang berbeda.
+%% Dimulai dari: PO sudah diterbitkan dan supplier mulai menyiapkan barang.
+%% Proses Utama: Pilih baris → isi metode kirim, ekspedisi, resi, tanggal kirim, ETA, lokasi transit → ubah status item → tiba → Barang Masuk.
+%% Hasil: Contoh PO-SUP-001 ASTA JAYA: barang LEO via laut (resi A, ETA 20/10), barang BUDI via udara (resi B, ETA 15/10), status masing-masing berbeda.
+%% Warning: Status Dikirim ≠ Diterima Toko. Status di header PO tidak boleh memaksa semua item sama. ETA lewat tanpa barang tiba → tampil sebagai Pengiriman Terlambat.
+%% Modul Terkait: Purchase Order, Barang Masuk, Sales Order, Dashboard.
+%% Catatan Programmer: Data per baris PO: ship_method, forwarder, tracking_no, shipped_date, eta_date, transit_location, status kirim. Endpoint: PUT /supplier-pos/{id}/items/{item}/shipping.
+%% Status Implementasi: Sudah ada: status kirim per item (sampai Tiba di Hub), ekspedisi, resi, tanggal, ETA, lokasi transit, log riwayat pengiriman. Belum: status kirim tidak menggerakkan baris SO (Dalam Pengiriman di SO masih manual); notice Pengiriman Terlambat belum ada; 'beri tahu customer' hanya disimpan; pengiriman dicatat per baris PO, belum ada entitas PAKET dengan qty sehingga satu baris tidak bisa dipecah ke dua paket; ekspedisi masih teks bebas (belum master ekspedisi).
+flowchart TB
+  subgraph T1["1 · Supplier menyiapkan barang"]
+    direction LR
+    S(["PO dikonfirmasi supplier"]):::so --> P["Supplier menyiapkan barang"]:::tunggu --> Q{"Semua item dikirim<br/>bersama?"}:::cek
+    Q -->|YA| ONE["Satu paket: isi data<br/>pengiriman ke semua baris"]:::aksi
+    Q -->|TIDAK| MANY["Per baris / paket:<br/>data pengiriman sendiri-sendiri"]:::aksi
+    MANY --> PKG["Target: PAKET berisi item + qty<br/>(laut & udara beda resi, beda ETA)"]:::off --> PQ{"Total qty dikirim + diterima<br/>> qty PO?"}:::cek
+    PQ -->|YA| PQ1["Ditolak: melebihi PO"]:::err
+    PQ -->|TIDAK| PQ2["Paket tersimpan"]:::ok
+  end
+  subgraph T2["2 · Admin mencatat pengiriman per baris"]
+    direction LR
+    I1[/"Metode: udara / laut / darat /<br/>ambil sendiri / lainnya"/]:::aksi --> I2[/"Ekspedisi + no. resi"/]:::aksi --> I3[/"Tanggal kirim, ETA,<br/>lokasi transit, catatan"/]:::aksi --> I4{"Data valid?<br/>(tanggal YYYY-MM-DD)"}:::cek
+    I4 -->|TIDAK| E1["Error, tidak disimpan"]:::err
+    I4 -->|YA| I5["Status item: DALAM PENGIRIMAN<br/>(target: baris SO ikut maju)"]:::so
+  end
+  subgraph T3["3 · Memantau"]
+    direction LR
+    M1{"ETA sudah lewat<br/>dan belum tiba?"}:::cek
+    M1 -->|YA| M2["Notice: Pengiriman terlambat<br/>→ hubungi supplier / update ETA"]:::err
+    M1 -->|TIDAK| M3["Tunggu"]:::tunggu
+    M4{"Barang tiba di toko?"}:::cek
+    M4 -->|YA| M5[["Buat Barang Masuk dari PO<br/>(Gambar 09)"]]:::sub
+    M4 -->|"Hilang / rusak di jalan"| M6[["Pembatalan / klaim item<br/>(Gambar 28)"]]:::sub
+  end
+  T1 --> T2 --> T3

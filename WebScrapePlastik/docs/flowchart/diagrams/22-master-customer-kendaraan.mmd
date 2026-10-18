@@ -1,0 +1,37 @@
+%% Gambar: 22
+%% Judul: Master Customer & Kendaraan
+%% Modul: Master Customer (+ data kendaraan di transaksi)
+%% Tujuan: Satu customer per nomor HP, dipakai di Sales Order dan Kasir bersama data kendaraan/plat.
+%% Dimulai dari: Customer baru di Master, atau otomatis saat kasir/SO menyimpan customer baru.
+%% Proses Utama: Nama → nomor HP (unik) → simpan → kendaraan/plat diisi per transaksi → dipakai SO & Kasir.
+%% Hasil: Riwayat transaksi per customer; plat dan kendaraan tercatat di setiap invoice/SO.
+%% Warning: Nomor HP tidak boleh dobel. Customer nonaktif tidak bisa dipilih di nota baru. Customer yang punya transaksi tidak bisa dihapus permanen.
+%% Modul Terkait: Cashier, Sales Order, Riwayat Invoice.
+%% Catatan Programmer: customers.phone UNIQUE. Kendaraan (plat, merk, tipe, warna, tahun) disimpan sebagai kolom di receipts/preorders, belum tabel tersendiri. Format plat divalidasi sama di SO dan Kasir.
+%% Status Implementasi: Customer sudah ada. Master Kendaraan terpisah (satu customer banyak mobil) BELUM ada — perlu keputusan apakah dibuat.
+flowchart TB
+  subgraph T1["1 · Customer"]
+    direction LR
+    A(["Customer baru"]):::aksi --> B[/"Nama + nomor HP"/]:::aksi --> C{"Nomor HP sudah terdaftar?"}:::cek
+    C -->|YA| C1["Pakai customer yang ada<br/>(tidak dobel)"]:::tunggu
+    C -->|TIDAK| D["Simpan: AKTIF"]:::ok
+    K(["Kasir / SO menyimpan<br/>customer baru"]):::so --> C
+  end
+  subgraph T2["2 · Kendaraan / plat"]
+    direction LR
+    V[/"Plat nomor"/]:::aksi --> V1{"Format plat valid?"}:::cek
+    V1 -->|TIDAK| V2["Ditolak"]:::err
+    V1 -->|YA| V3[/"Merk, tipe, warna, tahun"/]:::aksi --> V4[("Disimpan di transaksi<br/>(invoice / SO)")]:::data
+    VM["Target: Master Kendaraan<br/>1 customer → banyak mobil<br/>(perlu keputusan)"]:::off
+  end
+  subgraph T3["3 · Update / Nonaktif / Hapus"]
+    direction LR
+    U{"Aksi?"}:::cek
+    U -->|"Ubah"| U1["Tersimpan; transaksi lama tetap"]:::ok
+    U -->|"Nonaktifkan"| U2["NONAKTIF: tidak bisa dipilih<br/>di nota baru"]:::tunggu
+    U -->|"Aktifkan"| U3["AKTIF"]:::ok
+    U -->|"Hapus (admin)"| U4{"Punya invoice?"}:::cek
+    U4 -->|YA| U5["Ditolak: nonaktifkan saja"]:::err
+    U4 -->|TIDAK| U6["Dihapus"]:::off
+  end
+  T1 --> T2 --> T3

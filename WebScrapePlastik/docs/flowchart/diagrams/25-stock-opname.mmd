@@ -1,0 +1,45 @@
+%% Gambar: 25
+%% Judul: Stock Opname
+%% Modul: Stock Opname
+%% Tujuan: Menyesuaikan stok sistem dengan hitungan fisik lewat dokumen yang diverifikasi dan tercatat.
+%% Dimulai dari: Admin/staff memulai sesi opname.
+%% Proses Utama: Pilih barang → snapshot stok sistem → input hitung fisik → selisih → alasan → ajukan → verifikasi admin → posting koreksi → riwayat stok.
+%% Hasil: Stok = hasil hitung; setiap selisih tercatat sebagai ADJUSTMENT dengan referensi opname.
+%% Warning: Kolom hitung kosong ≠ stok nol. Stok yang bergerak selama opname harus dikonfirmasi. Posting dua kali dicegah.
+%% Modul Terkait: Master Barang, Riwayat Stok, Kasir/Barang Masuk (pergerakan selama opname), Audit Log.
+%% Catatan Programmer: Status draft → menunggu_verifikasi → disetujui / ditolak / dibatalkan. Semua aksi di bawah BEGIN IMMEDIATE + cek status. Snapshot diambil saat simpan dan saat ajukan. Setujui (admin) menolak jika stok ≠ snapshot kecuali accept_moved.
+%% Status Implementasi: Sudah ada seluruh cabang.
+flowchart TB
+  subgraph T1["1 · Hitung"]
+    direction LR
+    A(["Mulai sesi opname"]):::aksi --> B[/"Pilih barang yang dihitung"/]:::aksi --> C["Snapshot stok sistem"]:::data --> D[/"Input hitung fisik"/]:::aksi --> E{"Kolom kosong?"}:::cek
+    E -->|YA| E1["Belum dihitung —<br/>BUKAN nol (boleh di draft)"]:::tunggu
+    E -->|TIDAK| F{"Hitung vs sistem"}:::cek
+    F -->|"Sama"| F1["Selisih 0"]:::ok
+    F -->|"Kurang"| F2["Selisih − → alasan wajib"]:::err
+    F -->|"Lebih"| F3["Selisih + → alasan wajib"]:::tunggu
+  end
+  subgraph T2["2 · Ajukan"]
+    direction LR
+    S["Simpan Draft"]:::tunggu --> S1{"Semua dihitung &<br/>selisih beralasan?"}:::cek
+    S1 -->|TIDAK| S2["Ditolak: lengkapi"]:::err
+    S1 -->|YA| S3["MENUNGGU VERIFIKASI<br/>(snapshot diambil ulang)"]:::so
+    S4{"Salah input?"}:::cek -->|"Masih draft"| S5["Perbaiki / hitung ulang"]:::tunggu
+    S4 -->|"Sudah diajukan"| S6["Minta admin tolak → hitung ulang"]:::tunggu
+  end
+  subgraph T3["3 · Verifikasi (admin)"]
+    direction LR
+    V{"Keputusan admin?"}:::cek
+    V -->|"Tolak + catatan"| V1["DITOLAK: stok tidak berubah"]:::err
+    V -->|"Batalkan"| V0["DIBATALKAN"]:::off
+    V -->|"Setujui"| V2{"Stok berubah sejak snapshot?<br/>(ada transaksi lain)"}:::cek
+    V2 -->|"YA, tanpa konfirmasi"| V3["Ditolak: tinjau pergerakan"]:::err
+    V2 -->|"YA, dikonfirmasi / TIDAK"| V4{"Sudah disetujui sebelumnya?"}:::cek
+    V4 -->|YA| V5["Ditolak: posting dua kali"]:::err
+    V4 -->|TIDAK| V6["DISETUJUI"]:::ok
+  end
+  subgraph T4["4 · Posting koreksi"]
+    direction LR
+    P1["Stok = hasil hitung"]:::ok --> P2[("Riwayat: ADJUSTMENT<br/>ref opname + selisih")]:::data --> P3(["Selesai"]):::ok
+  end
+  T1 --> T2 --> T3 --> T4

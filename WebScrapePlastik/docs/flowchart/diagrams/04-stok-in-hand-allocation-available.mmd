@@ -1,0 +1,44 @@
+%% Gambar: 04
+%% Judul: Stock In Hand, Stock In Allocation, Stock Available
+%% Modul: Master Barang & Sales Order
+%% Tujuan: Memisahkan stok fisik, stok yang sudah di-booking customer, dan stok yang masih boleh dijual.
+%% Dimulai dari: Admin menerbitkan SO untuk barang yang ada di toko.
+%% Proses Utama: SO terbit → cadangkan dari Stock Available (sebagian boleh, kekurangan jadi PO) → buat alokasi → (batal: lepas alokasi) → (serah/pasang: keluarkan stok + tutup alokasi).
+%% Hasil: Contoh Lampu LED: In Hand 10, Allocation 6, Available 4. Setelah 6 diserahkan: In Hand 4, Allocation 0, Available 4.
+%% Warning: Alokasi tidak boleh melebihi Stock Available. Kasir menolak menjual stok yang dicadangkan; hanya admin yang boleh mengizinkan, dengan alasan yang dicatat. Barang dalam perjalanan dari supplier tidak masuk Stock In Hand. Stok tidak boleh dikurangi dua kali saat SO dipindah ke Kasir.
+%% Modul Terkait: Master Barang, Sales Order, Kasir, Barang Masuk, Riwayat Stok.
+%% Catatan Programmer: Alokasi TIDAK disimpan sebagai tabel; dihitung dari dokumen (baris SO terbit yang belum terpasang, invoice tidak void) sehingga tidak bisa melenceng. Urutan FIFO menurut waktu SO dibuat: barang yang datang lewat PO baris itu sendiri dulu, lalu stok ready. Fungsi: _reservation_lines / reserved_qty_by_item (backend/database.py). Penjualan kasir dicek di transaksi yang sama (BEGIN IMMEDIATE).
+%% Status Implementasi: Sudah ada (K-01 & K-02 diputuskan). Alokasi = cadangan otomatis saat SO terbit; stok fisik baru berkurang saat baris SO Terpasang. Kasir dicek terhadap Stock Available; override admin dicatat di riwayat nota. Pelepasan otomatis saat baris dihapus, SO batal/diarsip, atau invoice void. Tidak ada kedaluwarsa otomatis.
+flowchart TB
+  subgraph T1["1 · Booking dari stok toko"]
+    direction LR
+    S(["Customer booking barang ready"]):::aksi --> Q[/"Produk + qty"/]:::aksi --> C{"Stock Available ≥ qty?"}:::cek
+    C -->|TIDAK| W["Cadangkan sebagian dari stok<br/>kekurangan otomatis jadi Draft PO"]:::tunggu
+    C -->|YA| D{"SO sudah Terbit?"}:::cek
+    D -->|TIDAK| H["SO Draft<br/>tidak ada alokasi"]:::tunggu
+    D -->|YA| A["Buat ALOKASI untuk SO<br/>In Hand: tetap<br/>Allocation: + qty<br/>Available: − qty"]:::ok
+  end
+  subgraph T2["2 · Booking dibatalkan"]
+    direction LR
+    B0(["Baris SO dihapus / SO batal atau diarsip /<br/>invoice SO di-void"]):::err --> B1{"Barang sudah diserahkan<br/>atau dipasang?"}:::cek
+    B1 -->|YA| B2[["Bukan pembatalan alokasi:<br/>proses Retur (Gambar 28)"]]:::sub
+    B1 -->|TIDAK| B4["Lepas alokasi aktif<br/>In Hand: tetap<br/>Allocation: − qty<br/>Available: + qty"]:::ok --> B5[("Riwayat + log")]:::data
+  end
+  subgraph T3["3 · Barang diserahkan / dipasang (satu titik posting)"]
+    direction LR
+    F0(["Baris SO Terpasang<br/>(Pengerjaan Selesai di invoice)"]):::aksi --> F1{"Alokasi untuk SO ini<br/>masih aktif?"}:::cek
+    F1 -->|YA| F2["Keluarkan stok sekali:<br/>In Hand: − qty<br/>Allocation: − qty (terpenuhi)<br/>Available: tetap"]:::ok
+    F1 -->|"TIDAK, tanpa SO"| F5{"Kasir: qty ≤ Available?"}:::cek
+    F5 -->|YA| F3["Penjualan biasa:<br/>In Hand: − qty<br/>Available: − qty"]:::ok
+    F5 -->|TIDAK| F6["Ditolak: stok dicadangkan<br/>admin boleh izinkan + alasan (dicatat)"]:::err
+    F6 -.->|"admin izinkan"| F3
+    F2 --> F4[("Mutasi stok + ref. dokumen")]:::data
+    F3 --> F4
+  end
+  subgraph T4["4 · Barang inden datang dari supplier"]
+    direction LR
+    G0(["Barang Masuk diposting"]):::ok --> G1["In Hand: + qty diterima<br/>(barang di jalan TIDAK dihitung)"]:::ok --> G2{"Barang ini untuk SO tertentu?"}:::cek
+    G2 -->|YA| G3["Buat alokasi untuk SO itu<br/>→ tidak bisa dijual ke orang lain"]:::so
+    G2 -->|TIDAK| G4["Masuk Stock Available"]:::ok
+  end
+  T1 ~~~ T2 ~~~ T3 ~~~ T4

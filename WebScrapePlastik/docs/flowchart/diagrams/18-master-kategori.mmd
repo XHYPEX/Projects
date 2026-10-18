@@ -1,0 +1,49 @@
+%% Gambar: 18
+%% Judul: Master Kategori
+%% Modul: Master Kategori
+%% Tujuan: Mengelompokkan barang dalam dua tingkat: Kategori Induk → Subkategori → Produk.
+%% Dimulai dari: Admin menambah kategori manual atau impor CSV / skrip import_categories.
+%% Proses Utama: Isi nama (UPPERCASE) & kode → pilih induk (opsional) → validasi tingkat & duplikasi → simpan aktif → dipakai di Master Barang.
+%% Hasil: Pohon kategori 2 tingkat; produk hanya boleh ditempatkan di kategori AKTIF.
+%% Warning: Tidak boleh tingkat ketiga. Kode kategori tidak bisa diubah. Induk tidak bisa diarsip selama masih punya subkategori aktif. Kategori yang dipakai transaksi tidak dihapus permanen.
+%% Modul Terkait: Master Barang, Kasir (filter kategori), Laporan.
+%% Catatan Programmer: Status aktif / nonaktif / arsip. Arsip & pulihkan & impor CSV = admin. expected_updated_at → 409. Impor: anak boleh mengikuti induk yang sudah ada dengan kode lain; baris dengan kode kosong tidak membuat kategori.
+%% Status Implementasi: Sudah ada seluruhnya; tidak ada rute hapus (hanya arsip).
+flowchart TB
+  subgraph T1["1 · Create"]
+    direction LR
+    A(["Tombol ‘+ Kategori / Impor CSV’"]):::aksi --> B[/"Nama (UPPERCASE) + kode<br/>+ induk (opsional)"/]:::aksi --> C{"Ada induk?"}:::cek
+    C -->|TIDAK| C1["KATEGORI INDUK"]:::ok
+    C -->|YA| C2{"Induk itu sendiri<br/>subkategori?"}:::cek
+    C2 -->|YA| E1["Ditolak: maksimal 2 tingkat"]:::err
+    C2 -->|TIDAK| C3["SUBKATEGORI"]:::ok
+    C1 --> D{"Nama / kode duplikat?"}:::cek
+    C3 --> D
+    D -->|YA| E2["Ditolak: duplikat"]:::err
+    D -->|TIDAK| F["Simpan: AKTIF"]:::ok
+  end
+  subgraph T2["2 · Read & Update"]
+    direction LR
+    R[("Daftar kategori<br/>(pohon induk → sub)")]:::data --> U[/"Ubah nama / induk / status"/]:::aksi --> U1{"Kategori diarsip?"}:::cek
+    U1 -->|YA| U2["Ditolak: pulihkan dulu"]:::err
+    U1 -->|TIDAK| U3{"Diubah orang lain?"}:::cek
+    U3 -->|YA| U4["409: muat ulang"]:::err
+    U3 -->|TIDAK| U5["Tersimpan (kode tetap)"]:::ok
+  end
+  subgraph T3["3 · Nonaktif / Arsip / Aktifkan kembali"]
+    direction LR
+    N{"Aksi?"}:::cek
+    N -->|"Nonaktifkan"| N1["NONAKTIF: tidak bisa dipilih<br/>untuk barang baru"]:::tunggu
+    N -->|"Arsip (admin)"| N2{"Masih punya sub<br/>yang belum diarsip?"}:::cek
+    N2 -->|YA| N3["Ditolak: arsip sub dulu"]:::err
+    N2 -->|TIDAK| N4["ARSIP: disembunyikan,<br/>data historis barang tetap"]:::off
+    N -->|"Aktifkan / Pulihkan"| N5["AKTIF kembali"]:::ok
+    N -->|"Hapus permanen"| N6["Tidak tersedia —<br/>lindungi data historis"]:::err
+  end
+  subgraph T4["4 · Dipakai"]
+    direction LR
+    P1["Master Barang: pilih Induk → Sub"]:::so --> P2{"Kategori AKTIF?"}:::cek
+    P2 -->|TIDAK| P3["Ditolak"]:::err
+    P2 -->|YA| P4(["Produk terkelompok"]):::ok
+  end
+  T1 --> T2 --> T3 --> T4

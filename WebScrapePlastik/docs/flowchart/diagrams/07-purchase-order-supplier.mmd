@@ -1,0 +1,45 @@
+%% Gambar: 07
+%% Judul: Purchase Order Supplier
+%% Modul: Purchase Order (menu lama: Pembelian Supplier)
+%% Tujuan: Membeli barang dari supplier untuk Sales Order atau stok umum, dari draft sampai diterima.
+%% Dimulai dari: Draft PO otomatis dari SO, atau admin klik + Purchase Order Baru (manual / Ambil Barang dari Sales Order).
+%% Proses Utama: Draft → periksa supplier, barang, qty, referensi SO, harga beli → Terbitkan → konfirmasi supplier → kirim → terima sebagian/lengkap.
+%% Hasil: PO berstatus Diterima; baris SO terkait maju ke Sampai di Toko sesuai qty yang diterima.
+%% Warning: PO tidak menambah stok. PO yang sudah diterbitkan tidak bisa diedit bebas: perubahan lewat pembatalan item yang tercatat. Pembatalan satu customer tidak menyentuh baris customer lain.
+%% Modul Terkait: Sales Order, Barang Masuk, Faktur Pembelian, Master Supplier, Dashboard.
+%% Catatan Programmer: Status PO: draft, dipesan, sebagian_diterima, diterima, batal. Tahap order: menunggu_konfirmasi, dikonfirmasi, diproses, dalam_pengiriman. Qty yang bisa diambil dari SO = sisa belum dipesan (validasi server _spo_validate_items).
+%% Status Implementasi: Sudah ada: draft/terbit (no. INV-SUP-YYYYMMDD-NNN), tahap order (ubah tahap wajib catatan), picker multi-SO (UMUM boleh ke supplier mana pun, over-order diblokir), pembatalan item 2 langkah (ajukan → setujui/tolak), pembayaran, data faktur. Celah: batal PO tidak butuh admin; 'tindakan' pembatalan (kembali ke customer/simpan stok/retur) hanya dicatat, tanpa efek otomatis; baris SO tidak mundur saat item PO dibatalkan.
+flowchart TB
+  subgraph T1["1 · Sumber draft PO"]
+    direction LR
+    A1(["Draft otomatis dari SO<br/>(Gambar 05)"]):::so --> D["PO DRAFT"]:::tunggu
+    A2(["Tombol ‘+ Purchase Order Baru’"]):::aksi --> C{"Isi barang dari?"}:::cek
+    C -->|"Ambil dari Sales Order"| PK[/"Picker: baris SO yang sisa belum dipesan<br/>(boleh beberapa SO / customer)"/]:::aksi --> D
+    C -->|"Manual / stok umum"| MN[/"Barang manual tanpa SO"/]:::aksi --> D
+  end
+  subgraph T2["2 · Admin memeriksa draft"]
+    direction LR
+    R1{"Supplier benar & aktif?"}:::cek -->|YA| R2{"Barang, qty ≤ sisa SO,<br/>referensi SO benar?"}:::cek
+    R1 -->|TIDAK| FX["Perbaiki draft<br/>(draft bebas diedit)"]:::tunggu
+    R2 -->|TIDAK| FX
+    R2 -->|YA| R3{"Harga beli diisi?<br/>(terpisah dari harga jual)"}:::cek
+    R3 -->|TIDAK| FX
+    R3 -->|YA| SV["Simpan Draft"]:::tunggu --> IS{"Terbitkan sekarang?"}:::cek
+    IS -->|TIDAK| WAIT["Tetap Draft<br/>(qty tetap dihitung 'sudah dipesan')"]:::tunggu
+    IS -->|YA| ISS["TERBITKAN → status DIPESAN<br/>no. invoice internal dibuat<br/>baris SO → Sudah Dipesankan"]:::ok
+  end
+  subgraph T3["3 · Supplier memproses"]
+    direction LR
+    S1["Menunggu konfirmasi"]:::tunggu --> S2{"Supplier konfirmasi?"}:::cek
+    S2 -->|YA| S3["Dikonfirmasi → Diproses"]:::so --> S4[["Pengiriman per item<br/>(Gambar 08)"]]:::sub
+    S2 -->|"Sebagian tidak tersedia"| CX[["Ajukan pembatalan item<br/>(Gambar 28)"]]:::sub
+    S2 -->|"Ditolak semua"| CN["Batalkan PO<br/>baris SO kembali 'belum dipesan'"]:::err
+  end
+  subgraph T4["4 · Penerimaan & pembayaran (terpisah)"]
+    direction LR
+    G1[["Barang Masuk (Gambar 09)"]]:::sub --> G2{"Qty diterima = qty PO?"}:::cek
+    G2 -->|Sebagian| G3["SEBAGIAN DITERIMA"]:::tunggu
+    G2 -->|Lengkap| G4["DITERIMA"]:::ok
+    P1[["Faktur & pembayaran supplier<br/>(Gambar 17) — tidak mengubah status terima"]]:::sub
+  end
+  T1 --> T2 --> T3 --> T4

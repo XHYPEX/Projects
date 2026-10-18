@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from backend import product_images
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    reserved_qty_by_item,
     category_subtree_ids,
     get_category_row,
     autocomplete_master_items,
@@ -244,8 +245,18 @@ def _row_to_unit(row: dict) -> UnitOut:
     )
 
 
-def _row_to_master_item(row: dict) -> MasterItemOut:
+def _reserved_map(rows: list[dict]) -> dict[int, int]:
+    """One reservation lookup for a whole list of items (K-02)."""
+    return reserved_qty_by_item([r["id"] for r in rows]) if rows else {}
+
+
+def _row_to_master_item(row: dict, reserved: dict[int, int] | None = None) -> MasterItemOut:
+    if reserved is None:
+        reserved = reserved_qty_by_item([row["id"]])
+    held = reserved.get(row["id"], 0)
     return MasterItemOut(
+        reserved_qty=held,
+        available_qty=max(row["stock_qty"] - held, 0),
         id=row["id"],
         sku=row["sku"],
         sku_prefix=row["sku_prefix"],
@@ -598,7 +609,7 @@ async def duplicate_check(supplier_id: int, brand_id: int, product_name: str):
     cross = await loop.run_in_executor(None, find_cross_supplier_master_items, supplier_id, brand_id, product_name)
     return DuplicateCheckOut(
         exact_match=_row_to_master_item(exact) if exact is not None else None,
-        cross_supplier_matches=[_row_to_master_item(r) for r in cross],
+        cross_supplier_matches=[_row_to_master_item(r, res) for res in [_reserved_map(cross)] for r in cross],
     )
 
 
@@ -610,7 +621,8 @@ async def autocomplete(query: str, supplier_id: int | None = None, brand_id: int
         raise HTTPException(status_code=422, detail="Limit harus antara 1 dan 100.")
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(None, autocomplete_master_items, query, supplier_id, brand_id, limit)
-    return [_row_to_master_item(r) for r in rows]
+    res = _reserved_map(rows)
+    return [_row_to_master_item(r, res) for r in rows]
 
 
 @router.get("/inventory/master-items/by-sku/{sku}", response_model=MasterItemOut)
@@ -720,7 +732,7 @@ async def list_master_items_route(
         ),
     )
     return MasterItemListOut(
-        items=[_row_to_master_item(r) for r in result["items"]],
+        items=[_row_to_master_item(r, res) for res in [_reserved_map(result["items"])] for r in result["items"]],
         total=result["total"],
         page=result["page"],
         page_size=result["page_size"],
@@ -1138,7 +1150,7 @@ async def inventory_overview():
         total_inventory_value=result["total_inventory_value"],
         inbound_doc_count_30d=result["inbound_doc_count_30d"],
         low_stock_threshold=result["low_stock_threshold"],
-        low_stock_items=[_row_to_master_item(r) for r in result["low_stock_items"]],
+        low_stock_items=[_row_to_master_item(r, res) for res in [_reserved_map(result["low_stock_items"])] for r in result["low_stock_items"]],
         pending_invoice_count=result["pending_invoice_count"],
         pending_invoice_outstanding=result["pending_invoice_outstanding"],
         pending_invoices=[PendingInvoiceOut(**r) for r in result["pending_invoices"]],

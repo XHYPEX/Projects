@@ -3,7 +3,7 @@ admin approves it, and then through the stock ledger like every other movement."
 import sqlite3
 from datetime import datetime
 
-from backend.database import _conn, _now, get_master_item_usage
+from backend.database import _conn, _now, _reserved_by_item, get_master_item_usage
 
 REASONS = ("Susut / Hilang", "Rusak", "Salah catat / input", "Ditemukan lebih", "Retur belum tercatat", "Lainnya")
 STATUSES = ("draft", "menunggu_verifikasi", "disetujui", "ditolak", "dibatalkan")
@@ -40,7 +40,7 @@ def _activity_counts(con: sqlite3.Connection, master_item_id: int) -> dict:
     ).fetchone()["c"]
     po_cust = con.execute(
         f"""SELECT COUNT(DISTINCT preorder_id) AS c FROM preorder_items pi
-           WHERE master_item_id=? AND status<>'terpasang' AND {_OPEN_PO_LINE}""", (master_item_id,)
+           WHERE master_item_id=? AND status NOT IN ('terpasang','dibatalkan') AND {_OPEN_PO_LINE}""", (master_item_id,)
     ).fetchone()["c"]
     po_sup = con.execute(
         """SELECT COUNT(DISTINCT spi.supplier_po_id) AS c FROM supplier_po_items spi
@@ -49,14 +49,10 @@ def _activity_counts(con: sqlite3.Connection, master_item_id: int) -> dict:
     ).fetchone()["c"]
     po_cust_qty = con.execute(
         f"""SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items pi
-           WHERE master_item_id=? AND status<>'terpasang' AND {_OPEN_PO_LINE}""", (master_item_id,)
+           WHERE master_item_id=? AND status NOT IN ('terpasang','dibatalkan') AND {_OPEN_PO_LINE}""", (master_item_id,)
     ).fetchone()["c"]
-    # Arrived and still on the shelf for a customer. A PO with an invoice has already taken them off the
-    # shelf on arrival, so only lines of a PO without one (older POs) are reserved here.
-    po_cust_reserved = con.execute(
-        """SELECT COALESCE(SUM(quantity),0) AS c FROM preorder_items
-           WHERE master_item_id=? AND status='sampai_di_toko' AND receipt_id IS NULL""", (master_item_id,)
-    ).fetchone()["c"]
+    # K-02: what the shelf holds for Sales Order customers (not yet installed).
+    po_cust_reserved = _reserved_by_item(con, [master_item_id]).get(master_item_id, 0)
     po_sup_qty = con.execute(
         """SELECT COALESCE(SUM(MAX(spi.quantity - spi.qty_received, 0)),0) AS c FROM supplier_po_items spi
            JOIN supplier_pos sp ON sp.id = spi.supplier_po_id

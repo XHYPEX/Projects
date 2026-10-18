@@ -847,6 +847,11 @@ def init_db() -> None:
             ("spo_payments", (("reference_no", "TEXT"), ("bank_account", "TEXT"))),
             ("receipt_payments", (("reversed_of", "INTEGER"),)),
             ("preorder_payments", (("method", "TEXT NOT NULL DEFAULT 'cash'"),)),
+            # K-13: when the order was confirmed (the 24-hour cancellation clock) and how it was cancelled.
+            ("preorders", (("published_at", "TEXT"), ("cancelled_at", "TEXT"), ("cancelled_by", "TEXT"),
+                           ("cancel_kind", "TEXT"), ("cancel_reason", "TEXT"))),
+            ("preorder_items", (("cancelled_at", "TEXT"), ("cancelled_by", "TEXT"),
+                                ("cancel_kind", "TEXT"), ("cancel_reason", "TEXT"))),
         ):
             have = {row["name"] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
             for col, ddl in cols:
@@ -1008,6 +1013,9 @@ def init_db() -> None:
         # taken on the invoice only.
         if "receipt_id" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
             con.execute("ALTER TABLE preorders ADD COLUMN receipt_id TEXT")
+        # The supplier a Sales Order is bought from. Null = each barang follows its Master Barang supplier.
+        if "supplier_id" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
+            con.execute("ALTER TABLE preorders ADD COLUMN supplier_id INTEGER REFERENCES suppliers(id)")
         if "preorder_item_id" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
             con.execute("ALTER TABLE receipt_items ADD COLUMN preorder_item_id INTEGER")
         # --- Additive migration: Retur Barang ---
@@ -1048,6 +1056,14 @@ def init_db() -> None:
             if col not in rr_cols:
                 con.execute(f"ALTER TABLE receipt_returns ADD COLUMN {col} {ddl}")
         _backfill_po_invoices(con)
+        # A published Sales Order got its invoice at the moment it was published.
+        con.execute(
+            """UPDATE preorders SET published_at=(SELECT r.created_at FROM receipts r WHERE r.id=preorders.receipt_id)
+               WHERE published_at IS NULL AND receipt_id IS NOT NULL""")
+        con.execute("CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)")
+        if not con.execute("SELECT 1 FROM app_migrations WHERE name='k01_install_point'").fetchone():
+            _migrate_k01_install_point(con)
+            con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('k01_install_point', ?)", (_now(),))
 
 
 def _now() -> str:
@@ -1330,14 +1346,23 @@ def get_receipt_events(receipt_id: str) -> list[dict]:
 
 
 PO_ARRIVED_STATUSES = ("sampai_di_toko", "terpasang")
+# K-01: a Sales Order line leaves stock only once it is installed / handed over. Until then the goods
+# stay In Hand and are reserved for the customer (see _reservation_lines).
+PO_INSTALLED_STATUSES = ("terpasang",)
+# K-13: a cancelled Sales Order line. Not one of PREORDER_STATUSES (nobody sets it by hand); it is set
+# only by cancel_preorder / cancel_preorder_items, and such a line never moves again.
+PO_LINE_CANCELLED = "dibatalkan"
+PO_CLOSED_LINE_STATUSES = PO_INSTALLED_STATUSES + (PO_LINE_CANCELLED,)
 
 
-def _receipt_item_holdings(items: list[dict], con: sqlite3.Connection | None = None) -> dict[int, int]:
+def _receipt_item_holdings(
+    items: list[dict], con: sqlite3.Connection | None = None, counted_statuses: tuple = PO_INSTALLED_STATUSES,
+) -> dict[int, int]:
     """Sum of quantity per master_item_id across a set of receipt items, skipping
     lines with no master item link. This is the 'holding' referenced throughout
     the stock-movement code: what a non-void receipt currently has taken off the
     shelf, per product. A line that comes from a Sales Order holds nothing until
-    that PO line has arrived (sampai di toko / terpasang) -- pass `con` so it can look."""
+    that SO line is installed (terpasang) -- pass `con` so it can look."""
     holdings: dict[int, int] = {}
     for item in items:
         master_item_id = item.get("master_item_id")
@@ -1345,7 +1370,7 @@ def _receipt_item_holdings(items: list[dict], con: sqlite3.Connection | None = N
             continue
         if con is not None and item.get("preorder_item_id"):
             po_line = con.execute("SELECT status FROM preorder_items WHERE id=?", (item["preorder_item_id"],)).fetchone()
-            if po_line is None or po_line["status"] not in PO_ARRIVED_STATUSES:
+            if po_line is None or po_line["status"] not in counted_statuses:
                 continue
         held = item["quantity"] - (item.get("returned_stock_qty") or 0)
         if held > 0:
@@ -1353,8 +1378,108 @@ def _receipt_item_holdings(items: list[dict], con: sqlite3.Connection | None = N
     return holdings
 
 
+class StockReservedError(ValueError):
+    """A walk-in sale would take stock that is reserved for a Sales Order customer. An admin may
+    override it with a reason."""
+
+
+def _reservation_lines(con: sqlite3.Connection, master_item_ids=None) -> list[dict]:
+    """K-02 Stock In Allocation, worked out from the documents instead of kept as a running counter,
+    so it can never drift. Every open Sales Order line (published, not archived, invoice not void,
+    not yet installed) wants `quantity − still coming from a supplier`; what is still on a Purchase
+    Order (not yet posted in via Barang Masuk) is not on the shelf, so it can't be held. A receipt
+    (GR) counts as in stock once its Barang Masuk is posted — both receiving paths link the two.
+
+    The shelf (stock_qty) is shared out oldest Sales Order first, in two passes: goods that arrived
+    on a line's own Purchase Order go to that line before anything else, so one customer's delivery
+    is never handed to another; then the rest is spread over lines served from ready stock.
+    `reserved` is what a line holds; `shortfall` is what it still needs and nobody has ordered."""
+    params: list = []
+    item_sql = ""
+    if master_item_ids is not None:
+        ids = sorted({i for i in master_item_ids if i is not None})
+        if not ids:
+            return []
+        item_sql = f" AND pi.master_item_id IN ({_placeholders(ids)})"
+        params = list(ids)
+    rows = con.execute(
+        f"""SELECT pi.id, pi.preorder_id, pi.master_item_id, pi.product_name, pi.quantity, pi.status,
+                   p.po_number, p.customer_name,
+                   COALESCE((SELECT SUM(spi.quantity - spi.qty_cancelled) FROM supplier_po_items spi
+                             JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+                             WHERE spi.preorder_item_id = pi.id AND sp.status <> 'batal'), 0) AS ordered,
+                   COALESCE((SELECT SUM(srl.quantity) FROM spo_receipt_lines srl
+                             JOIN spo_receipts sr ON sr.id = srl.receipt_id
+                             JOIN inbound_documents d ON d.id = sr.inbound_document_id
+                             JOIN supplier_po_items spi ON spi.id = srl.item_id
+                             JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+                             WHERE spi.preorder_item_id = pi.id AND d.status = 'posted' AND sp.status <> 'batal'), 0) AS posted
+            FROM preorder_items pi
+            JOIN preorders p ON p.id = pi.preorder_id
+            LEFT JOIN receipts r ON r.id = p.receipt_id
+            WHERE p.is_draft = 0 AND pi.master_item_id IS NOT NULL
+              AND pi.status NOT IN ({_placeholders(PO_CLOSED_LINE_STATUSES)})
+              AND COALESCE(r.status, '') <> 'void'
+              AND (pi.receipt_id IS NULL OR pi.receipt_id = p.receipt_id){item_sql}
+            ORDER BY p.created_at ASC, pi.position ASC, pi.id ASC""",
+        [*PO_CLOSED_LINE_STATUSES, *params],
+    ).fetchall()
+    lines = [dict(r) for r in rows]
+    if not lines:
+        return []
+    mids = sorted({ln["master_item_id"] for ln in lines})
+    pool = {r["id"]: max(r["stock_qty"], 0) for r in con.execute(
+        f"SELECT id, stock_qty FROM master_items WHERE id IN ({_placeholders(mids)})", mids).fetchall()}
+    for ln in lines:
+        coming = max(ln["ordered"] - ln["posted"], 0)
+        ln["coming"] = coming
+        ln["wanted"] = max(ln["quantity"] - coming, 0)
+        ln["arrived"] = min(ln["posted"], ln["wanted"])
+        ln["reserved"] = 0
+    for part in ("arrived", "ready"):
+        for ln in lines:
+            want = ln["arrived"] if part == "arrived" else ln["wanted"] - ln["arrived"]
+            got = min(want, pool.get(ln["master_item_id"], 0))
+            if got > 0:
+                pool[ln["master_item_id"]] -= got
+                ln["reserved"] += got
+    for ln in lines:
+        ln["shortfall"] = ln["wanted"] - ln["reserved"]
+    return lines
+
+
+def _reserved_by_item(con: sqlite3.Connection, master_item_ids=None) -> dict[int, int]:
+    out: dict[int, int] = {}
+    for ln in _reservation_lines(con, master_item_ids):
+        if ln["reserved"]:
+            out[ln["master_item_id"]] = out.get(ln["master_item_id"], 0) + ln["reserved"]
+    return out
+
+
+def reserved_qty_by_item(master_item_ids=None) -> dict[int, int]:
+    with _conn() as con:
+        return _reserved_by_item(con, master_item_ids)
+
+
+def get_stock_reservations(master_item_id: int) -> list[dict]:
+    """Which Sales Orders hold this item, for the item's stock panel."""
+    with _conn() as con:
+        return [
+            {k: ln[k] for k in ("id", "preorder_id", "po_number", "customer_name", "product_name", "quantity",
+                                "status", "reserved", "coming", "shortfall")}
+            for ln in _reservation_lines(con, [master_item_id]) if ln["reserved"] or ln["coming"] or ln["shortfall"]
+        ]
+
+
+def _walkin_holdings(items: list[dict], con: sqlite3.Connection) -> dict[int, int]:
+    """What the receipt's own (non-Sales-Order) lines hold: the part a reservation can block."""
+    return _receipt_item_holdings([i for i in items if not i.get("preorder_item_id")], con)
+
+
 def _apply_receipt_stock_delta(
-    con: sqlite3.Connection, receipt_id: str, before: dict[int, int], after: dict[int, int]
+    con: sqlite3.Connection, receipt_id: str, before: dict[int, int], after: dict[int, int],
+    walkin: tuple[dict[int, int], dict[int, int]] | None = None, override_reason: str | None = None,
+    by: str | None = None,
 ) -> None:
     """The single place a sale moves stock. A non-void receipt HOLDS
     sum(quantity) per master_item_id; a void or deleted receipt holds NOTHING.
@@ -1380,6 +1505,33 @@ def _apply_receipt_stock_delta(
             raise ValueError(
                 f"Stok {mi['name']} tidak cukup: tersedia {max(mi['stock_qty'], 0)}, dibutuhkan {taken}."
             )
+    # K-02: a walk-in sale may not take what is reserved for a Sales Order customer, unless an admin
+    # overrides it with a reason. Sales Order lines themselves are never blocked here: their own
+    # reservation is what they consume.
+    if walkin is not None:
+        w_before, w_after = walkin
+        grow = {m: w_after.get(m, 0) - w_before.get(m, 0) for m in set(w_before) | set(w_after)}
+        grow = {m: q for m, q in grow.items() if q > 0}
+        if grow:
+            reserved = _reserved_by_item(con, list(grow))
+            conflicts = []
+            for mid, q in sorted(grow.items()):
+                if not reserved.get(mid):
+                    continue
+                mi = con.execute("SELECT name, stock_qty FROM master_items WHERE id=?", (mid,)).fetchone()
+                free = max(mi["stock_qty"] - reserved[mid], 0)
+                if q > free:
+                    conflicts.append(f"{mi['name']} (bebas {free}, dicadangkan {reserved[mid]}, diminta {q})")
+            if conflicts:
+                reason = (override_reason or "").strip()
+                if not reason:
+                    raise StockReservedError(
+                        "Stok sudah dicadangkan untuk pelanggan Sales Order: " + "; ".join(conflicts)
+                        + ". Kurangi jumlahnya, atau minta admin mengizinkan dengan alasan."
+                    )
+                _log_receipt_event(con, receipt_id, "override",
+                                   "Izin admin memakai stok yang dicadangkan: " + "; ".join(conflicts)
+                                   + f". Alasan: {reason}", by)
     now = _now()
     for master_item_id in touched_ids:
         # Positive when the receipt's holding shrank (stock returns, e.g. a void
@@ -1650,6 +1802,7 @@ def create_receipt(
     created_by: str | None = None,
     work_status: str = "belum",
     extra: dict | None = None,
+    stock_override_reason: str | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     if payment_method != "transfer":
@@ -1713,7 +1866,8 @@ def create_receipt(
         after_holdings = (
             _receipt_item_holdings(resolved_items, con) if _holds_stock(final_status, work_status) else {}
         )
-        _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings)
+        _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings, walkin=({}, after_holdings),
+                                   override_reason=stock_override_reason, by=created_by)
         _log_receipt_event(con, receipt_id, "created", {
             "draft": "Draft dibuat", "pengerjaan": "Nota dibuat, pengerjaan dimulai",
             "belum": "Nota dibuat, belum dikerjakan", "selesai": "Nota dibuat, pengerjaan selesai",
@@ -1971,6 +2125,7 @@ def update_receipt(
     changed_by: str | None = None,
     extra: dict | None = None,
     void_reason: str | None = None,
+    stock_override_reason: str | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -2190,7 +2345,12 @@ def update_receipt(
         after_holdings = (
             _receipt_item_holdings(after_items, con) if _holds_stock(new_status, new_work_status) else {}
         )
-        _apply_receipt_stock_delta(con, receipt_id, before_holdings, after_holdings)
+        held_before = _holds_stock(existing["status"], existing["work_status"])
+        held_after = _holds_stock(new_status, new_work_status)
+        walkin = (_walkin_holdings(existing_items, con) if held_before else {},
+                  _walkin_holdings(after_items, con) if held_after else {})
+        _apply_receipt_stock_delta(con, receipt_id, before_holdings, after_holdings, walkin=walkin,
+                                   override_reason=stock_override_reason, by=changed_by)
         if new_status == "void" and existing["status"] != "void":
             reason = (void_reason or "").strip() or None
             refund = existing["amount_paid"] or 0
@@ -2229,6 +2389,8 @@ def settle_receipt(
         remaining = max(row["total"] - row["amount_paid"], 0)
         if amount is not None and amount != remaining:
             raise ValueError(f"Jumlah dibayar harus sama dengan sisa pembayaran (Rp {remaining:,}).".replace(",", "."))
+        if row["work_status"] != "selesai":
+            _install_so_lines(con, receipt_id, settled_by)
         # status='pending' in the WHERE makes this a compare-and-set: a double click (or
         # two tills) that both read 'pending' above cannot both win -- the loser matches
         # no row and is told the receipt is already done instead of reporting a second success.
@@ -2372,8 +2534,8 @@ def return_receipt_item(
             raise ValueError("Jasa tidak bisa diretur. Gunakan potongan atau refund.")
         if item.get("preorder_item_id"):
             po_line = con.execute("SELECT status FROM preorder_items WHERE id=?", (item["preorder_item_id"],)).fetchone()
-            if po_line is None or po_line["status"] not in PO_ARRIVED_STATUSES:
-                raise ValueError("Barang PO ini belum sampai ke pelanggan. Batalkan di halaman Sales Order saja.")
+            if po_line is None or po_line["status"] not in PO_INSTALLED_STATUSES:
+                raise ValueError("Barang Sales Order ini belum terpasang/diserahkan. Batalkan di halaman Sales Order saja.")
         left = item["quantity"] - (item["returned_qty"] or 0)
         if quantity <= 0 or quantity > left:
             raise ValueError(f"Jumlah retur harus 1 sampai {left}.")
@@ -2435,8 +2597,35 @@ def get_receipt_returns(receipt_id: str) -> list[dict]:
         ).fetchall()]
 
 
+def _install_so_lines(con: sqlite3.Connection, receipt_id: str, by: str | None) -> None:
+    """K-01 + rule B: finishing the work on a Sales Order's invoice means its goods are installed /
+    handed over. Every arrived line becomes Terpasang, which is the moment it leaves stock (using up
+    its reservation). Refused while any line has not arrived yet."""
+    po = con.execute("SELECT id, po_number FROM preorders WHERE receipt_id=?", (receipt_id,)).fetchone()
+    if po is None:
+        return
+    lines = [dict(r) for r in con.execute(
+        "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (po["id"],)).fetchall()]
+    lines = [ln for ln in lines if ln["status"] != PO_LINE_CANCELLED]
+    missing = [ln["product_name"] for ln in lines if ln["status"] not in PO_ARRIVED_STATUSES]
+    if missing:
+        raise ValueError("Masih ada barang Sales Order yang belum datang: " + ", ".join(missing)
+                         + ". Pengerjaan belum bisa diselesaikan.")
+    todo = [ln for ln in lines if ln["status"] not in PO_INSTALLED_STATUSES]
+    if not todo:
+        return
+    before = _po_invoice_holdings(con, receipt_id)
+    now = _now()
+    for ln in todo:
+        con.execute("UPDATE preorder_items SET status='terpasang' WHERE id=?", (ln["id"],))
+        _log_preorder_status(con, po["id"], ln["id"], ln["product_name"], "terpasang", now, by, ln["status"])
+    con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, po["id"]))
+    _po_invoice_sync(con, po["id"], by, before)
+
+
 def change_receipt_work_status(
-    receipt_id: str, to_status: str, note: str | None = None, changed_by: str | None = None
+    receipt_id: str, to_status: str, note: str | None = None, changed_by: str | None = None,
+    stock_override_reason: str | None = None,
 ) -> dict:
     """Moves a nota between Belum Dikerjakan / Dalam Pengerjaan / Pengerjaan Selesai, whatever its
     payment state. Leaving Draft is the moment stock is taken off the shelf (and an oversell is
@@ -2463,7 +2652,11 @@ def change_receipt_work_status(
         if current == "draft":
             if not items:
                 raise ValueError("Nota belum punya item.")
-            _apply_receipt_stock_delta(con, receipt_id, {}, _receipt_item_holdings(items, con))
+            _apply_receipt_stock_delta(con, receipt_id, {}, _receipt_item_holdings(items, con),
+                                       walkin=({}, _walkin_holdings(items, con)),
+                                       override_reason=stock_override_reason, by=changed_by)
+        if to_status == "selesai":
+            _install_so_lines(con, receipt_id, changed_by)
         cur = con.execute(
             "UPDATE receipts SET work_status=?, draft_saved_at=NULL WHERE id=? AND work_status=?",
             (to_status, receipt_id, current),
@@ -2914,8 +3107,10 @@ def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
         row = con.execute(
             "SELECT 1 FROM master_items WHERE supplier_id=? "
             "UNION SELECT 1 FROM inbound_documents WHERE supplier_id=? "
-            "UNION SELECT 1 FROM purchase_invoices WHERE supplier_id=? LIMIT 1",
-            (entity_id, entity_id, entity_id),
+            "UNION SELECT 1 FROM purchase_invoices WHERE supplier_id=? "
+            "UNION SELECT 1 FROM supplier_pos WHERE supplier_id=? "
+            "UNION SELECT 1 FROM preorders WHERE supplier_id=? LIMIT 1",
+            (entity_id, entity_id, entity_id, entity_id, entity_id),
         ).fetchone()
     else:
         row = con.execute(
@@ -3833,7 +4028,7 @@ def get_inventory_overview() -> dict:
             for r in po_rows
         ]
         # Fully installed orders are finished business and drop off the dashboard.
-        preorders_open = [r for r in preorders_open if r["status"] != PREORDER_STATUSES[-1]]
+        preorders_open = [r for r in preorders_open if r["status"] not in PO_CLOSED_LINE_STATUSES]
 
         # Sales this calendar month (paid receipts).
         month_start = date.today().replace(day=1).isoformat()
@@ -4194,6 +4389,8 @@ def _spo_apply_inbound_receipt(con: sqlite3.Connection, header, lines: list[dict
 
 def post_inbound_document(document_id: int, by: str | None = None) -> dict:
     with _conn() as con:
+        # Take the write lock before reading, so two posts of the same draft can't both see 'draft'.
+        con.execute("BEGIN IMMEDIATE")
         header = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if header is None:
             raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
@@ -4201,6 +4398,8 @@ def post_inbound_document(document_id: int, by: str | None = None) -> dict:
             raise ValueError(
                 f"Dokumen barang masuk {document_id} tidak bisa diposting: statusnya '{header['status']}', hanya dokumen draft yang bisa diposting"
             )
+        if header["source"] == "manual" and not header["reviewed_at"]:
+            raise ValueError("Barang Masuk manual (tanpa PO) harus diperiksa dulu sebelum diposting.")
 
         # Step 2: re-validate received_date, even though it may have already been
         # checked at creation time (it can go stale between draft creation and posting).
@@ -4236,7 +4435,9 @@ def post_inbound_document(document_id: int, by: str | None = None) -> dict:
 
         # Step 4: flip status to posted FIRST — the avg-cost recompute below filters
         # on d.status='posted' and must see this document's own new rows.
-        con.execute("UPDATE inbound_documents SET status='posted' WHERE id=?", (document_id,))
+        if con.execute("UPDATE inbound_documents SET status='posted' WHERE id=? AND status='draft'",
+                       (document_id,)).rowcount != 1:
+            raise ValueError(f"Dokumen barang masuk {document_id} sudah diposting.")
 
         # Step 5: resolve unresolved new-product lines into real master items + SKUs.
         for item in items:
@@ -4334,6 +4535,7 @@ def post_inbound_document(document_id: int, by: str | None = None) -> dict:
 
 def void_inbound_document(document_id: int, reason: str, by: str | None = None) -> dict:
     with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
         header = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         if header is None:
             raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
@@ -4356,12 +4558,23 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
                 (document_id,),
             ).fetchall()
         ]
+        # qty_remaining is never drawn down by sales, so check the live stock instead: taking this
+        # document's quantity back out must not leave any item below zero.
+        taking: dict[int, int] = {}
         for item in items:
-            if item["qty_remaining"] != item["qty_in"]:
+            taking[item["master_item_id"]] = taking.get(item["master_item_id"], 0) + item["qty_in"]
+        for item in items:
+            mid = item["master_item_id"]
+            if mid not in taking:
+                continue
+            stock = con.execute("SELECT stock_qty FROM master_items WHERE id=?", (mid,)).fetchone()["stock_qty"]
+            if stock < taking[mid]:
                 raise ValueError(
-                    f"Dokumen {document_id} tidak bisa dibatalkan: stok barang SKU {item['sku']} sudah terpakai "
-                    f"(sisa={item['qty_remaining']} dari jumlah masuk={item['qty_in']})"
+                    f"Dokumen {document_id} tidak bisa dibatalkan: stok SKU {item['sku']} tinggal {stock}, "
+                    f"sedangkan dokumen ini memasukkan {taking[mid]} (sebagian sudah terjual/terpakai). "
+                    "Koreksi lewat Stock Opname atau penyesuaian stok."
                 )
+            del taking[mid]
 
         for item in items:
             master_item_id = item["master_item_id"]
@@ -4516,6 +4729,21 @@ def _supplier_snapshot(con: sqlite3.Connection, supplier_id: int) -> dict:
     }
 
 
+def _check_supplier_invoice_no(con: sqlite3.Connection, supplier_id: int, supplier_invoice_no: str | None,
+                               exclude_id: int | None = None) -> None:
+    """One supplier's own invoice number is recorded once; a voided faktur frees the number again."""
+    no = (supplier_invoice_no or "").strip()
+    if not no:
+        return
+    dup = con.execute(
+        "SELECT invoice_number FROM purchase_invoices WHERE supplier_id=? AND status != 'void' "
+        "AND UPPER(TRIM(supplier_invoice_no)) = UPPER(?) AND id != ?",
+        (supplier_id, no, exclude_id or 0),
+    ).fetchone()
+    if dup is not None:
+        raise ValueError(f"No. faktur supplier {no} sudah dicatat di {dup['invoice_number']}.")
+
+
 def create_purchase_invoice(
     supplier_id: int,
     invoice_date: str,
@@ -4531,6 +4759,7 @@ def create_purchase_invoice(
     totals = compute_purchase_invoice_totals(items, discount, tax_rate)
     with _conn() as con:
         snapshot = _supplier_snapshot(con, supplier_id)
+        _check_supplier_invoice_no(con, supplier_id, supplier_invoice_no)
         invoice_number = _next_purchase_invoice_number(con, date.today().strftime("%Y%m%d"))
         cur = con.execute(
             """INSERT INTO purchase_invoices
@@ -4589,6 +4818,7 @@ def update_purchase_invoice(
                 "hanya faktur draft yang bisa diubah"
             )
         snapshot = _supplier_snapshot(con, supplier_id)
+        _check_supplier_invoice_no(con, supplier_id, supplier_invoice_no, invoice_id)
         con.execute(
             """UPDATE purchase_invoices
                SET supplier_id=?, supplier_invoice_no=?, supplier_name_snapshot=?,
@@ -5024,6 +5254,7 @@ PREORDER_STATUS_LABELS = {
     "dalam_pengiriman": "Dalam pengiriman",
     "sampai_di_toko": "Sampai di toko",
     "terpasang": "Terpasang",
+    PO_LINE_CANCELLED: "Dibatalkan",
 }
 
 
@@ -5031,6 +5262,9 @@ def _preorder_overall_status(item_statuses: list[str]) -> str:
     """The order as a whole is only as far along as its *least* advanced line —
     an order with a pipe still in transit is not 'sampai di toko' just because
     the fittings arrived. An order with no items falls back to the first stage."""
+    if item_statuses and all(s == PO_LINE_CANCELLED for s in item_statuses):
+        return PO_LINE_CANCELLED
+    item_statuses = [s for s in item_statuses if s != PO_LINE_CANCELLED]
     if not item_statuses:
         return PREORDER_STATUSES[0]
     return min(item_statuses, key=lambda s: PREORDER_STATUSES.index(s) if s in PREORDER_STATUSES else 0)
@@ -5065,7 +5299,7 @@ def _preorder_paid_by_order(con: sqlite3.Connection) -> dict[str, int]:
 def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | None = None) -> dict:
     """`paid` is the sum of the order's own payments; the legacy preorders.deposit column is ignored.
     Once the PO has its invoice, paid and remaining are the invoice's (payments are taken there)."""
-    total = sum(i["quantity"] * i["unit_price"] for i in items)
+    total = sum(i["quantity"] * i["unit_price"] for i in items if i["status"] != PO_LINE_CANCELLED)
     out = {
         **row,
         "deposit": paid,
@@ -5153,21 +5387,28 @@ def _general_supplier(con: sqlite3.Connection) -> dict:
 
 
 def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, by: str | None) -> list[str]:
-    """Every published Sales Order must have Purchase Order(s): whatever quantity of its lines no
-    Purchase Order covers yet goes on a new draft, one per supplier (barang with no supplier go to
-    UMUM). Lines already at the shop need none. Safe to call repeatedly: drafts count as ordered."""
+    """A published Sales Order gets draft Purchase Order(s) for what the shop can't supply from stock:
+    the quantity that is neither reserved from the shelf nor already on a Purchase Order goes on a new
+    draft, one per supplier (barang with no supplier go to UMUM). Lines already at the shop need none.
+    Safe to call repeatedly: drafts count as ordered."""
     from uuid import uuid4
     po = con.execute("SELECT po_number, is_draft FROM preorders WHERE id=?", (preorder_id,)).fetchone()
     if po is None or po["is_draft"]:
         return []
     groups: dict[int, list[dict]] = {}
-    for r in _spo_candidate_rows(con, None, None):
-        if r["preorder_id"] != preorder_id:
+    candidates = [r for r in _spo_candidate_rows(con, None, None) if r["preorder_id"] == preorder_id]
+    # K-02 / rule A: what the shelf can hold for this order is reserved, only the rest is bought.
+    # Older orders keep their claim on the shelf first. A line with no master item can't come from stock.
+    res_lines = _reservation_lines(con, [r["master_item_id"] for r in candidates])
+    short = {ln["id"]: ln["shortfall"] for ln in res_lines}
+    for r in candidates:
+        qty = r["qty_left"] if r["master_item_id"] is None else min(r["qty_left"], short.get(r["preorder_item_id"], 0))
+        if qty <= 0:
             continue
         sid = r["supplier_id"] if r["supplier_id"] is not None else _general_supplier(con)["id"]
         groups.setdefault(sid, []).append({
             "preorder_item_id": r["preorder_item_id"], "master_item_id": r["master_item_id"],
-            "product_name": r["product_name"], "unit": r["unit"], "quantity": r["qty_left"],
+            "product_name": r["product_name"], "unit": r["unit"], "quantity": qty,
             "est_unit_price": r["est_unit_price"], "discount_pct": 0,
         })
     now, po_date, created = _now(), shop_today().isoformat(), []
@@ -5186,6 +5427,17 @@ def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, b
         _spo_replace_items(con, spo_id, items)
         _spo_event(con, spo_id, "created", f"Draft dibuat otomatis dari Sales Order {po['po_number']}", by)
         created.append(spo_id)
+    # A line the shelf covers completely is already at the shop: it waits for installation like a
+    # delivered one (and lets the invoice leave Menunggu Barang).
+    ready = [ln for ln in res_lines if ln["preorder_id"] == preorder_id and ln["status"] == "pesanan_dibuat"
+             and ln["coming"] == 0 and ln["reserved"] >= ln["quantity"]]
+    if ready:
+        now = _now()
+        for ln in ready:
+            con.execute("UPDATE preorder_items SET status='sampai_di_toko' WHERE id=?", (ln["id"],))
+            _log_preorder_status(con, preorder_id, ln["id"], ln["product_name"], "sampai_di_toko", now, by,
+                                 "pesanan_dibuat")
+        _po_invoice_sync(con, preorder_id, by)
     return created
 
 
@@ -5201,6 +5453,7 @@ def create_preorder(
     po_date: str | None = None,
     is_draft: bool = False,
     deposit_method: str = "cash",
+    supplier_id: int | None = None,
 ) -> dict:
     """A deposit given at creation is recorded as the first payment ("DP awal"); on a published PO it
     is booked straight onto the PO's invoice, which is created here too."""
@@ -5210,10 +5463,10 @@ def create_preorder(
         con.execute(
             """INSERT INTO preorders
                (id, po_number, po_date, plate_full, customer_name, customer_phone, deposit, notes,
-                created_at, updated_at, is_draft)
-               VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
+                created_at, updated_at, is_draft, supplier_id)
+               VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)""",
             (preorder_id, _next_po_no(con, po_date), po_date, plate_full, customer_name,
-             customer_phone, notes, now, now, int(is_draft)),
+             customer_phone, notes, now, now, int(is_draft), supplier_id),
         )
         if deposit > 0:
             con.execute(
@@ -5224,6 +5477,9 @@ def create_preorder(
             _insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now)
         if deposit > 0 and deposit_method != "cash":
             con.execute("UPDATE preorder_payments SET method=? WHERE preorder_id=?", (deposit_method, preorder_id))
+        if not is_draft:
+            _require_publish_dp(con, preorder_id)
+            con.execute("UPDATE preorders SET published_at=? WHERE id=?", (now, preorder_id))
         # A published PO gets its invoice now; the DP lands on it.
         receipt_id = _po_invoice_sync(con, preorder_id, changed_by)
         if receipt_id:
@@ -5234,7 +5490,7 @@ def create_preorder(
 
 def get_preorder(preorder_id: str) -> dict | None:
     with _conn() as con:
-        row = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        row = con.execute("SELECT *, (SELECT name FROM suppliers WHERE id=preorders.supplier_id) AS supplier_name FROM preorders WHERE id=?", (preorder_id,)).fetchone()
         if row is None:
             return None
         items = [dict(r) for r in con.execute(
@@ -5270,6 +5526,12 @@ def get_preorder_items(preorder_id: str) -> list[dict]:
                 (it["id"],),
             ).fetchall()
             it["supplier_pos"] = [dict(l) for l in links]
+        held = {ln["id"]: ln for ln in _reservation_lines(con, [it["master_item_id"] for it in items])}
+        for it in items:
+            ln = held.get(it["id"])
+            it["reserved_qty"] = ln["reserved"] if ln else 0
+            it["coming_qty"] = ln["coming"] if ln else 0
+            it["shortfall_qty"] = ln["shortfall"] if ln else 0
         return items
 
 
@@ -5524,7 +5786,8 @@ def _po_invoice_sync(
     if before is None:
         before = _po_invoice_holdings(con, receipt_id)
     po_items = [dict(r) for r in con.execute(
-        "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,)
+        "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>? ORDER BY position ASC, id ASC",
+        (preorder_id, PO_LINE_CANCELLED),
     ).fetchall()]
     lines = {r["preorder_item_id"]: dict(r) for r in con.execute(
         "SELECT * FROM receipt_items WHERE receipt_id=? AND preorder_item_id IS NOT NULL", (receipt_id,)
@@ -5617,6 +5880,38 @@ def po_invoices(con: sqlite3.Connection, receipt_ids: list[str]) -> dict[str, di
     ).fetchall()}
 
 
+def _migrate_k01_install_point(con: sqlite3.Connection) -> None:
+    """One-time switch to K-01 (Sales Order goods leave stock when installed, not when they arrive).
+    Invoices whose work is already finished had their goods installed: those lines are recorded as
+    Terpasang and keep their stock movement. On every other invoice, arrived-but-not-installed goods
+    are put back In Hand (a ledger IN per item) — they are physically still on the shelf — and from
+    then on are reserved for that customer, so Available does not change."""
+    rids = [r["receipt_id"] for r in con.execute(
+        """SELECT DISTINCT ri.receipt_id FROM receipt_items ri JOIN receipts r ON r.id = ri.receipt_id
+           WHERE ri.preorder_item_id IS NOT NULL AND r.status <> 'void' AND r.work_status <> 'draft'""").fetchall()]
+    now = _now()
+    for rid in rids:
+        rec = con.execute("SELECT work_status FROM receipts WHERE id=?", (rid,)).fetchone()
+        items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (rid,)).fetchall()]
+        if rec["work_status"] == "selesai":
+            for it in items:
+                if not it.get("preorder_item_id"):
+                    continue
+                line = con.execute("SELECT * FROM preorder_items WHERE id=?", (it["preorder_item_id"],)).fetchone()
+                if line is not None and line["status"] == "sampai_di_toko":
+                    con.execute("UPDATE preorder_items SET status='terpasang' WHERE id=?", (line["id"],))
+                    _log_preorder_status(con, line["preorder_id"], line["id"], line["product_name"], "terpasang",
+                                         now, "sistem", "sampai_di_toko")
+            continue
+        old = _receipt_item_holdings(items, con, PO_ARRIVED_STATUSES)
+        new = _receipt_item_holdings(items, con)
+        if old != new:
+            _apply_receipt_stock_delta(con, rid, old, new)
+            _log_receipt_event(con, rid, "status",
+                               "Aturan stok baru: barang Sales Order yang sudah di toko tetapi belum terpasang "
+                               "dikembalikan ke stok dan dicadangkan untuk pelanggan ini.", "sistem")
+
+
 def _backfill_po_invoices(con: sqlite3.Connection) -> None:
     """Startup: a published PO without an invoice gets one, and what was paid on the PO moves onto it.
     A PO whose lines were already turned into a nota the old way, or whose plate the cashier would not
@@ -5656,7 +5951,7 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
 
     with _conn() as con:
         rows = [dict(r) for r in con.execute(
-            f"SELECT * FROM preorders {where_sql} ORDER BY created_at DESC", params
+            f"SELECT *, (SELECT name FROM suppliers WHERE id=preorders.supplier_id) AS supplier_name FROM preorders {where_sql} ORDER BY created_at DESC", params
         ).fetchall()]
         items_by_order: dict[str, list[dict]] = {}
         for item in con.execute(
@@ -5673,6 +5968,64 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
     return result
 
 
+def _release_preorder_line_from_pos(con: sqlite3.Connection, line: dict, by: str | None) -> None:
+    """A Sales Order line is being removed. Draft Purchase Orders are only plans, so the line is taken
+    off them (an emptied draft is cancelled). Once a PO has gone to the supplier the goods are really
+    coming, so the removal is refused until that PO item is cancelled the proper way."""
+    refs = con.execute(
+        """SELECT spi.id, spi.supplier_po_id, spi.quantity, COALESCE(spi.qty_cancelled, 0) AS qty_cancelled,
+                  sp.status, sp.po_number
+           FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+           WHERE spi.preorder_item_id=?""",
+        (line["id"],),
+    ).fetchall()
+    for r in refs:
+        if r["status"] not in ("draft", "batal") and r["quantity"] - r["qty_cancelled"] > 0:
+            raise ValueError(
+                f"Barang “{line['product_name']}” sudah dipesan di Purchase Order {r['po_number']}. "
+                "Batalkan item itu di Purchase Order dulu, baru hapus dari Sales Order."
+            )
+    for r in refs:
+        if r["status"] != "draft":
+            continue
+        con.execute("DELETE FROM supplier_po_items WHERE id=?", (r["id"],))
+        left = con.execute("SELECT COUNT(*) AS n FROM supplier_po_items WHERE supplier_po_id=?",
+                           (r["supplier_po_id"],)).fetchone()["n"]
+        if left == 0:
+            con.execute("UPDATE supplier_pos SET status='batal', updated_at=? WHERE id=?", (_now(), r["supplier_po_id"]))
+        _spo_event(con, r["supplier_po_id"], "cancel" if left == 0 else "edit",
+                   f"Baris “{line['product_name']}” dihapus dari Sales Order"
+                   + (" — draft kosong, dibatalkan" if left == 0 else ""), by)
+
+
+SO_MIN_DP_PERCENT = 50
+
+
+def _require_publish_dp(con: sqlite3.Connection, preorder_id: str) -> None:
+    """K-03: a Sales Order is published only once the customer has paid at least half its total
+    as down payment. No exceptions; until then it stays a draft. Checked at the moment of
+    publishing only, so later edits to a published order are not blocked by it."""
+    total = con.execute(
+        "SELECT COALESCE(SUM(quantity*unit_price),0) AS t FROM preorder_items WHERE preorder_id=?", (preorder_id,)
+    ).fetchone()["t"]
+    need = -(-total * SO_MIN_DP_PERCENT // 100)
+    paid = con.execute(
+        "SELECT COALESCE(SUM(amount),0) AS n FROM preorder_payments WHERE preorder_id=?", (preorder_id,)
+    ).fetchone()["n"]
+    inv = con.execute(
+        "SELECT r.amount_paid FROM preorders p JOIN receipts r ON r.id=p.receipt_id WHERE p.id=? AND r.status<>'void'",
+        (preorder_id,),
+    ).fetchone()
+    if inv is not None:
+        paid = max(paid, inv["amount_paid"] or 0)
+    if paid < need:
+        rp = lambda n: f"{n:,}".replace(",", ".")
+        raise ValueError(
+            f"Uang muka (DP) minimal {SO_MIN_DP_PERCENT}% dari total sebelum Sales Order diterbitkan: "
+            f"minimal Rp {rp(need)}, tercatat Rp {rp(paid)}. Simpan sebagai draft dulu, atau tambah DP."
+        )
+
+
 def update_preorder(
     preorder_id: str,
     customer_name: str | None = None,
@@ -5684,6 +6037,8 @@ def update_preorder(
     is_draft: bool | None = None,
     plate_full: str | None = None,
     po_date: str | None = None,
+    set_supplier: bool = False,
+    supplier_id: int | None = None,
 ) -> dict:
     """Items are matched by id rather than deleted and re-inserted (the pattern
     receipts use), because a line item owns its stage and its status history —
@@ -5695,6 +6050,8 @@ def update_preorder(
         if row is None:
             raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
         existing = dict(row)
+        if existing.get("cancelled_at"):
+            raise ValueError("Sales Order ini sudah dibatalkan dan tidak bisa diubah lagi.")
         before = _po_invoice_snapshot(con, preorder_id)
         if is_draft and not existing["is_draft"] and existing.get("receipt_id"):
             inv = con.execute("SELECT status, work_status FROM receipts WHERE id=?", (existing["receipt_id"],)).fetchone()
@@ -5703,7 +6060,7 @@ def update_preorder(
 
         con.execute(
             """UPDATE preorders SET customer_name=?, customer_phone=?, plate_full=?, po_date=?, notes=?,
-               updated_at=?, is_draft=? WHERE id=?""",
+               updated_at=?, is_draft=?, supplier_id=? WHERE id=?""",
             (
                 customer_name if customer_name is not None else existing["customer_name"],
                 customer_phone if customer_phone is not None else existing["customer_phone"],
@@ -5712,6 +6069,7 @@ def update_preorder(
                 notes if update_notes else existing["notes"],
                 now,
                 int(is_draft) if is_draft is not None else existing["is_draft"],
+                supplier_id if set_supplier else existing.get("supplier_id"),
                 preorder_id,
             ),
         )
@@ -5728,7 +6086,11 @@ def update_preorder(
                 if item_id is not None and item_id in current:
                     kept.add(item_id)
                     prev = current[item_id]
+                    if prev["status"] == PO_LINE_CANCELLED:
+                        continue  # a cancelled line is kept exactly as it was
                     new_status = item.get("status") or prev["status"]
+                    if new_status == PO_LINE_CANCELLED:
+                        raise ValueError("Barang hanya bisa dibatalkan lewat tombol Batalkan Sales Order / Pembatalan Khusus.")
                     con.execute(
                         """UPDATE preorder_items SET master_item_id=?, product_name=?, unit=?,
                            quantity=?, unit_price=?, status=?, position=?, ship_route=?, priority=?, eta_date=? WHERE id=?""",
@@ -5745,9 +6107,15 @@ def update_preorder(
                     kept.add(_insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now))
 
             for stale_id in set(current) - kept:
+                if current[stale_id]["status"] == PO_LINE_CANCELLED:
+                    raise ValueError(f"Barang “{current[stale_id]['product_name']}” sudah dibatalkan dan tetap tercatat; tidak bisa dihapus.")
+                _release_preorder_line_from_pos(con, current[stale_id], changed_by)
                 con.execute("DELETE FROM preorder_status_history WHERE preorder_item_id=?", (stale_id,))
                 con.execute("DELETE FROM preorder_items WHERE id=?", (stale_id,))
 
+        if existing["is_draft"] and is_draft is False:
+            _require_publish_dp(con, preorder_id)
+            con.execute("UPDATE preorders SET published_at=COALESCE(published_at, ?) WHERE id=?", (now, preorder_id))
         # A published PO's invoice follows (and a draft that is published now gets its invoice).
         receipt_id = _po_invoice_sync(con, preorder_id, changed_by, before)
         if receipt_id:
@@ -5767,6 +6135,8 @@ def set_preorder_item_status(
         if row is None:
             raise ValueError(f"Item Sales Order {item_id} tidak ditemukan.")
         item = dict(row)
+        if item["status"] == PO_LINE_CANCELLED:
+            raise ValueError(f"Barang “{item['product_name']}” sudah dibatalkan; statusnya tidak bisa diubah.")
         if item["status"] != status:
             before = _po_invoice_snapshot(con, preorder_id)
             con.execute("UPDATE preorder_items SET status=? WHERE id=?", (status, item_id))
@@ -5788,7 +6158,8 @@ def set_preorder_status(preorder_id: str, status: str, changed_by: str | None = 
             raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
         before = _po_invoice_snapshot(con, preorder_id)
         for item in con.execute(
-            "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>?", (preorder_id, status)
+            "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>? AND status<>?",
+            (preorder_id, status, PO_LINE_CANCELLED),
         ).fetchall():
             con.execute("UPDATE preorder_items SET status=? WHERE id=?", (status, item["id"]))
             _log_preorder_status(con, preorder_id, item["id"], item["product_name"], status, now,
@@ -5798,6 +6169,348 @@ def set_preorder_status(preorder_id: str, status: str, changed_by: str | None = 
             con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
             _po_invoice_sync(con, preorder_id, changed_by, before)
     return changed
+
+
+# --- K-13: cancelling a Sales Order (official policy, decided 2026-10-18) -----------------------
+# Rules are per line. An INDENT line (ordered from a supplier: free text, on any Purchase Order, or
+# still needing goods the shelf can't cover) may be cancelled at the customer's request only within
+# 24 hours of the order being published AND while no Purchase Order carrying it went to the
+# supplier, whichever ends first; past that it is blocked: nothing is cancelled, refunded or
+# released. A SHOP-STOCK line (served entirely from the shelf) may be cancelled by an admin at any
+# time until it is installed / handed over. When the shop or the supplier
+# fails the customer (cannot supply, wrong goods, broken delivery terms) an admin may still cancel
+# the affected lines (Pembatalan Khusus): the customer gets back in full what they paid beyond the
+# lines they keep, and issued Purchase Orders and stock are left for the admin to settle by hand.
+# Installed (Terpasang) lines are never cancelled; they stay billed. Admin only, reason mandatory,
+# every step logged on the Sales Order, its invoice and the Purchase Orders involved.
+
+SO_CANCEL_WINDOW_HOURS = 24
+SO_FAULT_CATEGORIES = {
+    "gagal_memenuhi": "Toko/supplier gagal memenuhi pesanan",
+    "barang_salah": "Barang yang dikirim salah / tidak sesuai",
+    "pelanggaran_pengiriman": "Melanggar ketentuan pengiriman yang disepakati",
+}
+SO_REFUND_METHODS = ("cash", "transfer", "qris", "debit")
+
+
+def _rp(n: int) -> str:
+    return f"Rp {n:,}".replace(",", ".")
+
+
+def _so_issued_po_refs(con: sqlite3.Connection, line_ids: list[int]) -> list[dict]:
+    """Purchase Orders already sent to the supplier that still carry some of these lines."""
+    if not line_ids:
+        return []
+    return [dict(r) for r in con.execute(
+        f"""SELECT spi.preorder_item_id, spi.product_name, sp.id AS supplier_po_id, sp.po_number, sp.status
+            FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+            WHERE spi.preorder_item_id IN ({_placeholders(line_ids)}) AND sp.status NOT IN ('draft','batal')
+              AND spi.quantity - COALESCE(spi.qty_cancelled, 0) > 0
+            ORDER BY sp.po_number""", line_ids).fetchall()]
+
+
+def _so_line_kinds(con: sqlite3.Connection, lines: list[dict]) -> dict[int, str]:
+    """'inden' for a line that comes (or came) from a supplier, 'stok' for one the shelf covers alone."""
+    held = {ln["id"]: ln for ln in _reservation_lines(con, [ln["master_item_id"] for ln in lines])}
+    ids = [ln["id"] for ln in lines]
+    on_po = {r["preorder_item_id"] for r in con.execute(
+        f"""SELECT DISTINCT spi.preorder_item_id FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+            WHERE spi.preorder_item_id IN ({_placeholders(ids)}) AND sp.status <> 'batal'""", ids)} if ids else set()
+    out = {}
+    for ln in lines:
+        h = held.get(ln["id"])
+        supplier = ln["master_item_id"] is None or ln["id"] in on_po or (h is not None and (h["coming"] or h["shortfall"]))
+        out[ln["id"]] = "inden" if supplier else "stok"
+    return out
+
+
+def _so_cancel_check(con: sqlite3.Connection, po: dict, lines: list[dict]) -> dict:
+    """Which lines 'Batalkan' (customer request) may cancel right now, and why the others can't.
+    `lines` in the result: one entry per open line {id, product_name, type, allowed, reason}."""
+    out = {"allowed": False, "reasons": [], "deadline": None, "special_allowed": False, "lines": []}
+    if po.get("cancelled_at"):
+        out["reasons"].append("Sales Order ini sudah dibatalkan.")
+        return out
+    if po["is_draft"]:
+        out["reasons"].append("Sales Order masih draft; cukup diarsipkan.")
+        return out
+    inv = con.execute("SELECT status FROM receipts WHERE id=?", (po["receipt_id"],)).fetchone() if po.get("receipt_id") else None
+    if inv is None or inv["status"] == "void":
+        out["reasons"].append("Invoice Sales Order ini sudah di-void.")
+        return out
+    open_lines = [ln for ln in lines if ln["status"] not in PO_CLOSED_LINE_STATUSES]
+    if not open_lines:
+        out["reasons"].append("Tidak ada barang yang bisa dibatalkan: semua sudah terpasang atau dibatalkan.")
+        return out
+    out["special_allowed"] = True
+    kinds = _so_line_kinds(con, open_lines)
+    published = po.get("published_at") or po["created_at"]
+    deadline = datetime.fromisoformat(published) + timedelta(hours=SO_CANCEL_WINDOW_HOURS)
+    expired = datetime.now(timezone.utc) > deadline
+    local = deadline + timedelta(minutes=SHOP_UTC_OFFSET_MINUTES)
+    issued: dict[int, list[str]] = {}
+    for r in _so_issued_po_refs(con, [ln["id"] for ln in open_lines]):
+        issued.setdefault(r["preorder_item_id"], []).append(r["po_number"])
+    if any(k == "inden" for k in kinds.values()):
+        out["deadline"] = deadline.isoformat()
+    for ln in open_lines:
+        why = []
+        if kinds[ln["id"]] == "inden":
+            if expired:
+                why.append(f"barang inden, sudah lewat {SO_CANCEL_WINDOW_HOURS} jam sejak dikonfirmasi (batas {local:%d/%m/%Y %H:%M})")
+            if ln["id"] in issued:
+                why.append(f"Purchase Order {', '.join(sorted(set(issued[ln['id']])))} sudah diterbitkan ke supplier")
+        reason = "; ".join(why) or None
+        out["lines"].append({"id": ln["id"], "product_name": ln["product_name"], "type": kinds[ln["id"]],
+                             "allowed": not why, "reason": reason})
+        if why:
+            out["reasons"].append(f"{ln['product_name']}: {reason}")
+    out["allowed"] = any(x["allowed"] for x in out["lines"])
+    return out
+
+
+def get_preorder_cancel_check(preorder_id: str) -> dict | None:
+    with _conn() as con:
+        po = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if po is None:
+            return None
+        lines = [dict(r) for r in con.execute("SELECT * FROM preorder_items WHERE preorder_id=?", (preorder_id,))]
+        return _so_cancel_check(con, dict(po), lines)
+
+
+def _so_mark_lines_cancelled(con: sqlite3.Connection, po: dict, lines: list[dict], kind: str, reason: str,
+                             by: str | None, now: str) -> None:
+    for ln in lines:
+        con.execute(
+            """UPDATE preorder_items SET status=?, cancelled_at=?, cancelled_by=?, cancel_kind=?, cancel_reason=?
+               WHERE id=? AND status=?""",
+            (PO_LINE_CANCELLED, now, by, kind, reason, ln["id"], ln["status"]),
+        )
+        _log_preorder_status(con, po["id"], ln["id"], ln["product_name"], PO_LINE_CANCELLED, now, by, ln["status"])
+
+
+def _so_drop_from_draft_pos(con: sqlite3.Connection, po: dict, line: dict, by: str | None) -> None:
+    """Draft Purchase Orders are only plans: the cancelled line is taken off them."""
+    for r in con.execute(
+        """SELECT spi.id, spi.supplier_po_id FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+           WHERE spi.preorder_item_id=? AND sp.status='draft'""", (line["id"],)).fetchall():
+        con.execute("DELETE FROM supplier_po_items WHERE id=?", (r["id"],))
+        left = con.execute("SELECT COUNT(*) AS n FROM supplier_po_items WHERE supplier_po_id=?",
+                           (r["supplier_po_id"],)).fetchone()["n"]
+        if left == 0:
+            con.execute("UPDATE supplier_pos SET status='batal', updated_at=? WHERE id=?", (_now(), r["supplier_po_id"]))
+        _spo_event(con, r["supplier_po_id"], "cancel" if left == 0 else "edit",
+                   f"Sales Order {po['po_number']} dibatalkan: “{line['product_name']}” dihapus dari draft"
+                   + (" — draft kosong, dibatalkan" if left == 0 else ""), by)
+
+
+def _so_settle_invoice(con: sqlite3.Connection, po: dict, before: dict | None, refund: int, method: str,
+                       fee: int, note: str, by: str | None) -> dict:
+    """After lines are cancelled: the invoice drops them, keeps a cancellation fee if any, pays back
+    `refund`, and closes when nothing is left to do."""
+    receipt_id = _po_invoice_sync(con, po["id"], by, before)
+    if fee > 0:
+        con.execute(
+            """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
+                   item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id)
+               VALUES (?, ?, 1, ?, NULL, NULL, 'jasa', 0, ?, ?, 1, NULL)""",
+            (receipt_id, f"BIAYA PEMBATALAN SALES ORDER {po['po_number']}", fee, _now(), by),
+        )
+        _po_invoice_sync(con, po["id"], by)
+    rec = dict(con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone())
+    if refund > 0:
+        cur = con.execute("UPDATE receipts SET amount_paid=? WHERE id=? AND amount_paid=?",
+                          (rec["amount_paid"] - refund, receipt_id, rec["amount_paid"]))
+        if cur.rowcount == 0:
+            raise ValueError("Invoice ini baru saja berubah. Muat ulang lalu coba lagi.")
+        _insert_receipt_payment(con, receipt_id, -refund, method, f"Refund pembatalan Sales Order {po['po_number']}", by)
+        _log_receipt_event(con, receipt_id, "refund", f"{_rp(refund)} ({method}) dikembalikan ke pelanggan. {note}", by)
+        rec["amount_paid"] -= refund
+    status = _compute_receipt_status(rec["total"], rec["amount_paid"], None)
+    con.execute("UPDATE receipts SET status=? WHERE id=?", (status, receipt_id))
+    left = con.execute("SELECT status FROM preorder_items WHERE preorder_id=? AND status<>?",
+                       (po["id"], PO_LINE_CANCELLED)).fetchall()
+    if all(r["status"] in PO_INSTALLED_STATUSES for r in left):
+        if rec["total"] == 0 and rec["amount_paid"] == 0:
+            con.execute("UPDATE receipts SET status='void', void_reason=?, voided_by=?, voided_at=? WHERE id=?",
+                        (note, by, _now(), receipt_id))
+            _log_receipt_event(con, receipt_id, "void", f"Invoice ditutup (void): {note}", by)
+        elif rec["work_status"] != "selesai":
+            con.execute("UPDATE receipts SET work_status='selesai' WHERE id=?", (receipt_id,))
+            _log_receipt_event(con, receipt_id, "status", f"Status: Pengerjaan Selesai — {note}", by)
+    _log_receipt_event(con, receipt_id, "status", note, by)
+    return dict(con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone())
+
+
+def _so_load_for_cancel(con: sqlite3.Connection, preorder_id: str) -> tuple[dict, list[dict]]:
+    con.execute("BEGIN IMMEDIATE")
+    po = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+    if po is None:
+        raise ValueError("Sales Order tidak ditemukan.")
+    lines = [dict(r) for r in con.execute(
+        "SELECT * FROM preorder_items WHERE preorder_id=? ORDER BY position ASC, id ASC", (preorder_id,))]
+    return dict(po), lines
+
+
+def _so_amounts(con: sqlite3.Connection, po: dict, keep_lines: list[dict]) -> tuple[int, int]:
+    """(paid on the invoice, what the invoice will still bill once only `keep_lines` remain)."""
+    rec = con.execute("SELECT * FROM receipts WHERE id=?", (po["receipt_id"],)).fetchone()
+    keep_ids = {ln["id"] for ln in keep_lines}
+    items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (po["receipt_id"],))]
+    billed = sum(_line_total(i) for i in items if i["preorder_item_id"] is None or i["preorder_item_id"] in keep_ids)
+    billed = max(billed - min(rec["discount"] or 0, billed) - (rec["return_total"] or 0), 0)
+    return rec["amount_paid"], billed
+
+
+def preview_preorder_cancel(preorder_id: str, item_ids: list[int] | None = None) -> dict:
+    """What a cancellation would do to the money, for the confirmation dialog. `item_ids` None = the
+    whole order (customer request); a list = those lines (Pembatalan Khusus)."""
+    with _conn() as con:
+        po = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if po is None:
+            raise ValueError("Sales Order tidak ditemukan.")
+        po = dict(po)
+        lines = [dict(r) for r in con.execute("SELECT * FROM preorder_items WHERE preorder_id=?", (preorder_id,))]
+        check = _so_cancel_check(con, po, lines)
+        if not po.get("receipt_id"):
+            return {"check": check, "paid": 0, "billed_after": 0, "refund_max": 0}
+        open_ids = {ln["id"] for ln in lines if ln["status"] not in PO_CLOSED_LINE_STATUSES}
+        drop = open_ids if item_ids is None else open_ids & set(item_ids)
+        keep = [ln for ln in lines if ln["status"] != PO_LINE_CANCELLED and ln["id"] not in drop]
+        paid, billed = _so_amounts(con, po, keep)
+        return {"check": check, "paid": paid, "billed_after": billed, "refund_max": max(paid - billed, 0)}
+
+
+def cancel_preorder(preorder_id: str, reason: str, refund_amount: int, refund_method: str,
+                    by: str | None = None, item_ids: list[int] | None = None) -> dict:
+    """Batalkan at the customer's request (admin). `item_ids` None = every line the policy allows;
+    a list = those lines, each of which must be allowed (shop-stock lines any time before they are
+    installed; indent lines only inside the 24-hour window and before their Purchase Order is
+    issued). Draft Purchase Orders lose the lines, the shelf stock held for them is free again, and
+    the admin decides how much of the money beyond the lines that stay goes back (the rest is kept
+    as a cancellation fee on the invoice). The order itself is cancelled once nothing is left open."""
+    reason = (reason or "").strip()
+    if len(reason) < 5:
+        raise ValueError("Alasan pembatalan wajib diisi (minimal 5 huruf).")
+    if refund_method not in SO_REFUND_METHODS:
+        raise ValueError("Metode refund harus salah satu dari: cash, transfer, qris, debit.")
+    now = _now()
+    with _conn() as con:
+        po, lines = _so_load_for_cancel(con, preorder_id)
+        check = _so_cancel_check(con, po, lines)
+        if not check["allowed"] and not check["lines"]:
+            raise ValueError(check["reasons"][0])
+        if not check["allowed"]:
+            raise ValueError((
+                "Tidak ada barang yang boleh dibatalkan: " + "; ".join(r.rstrip(".") for r in check["reasons"]) + ". "
+                + ("Bila toko atau supplier gagal memenuhi pesanan, admin dapat memakai Pembatalan Khusus."
+                   if check["special_allowed"] else "")).strip())
+        rule = {x["id"]: x for x in check["lines"]}
+        by_id = {ln["id"]: ln for ln in lines}
+        if item_ids is None:
+            drop = [by_id[x["id"]] for x in check["lines"] if x["allowed"]]
+        else:
+            drop = []
+            for iid in dict.fromkeys(item_ids):
+                x = rule.get(iid)
+                if x is None:
+                    raise ValueError("Barang itu tidak ada, sudah terpasang, atau sudah dibatalkan.")
+                if not x["allowed"]:
+                    raise ValueError(f"“{x['product_name']}” tidak bisa dibatalkan: {x['reason']}.")
+                drop.append(by_id[iid])
+            if not drop:
+                raise ValueError("Pilih barang yang dibatalkan.")
+        drop_ids = {ln["id"] for ln in drop}
+        keep = [ln for ln in lines if ln["status"] != PO_LINE_CANCELLED and ln["id"] not in drop_ids]
+        paid, billed = _so_amounts(con, po, keep)
+        over = max(paid - billed, 0)
+        if refund_amount < 0 or refund_amount > over:
+            raise ValueError(f"Jumlah refund harus 0 sampai {_rp(over)} (uang yang sudah dibayar di luar barang yang tetap ditagih)." if over
+                             else "Tidak ada uang yang bisa dikembalikan: pembayaran masih dipakai untuk barang yang tidak dibatalkan.")
+        before = _po_invoice_snapshot(con, preorder_id)
+        _so_mark_lines_cancelled(con, po, drop, "pelanggan", reason, by, now)
+        for ln in drop:
+            _so_drop_from_draft_pos(con, po, ln, by)
+        if not any(ln["status"] not in PO_CLOSED_LINE_STATUSES for ln in keep):
+            con.execute("""UPDATE preorders SET cancelled_at=?, cancelled_by=?, cancel_kind='pelanggan', cancel_reason=?,
+                           updated_at=? WHERE id=?""", (now, by, reason, now, preorder_id))
+        else:
+            con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
+        fee = over - refund_amount
+        note = (f"Sales Order {po['po_number']}: dibatalkan atas permintaan pelanggan — "
+                f"{', '.join(ln['product_name'] for ln in drop)}. Alasan: {reason}. "
+                f"Refund {_rp(refund_amount)}" + (f", biaya pembatalan {_rp(fee)}" if fee else ""))
+        _so_settle_invoice(con, po, before, refund_amount, refund_method, fee, note, by)
+    return get_preorder(preorder_id)
+
+
+def cancel_preorder_items(preorder_id: str, item_ids: list[int], category: str, reason: str,
+                          refund_method: str, by: str | None = None) -> dict:
+    """Pembatalan Khusus (admin): the shop or the supplier failed the customer on these lines. They are
+    cancelled whatever the 24-hour window or issued Purchase Orders say, and the customer gets back in
+    full what they paid beyond the lines they keep. Issued Purchase Orders are NOT cancelled and no
+    stock is released by this: a line whose goods already sit on the shelf must be dealt with first
+    (returned to the supplier or handed over), and each issued PO is flagged for the admin."""
+    reason = (reason or "").strip()
+    if category not in SO_FAULT_CATEGORIES:
+        raise ValueError("Pilih alasan pembatalan khusus: " + ", ".join(SO_FAULT_CATEGORIES.values()) + ".")
+    if len(reason) < 10:
+        raise ValueError("Jelaskan kejadiannya (minimal 10 huruf): apa yang gagal, kapan, dan buktinya.")
+    if refund_method not in SO_REFUND_METHODS:
+        raise ValueError("Metode refund harus salah satu dari: cash, transfer, qris, debit.")
+    if not item_ids:
+        raise ValueError("Pilih barang yang dibatalkan.")
+    now = _now()
+    with _conn() as con:
+        po, lines = _so_load_for_cancel(con, preorder_id)
+        check = _so_cancel_check(con, po, lines)
+        if not check["special_allowed"]:
+            raise ValueError("Tidak bisa: " + "; ".join(check["reasons"]))
+        by_id = {ln["id"]: ln for ln in lines}
+        drop = []
+        for iid in dict.fromkeys(item_ids):
+            ln = by_id.get(iid)
+            if ln is None:
+                raise ValueError("Barang tidak ada di Sales Order ini.")
+            if ln["status"] in PO_INSTALLED_STATUSES:
+                raise ValueError(f"“{ln['product_name']}” sudah terpasang; pakai Retur Barang di invoice.")
+            if ln["status"] == PO_LINE_CANCELLED:
+                raise ValueError(f"“{ln['product_name']}” sudah dibatalkan.")
+            drop.append(ln)
+        held = {r["id"]: r["reserved"] for r in _reservation_lines(con, [ln["master_item_id"] for ln in drop])}
+        for ln in drop:
+            if held.get(ln["id"], 0) > 0:
+                raise ValueError(
+                    f"“{ln['product_name']}”: {held[ln['id']]} barang untuk pelanggan ini sudah ada di toko. "
+                    "Selesaikan barangnya dulu (retur ke supplier lewat Purchase Order / Barang Masuk, atau serahkan ke pelanggan).")
+        drop_ids = {ln["id"] for ln in drop}
+        keep = [ln for ln in lines if ln["status"] != PO_LINE_CANCELLED and ln["id"] not in drop_ids]
+        paid, billed = _so_amounts(con, po, keep)
+        refund = max(paid - billed, 0)
+        issued = _so_issued_po_refs(con, list(drop_ids))
+        before = _po_invoice_snapshot(con, preorder_id)
+        label = SO_FAULT_CATEGORIES[category]
+        _so_mark_lines_cancelled(con, po, drop, category, reason, by, now)
+        for ln in drop:
+            _so_drop_from_draft_pos(con, po, ln, by)
+        for ref in issued:
+            _spo_event(con, ref["supplier_po_id"], "so_cancelled",
+                       f"PERLU TINDAKAN: Sales Order {po['po_number']} membatalkan “{ref['product_name']}” "
+                       f"(Pembatalan Khusus: {label}). Barang ini tidak lagi untuk pelanggan; ajukan pembatalan item ke supplier, "
+                       "atau terima sebagai stok toko.", by)
+        whole = not any(ln["status"] not in PO_CLOSED_LINE_STATUSES for ln in keep)
+        if whole:
+            con.execute("""UPDATE preorders SET cancelled_at=?, cancelled_by=?, cancel_kind=?, cancel_reason=?,
+                           updated_at=? WHERE id=?""", (now, by, category, reason, now, preorder_id))
+        else:
+            con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
+        names = ", ".join(ln["product_name"] for ln in drop)
+        note = (f"Pembatalan Khusus Sales Order {po['po_number']} ({label}): {names}. {reason}. "
+                f"Refund penuh {_rp(refund)}"
+                + (f". PO yang sudah terbit tidak dibatalkan otomatis: {', '.join(sorted({r['po_number'] for r in issued}))}"
+                   if issued else ""))
+        _so_settle_invoice(con, po, before, refund, refund_method, 0, note, by)
+    return get_preorder(preorder_id)
 
 
 # Preorders are archived as drafts (is_draft=1 via update_preorder), never
@@ -5869,7 +6582,7 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
     if exclude_po:
         exclude_sql = " AND sp.id != ?"
         params.append(exclude_po)
-    where = ["p.is_draft=0", "pi.status NOT IN ('sampai_di_toko','terpasang')"]
+    where = ["p.is_draft=0", "pi.status NOT IN ('sampai_di_toko','terpasang','dibatalkan')"]
     if query:
         where.append(
             "(p.po_number LIKE ? OR p.customer_name LIKE ? OR p.plate_full LIKE ? OR p.customer_phone LIKE ? "
@@ -5880,7 +6593,7 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
         f"""SELECT pi.id AS preorder_item_id, pi.preorder_id, p.po_number AS customer_po_number,
                    p.customer_name, p.plate_full, pi.product_name, pi.unit, pi.quantity AS qty_ordered_by_customer,
                    pi.master_item_id, COALESCE(o.ordered, 0) AS qty_bought,
-                   pi.ship_route, pi.priority, pi.eta_date, m.supplier_id, s.name AS supplier_name, COALESCE(m.last_cost_price, 0) AS est_unit_price
+                   pi.ship_route, pi.priority, pi.eta_date, s.id AS supplier_id, s.name AS supplier_name, COALESCE(m.last_cost_price, 0) AS est_unit_price
             FROM preorder_items pi
             JOIN preorders p ON p.id = pi.preorder_id
             LEFT JOIN (
@@ -5890,7 +6603,7 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
                 GROUP BY spi.preorder_item_id
             ) o ON o.preorder_item_id = pi.id
             LEFT JOIN master_items m ON m.id = pi.master_item_id
-            LEFT JOIN suppliers s ON s.id = m.supplier_id
+            LEFT JOIN suppliers s ON s.id = COALESCE(p.supplier_id, m.supplier_id)
             WHERE {' AND '.join(where)}
             ORDER BY p.created_at DESC, pi.position ASC, pi.id ASC""",
         params,
@@ -6028,9 +6741,18 @@ def get_supplier_po(supplier_po_id: str) -> dict | None:
             "SELECT * FROM spo_item_shipments WHERE supplier_po_id=? ORDER BY at ASC, id ASC", (supplier_po_id,))]
         dr = con.execute("SELECT * FROM spo_receive_drafts WHERE supplier_po_id=?", (supplier_po_id,)).fetchone()
         receive_draft = {**json.loads(dr["payload"]), "saved_by": dr["saved_by"], "saved_at": dr["saved_at"]} if dr else None
+        # K-13: lines still coming whose customer line was cancelled (Pembatalan Khusus). They stay
+        # until the admin cancels them with the supplier or receives them as shop stock.
+        so_cancelled = [dict(r) for r in con.execute(
+            """SELECT spi.id, spi.product_name, p.po_number AS customer_po_number, p.customer_name,
+                      spi.quantity - spi.qty_cancelled - spi.qty_received AS qty_left
+               FROM supplier_po_items spi JOIN preorder_items pi ON pi.id = spi.preorder_item_id
+               JOIN preorders p ON p.id = pi.preorder_id
+               WHERE spi.supplier_po_id=? AND pi.status=? AND spi.quantity - spi.qty_cancelled - spi.qty_received > 0""",
+            (supplier_po_id, PO_LINE_CANCELLED))] if po["status"] not in ("draft", "batal") else []
     return {**po, **_spo_totals(po, items), "items": items, "events": events, "payments": payments,
             "receipts": receipts, "cancellations": cancellations, "shipments": shipments,
-            "receive_draft": receive_draft}
+            "receive_draft": receive_draft, "so_cancelled_lines": so_cancelled}
 
 
 def _spo_shipping_status(po: dict, items: list[dict]) -> str | None:
@@ -6203,7 +6925,7 @@ def _sync_preorder_line(con: sqlite3.Connection, preorder_item_id: int, changed_
     backwards (a line someone already set to 'dalam_pengiriman' stays there when
     a later PO is merely issued). Each move lands in the preorder's status history."""
     line = con.execute("SELECT * FROM preorder_items WHERE id=?", (preorder_item_id,)).fetchone()
-    if line is None:
+    if line is None or line["status"] == PO_LINE_CANCELLED:
         return
     agg = con.execute(
         f"""SELECT COALESCE(SUM(spi.quantity - spi.qty_cancelled), 0) AS ordered,
@@ -6212,9 +6934,16 @@ def _sync_preorder_line(con: sqlite3.Connection, preorder_item_id: int, changed_
             WHERE spi.preorder_item_id=? AND sp.status IN ({_placeholders(_SPO_ISSUED)})""",
         (preorder_item_id, *_SPO_ISSUED),
     ).fetchone()
-    if agg["received"] >= line["quantity"]:
+    # K-02: part of the line may be held from ready stock, with only the shortfall on a Purchase
+    # Order; that part already sits on the shelf, so it counts as arrived.
+    shelf = 0
+    if line["master_item_id"] is not None:
+        for ln in _reservation_lines(con, [line["master_item_id"]]):
+            if ln["id"] == preorder_item_id:
+                shelf = ln["reserved"] - min(ln["arrived"], ln["reserved"])
+    if agg["received"] + shelf >= line["quantity"]:
         target = "sampai_di_toko"
-    elif agg["ordered"] >= line["quantity"]:
+    elif agg["ordered"] + shelf >= line["quantity"]:
         target = "sudah_dipesankan"
     else:
         return
@@ -6627,10 +7356,12 @@ def receive_supplier_po(
                 notes_txt = f"Dari Purchase Order {row['po_number']}" + (f", surat jalan {surat_jalan_no}" if surat_jalan_no else "")
                 doc = con.execute(
                     """INSERT INTO inbound_documents
-                       (doc_number, supplier_id, received_date, supplier_invoice_no, notes, status, total_value, created_at)
-                       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)""",
+                       (doc_number, supplier_id, received_date, supplier_invoice_no, notes, status, total_value, created_at,
+                        supplier_po_id, source, surat_jalan_no, created_by)
+                       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, 'po_supplier', ?, ?)""",
                     (doc_number, row["supplier_id"], received_date, row["supplier_invoice_no"], notes_txt,
-                     sum(v["qty_in"] * v["cost_price"] for v in by_master.values()), now),
+                     sum(v["qty_in"] * v["cost_price"] for v in by_master.values()), now,
+                     supplier_po_id, surat_jalan_no, changed_by),
                 )
                 _insert_inbound_items(con, doc.lastrowid, list(by_master.values()))
                 con.execute("UPDATE spo_receipts SET inbound_document_id=? WHERE id=?", (doc.lastrowid, receipt_id))

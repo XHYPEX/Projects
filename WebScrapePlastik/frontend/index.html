@@ -152,6 +152,8 @@
     .po-pill.is-solid.is-dalam_pengiriman { background: #4B6C6F; }
     .po-pill.is-solid.is-sampai_di_toko   { background: #D97757; }
     .po-pill.is-solid.is-terpasang        { background: #5B7A5B; }
+    .po-pill.is-dibatalkan       { color: #A83B3B; background: rgba(168, 59, 59, 0.12); }
+    .po-pill.is-solid.is-dibatalkan       { background: #A83B3B; }
 
     /* Purchase Order statuses (same pill as the preorder stages). */
     .po-pill.is-spo-draft { color: #6F6A62; background: rgba(154, 147, 138, 0.16); }
@@ -370,6 +372,8 @@
     }
 
     .is-staff .admin-only { display: none !important; }
+    /* A Sales Order being created has no stage yet; the per-line status only shows when editing. */
+    #po-form-panel.is-new .po-row-status, #po-form-panel.is-new .po-col-status { display: none; }
     /* Set on <body> when /api/config reports scraper_enabled=false. */
     .scraper-off .scraper-only { display: none !important; }
 
@@ -1705,7 +1709,7 @@
               <circle cx="38" cy="45" r="8" fill="#FAF9F5" stroke="#141413" stroke-width="2.2"/><circle cx="38" cy="45" r="2.6" fill="#D97757"/>
               <circle cx="108" cy="45" r="8" fill="#FAF9F5" stroke="#141413" stroke-width="2.2"/><circle cx="108" cy="45" r="2.6" fill="#D97757"/>
             </svg>
-            <p class="text-sm text-muted leading-snug max-w-xs">Pesanan barang yang belum ada di toko. Tidak mengubah stok sampai barang datang.</p>
+            <p class="text-sm text-muted leading-snug max-w-xs">Pesanan pelanggan. Stok di toko dicadangkan, kekurangannya dipesan ke supplier; stok baru keluar saat barang terpasang.</p>
           </div>
           <button onclick="newPreorderForm()" class="ml-auto px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Sales Order Baru</button>
         </div>
@@ -1809,6 +1813,12 @@
               <input id="po-date" type="date" data-no-uppercase
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
+            <div>
+              <label for="po-supplier" class="block text-xs text-muted mb-1.5">Supplier</label>
+              <select id="po-supplier"
+                class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+              <p class="text-xs text-muted mt-1.5">Semua barang pesanan ini dipesan ke supplier ini. Kosongkan untuk mengikuti supplier di Master Barang.</p>
+            </div>
           </div>
           <div>
             <label for="po-notes" class="block text-xs text-muted mb-1.5">Catatan Pesanan</label>
@@ -1828,7 +1838,7 @@
             <div class="w-20 text-right">Qty</div>
             <div class="w-32 text-right">Harga Satuan</div>
             <div class="w-28 text-right">Subtotal</div>
-            <div class="w-44">Status Pemesanan</div>
+            <div class="w-44 po-col-status">Status Pemesanan</div>
             <div class="w-10"></div>
           </div>
           <div id="po-item-rows" class="space-y-2"></div>
@@ -1850,6 +1860,7 @@
               <span id="po-deposit-fixed" class="hidden font-serif text-base font-semibold text-done tabular-nums">Rp 0</span>
             </div>
             <p id="po-deposit-hint" class="hidden text-[11px] text-muted text-right">Pembayaran tambahan dicatat dari halaman detail (Tambah Pembayaran).</p>
+            <p id="po-deposit-min" class="text-[11px] text-muted text-right"></p>
             <div class="flex items-center justify-between border-t border-line pt-2">
               <span class="text-muted">Sisa Tagihan</span>
               <span id="po-remaining-display" class="font-serif text-base font-semibold text-failed tabular-nums">Rp 0</span>
@@ -1873,14 +1884,16 @@
             <button onclick="backToPreorderList()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openPreorderEdit(currentPreorder.id)" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Edit Data PO</button>
+            <button id="po-edit-btn" onclick="openPreorderEdit(currentPreorder.id)" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Edit Data PO</button>
             <button id="po-pay-btn" onclick="poPayClick()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Tambah Pembayaran</button>
-            <button onclick="openPoStatusModal()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Ubah Status PO</button>
+            <button id="po-status-btn" onclick="openPoStatusModal()" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Ubah Status PO</button>
             <button onclick="openPreorderPrint(currentPreorder.id)" class="px-3 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">Cetak Nota</button>
             <div class="relative">
-              <button onclick="togglePoMenu(event)" aria-label="Aksi lainnya" class="px-2.5 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">&middot;&middot;&middot;</button>
+              <button onclick="togglePoMenu(event)" aria-label="Aksi lainnya" class="admin-only px-2.5 py-1.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors">&middot;&middot;&middot;</button>
               <div id="po-menu" class="hidden absolute right-0 mt-1 z-20 min-w-[170px] bg-bg border border-line rounded-lg shadow-sm py-1">
                 <button id="po-menu-draft" onclick="togglePreorderDraft()" class="admin-only w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg2 transition-colors">Jadikan Draft</button>
+                <button id="po-menu-cancel" onclick="openSoCancelModal()" class="admin-only w-full text-left px-3 py-2 text-sm text-failed hover:bg-bg2 transition-colors">Batalkan Sales Order</button>
+                <button id="po-menu-special" onclick="openSoSpecialCancelModal()" class="admin-only w-full text-left px-3 py-2 text-sm text-failed hover:bg-bg2 transition-colors">Pembatalan Khusus</button>
               </div>
             </div>
           </div>
@@ -1893,6 +1906,7 @@
             </table>
             <div class="flex items-center gap-2 text-sm text-muted">Status PO: <span id="po-detail-status"></span></div>
           </div>
+          <div id="po-detail-cancel-note" class="hidden mt-3 border-t border-line pt-3 text-sm"></div>
         </div>
 
         <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Daftar Barang</div>
@@ -2212,10 +2226,10 @@
             </div>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <label for="spo-f-ship" class="text-muted">Ongkos Kirim</label>
+            <label for="spo-f-shipcost" class="text-muted">Ongkos Kirim</label>
             <div class="relative w-36">
               <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-              <input id="spo-f-ship" type="text" inputmode="numeric" value="0" oninput="updateSpoFormTotals()"
+              <input id="spo-f-shipcost" type="text" inputmode="numeric" value="0" oninput="updateSpoFormTotals()"
                 class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
             </div>
           </div>
@@ -2250,6 +2264,7 @@
           <div id="spo-detail-actions" class="flex flex-wrap items-center gap-2"></div>
         </div>
 
+        <div id="spo-so-cancelled" class="hidden mb-4 rounded-xl border border-failed/30 bg-failed/5 p-4 text-sm"></div>
         <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-4 mb-4">
           <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
             <div id="spo-detail-info" class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3"></div>
@@ -4608,7 +4623,7 @@ const ROUTE_META = {
     icon: '<path d="M3 7h18M6 7l1.5 10.5A2 2 0 0 0 9.48 19h5.04a2 2 0 0 0 1.98-1.5L18 7M9 11h6"/>',
   },
   "/preorder": {
-    subtitle: "Pesanan barang variasi mobil yang belum ada di toko. Tidak mengubah stok.",
+    subtitle: "Pesanan pelanggan. Stok dicadangkan saat terbit, keluar saat barang terpasang.",
     icon: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 13 2 2 4-4"/>',
   },
   "/supplier-po": {
@@ -5505,6 +5520,7 @@ function renderScanSuggest() {
         ${item.brand_name ? `<span>&middot; ${esc(item.brand_name)}</span>` : ""}
         <span>&middot; ${esc(item.unit)}</span>
         <span class="${item.stock_qty <= 0 ? "text-failed font-medium" : ""}">&middot; Stok ${item.stock_qty}</span>
+        ${item.reserved_qty > 0 ? `<span class="${item.available_qty <= 0 ? "text-failed font-medium" : "text-pending"}">&middot; Bebas ${item.available_qty} (dicadangkan ${item.reserved_qty})</span>` : ""}
         <span>&middot; ${formatIDR(item.sell_price)}</span>
       </div>
     </button>
@@ -5541,6 +5557,12 @@ function addScannedItemToReceipt(item, targetRow) {
   if (Number.isFinite(stock) && qtyOnReceipt > stock) {
     openStockShortModal(item, targetRow, qtyOnReceipt);
     return false;
+  }
+  // K-02: part of the shelf is held for Sales Order customers. Only a warning here; the server
+  // decides at save (an admin can allow it with a reason).
+  const free = Number(item.available_qty);
+  if (item.reserved_qty > 0 && Number.isFinite(free) && qtyOnReceipt > free) {
+    showToast(`${item.name}: ${item.reserved_qty} dicadangkan untuk Sales Order, bebas dijual ${Math.max(free, 0)}.`);
   }
   if (existingRow) {
     existingRow.querySelector(".item-qty").value = qtyOnReceipt;
@@ -6067,6 +6089,52 @@ async function reloadTabFromServer(tab) {
   renderCashierForm();
 }
 
+// K-02: stock reserved for a Sales Order customer can't be sold at the till. An admin may still allow it
+// with a reason (logged on the nota); everyone else gets the server's message.
+let stockOverrideResolve = null;
+
+function askStockOverrideReason(detail) {
+  return new Promise(resolve => {
+    openModal("Stok dicadangkan untuk pelanggan", `
+      <div class="space-y-3">
+        <p class="text-sm text-ink">${esc(detail)}</p>
+        <p class="text-xs text-muted">Sebagai admin Anda bisa tetap menjualnya. Pelanggan Sales Order itu jadi kekurangan barang, dan alasannya dicatat di riwayat nota.</p>
+        <div>
+          <label for="so-override-reason" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan</label>
+          <textarea id="so-override-reason" rows="2" maxlength="200" data-no-uppercase
+            class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+          <button type="button" onclick="confirmStockOverride()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Izinkan &amp; Simpan</button>
+        </div>
+      </div>`);
+    stockOverrideResolve = resolve;
+    document.getElementById("so-override-reason")?.focus();
+  });
+}
+
+function confirmStockOverride() {
+  const reason = document.getElementById("so-override-reason")?.value.trim() || "";
+  if (reason.length < 3) { showToast("Tulis alasannya (minimal 3 huruf)."); return; }
+  const r = stockOverrideResolve;
+  stockOverrideResolve = null;
+  closeModal();
+  if (r) r(reason);
+}
+
+async function fetchWithStockOverride(url, opts) {
+  const resp = await fetch(url, opts);
+  if (resp.status !== 422 || !isAdmin()) return resp;
+  const detail = await resp.clone().json().then(d => d.detail, () => "");
+  if (typeof detail !== "string" || !detail.includes("dicadangkan")) return resp;
+  const reason = await askStockOverrideReason(detail);
+  if (!reason) return resp;
+  const body = JSON.parse(opts.body || "{}");
+  body.stock_override_reason = reason;
+  return fetch(url, { ...opts, body: JSON.stringify(body) });
+}
+
 // mode: "draft" saves as Draft; "belum" saves as Belum Dikerjakan; "start" saves and starts pengerjaan;
 // "save" saves edits to a saved nota; "pay" saves (a new nota or Draft becomes Belum Dikerjakan) and opens
 // Pembayaran Nota without touching the work stage.
@@ -6085,17 +6153,17 @@ async function saveReceipt(mode = "save") {
   try {
     if (!isUpdate) {
       payload.work_status = target || "draft";
-      const resp = await fetch("/api/receipts", { method: "POST", headers, body: JSON.stringify(payload) });
+      const resp = await fetchWithStockOverride("/api/receipts", { method: "POST", headers, body: JSON.stringify(payload) });
       if (!resp.ok) { showToast(await responseErrorDetail(resp, "Nota tidak bisa disimpan.")); return; }
       tab.receiptId = (await resp.json()).receipt_id;
     } else {
       if (tab.dirty) {
         if (tab.revision) payload.expected_revision = tab.revision;   // refused (409) if someone else changed the nota meanwhile
-        const resp = await fetch(`/api/receipts/${tab.receiptId}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
+        const resp = await fetchWithStockOverride(`/api/receipts/${tab.receiptId}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
         if (!resp.ok) { showToast(await responseErrorDetail(resp, "Nota tidak bisa disimpan.")); return; }
       }
       if (target && target !== "draft" && tab.workStatus !== target) {
-        const resp = await fetch(`/api/receipts/${tab.receiptId}/work-status`, {
+        const resp = await fetchWithStockOverride(`/api/receipts/${tab.receiptId}/work-status`, {
           method: "POST", headers, body: JSON.stringify({ to: target }),
         });
         if (!resp.ok) moveError = await responseErrorDetail(resp, "Status nota tidak bisa diubah.");
@@ -6445,7 +6513,7 @@ function cashierTlGroups() {
     ["catatan", "Catatan Kasir", tab && tab.workNotes ? 1 : 0],
     ["item", "Riwayat Item", events.filter(e => e.kind === "created" || e.kind === "item_added" || e.kind === "item_changed").length],
     ["bayar", "Riwayat Pembayaran", payments.length],
-    ["status", "Riwayat Status", events.filter(e => ["status", "void", "reopen", "refund", "overpaid"].includes(e.kind)).length],
+    ["status", "Riwayat Status", events.filter(e => ["status", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).length],
     ["po", "Terkait Sales Order", preorders.length],
   ];
 }
@@ -6513,8 +6581,8 @@ function renderCashierTimeline() {
       [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : ""), "tabular-nums font-medium")}${td(esc(pay.note || ""))}${td(esc(pay.created_by || "-"))}</tr>`));
   } else if (cashierTlTab === "status") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
-      events.filter(e => ["status", "void", "reopen", "refund", "overpaid"].includes(e.kind)).sort(byTimeDesc)
-        .map(evRow(e => ({ void: "Nota di-void", reopen: "Dibuka kembali", refund: "Refund kelebihan bayar", overpaid: "Kelebihan bayar" })[e.kind] || "Status diubah")));
+      events.filter(e => ["status", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).sort(byTimeDesc)
+        .map(evRow(e => ({ void: "Nota di-void", reopen: "Dibuka kembali", refund: "Refund kelebihan bayar", overpaid: "Kelebihan bayar", override: "Izin admin: stok dicadangkan" })[e.kind] || "Status diubah")));
   } else {
     html = table(["No. PO", "Pelanggan", "Item dari PO", "DP Dialokasikan", ""],
       preorders.map(po => `<tr class="border-b border-line last:border-b-0">${td(`<span class="font-mono">${esc(po.po_number || po.id)}</span>`)}${td(esc(po.customer_name || "-"))}${td(String(po.item_count))}${td(esc(formatIDR(po.dp_allocated)), "tabular-nums")}${td(`<a href="#/preorder" onclick="openPreorderFromDashboard('${esc(po.id)}'); return false;" class="text-accentDark hover:underline">Buka</a>`)}</tr>`));
@@ -8577,6 +8645,7 @@ function openModal(title, bodyHtml, opts = {}) {
 }
 
 function closeModal() {
+  if (stockOverrideResolve) { const r = stockOverrideResolve; stockOverrideResolve = null; r(null); }
   document.getElementById("modal-backdrop").classList.add("hidden");
   document.getElementById("modal-panel").classList.add("hidden");
   document.getElementById("modal-body").innerHTML = "";
@@ -10580,7 +10649,8 @@ function renderMasterItemsTable(data) {
       </td>
       <td class="px-2.5 py-3">${activePillHtml(item.is_active)}</td>
       <td class="px-2.5 py-3">${statusPillHtml(stock.dot, stock.label, stock.tint)}</td>
-      <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}<div class="text-[11px] font-normal text-muted">${esc(item.unit || "")}</div></td>
+      <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}<div class="text-[11px] font-normal text-muted">${esc(item.unit || "")}</div>${item.reserved_qty > 0
+        ? `<div class="text-[11px] font-normal text-pending whitespace-nowrap" title="Dicadangkan untuk pelanggan Sales Order">${item.reserved_qty} dicadangkan · bebas ${item.available_qty}</div>` : ""}</td>
       <td class="admin-only px-2.5 py-3 text-right tabular-nums whitespace-nowrap">${item.avg_cost_price > 0
         ? `<span class="text-muted">${formatIDR(item.avg_cost_price)}</span>`
         : '<span class="text-xs text-muted">Belum dapat dihitung</span>'}</td>
@@ -11979,13 +12049,13 @@ function renderMasterStockHistory() {
   const it = currentMasterItem, all = masterDetailExtra.ledger || [];
   const g = i => document.getElementById(i);
   const act = shActivity || {};
-  const alloc = act.po_customer_reserved_qty || 0;   // barang Sales Order yang sudah di toko, ditahan untuk pelanggan
+  const alloc = act.po_customer_reserved_qty || 0;   // K-02: barang di toko yang dicadangkan untuk pelanggan Sales Order (belum terpasang)
   const demand = act.po_customer_qty || 0;
   g("sh-header").innerHTML = masterHistoryHeader(it, false);
   g("sh-kpis").innerHTML =
     mhKpi("box", "bg-blue-100 text-blue-600", "Stok Fisik", `${formatInt(it.stock_qty)} ${esc(it.unit)}`, "Stok tercatat di sistem")
     + mhKpi("doc", "bg-blue-100 text-blue-600", "Stok Tersedia", `${formatInt(Math.max(it.stock_qty - alloc, 0))} ${esc(it.unit)}`, "Siap untuk dijual")
-    + mhKpi("box", "bg-orange-100 text-orange-600", "Dialokasikan", `${formatInt(alloc)} ${esc(it.unit)}`, "Reservasi Sales Order (sudah di toko)")
+    + mhKpi("box", "bg-orange-100 text-orange-600", "Dialokasikan", `${formatInt(alloc)} ${esc(it.unit)}`, "Dicadangkan untuk Sales Order (belum terpasang)")
     + mhKpi("warn", "bg-pending/15 text-pending", "Stok Minimum", `${formatInt(it.min_stock ?? 0)} ${esc(it.unit)}`, "Batas peringatan stok");
   g("sh-chips").innerHTML = SH_CHIPS.map(([k, label, dot]) => `<button type="button" aria-pressed="${shKind === k}" data-kind="${k}" onclick="setStockKind('${k}')"
     class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm transition-colors ${shKind === k ? "border-accent bg-accent/10 text-accentDark font-medium" : "border-line bg-white text-ink hover:bg-bg2"}">${dot ? `<span class="w-2 h-2 rounded-full ${dot}"></span>` : ""}${label}</button>`).join("");
@@ -14529,7 +14599,7 @@ const PREORDER_STATUSES = [
   { key: "terpasang", label: "Terpasang" },
 ];
 
-const PREORDER_STATUS_LABELS = Object.fromEntries(PREORDER_STATUSES.map(s => [s.key, s.label]));
+const PREORDER_STATUS_LABELS = { ...Object.fromEntries(PREORDER_STATUSES.map(s => [s.key, s.label])), dibatalkan: "Dibatalkan" };
 const PREORDER_DONE_STATUS = "terpasang";
 const PO_PANELS = ["po-list-panel", "po-form-panel", "po-detail-panel", "po-print-panel"];
 
@@ -14579,7 +14649,7 @@ function poDateTimeLabel(po) {
 
 function renderPreorderStatusFilters() {
   const wrap = document.getElementById("po-status-filters");
-  const chips = [{ key: "", label: "Semua" }, ...PREORDER_STATUSES];
+  const chips = [{ key: "", label: "Semua" }, ...PREORDER_STATUSES, { key: "dibatalkan", label: "Dibatalkan" }];
   wrap.innerHTML = chips.map(c => `
     <button type="button" data-po-status="${esc(c.key)}" onclick="setPreorderStatusFilter('${esc(c.key)}')"
       class="po-status-btn ${!poDraftView && c.key === poStatusFilter ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">${esc(c.label)}</button>
@@ -14759,10 +14829,19 @@ function poFormBack() {
   else backToPreorderList();
 }
 
-function renderPreorderForm(detail) {
+async function renderPreorderForm(detail) {
   currentPreorder = detail;
   poFormOrigin = detail && !document.getElementById("po-detail-panel").classList.contains("hidden") ? "detail" : "list";
   const editing = Boolean(detail);
+  document.getElementById("po-form-panel").classList.toggle("is-new", !editing);
+  await loadSpoSuppliers();
+  const supSel = document.getElementById("po-supplier");
+  const chosen = editing ? detail.supplier_id : null;
+  // A supplier deactivated since stays selectable on the order that already uses it.
+  const opts = spoSupplierOptions.some(o => o.id === chosen) || !chosen ? spoSupplierOptions
+    : [...spoSupplierOptions, { id: chosen, name: detail.supplier_name || `Supplier #${chosen}` }];
+  supSel.innerHTML = `<option value="">Ikuti supplier barang</option>`
+    + opts.map(o => `<option value="${o.id}" ${o.id === chosen ? "selected" : ""}>${esc(o.name)}</option>`).join("");
   document.getElementById("po-form-title").textContent = editing ? `Edit ${detail.po_number}` : "Sales Order Baru";
   const meta = document.getElementById("po-form-meta");
   if (editing) {
@@ -15014,6 +15093,13 @@ function updatePreorderTotals() {
   const remaining = Math.max(total - deposit, 0);
   document.getElementById("po-total-display").textContent = formatIDR(total);
   document.getElementById("po-deposit-fixed").textContent = formatIDR(deposit);
+  // K-03: an order is published only with a DP of at least half the total; a draft has no minimum.
+  const minEl = document.getElementById("po-deposit-min");
+  const published = currentPreorder && !currentPreorder.is_draft;
+  const need = soMinDp(total);
+  minEl.textContent = published || total <= 0 ? "" : `Minimal DP ${SO_MIN_DP_PERCENT}% untuk diterbitkan: ${formatIDR(need)}`;
+  minEl.classList.toggle("text-failed", !published && total > 0 && deposit < need);
+  minEl.classList.toggle("text-muted", published || total <= 0 || deposit >= need);
   const remainingEl = document.getElementById("po-remaining-display");
   remainingEl.textContent = formatIDR(remaining);
   remainingEl.classList.toggle("text-failed", remaining > 0);
@@ -15028,6 +15114,7 @@ function collectPreorderPayload(asDraft) {
     customer_name: document.getElementById("po-customer-name").value.trim(),
     customer_phone: document.getElementById("po-customer-phone").value.trim(),
     plate_full: getPoPlate(),
+    supplier_id: parseInt(document.getElementById("po-supplier").value, 10) || null,
     po_date: document.getElementById("po-date").value || null,
     notes: document.getElementById("po-notes").value.trim() || null,
     is_draft: asDraft,
@@ -15036,6 +15123,9 @@ function collectPreorderPayload(asDraft) {
   if (!currentPreorder) payload.deposit = priceValue(document.getElementById("po-deposit"));
   return payload;
 }
+
+const SO_MIN_DP_PERCENT = 50;   // mirrors backend database.SO_MIN_DP_PERCENT
+function soMinDp(total) { return Math.ceil(total * SO_MIN_DP_PERCENT / 100); }
 
 function validatePreorderPayload(payload) {
   if (!payload.customer_name) return "Nama customer wajib diisi.";
@@ -15048,6 +15138,11 @@ function validatePreorderPayload(payload) {
   }
   const total = payload.items.reduce((acc, i) => acc + i.quantity * i.unit_price, 0);
   if ((payload.deposit || 0) > total) return "DP melebihi total pesanan.";
+  const publishing = !payload.is_draft && (!currentPreorder || currentPreorder.is_draft);
+  const paid = currentPreorder ? currentPreorder.deposit : (payload.deposit || 0);
+  if (publishing && paid < soMinDp(total)) {
+    return `DP minimal ${SO_MIN_DP_PERCENT}% (${formatIDR(soMinDp(total))}) sebelum Sales Order diterbitkan. Simpan sebagai draft dulu, atau tambah DP.`;
+  }
   return null;
 }
 
@@ -15105,14 +15200,32 @@ function renderPreorderDetail(detail) {
     poInfoRow("Tanggal PO", `<span class="tabular-nums">${esc(poDateTimeLabel(detail))}</span>`),
     poInfoRow("Nama Customer", esc(detail.customer_name)),
     poInfoRow("Plat Mobil", esc(detail.plate_full) || '<span class="text-muted">—</span>'),
+    poInfoRow("Supplier", detail.supplier_name ? esc(detail.supplier_name) : '<span class="text-muted">Ikuti supplier barang</span>'),
     poInfoRow("Nomor Telepon", `<span class="tabular-nums">${esc(detail.customer_phone)}</span>`),
     poInfoRow("Catatan", esc(detail.notes || "—")),
   ].join("");
   document.getElementById("po-detail-status").innerHTML =
     `<span class="po-pill is-solid is-${esc(detail.status)}">${esc(preorderStatusLabel(detail.status))}</span>`;
   document.getElementById("po-menu-draft").textContent = detail.is_draft ? "Aktifkan Kembali" : "Jadikan Draft";
+  const soCancelled = !!detail.cancelled_at;
+  document.getElementById("po-edit-btn").classList.toggle("hidden", soCancelled);
+  document.getElementById("po-status-btn").classList.toggle("hidden", soCancelled);
+  document.getElementById("po-menu-cancel").classList.toggle("hidden", soCancelled || detail.is_draft);
+  document.getElementById("po-menu-draft").classList.toggle("hidden", soCancelled);
+  document.getElementById("po-menu-special").classList.toggle("hidden", !detail.cancel_check?.special_allowed);
+  renderSoCancelNote(detail);
 
-  document.getElementById("po-detail-items").innerHTML = detail.items.map((item, idx) => `
+  document.getElementById("po-detail-items").innerHTML = detail.items.map((item, idx) => item.status === "dibatalkan" ? `
+    <tr class="border-b border-line last:border-b-0 bg-bg2/40">
+      <td class="px-3 py-2 text-muted tabular-nums">${idx + 1}</td>
+      <td class="px-3 py-2 text-muted line-through">${esc(item.product_name)}</td>
+      <td class="px-3 py-2 text-muted">${esc(item.unit || "")}</td>
+      <td class="px-3 py-2 text-right text-muted tabular-nums">${item.quantity}</td>
+      <td class="px-3 py-2 text-right text-muted tabular-nums whitespace-nowrap">${formatIDR(item.unit_price)}</td>
+      <td class="px-3 py-2 text-right text-muted tabular-nums whitespace-nowrap line-through">${formatIDR(item.quantity * item.unit_price)}</td>
+      <td class="px-3 py-2" colspan="2">${preorderStatusBadgeHtml(item.status)}
+        <div class="mt-1 text-[11px] leading-snug text-muted">${esc(SO_CANCEL_KIND_LABELS[item.cancel_kind] || "")}${item.cancel_reason ? ": " + esc(item.cancel_reason) : ""}</div></td>
+    </tr>` : `
     <tr class="border-b border-line last:border-b-0">
       <td class="px-3 py-2 text-muted tabular-nums">${idx + 1}</td>
       <td class="px-3 py-2 text-ink">${esc(item.product_name)}${item.sku
@@ -15121,7 +15234,7 @@ function renderPreorderDetail(detail) {
       <td class="px-3 py-2 text-right text-ink tabular-nums">${item.quantity}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(item.unit_price)}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(item.quantity * item.unit_price)}</td>
-      <td class="px-3 py-2">${preorderStatusBadgeHtml(item.status)}</td>
+      <td class="px-3 py-2">${preorderStatusBadgeHtml(item.status)}${soReservationHtml(item)}</td>
       <td class="px-3 py-2">
         <div class="flex items-center justify-end gap-1.5">
           ${poIconButton(PO_ICON_EDIT, "Edit barang", `openPreorderEdit('${esc(detail.id)}')`)}
@@ -15161,7 +15274,9 @@ function renderPreorderDetail(detail) {
     document.getElementById("po-detail-invoice-info").innerHTML =
       `<span class="text-ink font-medium tabular-nums">${esc(detail.receipt_no || "Invoice")}</span> &middot; ${formatIDR(detail.invoice_total || 0)} `
       + `<span class="inline-flex gap-1 align-middle">${paymentBadge(detail.invoice_total, detail.deposit, detail.invoice_status)}${workBadge(detail.invoice_work_status, detail.invoice_status)}</span>`
-      + `<div class="text-xs text-muted mt-1">Pembayaran dicatat di invoice. Perubahan barang di PO ikut mengubah invoice; stok berkurang saat barang sampai di toko.</div>`;
+      + `<div class="text-xs text-muted mt-1">${detail.cancelled_at
+        ? "Sales Order dibatalkan; refund dan biaya pembatalan (bila ada) tercatat di invoice ini."
+        : "Pembayaran dicatat di invoice. Perubahan barang di PO ikut mengubah invoice; stok dicadangkan selama pesanan berjalan dan berkurang saat barang terpasang."}</div>`;
     document.getElementById("po-inv-pay-btn").classList.toggle("hidden", invVoid || detail.remaining <= 0);
     document.getElementById("po-inv-return-btn").classList.toggle("hidden", invVoid || !isAdmin());
   }
@@ -15226,6 +15341,230 @@ function openPoInvoiceCreatedModal(detail) {
     </div>`);
 }
 
+// K-13: cancelling an indent Sales Order. The server decides; this shows what it allows and why.
+const SO_CANCEL_KIND_LABELS = {
+  pelanggan: "Dibatalkan atas permintaan pelanggan",
+  gagal_memenuhi: "Pembatalan Khusus — toko/supplier gagal memenuhi pesanan",
+  barang_salah: "Pembatalan Khusus — barang salah / tidak sesuai",
+  pelanggaran_pengiriman: "Pembatalan Khusus — melanggar ketentuan pengiriman",
+};
+const SO_FAULT_OPTIONS = [
+  ["gagal_memenuhi", "Toko/supplier gagal memenuhi pesanan"],
+  ["barang_salah", "Barang yang dikirim salah / tidak sesuai"],
+  ["pelanggaran_pengiriman", "Melanggar ketentuan pengiriman yang disepakati"],
+];
+const SO_REFUND_METHOD_OPTIONS = [["cash", "Tunai"], ["transfer", "Transfer"], ["qris", "QRIS"], ["debit", "Debit"]];
+
+function soDeadlineLabel(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? "" : `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function renderSoCancelNote(detail) {
+  const el = document.getElementById("po-detail-cancel-note");
+  const chk = detail.cancel_check || {};
+  let html = "";
+  if (detail.cancelled_at) {
+    html = `<div class="text-failed font-medium">${esc(SO_CANCEL_KIND_LABELS[detail.cancel_kind] || "Dibatalkan")}</div>
+      <div class="text-muted mt-0.5">${esc(detail.cancel_reason || "")} &middot; ${esc(detail.cancelled_by || "—")}, ${esc(formatDateTimeSeconds(detail.cancelled_at).slice(0, 16))}</div>`;
+  } else if (!detail.is_draft && chk.special_allowed) {
+    const lines = chk.lines || [];
+    const indenOpen = lines.some(l => l.type === "inden" && l.allowed);
+    const blocked = lines.filter(l => !l.allowed);
+    const bits = [];
+    if (indenOpen) bits.push(`Barang inden masih boleh dibatalkan pelanggan sampai <b class="text-ink tabular-nums">${esc(soDeadlineLabel(chk.deadline))}</b> (24 jam sejak dikonfirmasi, selama Purchase Order-nya belum terbit).`);
+    if (lines.some(l => l.type === "stok")) bits.push("Barang dari stok toko boleh dibatalkan admin kapan saja selama belum terpasang/diserahkan.");
+    if (blocked.length) bits.push(`Terkunci: ${blocked.map(l => `${esc(l.product_name)} (${esc(l.reason)})`).join("; ")}. Hanya lewat Pembatalan Khusus bila toko/supplier gagal memenuhi pesanan.`);
+    html = `<span class="text-muted">${bits.join(" ")}</span>`;
+  }
+  el.innerHTML = html;
+  el.classList.toggle("hidden", !html);
+}
+
+function soMethodSelect(id) {
+  return `<select id="${id}" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+    ${SO_REFUND_METHOD_OPTIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
+}
+
+const SO_LABEL_CLS = "block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5";
+const SO_INPUT_CLS = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
+
+async function openSoCancelModal() {
+  const d = currentPreorder;
+  if (!d) return;
+  const chk = d.cancel_check || {};
+  const lines = chk.lines || [];
+  if (!chk.allowed) {
+    openModal("Tidak ada barang yang bisa dibatalkan", `
+      <div class="space-y-3">
+        <p class="text-sm text-ink">Barang inden hanya bisa dibatalkan pelanggan dalam 24 jam sejak dikonfirmasi dan sebelum Purchase Order-nya terbit. Barang dari stok toko bisa dibatalkan selama belum terpasang.</p>
+        <ul class="text-sm text-failed list-disc pl-5">${(chk.reasons || []).map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+        ${chk.special_allowed ? `<p class="text-xs text-muted">Bila toko atau supplier gagal memenuhi pesanan, barang salah, atau ketentuan pengiriman dilanggar, pelanggan berhak atas refund penuh untuk barang itu lewat Pembatalan Khusus.</p>` : ""}
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Tutup</button>
+          ${chk.special_allowed ? `<button type="button" onclick="closeModal(); openSoSpecialCancelModal()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Pembatalan Khusus</button>` : ""}
+        </div>
+      </div>`);
+    return;
+  }
+  const qty = Object.fromEntries(d.items.map(i => [i.id, i.quantity]));
+  openModal("Batalkan Sales Order", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink">Pembatalan atas permintaan pelanggan untuk <b>${esc(d.po_number)}</b>. Pilih barang yang dibatalkan; draft Purchase Order-nya ikut dibatalkan dan stok yang dicadangkan kembali bebas dijual.</p>
+      <div class="space-y-1.5">${lines.map(l => `
+        <label class="flex items-start gap-2 text-sm ${l.allowed ? "text-ink" : "text-muted"}">
+          <input type="checkbox" class="so-cancel-item mt-0.5" value="${l.id}" ${l.allowed ? "checked" : "disabled"} onchange="soCancelPreview()" />
+          <span>${esc(l.product_name)} &times; ${qty[l.id] ?? ""} <span class="text-[11px] uppercase tracking-wider ${l.type === "inden" ? "text-pending" : "text-done"}">${l.type === "inden" ? "Inden" : "Stok toko"}</span>
+          ${l.allowed ? "" : `<span class="block text-[11px] text-failed">Terkunci: ${esc(l.reason)}</span>`}</span></label>`).join("")}</div>
+      <div id="so-cancel-money" class="rounded-lg bg-bg2 px-3 py-2 text-sm text-muted">Menghitung…</div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label for="so-cancel-refund" class="${SO_LABEL_CLS}">Refund ke pelanggan</label>
+          <input id="so-cancel-refund" type="text" inputmode="numeric" class="price-input ${SO_INPUT_CLS} text-right tabular-nums" oninput="soCancelFeeHint()" /></div>
+        <div><label for="so-cancel-method" class="${SO_LABEL_CLS}">Metode refund</label>${soMethodSelect("so-cancel-method")}</div>
+      </div>
+      <p id="so-cancel-fee" class="text-xs text-muted"></p>
+      <div><label for="so-cancel-reason" class="${SO_LABEL_CLS}">Alasan pembatalan</label>
+        <textarea id="so-cancel-reason" rows="2" maxlength="300" data-no-uppercase class="${SO_INPUT_CLS}"></textarea></div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Kembali</button>
+        <button type="button" id="so-cancel-submit" onclick="submitSoCancel()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">Batalkan Barang Terpilih</button>
+      </div>
+    </div>`, { lg: true });
+  await soCancelPreview();
+}
+
+let soCancelMax = 0, soCancelSeq = 0;
+async function soCancelPreview() {
+  const ids = [...document.querySelectorAll(".so-cancel-item:checked")].map(el => parseInt(el.value, 10));
+  const box = document.getElementById("so-cancel-money");
+  if (!ids.length) { box.textContent = "Pilih barang yang dibatalkan."; soCancelMax = 0; setPriceInput(document.getElementById("so-cancel-refund"), 0); document.getElementById("so-cancel-fee").textContent = ""; return; }
+  const seq = ++soCancelSeq;
+  const resp = await fetch(`/api/preorders/${currentPreorder.id}/cancel-preview?items=${ids.join(",")}`);
+  if (seq !== soCancelSeq || !document.getElementById("so-cancel-money")) return;
+  if (!resp.ok) { box.textContent = "Gagal menghitung refund."; return; }
+  const pv = await resp.json();
+  soCancelMax = pv.refund_max;
+  box.innerHTML = `<div class="flex justify-between"><span>Sudah dibayar</span><span class="tabular-nums text-ink">${formatIDR(pv.paid)}</span></div>
+    <div class="flex justify-between"><span>Tetap ditagih (barang yang tidak dibatalkan)</span><span class="tabular-nums text-ink">${formatIDR(pv.billed_after)}</span></div>
+    <div class="flex justify-between border-t border-line pt-1 mt-1"><span>Bisa dikembalikan</span><span class="tabular-nums font-semibold text-ink">${formatIDR(pv.refund_max)}</span></div>`;
+  setPriceInput(document.getElementById("so-cancel-refund"), pv.refund_max);
+  soCancelFeeHint();
+}
+
+function soCancelFeeHint() {
+  const max = soCancelMax;
+  const refund = priceValue(document.getElementById("so-cancel-refund"));
+  const el = document.getElementById("so-cancel-fee");
+  if (refund > max) { el.textContent = `Refund tidak boleh lebih dari ${formatIDR(max)}.`; el.className = "text-xs text-failed"; return; }
+  el.className = "text-xs text-muted";
+  el.textContent = max === 0 ? "Tidak ada uang yang perlu dikembalikan: pembayaran tetap dipakai untuk barang yang tidak dibatalkan."
+    : refund < max ? `Sisa ${formatIDR(max - refund)} dicatat sebagai biaya pembatalan di invoice.` : "Seluruh kelebihan pembayaran dikembalikan.";
+}
+
+async function submitSoCancel() {
+  const ids = [...document.querySelectorAll(".so-cancel-item:checked")].map(el => parseInt(el.value, 10));
+  const refund = priceValue(document.getElementById("so-cancel-refund"));
+  const reason = document.getElementById("so-cancel-reason").value.trim();
+  if (!ids.length) { showToast("Pilih barang yang dibatalkan."); return; }
+  if (refund > soCancelMax) { showToast(`Refund tidak boleh lebih dari ${formatIDR(soCancelMax)}.`); return; }
+  if (reason.length < 5) { showToast("Tulis alasan pembatalan (minimal 5 huruf)."); return; }
+  const btn = document.getElementById("so-cancel-submit");
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/api/preorders/${currentPreorder.id}/cancel`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason, refund_amount: refund, refund_method: document.getElementById("so-cancel-method").value, item_ids: ids }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.detail || "Gagal membatalkan Sales Order.");
+    closeModal();
+    showToast(body.cancelled_at ? "Sales Order dibatalkan." : "Barang dibatalkan.", "success");
+    renderPreorderDetail(body);
+    loadPreorders();
+  } catch (e) {
+    showToast(e.message);
+    btn.disabled = false;
+  }
+}
+
+function openSoSpecialCancelModal() {
+  const d = currentPreorder;
+  if (!d) return;
+  const open = d.items.filter(i => i.status !== "terpasang" && i.status !== "dibatalkan");
+  openModal("Pembatalan Khusus", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink">Untuk pesanan yang gagal dipenuhi toko/supplier, barang salah, atau ketentuan pengiriman yang disepakati dilanggar. Pelanggan menerima refund penuh untuk barang yang dibatalkan.</p>
+      <p class="text-xs text-muted">Purchase Order yang sudah terbit <b>tidak</b> dibatalkan otomatis dan stok tidak dilepas; PO-nya ditandai agar admin mengajukan pembatalan ke supplier. Keterlambatan dinilai terhadap janji kirim yang disepakati, bukan estimasi.</p>
+      <div>
+        <div class="${SO_LABEL_CLS}">Barang yang dibatalkan</div>
+        <div class="space-y-1.5">${open.map(i => {
+          const held = i.reserved_qty > 0;
+          return `<label class="flex items-start gap-2 text-sm ${held ? "text-muted" : "text-ink"}">
+            <input type="checkbox" class="so-special-item mt-0.5" value="${i.id}" ${held ? "disabled" : ""} onchange="soSpecialPreview()" />
+            <span>${esc(i.product_name)} &times; ${i.quantity} <span class="text-muted">· ${esc(preorderStatusLabel(i.status))}${i.eta_date ? " · janji kirim " + esc(formatPoDate(i.eta_date)) : ""}</span>
+            ${held ? `<span class="block text-[11px] text-pending">${i.reserved_qty} sudah ada di toko untuk pelanggan ini: retur ke supplier atau serahkan dulu.</span>` : ""}</span></label>`;
+        }).join("")}</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label for="so-special-cat" class="${SO_LABEL_CLS}">Alasan</label>
+          <select id="so-special-cat" class="${SO_INPUT_CLS}"><option value="">Pilih…</option>${SO_FAULT_OPTIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>
+        <div><label for="so-special-method" class="${SO_LABEL_CLS}">Metode refund</label>${soMethodSelect("so-special-method")}</div>
+      </div>
+      <div><label for="so-special-reason" class="${SO_LABEL_CLS}">Kronologi &amp; bukti</label>
+        <textarea id="so-special-reason" rows="3" maxlength="500" data-no-uppercase placeholder="Apa yang gagal, kapan, konfirmasi supplier / bukti" class="${SO_INPUT_CLS}"></textarea></div>
+      <div id="so-special-money" class="rounded-lg bg-bg2 px-3 py-2 text-sm text-muted">Pilih barang untuk melihat refund.</div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Kembali</button>
+        <button type="button" id="so-special-submit" onclick="submitSoSpecialCancel()" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">Batalkan &amp; Refund</button>
+      </div>
+    </div>`, { lg: true });
+}
+
+function soSpecialIds() {
+  return [...document.querySelectorAll(".so-special-item:checked")].map(el => parseInt(el.value, 10));
+}
+
+let soSpecialSeq = 0;
+async function soSpecialPreview() {
+  const ids = soSpecialIds();
+  const box = document.getElementById("so-special-money");
+  if (!ids.length) { box.textContent = "Pilih barang untuk melihat refund."; return; }
+  const seq = ++soSpecialSeq;
+  const resp = await fetch(`/api/preorders/${currentPreorder.id}/cancel-preview?items=${ids.join(",")}`);
+  if (seq !== soSpecialSeq || !document.getElementById("so-special-money")) return;
+  if (!resp.ok) { box.textContent = "Gagal menghitung refund."; return; }
+  const pv = await resp.json();
+  box.innerHTML = `<div class="flex justify-between"><span>Sudah dibayar</span><span class="tabular-nums text-ink">${formatIDR(pv.paid)}</span></div>
+    <div class="flex justify-between"><span>Tagihan barang yang tetap</span><span class="tabular-nums text-ink">${formatIDR(pv.billed_after)}</span></div>
+    <div class="flex justify-between border-t border-line pt-1 mt-1"><span>Refund penuh</span><span class="tabular-nums font-semibold text-ink">${formatIDR(pv.refund_max)}</span></div>`;
+}
+
+async function submitSoSpecialCancel() {
+  const ids = soSpecialIds();
+  const category = document.getElementById("so-special-cat").value;
+  const reason = document.getElementById("so-special-reason").value.trim();
+  if (!ids.length) { showToast("Pilih barang yang dibatalkan."); return; }
+  if (!category) { showToast("Pilih alasan pembatalan khusus."); return; }
+  if (reason.length < 10) { showToast("Tulis kronologi dan buktinya (minimal 10 huruf)."); return; }
+  const btn = document.getElementById("so-special-submit");
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/api/preorders/${currentPreorder.id}/cancel-items`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_ids: ids, category, reason, refund_method: document.getElementById("so-special-method").value }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.detail || "Gagal membatalkan barang.");
+    closeModal();
+    showToast("Barang dibatalkan dan refund dicatat.", "success");
+    renderPreorderDetail(body);
+    loadPreorders();
+  } catch (e) {
+    showToast(e.message);
+    btn.disabled = false;
+  }
+}
+
 function togglePoMenu(event) {
   event.stopPropagation();
   document.getElementById("po-menu").classList.toggle("hidden");
@@ -15273,18 +15612,31 @@ function confirmRemovePoItem(itemId) {
   `);
 }
 
+// K-02: what the shelf holds for this line, what is still coming from a supplier, and what nobody covers yet.
+function soReservationHtml(item) {
+  if (!item.master_item_id || item.status === "terpasang") return "";
+  const bits = [];
+  if (item.reserved_qty > 0) bits.push(`<span class="text-done">Dicadangkan ${item.reserved_qty}</span>`);
+  if (item.coming_qty > 0) bits.push(`<span class="text-muted">Dalam pemesanan ${item.coming_qty}</span>`);
+  if (item.shortfall_qty > 0) bits.push(`<span class="text-failed font-medium">Kurang ${item.shortfall_qty}, belum dipesan</span>`);
+  return bits.length ? `<div class="mt-1 text-[11px] leading-snug space-x-1.5">${bits.join("")}</div>` : "";
+}
+
 async function removePoItem(itemId) {
   const items = currentPreorder.items
     .filter(i => i.id !== itemId)
     .map(i => ({
       id: i.id, master_item_id: i.master_item_id, product_name: i.product_name, unit: i.unit,
       quantity: i.quantity, unit_price: i.unit_price, status: i.status,
+      ship_route: i.ship_route, priority: i.priority, eta_date: i.eta_date,
     }));
+  const body = { items };
+  if (currentPreorder.updated_at) body.expected_updated_at = currentPreorder.updated_at;
   try {
     const resp = await fetch(`/api/preorders/${currentPreorder.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -17129,6 +17481,13 @@ function renderSupplierPoDetail(po) {
     <div class="bg-white border border-line rounded-xl p-4"><div class="font-serif font-semibold text-ink mb-3">Informasi Pembayaran</div>
       <div class="grid grid-cols-2 gap-3">${sumCell("Sudah Dibayar", formatIDR(po.paid_amount), "text-blue-700")}${sumCell("Sisa Tagihan", formatIDR(po.outstanding), po.outstanding > 0 ? "text-failed" : "text-done")}</div></div>`;
   document.getElementById("spo-detail-status").innerHTML = spoOrderPill(po, true);
+  const soCancelBox = document.getElementById("spo-so-cancelled");
+  const soCancelled = po.so_cancelled_lines || [];
+  soCancelBox.classList.toggle("hidden", soCancelled.length === 0);
+  soCancelBox.innerHTML = soCancelled.length ? `
+    <div class="font-medium text-failed">Perlu tindakan: pelanggan sudah membatalkan barang ini</div>
+    <ul class="mt-1 text-ink list-disc pl-5">${soCancelled.map(l => `<li>${esc(l.product_name)} &times; ${l.qty_left} — ${esc(l.customer_name || "")} (${esc(l.customer_po_number || "")})</li>`).join("")}</ul>
+    <div class="mt-1 text-xs text-muted">Ajukan pembatalan item ke supplier, atau bila barang tetap dikirim, terima sebagai stok toko.</div>` : "";
   document.getElementById("spo-detail-pay").innerHTML = spoPayPill(po, true);
   renderSpoStepper(po);
 
@@ -17821,7 +18180,7 @@ async function renderSpoForm(detail) {
   document.getElementById("spo-eta").value = detail ? (detail.est_arrival_date || "") : "";
   document.getElementById("spo-f-disc").value = detail ? detail.discount_pct : 0;
   document.getElementById("spo-f-tax").value = detail && detail.tax_rate === 11 ? "11" : "0";
-  setPriceInput(document.getElementById("spo-f-ship"), detail ? detail.shipping_cost : 0);
+  setPriceInput(document.getElementById("spo-f-shipcost"), detail ? detail.shipping_cost : 0);
   setPriceInput(document.getElementById("spo-f-paid"), 0);
   // Payment can only be recorded once the PO is issued, so editing a draft hides the field.
   document.getElementById("spo-f-paid-row").classList.toggle("hidden", Boolean(detail));
@@ -17920,7 +18279,7 @@ function spoFormLine(i) {
 function updateSpoFormTotals() {
   const discPct = parseFloat(document.getElementById("spo-f-disc").value) || 0;
   const taxPct = parseFloat(document.getElementById("spo-f-tax").value) || 0;
-  const ship = priceValue(document.getElementById("spo-f-ship"));
+  const ship = priceValue(document.getElementById("spo-f-shipcost"));
   const c = spoCalc(spoItems.map(spoFormLine), discPct, taxPct, ship);
   document.getElementById("spo-f-subtotal").textContent = formatIDR(c.sub);
   document.getElementById("spo-f-disc-amt").textContent = "- " + formatIDR(c.disc);
@@ -17979,7 +18338,7 @@ async function saveSupplierPo(issue) {
     est_arrival_date: document.getElementById("spo-eta").value || null,
     discount_pct: parseFloat(document.getElementById("spo-f-disc").value) || 0,
     tax_rate: parseFloat(document.getElementById("spo-f-tax").value) || 0,
-    shipping_cost: priceValue(document.getElementById("spo-f-ship")),
+    shipping_cost: priceValue(document.getElementById("spo-f-shipcost")),
     items: spoItems.map(i => ({
       preorder_item_id: i.preorder_item_id, master_item_id: i.master_item_id, sku: (i.sku || "").trim() || null,
       product_name: i.product_name, unit: (i.unit || "").trim() || null, quantity: i.quantity,

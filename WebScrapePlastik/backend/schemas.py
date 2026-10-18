@@ -61,6 +61,8 @@ class ReceiptExtra(BaseModel):
 
 
 class ReceiptRequest(ReceiptExtra):
+    # Admin only: why this sale may use stock reserved for a Sales Order customer (K-02).
+    stock_override_reason: str | None = None
     plate_region: str
     plate_number: str
     plate_suffix: str
@@ -87,6 +89,8 @@ class ReceiptRequest(ReceiptExtra):
 
 
 class ReceiptUpdateRequest(ReceiptExtra):
+    # Admin only: why this sale may use stock reserved for a Sales Order customer (K-02).
+    stock_override_reason: str | None = None
     # Optimistic locking: the `revision` the client loaded; a mismatch means someone else changed the nota.
     expected_revision: str | None = None
     # Required (by the route) when status='void': why the nota is being cancelled.
@@ -198,6 +202,8 @@ class ReceiptEventOut(BaseModel):
 class ReceiptWorkStatusRequest(BaseModel):
     to: str  # belum | pengerjaan | selesai
     note: str | None = None
+    # Admin only: why this sale may use stock reserved for a Sales Order customer (K-02).
+    stock_override_reason: str | None = None
 
 
 class ReceiptPaymentOut(BaseModel):
@@ -463,6 +469,9 @@ class MasterItemOut(BaseModel):
     avg_cost_price: int
     sell_price: int
     stock_qty: int
+    # K-02: part of stock_qty held for Sales Order customers, and what is left to sell (stock − reserved).
+    reserved_qty: int = 0
+    available_qty: int | None = None
     first_received_date: str | None
     is_active: bool
     created_at: str
@@ -899,6 +908,8 @@ class PreorderRequest(BaseModel):
     deposit: int = 0
     deposit_method: str = "cash"  # cash | transfer | qris | debit
     notes: str | None = None
+    # Buy every barang of this order from this supplier; null = each follows its Master Barang supplier.
+    supplier_id: int | None = None
 
 
 class PreorderUpdateRequest(BaseModel):
@@ -913,6 +924,8 @@ class PreorderUpdateRequest(BaseModel):
     notes: str | None = None
     # No null state to distinguish here -- a plain bool | None (omitted = leave as-is) is enough.
     is_draft: bool | None = None
+    # Omitted = keep; null = clear (follow each barang's supplier).
+    supplier_id: int | None = None
 
 
 class PreorderItemStatusRequest(BaseModel):
@@ -992,6 +1005,15 @@ class PreorderItemOut(BaseModel):
     ship_route: str | None = None
     priority: str = "normal"
     eta_date: str | None = None
+    # K-02: held for this line on the shelf, still coming from a supplier, and needed but not covered.
+    reserved_qty: int = 0
+    coming_qty: int = 0
+    shortfall_qty: int = 0
+    # K-13: set when the line was cancelled (status 'dibatalkan').
+    cancelled_at: str | None = None
+    cancelled_by: str | None = None
+    cancel_kind: str | None = None
+    cancel_reason: str | None = None
 
 
 class PreorderHistoryOut(BaseModel):
@@ -1009,6 +1031,8 @@ class PreorderOut(BaseModel):
     id: str
     po_number: str
     po_date: str
+    supplier_id: int | None = None
+    supplier_name: str | None = None
     # Empty for orders created before the plate was captured.
     plate_full: str
     customer_name: str
@@ -1033,6 +1057,12 @@ class PreorderOut(BaseModel):
     invoice_total: int | None = None
     invoice_status: str | None = None  # pending | done | void
     invoice_work_status: str | None = None
+    # K-13: when the order was confirmed (starts the 24-hour cancellation window) and its cancellation.
+    published_at: str | None = None
+    cancelled_at: str | None = None
+    cancelled_by: str | None = None
+    cancel_kind: str | None = None  # pelanggan | gagal_memenuhi | barang_salah | pelanggaran_pengiriman
+    cancel_reason: str | None = None
 
 
 class PreorderDetail(PreorderOut):
@@ -1042,6 +1072,23 @@ class PreorderDetail(PreorderOut):
     allocations: list[PreorderAllocationOut] = []
     # DP still free to apply to a nota.
     dp_unallocated: int = 0
+    # K-13: {allowed, reasons[], deadline, special_allowed} for Batalkan Sales Order / Pembatalan Khusus.
+    cancel_check: dict | None = None
+
+
+class PreorderCancelRequest(BaseModel):
+    reason: str
+    refund_amount: int = 0
+    refund_method: str = "cash"
+    # None = every line the policy allows; else just these lines.
+    item_ids: list[int] | None = None
+
+
+class PreorderSpecialCancelRequest(BaseModel):
+    item_ids: list[int]
+    category: str
+    reason: str
+    refund_method: str = "cash"
 
 
 # ---------------------------------------------------------------------------
@@ -1320,6 +1367,8 @@ class SupplierPoDetail(SupplierPoOut):
     cancellations: list[SupplierPoCancellationOut] = []
     shipments: list[SupplierPoShipmentOut] = []
     receive_draft: dict | None = None
+    # K-13: lines still coming whose customer cancelled (Pembatalan Khusus) — the admin must act.
+    so_cancelled_lines: list[dict] = []
 
 
 class SupplierPoSummary(BaseModel):

@@ -133,6 +133,18 @@ EXTRA_MAX = {"work_notes": 1000, "cashier_name": 80, "estimated_finish_at": 40, 
              "vehicle_model": 60, "vehicle_color": 40, "vehicle_year": 8}
 
 
+def _override_reason(req, user: dict) -> str | None:
+    """Using stock reserved for a Sales Order customer needs an admin and a reason."""
+    reason = _clean_name(getattr(req, "stock_override_reason", None))
+    if not reason:
+        return None
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Hanya admin yang boleh memakai stok yang dicadangkan.")
+    if len(reason) < 3 or len(reason) > 200:
+        raise HTTPException(status_code=422, detail="Alasan izin stok 3-200 karakter.")
+    return reason
+
+
 def _clean_extra(req: ReceiptExtra, only_sent: bool) -> dict:
     """The work-order fields, trimmed and length-checked. On edit only the fields the client
     actually sent are returned, so an omitted field is left alone while an explicit null clears it."""
@@ -247,7 +259,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
             None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
             req.customer_id, transfer_sender, transfer_account, user["username"], req.work_status,
-            _clean_extra(req, False),
+            _clean_extra(req, False), _override_reason(req, user),
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -470,6 +482,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             user["username"],
             _clean_extra(req, True),
             void_reason or None,
+            _override_reason(req, user),
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save, or the new total
@@ -561,7 +574,7 @@ async def change_work_status_route(
         raise HTTPException(status_code=422, detail="Catatan maksimal 200 karakter.")
     try:
         updated = await loop.run_in_executor(
-            None, change_receipt_work_status, receipt_id, req.to, note, user["username"]
+            None, change_receipt_work_status, receipt_id, req.to, note, user["username"], _override_reason(req, user)
         )
     except ValueError as e:
         msg = str(e)

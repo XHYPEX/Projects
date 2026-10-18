@@ -4,9 +4,15 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_admin
 from backend.database import (
+    get_supplier,
     PREORDER_STATUSES,
+    PO_LINE_CANCELLED,
+    cancel_preorder,
+    cancel_preorder_items,
+    get_preorder_cancel_check,
+    preview_preorder_cancel,
     add_preorder_payment,
     get_receipt_payments,
     po_invoice_payment,
@@ -30,6 +36,8 @@ from backend.database import (
     update_preorder,
 )
 from backend.schemas import (
+    PreorderCancelRequest,
+    PreorderSpecialCancelRequest,
     PreorderAllocationOut,
     PreorderConvertRequest,
     PreorderConvertResponse,
@@ -85,7 +93,7 @@ def _require_invoice_plate(plate: str) -> None:
 
 def _po_error(e: ValueError) -> HTTPException:
     msg = str(e)
-    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat")) else 409
+    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat", "Uang muka")) else 409
     return HTTPException(status_code=status, detail=msg)
 
 
@@ -96,7 +104,9 @@ def _validate_po_date(raw: str) -> str:
         raise HTTPException(status_code=422, detail="Tanggal PO harus berformat YYYY-MM-DD.")
 
 
-def _validate_status(status: str) -> str:
+def _validate_status(status: str, allow_cancelled: bool = False) -> str:
+    if status == PO_LINE_CANCELLED and allow_cancelled:
+        return status
     if status not in PREORDER_STATUSES:
         raise HTTPException(
             status_code=422,
@@ -115,7 +125,7 @@ def _validate_items(items: list[PreorderItemRequest]) -> list[dict]:
         if item.unit_price < 0:
             raise HTTPException(status_code=422, detail="Harga satuan tidak boleh negatif.")
         if item.status is not None:
-            _validate_status(item.status)
+            _validate_status(item.status, allow_cancelled=True)
         try:
             _preorder_item_logistics(item.model_dump())
         except ValueError as exc:
@@ -142,6 +152,13 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         ship_route=row.get("ship_route"),
         priority=row.get("priority") or "normal",
         eta_date=row.get("eta_date"),
+        reserved_qty=row.get("reserved_qty") or 0,
+        coming_qty=row.get("coming_qty") or 0,
+        shortfall_qty=row.get("shortfall_qty") or 0,
+        cancelled_at=row.get("cancelled_at"),
+        cancelled_by=row.get("cancelled_by"),
+        cancel_kind=row.get("cancel_kind"),
+        cancel_reason=row.get("cancel_reason"),
     )
 
 
@@ -166,14 +183,24 @@ async def _detail(preorder_id: str) -> PreorderDetail:
         with _conn() as con:
             return preorder_unallocated_dp(con, preorder_id)
     dp_free = await loop.run_in_executor(None, _free)
+    cancel_check = await loop.run_in_executor(None, get_preorder_cancel_check, preorder_id)
     return PreorderDetail(
         **row,
+        cancel_check=cancel_check,
         allocations=[PreorderAllocationOut(**a) for a in allocations],
         dp_unallocated=dp_free,
         items=[_row_to_item(i) for i in items],
         history=[PreorderHistoryOut(**h) for h in history],
         payments=[PreorderPaymentOut(**p) for p in payments],
     )
+
+
+async def _require_supplier(loop, supplier_id: int | None) -> None:
+    if supplier_id is None:
+        return
+    sup = await loop.run_in_executor(None, get_supplier, supplier_id)
+    if sup is None or not sup["is_active"]:
+        raise HTTPException(status_code=422, detail="Supplier tidak ditemukan atau tidak aktif.")
 
 
 @router.post("/preorders", response_model=PreorderDetail, status_code=201)
@@ -200,11 +227,12 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
 
     preorder_id = str(uuid4())
     loop = asyncio.get_event_loop()
+    await _require_supplier(loop, req.supplier_id)
     try:
         await loop.run_in_executor(
             None, lambda: create_preorder(
                 preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
-                plate_full, po_date, req.is_draft, deposit_method=req.deposit_method,
+                plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
             ),
         )
     except ValueError as e:
@@ -215,7 +243,7 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
 @router.get("/preorders", response_model=list[PreorderOut])
 async def list_preorders(query: str | None = None, status: str | None = None, draft: bool = False):
     if status:
-        _validate_status(status)
+        _validate_status(status, allow_cancelled=True)
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(None, get_all_preorders, query, status, draft)
     return [PreorderOut(**r) for r in rows]
@@ -260,6 +288,9 @@ async def update_preorder_route(
     if not will_be_draft and (plate_full is not None or current["is_draft"]):
         _require_invoice_plate(plate_full if plate_full is not None else current["plate_full"])
 
+    set_supplier = "supplier_id" in req.model_fields_set
+    if set_supplier:
+        await _require_supplier(loop, req.supplier_id)
     try:
         await loop.run_in_executor(
             None,
@@ -267,6 +298,7 @@ async def update_preorder_route(
                 preorder_id, customer_name=customer_name, customer_phone=customer_phone, items=items,
                 notes=notes, update_notes=update_notes, changed_by=user["username"],
                 is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
+                set_supplier=set_supplier, supplier_id=req.supplier_id,
             ),
         )
     except ValueError as e:
@@ -302,6 +334,49 @@ async def update_preorder_status(
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, set_preorder_status, preorder_id, status, user["username"])
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.get("/preorders/{preorder_id}/cancel-preview")
+async def cancel_preview_route(preorder_id: str, items: str | None = None, _admin: dict = Depends(require_admin)):
+    """Money a cancellation would move. `items` = comma-separated line ids (Pembatalan Khusus)."""
+    ids = None
+    if items is not None:
+        try:
+            ids = [int(x) for x in items.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Daftar barang tidak valid.")
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, preview_preorder_cancel, preorder_id, ids)
+    except ValueError as e:
+        raise _po_error(e)
+
+
+@router.post("/preorders/{preorder_id}/cancel", response_model=PreorderDetail)
+async def cancel_preorder_route(preorder_id: str, req: PreorderCancelRequest, user: dict = Depends(require_admin)):
+    """K-13 Batalkan (customer request, admin only): shop-stock lines any time before installation; indent
+    lines only within 24 hours and before their Purchase Order is issued."""
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, lambda: cancel_preorder(
+            preorder_id, req.reason, req.refund_amount, req.refund_method, user["username"], req.item_ids))
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/cancel-items", response_model=PreorderDetail)
+async def cancel_preorder_items_route(
+    preorder_id: str, req: PreorderSpecialCancelRequest, user: dict = Depends(require_admin)
+):
+    """K-13 Pembatalan Khusus: the shop or supplier failed the customer on these lines (admin only)."""
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, lambda: cancel_preorder_items(
+            preorder_id, req.item_ids, req.category, req.reason, req.refund_method, user["username"]))
     except ValueError as e:
         raise _po_error(e)
     return await _detail(preorder_id)

@@ -1960,11 +1960,26 @@
                 </div>
                 <span id="po-deposit-fixed" class="hidden font-serif text-base font-semibold text-done tabular-nums">Rp 0</span>
               </div>
-              <p id="po-deposit-hint" class="hidden text-[11px] text-muted text-right">Pembayaran tambahan dicatat dari halaman detail (Tambah Pembayaran).</p>
+              <div id="po-deposit-method-wrap" class="space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                  <label for="po-deposit-method" class="text-muted shrink-0">Metode DP</label>
+                  <select id="po-deposit-method" onchange="poDepositMethodChanged()" class="select-chevron w-40 border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                    <option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option></select>
+                </div>
+                <label id="po-deposit-confirm-wrap" class="hidden flex items-start gap-2 rounded-lg border border-line bg-bg2 px-3 py-2 text-xs text-ink cursor-pointer">
+                  <input id="po-deposit-confirmed" type="checkbox" class="accent-[#D97757] mt-0.5" />
+                  <span>Dana sudah saya cek masuk<span class="block text-[11px] text-muted">Bila tidak dicentang, DP dicatat <b>Pending</b> dan belum dihitung sebagai DP sampai dikonfirmasi.</span></span>
+                </label>
+              </div>
+              <div id="po-deposit-hint" class="hidden text-right">
+                <button type="button" onclick="openPoPaymentModal()" class="px-3 py-1.5 border border-accent text-accent rounded-lg text-xs font-medium hover:bg-accent/10 transition-colors">+ Tambah DP / Pembayaran</button>
+                <p class="text-[11px] text-muted mt-1">Dicatat langsung ke Sales Order ini; perubahan form yang belum disimpan tidak ikut.</p>
+              </div>
               <div class="rounded-lg bg-bg2 px-3 py-2">
                 <div class="flex items-center justify-between text-xs"><span class="text-muted">Minimal DP (30%)</span><span id="po-deposit-need" class="tabular-nums text-ink">Rp 0</span></div>
                 <div class="mt-1.5 h-1.5 rounded-full bg-line overflow-hidden"><div id="po-deposit-bar" class="h-full bg-accent rounded-full transition-all" style="width:0%"></div></div>
                 <p id="po-deposit-min" class="text-[11px] text-muted mt-1.5"></p>
+                <button id="po-deposit-fill" type="button" onclick="poFillMinDeposit()" class="hidden mt-1.5 text-xs text-accent hover:text-accentDark font-medium">Isi DP minimal</button>
               </div>
               <div class="flex items-center justify-between border-t border-line pt-2">
                 <span class="text-muted">Sisa Tagihan</span>
@@ -2290,7 +2305,7 @@
             </div>
             <div>
               <label for="spo-date" class="block text-xs text-muted mb-1.5">Tanggal PO</label>
-              <input id="spo-date" type="date" data-no-uppercase onchange="onSpoTermsChange()"
+              <input id="spo-date" type="date" data-no-uppercase onchange="onSpoTermsChange(); refreshSpoNumberPreview()"
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
             <div class="sm:col-span-2">
@@ -2983,6 +2998,23 @@
           <span id="handover-summary" class="text-xs text-muted"></span>
         </div>
         <div class="bg-white border border-line rounded-xl overflow-x-auto"><table class="w-full text-sm"><tbody id="handover-tbody"></tbody></table></div>
+      </div>
+
+      <!-- K-22: special prices staff asked for, waiting for an admin. Admin only; hidden when none. -->
+      <div id="price-card" class="hidden mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Harga khusus menunggu persetujuan</h2>
+          <span id="price-summary" class="text-xs text-muted"></span>
+        </div>
+        <div class="bg-white border border-pending/40 rounded-xl overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-bg2"><tr>
+              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diajukan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nota / SO</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
+              <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga normal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga khusus</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diskon</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Alasan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Oleh</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
+            </tr></thead>
+            <tbody id="price-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- K-18: transfer/QRIS payments waiting for someone to see the money in the account. Hidden when none. -->
@@ -4897,7 +4929,7 @@ function renderRoute() {
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
   if (route === "/cashier") { itemEntryInput()?.focus(); svcLoadSerialSkus(); }
-  if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); }
+  if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); }
   if (route === "/kas-keluar") koInit();
   if (route === "/master-kategori") katInit();
   if (route === "/stock-opname") opInit();
@@ -5525,6 +5557,117 @@ async function resolveItemRowImage(row, sku) {
 // inside an attribute here. The name, qty and price are assigned as element properties after
 // the markup is built, which also closes the old value="${esc(name)}" gap (a name containing
 // a double quote used to truncate the attribute). The SKU only ever lands in a text node.
+// ── K-22 Harga Khusus: a price below Master Barang, per line ─────────────────────────────────────────
+// The reason is typed on the line itself. Staff's request waits for an admin; an admin's is approved on the spot.
+// Below cost needs an admin's explicit tick. The server enforces all of this; the panel only makes it visible.
+function itemSpecialInfo(row) {
+  const list = Number(row.dataset.listPrice) || 0;
+  const qty = parseInt(row.querySelector(".item-qty").value, 10) || 0;
+  const price = priceValue(row.querySelector(".item-price"));
+  const disc = priceValue(row.querySelector(".item-disc"));
+  const net = qty * price - disc;
+  const special = list > 0 && qty > 0 && net < qty * list;
+  return { list, qty, net, special, perUnit: qty ? Math.round(net / qty) : 0, diff: qty * list - net };
+}
+
+function specialPill(state, who) {
+  return state === "pending"
+    ? `<span class="px-2 py-0.5 rounded-full bg-pending/15 text-pending font-medium">Menunggu persetujuan Admin</span>`
+    : state === "approved" ? `<span class="px-2 py-0.5 rounded-full bg-done/15 text-done font-medium">Disetujui${who ? " " + esc(who) : ""}</span>` : "";
+}
+
+function refreshItemSpecial(row) {
+  const box = row.querySelector(".item-special");
+  if (!box) return;
+  const f = itemSpecialInfo(row);
+  if (!f.special) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  const cost = Number(row.dataset.costPrice) || 0;
+  const below = isAdmin() && cost > 0 && f.net < f.qty * cost;
+  const same = row.dataset.priceState && Number(row.dataset.savedNet) === f.perUnit;
+  const state = same ? row.dataset.priceState : "";
+  const poOwned = !!row.dataset.poItem && !priceValue(row.querySelector(".item-disc"));
+  const tab = getActiveTab();
+  // A locked / closed nota cannot have its reason edited, but an admin can still approve or reject a request.
+  const ro = !!tab && (tab.status === "void" || tab.locked || (tab.receiptId && tab.status === "done" && tab.workStatus === "selesai"));
+  const dis = ro ? "disabled" : "";
+  const decide = state === "pending" && isAdmin() && row.dataset.itemId && tab?.receiptId && tab.status !== "void"
+    ? `<button type="button" onclick="priceDecide('receipt','${tab.receiptId}',${row.dataset.itemId},true)" class="px-2.5 py-1 rounded-md bg-done text-white font-medium">Setujui</button>
+       <button type="button" onclick="priceDecide('receipt','${tab.receiptId}',${row.dataset.itemId},false)" class="px-2.5 py-1 rounded-md border border-failed text-failed font-medium">Tolak</button>` : "";
+  const note = state ? "" : isAdmin() ? `<span class="text-muted">Admin: langsung disetujui.</span>` : `<span class="text-muted">Staff: diajukan ke Admin, pembayaran ditahan sampai disetujui.</span>`;
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+      <span class="font-semibold text-ink">Harga khusus</span>
+      <span class="text-muted">normal <s>${formatIDR(f.list)}</s> → <b class="text-ink">${formatIDR(f.perUnit)}</b> / unit · diskon ${formatIDR(f.diff)}</span>
+      ${specialPill(state, row.dataset.priceApprovedBy)} ${note}
+      ${row.dataset.priceRequestedBy && state ? `<span class="text-muted">diajukan ${esc(row.dataset.priceRequestedBy)}</span>` : ""}
+      ${decide}
+    </div>
+    ${poOwned ? `<div class="text-[11px] text-muted mt-1">Harga ini berasal dari Sales Order${row.dataset.priceReason ? ": " + esc(row.dataset.priceReason) : ""}.</div>` : `
+    <div class="flex flex-wrap items-center gap-2 mt-1.5">
+      <input type="text" ${dis} class="item-price-reason flex-1 min-w-[12rem] border border-line rounded-lg px-2.5 py-1 text-xs bg-white text-ink disabled:opacity-60" data-no-uppercase maxlength="300"
+        placeholder="Alasan harga khusus (wajib) — mis. hasil negosiasi" value="${esc(row.dataset.priceReason || "")}"
+        oninput="this.closest('.item-row').dataset.priceReason = this.value; markActiveTabDirty();">
+      ${below ? `<label class="flex items-center gap-1.5 text-xs text-failed font-medium"><input type="checkbox" ${dis} class="accent-[#D97757]" ${row.dataset.belowOk ? "checked" : ""}
+        onchange="this.closest('.item-row').dataset.belowOk = this.checked ? '1' : ''; if (!this.checked) delete this.closest('.item-row').dataset.belowOk; markActiveTabDirty();"> Harga di bawah modal — izinkan</label>` : ""}
+    </div>`}`;
+}
+
+// Approve / reject a special price (admin). A refusal needs a reason; the line goes back to the normal price.
+function priceDecide(scope, docId, itemId, approve) {
+  if (approve) { submitPriceDecision(scope, docId, itemId, true, ""); return; }
+  openModal("Tolak Harga Khusus", `<div class="space-y-3">
+    <p class="text-sm text-muted">Baris ini kembali ke harga normal Master Barang dan tagihan dihitung ulang. Pembayaran yang sudah masuk tidak dihapus.</p>
+    <div><label for="price-reject-note" class="block text-xs text-muted mb-1.5">Alasan penolakan <span class="text-failed">*</span></label>
+      <input id="price-reject-note" type="text" maxlength="300" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink"></div>
+    <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+      <button type="button" onclick="submitPriceDecision('${scope}','${docId}',${itemId},false,document.getElementById('price-reject-note').value)" class="px-4 py-1.5 bg-failed text-white rounded-lg text-sm font-medium">Tolak</button></div></div>`);
+  setTimeout(() => document.getElementById("price-reject-note")?.focus(), 0);
+}
+
+async function submitPriceDecision(scope, docId, itemId, approve, note) {
+  if (!approve && !(note || "").trim()) { showToast("Tulis alasan penolakan."); return; }
+  try {
+    const resp = await fetch(`/api/${scope === "receipt" ? "receipts" : "preorders"}/${docId}/items/${itemId}/price/${approve ? "approve" : "reject"}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: note || null }) });
+    if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.detail || "Gagal memproses harga khusus."); }
+    const data = await resp.json();
+    closeModal();
+    showToast(approve ? "Harga khusus disetujui." : "Harga khusus ditolak, kembali ke harga normal.", "success");
+    await afterPriceDecision(scope, docId, data);
+  } catch (e) { showToast(e.message); }
+}
+
+// Redraw whatever is on screen with the new state of the nota / Sales Order.
+async function afterPriceDecision(scope, docId, data) {
+  if (scope === "preorder") {
+    if (currentPreorder && currentPreorder.id === docId) renderPreorderDetail(data);
+  } else {
+    const tab = cashierTabs.find(t => t.receiptId === docId);
+    if (tab) {
+      const idx = cashierTabs.indexOf(tab);
+      cashierTabs[idx] = { ...tabStateFromReceipt(tab.tabId, data), locked: tab.locked };
+      if (getActiveTab() === cashierTabs[idx]) setActiveCashierTab(tab.tabId);
+    }
+  }
+  if (typeof loadPricePending === "function") loadPricePending();
+  if (typeof renderReceiptHistory === "function") renderReceiptHistory();
+}
+
+// Read-only summary of a special price on a saved line (SO detail, nota history), with the admin's buttons.
+function specialDetailHtml(it, scope, docId) {
+  if (!it.price_state) return "";
+  const net = it.quantity * it.unit_price - (it.line_discount || 0);
+  const perUnit = it.quantity ? Math.round(net / it.quantity) : it.unit_price;
+  const diff = it.quantity * (it.list_price || 0) - net;
+  const decide = it.price_state === "pending" && isAdmin()
+    ? ` <button type="button" onclick="priceDecide('${scope}','${docId}',${it.id},true)" class="px-2 py-0.5 rounded-md bg-done text-white font-medium">Setujui</button>
+        <button type="button" onclick="priceDecide('${scope}','${docId}',${it.id},false)" class="px-2 py-0.5 rounded-md border border-failed text-failed font-medium">Tolak</button>` : "";
+  const who = it.price_state === "approved" ? (it.price_approved_by || "Admin") : "";
+  return `<div class="mt-1 text-[11px] leading-snug text-muted">Harga khusus: normal <s>${formatIDR(it.list_price || 0)}</s> → <b class="text-ink">${formatIDR(perUnit)}</b>
+    (diskon ${formatIDR(diff)})${it.price_reason ? " · " + esc(it.price_reason) : ""} · diajukan ${esc(it.price_requested_by || "-")}
+    ${specialPill(it.price_state, who)}${it.price_below_cost && isAdmin() ? ' <span class="text-failed font-medium">di bawah modal</span>' : ""}${decide}</div>`;
+}
+
 function addItemRow(prefill) {
   const container = document.getElementById("item-rows");
   const row = document.createElement("div");
@@ -5544,6 +5687,15 @@ function addItemRow(prefill) {
   // A line of a Sales Order is changed on the PO; a returned line is frozen (see applyCashierVoidLock).
   if (prefill && prefill.preorderItemId) row.dataset.poItem = prefill.preorderItemId;
   if (prefill && Number(prefill.returnedQty) > 0) row.dataset.returnedQty = prefill.returnedQty;
+  // K-22: the Master Barang price this line is compared with, the cost (admin only) and the state of a special price.
+  if (prefill && Number(prefill.listPrice) > 0) row.dataset.listPrice = prefill.listPrice;
+  if (prefill && Number(prefill.costPrice) > 0) row.dataset.costPrice = prefill.costPrice;
+  if (prefill && prefill.priceState) row.dataset.priceState = prefill.priceState;
+  if (prefill && prefill.priceReason) row.dataset.priceReason = prefill.priceReason;
+  if (prefill && prefill.priceApprovedBy) row.dataset.priceApprovedBy = prefill.priceApprovedBy;
+  if (prefill && prefill.priceRequestedBy) row.dataset.priceRequestedBy = prefill.priceRequestedBy;
+  if (prefill && prefill.savedNet != null) row.dataset.savedNet = prefill.savedNet;
+  if (prefill && prefill.belowOk) row.dataset.belowOk = "1";
   // Photo of the linked master item: from the prefill, else from what the register already knows
   // about this SKU. Dataset values are plain strings, so this stays out of the markup below.
   const knownImage = (prefill && prefill.imageUrl) || (prefill && prefill.sku ? skuImageCache.get(prefill.sku) : "") || "";
@@ -5588,6 +5740,7 @@ function addItemRow(prefill) {
     </div>
     ${iconButtonHtml("danger", "Hapus item", "this.closest('.item-row').remove(); ensureTrailingEmptyRow(); recomputeTotals(); markActiveTabDirty();", "trash", "col-start-3 row-start-1 lg:col-start-auto lg:row-start-auto disabled:opacity-40 disabled:cursor-not-allowed")}
     <div class="item-notice hidden col-span-full items-center gap-2 rounded-md bg-pending/10 border border-pending/30 px-3 py-1.5 text-xs text-ink" role="status"></div>
+    <div class="item-special hidden col-span-full rounded-md bg-bg2 border border-line px-3 py-2"></div>
   `;
   row.querySelector(".item-name").value = prefill ? (prefill.name || "") : "";
   row.querySelector(".item-qty").value = prefill && prefill.qty != null && prefill.qty !== "" ? String(prefill.qty) : "1";
@@ -5956,6 +6109,9 @@ function addScannedItemToReceipt(item, targetRow) {
     row.querySelector(".item-name").value = item.name;
     row.querySelector(".item-qty").value = "1";
     row.querySelector(".item-price").value = groupDigits(item.sell_price);
+    row.dataset.listPrice = item.sell_price > 0 ? String(item.sell_price) : "";
+    row.dataset.costPrice = item.avg_cost_price > 0 ? String(item.avg_cost_price) : "";
+    for (const k of ["priceState", "priceReason", "priceApprovedBy", "priceRequestedBy", "savedNet", "belowOk"]) delete row.dataset[k];
     refreshItemRowMeta(row);
   }
   ensureTrailingEmptyRow();
@@ -6153,6 +6309,7 @@ function recomputeTotals() {
     discInput.classList.toggle("border-failed", typedDisc > lineGross);
     const lineTotal = lineGross - disc;
     row.querySelector(".item-subtotal").textContent = formatIDR(lineTotal);
+    refreshItemSpecial(row);
     gross += lineGross;
     lineDiscount += disc;
     if (row.dataset.itemType === "jasa") serviceTotal += lineTotal;
@@ -6301,6 +6458,9 @@ function collectReceiptPayload() {
     sku: row.dataset.sku || null,
     item_type: row.dataset.itemType === "jasa" ? "jasa" : "barang",
     line_discount: priceValue(row.querySelector(".item-disc")),
+    // K-22: why a price below Master Barang was given, and (admin only) that a price under cost is intended.
+    price_reason: row.dataset.priceReason || null,
+    allow_below_cost: !!row.dataset.belowOk,
   }));
   const customerName = document.getElementById("customer-name").value.trim();
   const text = id => document.getElementById(id).value.trim() || null;
@@ -6368,6 +6528,15 @@ function validateReceiptForm(payload) {
   }
   if (payload.items.some(i => i.line_discount > i.quantity * i.unit_price)) {
     showToast("Diskon item tidak boleh melebihi harga item.");
+    return false;
+  }
+  const noReason = [...document.querySelectorAll("#item-rows .item-row")].find(row => !isBlankItemRow(row)
+    && row.querySelector(".item-special") && !row.querySelector(".item-special").classList.contains("hidden")
+    && !row.dataset.poItem && (row.dataset.priceReason || "").trim().length < 3
+    && !(row.dataset.priceState && Number(row.dataset.savedNet) === itemSpecialInfo(row).perUnit));
+  if (noReason) {
+    showToast(`Isi alasan harga khusus untuk “${noReason.querySelector(".item-name").value.trim()}”.`);
+    noReason.querySelector(".item-price-reason")?.focus();
     return false;
   }
   const net = payload.items.reduce((sum, i) => sum + i.quantity * i.unit_price - i.line_discount, 0);
@@ -7289,6 +7458,12 @@ function tabStateFromReceipt(tabId, r) {
       addedDuringWork: !!it.added_during_work,
       preorderItemId: it.preorder_item_id || null,
       returnedQty: it.returned_qty || 0,
+      // K-22: a saved special price keeps its own list price; a normal line is compared with today's master price.
+      listPrice: (it.price_state ? it.list_price : it.master_price) || "", costPrice: it.avg_cost_price || "",
+      priceState: it.price_state || "", priceReason: it.price_reason || "", priceApprovedBy: it.price_approved_by || "",
+      priceRequestedBy: it.price_requested_by || "",
+      savedNet: it.price_state ? Math.round((it.quantity * it.unit_price - (it.line_discount || 0)) / it.quantity) : null,
+      belowOk: !!it.price_below_cost,
     })),
     preorderId: r.preorder_id || null,
     poNumber: r.po_number || "",
@@ -7376,6 +7551,10 @@ function captureFormIntoActiveTab() {
     addedDuringWork: !!row.dataset.addedDuringWork,
     preorderItemId: row.dataset.poItem ? Number(row.dataset.poItem) : null,
     returnedQty: Number(row.dataset.returnedQty) || 0,
+    listPrice: row.dataset.listPrice || "", costPrice: row.dataset.costPrice || "", priceState: row.dataset.priceState || "",
+    priceReason: row.dataset.priceReason || "", priceApprovedBy: row.dataset.priceApprovedBy || "",
+    priceRequestedBy: row.dataset.priceRequestedBy || "", savedNet: row.dataset.savedNet != null ? Number(row.dataset.savedNet) : null,
+    belowOk: !!row.dataset.belowOk,
   }));
   tab.cashierName = document.getElementById("cashier-name-input").value;
   tab.estimatedFinish = document.getElementById("est-finish-input").value;
@@ -7581,6 +7760,9 @@ function applyCashierVoidLock(tab) {
         if (!el.classList.contains("item-disc") || row.dataset.returnedQty) el.disabled = true;
       });
     }
+    // K-22: the admin's Setujui / Tolak stay usable on a locked nota (not on a void one); the reason box follows the lock.
+    row.querySelectorAll(".item-special button").forEach(el => { el.disabled = isVoid; });
+    row.querySelectorAll(".item-special input").forEach(el => { el.disabled = readOnly || !!row.dataset.returnedQty; });
   });
 
   // Edit is offered only for a saved receipt that is locked and not voided —
@@ -10971,6 +11153,36 @@ async function loadPendingPayments() {
       <td class="px-3 py-2 text-right tabular-nums font-medium text-pending whitespace-nowrap">${esc(formatIDR(p.amount))}</td>
       <td class="px-3 py-2 text-muted">${esc(p.created_by || "—")}</td>
       <td class="px-3 py-2 text-right whitespace-nowrap">${payActionButtons(source, p.ref_id, { id: p.id, state: "pending" })}</td></tr>`;
+  }).join("");
+}
+
+// K-22 dashboard card (admin): special prices waiting for approval, newest first.
+async function loadPricePending() {
+  const card = document.getElementById("price-card");
+  if (!card) return;
+  let rows = [];
+  if (isAdmin()) {
+    try { const resp = await fetch("/api/price-requests/pending"); if (resp.ok) rows = await resp.json(); } catch (_) {}
+  }
+  card.classList.toggle("hidden", rows.length === 0);
+  document.getElementById("price-summary").textContent = `${rows.length} baris · diskon ${formatIDR(rows.reduce((a, r) => a + r.discount_total, 0))}`;
+  document.getElementById("price-tbody").innerHTML = rows.map(r => {
+    const link = r.scope === "preorder"
+      ? `<a href="#/sales-order" onclick="openPreorderFromDashboard('${esc(r.doc_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(r.doc_no || "SO")}</a> <span class="text-[10px] uppercase text-muted">SO</span>`
+      : `<a href="#/invoices" onclick="openReceiptFromHistory('${esc(r.doc_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(r.doc_no || "Nota")}</a>`;
+    return `<tr class="border-b border-line last:border-b-0 align-top">
+      <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatReceiptWhen(r.price_requested_at, true))}</td>
+      <td class="px-3 py-2">${link}</td>
+      <td class="px-3 py-2 text-ink">${esc(r.customer_name || "—")}<div class="text-xs text-muted">${esc(r.plate_full || "")}</div></td>
+      <td class="px-3 py-2 text-ink">${esc(r.product_name)}<div class="text-xs text-muted">${r.quantity} unit</div></td>
+      <td class="px-3 py-2 text-right tabular-nums text-muted whitespace-nowrap"><s>${esc(formatIDR(r.list_price || 0))}</s></td>
+      <td class="px-3 py-2 text-right tabular-nums font-medium text-ink whitespace-nowrap">${esc(formatIDR(r.special_unit_price))}</td>
+      <td class="px-3 py-2 text-right tabular-nums text-pending whitespace-nowrap">${esc(formatIDR(r.discount_total))}</td>
+      <td class="px-3 py-2 text-muted">${esc(r.price_reason || "—")}</td>
+      <td class="px-3 py-2 text-muted">${esc(r.price_requested_by || "—")}</td>
+      <td class="px-3 py-2 text-right whitespace-nowrap">
+        <button type="button" onclick="priceDecide('${r.scope}','${esc(r.doc_id)}',${r.item_id},true)" class="px-2.5 py-1 rounded-md bg-done text-white text-xs font-medium">Setujui</button>
+        <button type="button" onclick="priceDecide('${r.scope}','${esc(r.doc_id)}',${r.item_id},false)" class="px-2.5 py-1 rounded-md border border-failed text-failed text-xs font-medium">Tolak</button></td></tr>`;
   }).join("");
 }
 
@@ -15973,6 +16185,10 @@ async function renderPreorderForm(detail) {
   // A new order takes an up-front DP; once it exists, payments are only added
   // from the detail page, so the form shows the running total read-only.
   document.getElementById("po-deposit-wrap").classList.toggle("hidden", editing);
+  document.getElementById("po-deposit-method-wrap").classList.toggle("hidden", editing);
+  document.getElementById("po-deposit-method").value = "cash";
+  document.getElementById("po-deposit-confirmed").checked = false;
+  poDepositMethodChanged();
   document.getElementById("po-deposit-fixed").classList.toggle("hidden", !editing);
   document.getElementById("po-deposit-hint").classList.toggle("hidden", !editing);
   setPriceInput(document.getElementById("po-deposit"), 0);
@@ -16078,7 +16294,7 @@ function addPreorderRow(prefill) {
   div.dataset.rowId = rowId;
   div.dataset.masterItemId = "";
   div.dataset.itemId = "";
-  div.innerHTML = preorderRowTemplate();
+  div.innerHTML = preorderRowTemplate() + `<div class="po-row-special hidden mt-2 rounded-md bg-bg2 border border-line px-3 py-2"></div>`;
   document.getElementById("po-item-rows").appendChild(div);
   const sourceEl = div.querySelector(".po-row-source");
   // Lines saved before the per-line source keep the old automatic rule until someone picks one.
@@ -16105,6 +16321,15 @@ function addPreorderRow(prefill) {
     div.querySelector(".po-row-priority").value = prefill.priority || "normal";
     div.querySelector(".po-row-eta").value = prefill.eta_date || "";
     setPoRowMeta(div, prefill.sku, prefill.supplier_pos);
+    // K-22: a saved special price keeps its own list price; a normal line is compared with today's master price.
+    div.dataset.listPrice = String((prefill.price_state ? prefill.list_price : prefill.master_price) || "");
+    div.dataset.costPrice = String(prefill.avg_cost_price || "");
+    if (prefill.price_state) {
+      div.dataset.priceState = prefill.price_state; div.dataset.priceReason = prefill.price_reason || "";
+      div.dataset.priceApprovedBy = prefill.price_approved_by || ""; div.dataset.priceRequestedBy = prefill.price_requested_by || "";
+      div.dataset.savedNet = String(prefill.unit_price);
+      if (prefill.price_below_cost) div.dataset.belowOk = "1";
+    }
   }
   updatePreorderTotals();
   return div;
@@ -16193,6 +16418,9 @@ function choosePoProduct(btnEl) {
   const priceEl = rowEl.querySelector(".po-row-price");
   // The customer is quoted the selling price, not what the shop pays for it.
   if (!priceValue(priceEl) && item.sell_price) setPriceInput(priceEl, item.sell_price);
+  rowEl.dataset.listPrice = item.sell_price > 0 ? String(item.sell_price) : "";
+  rowEl.dataset.costPrice = item.avg_cost_price > 0 ? String(item.avg_cost_price) : "";
+  for (const k of ["priceState", "priceReason", "priceApprovedBy", "priceRequestedBy", "savedNet", "belowOk"]) delete rowEl.dataset[k];
   setPoRowMeta(rowEl, item.sku);
   // Suggest the source: from the shelf when enough is free, otherwise order it from the item's supplier.
   const sourceEl = rowEl.querySelector(".po-row-source");
@@ -16257,8 +16485,60 @@ function preorderRowValues() {
     source: rowEl.querySelector(".po-row-source").value || null,
     supplier_id: rowEl.querySelector(".po-row-source").value === "supplier"
       ? (parseInt(rowEl.querySelector(".po-row-supplier").value, 10) || null) : null,
+    price_reason: rowEl.dataset.priceReason || null,
+    allow_below_cost: !!rowEl.dataset.belowOk,
     rowEl,
   }));
+}
+
+// K-22 on a Sales Order line: same rules as the Kasir (reason on the line, staff asks, admin approves).
+function poSpecialInfo(rowEl) {
+  const list = Number(rowEl.dataset.listPrice) || 0;
+  const qty = parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 0;
+  const price = priceValue(rowEl.querySelector(".po-row-price"));
+  const net = qty * price;
+  return { list, qty, net, special: list > 0 && qty > 0 && net < qty * list, perUnit: price, diff: qty * list - net };
+}
+
+function refreshPoSpecial(rowEl) {
+  const box = rowEl.querySelector(".po-row-special");
+  if (!box) return;
+  const f = poSpecialInfo(rowEl);
+  if (!f.special || rowEl.querySelector(".po-row-status").value === "dibatalkan") { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  const cost = Number(rowEl.dataset.costPrice) || 0;
+  const below = isAdmin() && cost > 0 && f.net < f.qty * cost;
+  const same = rowEl.dataset.priceState && Number(rowEl.dataset.savedNet) === f.perUnit;
+  const state = same ? rowEl.dataset.priceState : "";
+  const decide = state === "pending" && isAdmin() && rowEl.dataset.itemId && currentPreorder
+    ? `<button type="button" onclick="priceDecide('preorder','${currentPreorder.id}',${rowEl.dataset.itemId},true)" class="px-2.5 py-1 rounded-md bg-done text-white font-medium">Setujui</button>
+       <button type="button" onclick="priceDecide('preorder','${currentPreorder.id}',${rowEl.dataset.itemId},false)" class="px-2.5 py-1 rounded-md border border-failed text-failed font-medium">Tolak</button>` : "";
+  const note = state ? "" : isAdmin() ? `<span class="text-muted">Admin: langsung disetujui.</span>` : `<span class="text-muted">Staff: diajukan ke Admin, DP dan penerbitan ditahan sampai disetujui.</span>`;
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+      <span class="font-semibold text-ink">Harga khusus</span>
+      <span class="text-muted">normal <s>${formatIDR(f.list)}</s> → <b class="text-ink">${formatIDR(f.perUnit)}</b> / unit · diskon ${formatIDR(f.diff)}</span>
+      ${specialPill(state, rowEl.dataset.priceApprovedBy)} ${note}${decide}
+    </div>
+    <div class="flex flex-wrap items-center gap-2 mt-1.5">
+      <input type="text" class="flex-1 min-w-[12rem] border border-line rounded-lg px-2.5 py-1 text-xs bg-white text-ink" data-no-uppercase maxlength="300"
+        placeholder="Alasan harga khusus (wajib) — mis. hasil negosiasi" value="${esc(rowEl.dataset.priceReason || "")}"
+        oninput="this.closest('.po-item-row').dataset.priceReason = this.value;">
+      ${below ? `<label class="flex items-center gap-1.5 text-xs text-failed font-medium"><input type="checkbox" class="accent-[#D97757]" ${rowEl.dataset.belowOk ? "checked" : ""}
+        onchange="if (this.checked) this.closest('.po-item-row').dataset.belowOk = '1'; else delete this.closest('.po-item-row').dataset.belowOk;"> Harga di bawah modal — izinkan</label>` : ""}
+    </div>`;
+}
+
+function poSpecialReasonError() {
+  for (const r of preorderRowValues()) {
+    const f = poSpecialInfo(r.rowEl);
+    if (!f.special || !r.product_name || r.rowEl.querySelector(".po-row-special").classList.contains("hidden")) continue;
+    const same = r.rowEl.dataset.priceState && Number(r.rowEl.dataset.savedNet) === f.perUnit;
+    if (!same && (r.rowEl.dataset.priceReason || "").trim().length < 3) {
+      r.rowEl.querySelector(".po-row-special input[type=text]")?.focus();
+      return `Isi alasan harga khusus untuk “${r.product_name}”.`;
+    }
+  }
+  return null;
 }
 
 function updatePreorderTotals() {
@@ -16267,6 +16547,7 @@ function updatePreorderTotals() {
     const lineTotal = row.quantity * row.unit_price;
     total += lineTotal;
     row.rowEl.querySelector(".po-row-total").textContent = formatIDR(lineTotal);
+    refreshPoSpecial(row.rowEl);
   }
   // Editing an existing order: the DP is whatever payments already exist.
   const deposit = currentPreorder ? currentPreorder.deposit : priceValue(document.getElementById("po-deposit"));
@@ -16285,6 +16566,7 @@ function updatePreorderTotals() {
   minEl.textContent = published ? "Sales Order sudah terbit; DP minimal hanya dicek saat diterbitkan."
     : total <= 0 ? "" : short ? `Kurang ${formatIDR(need - deposit)} untuk bisa diterbitkan. Draft tetap bisa disimpan.`
     : "DP cukup untuk menerbitkan Sales Order.";
+  document.getElementById("po-deposit-fill").classList.toggle("hidden", !(short && !currentPreorder));
   minEl.classList.toggle("text-failed", short);
   minEl.classList.toggle("text-muted", !short);
   renderPoDraftPreview();
@@ -16292,6 +16574,28 @@ function updatePreorderTotals() {
   remainingEl.textContent = formatIDR(remaining);
   remainingEl.classList.toggle("text-failed", remaining > 0);
   remainingEl.classList.toggle("text-done", remaining === 0 && total > 0);
+}
+
+function poDepositMethodChanged() {
+  const m = document.getElementById("po-deposit-method").value;
+  document.getElementById("po-deposit-confirm-wrap").classList.toggle("hidden", !["transfer", "qris"].includes(m));
+}
+
+function poFillMinDeposit() {
+  let total = 0;
+  for (const row of preorderRowValues()) total += row.quantity * row.unit_price;
+  setPriceInput(document.getElementById("po-deposit"), soMinDp(total));
+  updatePreorderTotals();
+}
+
+// The DP rule was broken: scroll to the DP field and flash it so it is obvious where to type.
+function poFocusDeposit() {
+  const el = document.getElementById("po-deposit");
+  if (!el || el.offsetParent === null) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.focus();
+  el.classList.add("ring-2", "ring-failed", "border-failed");
+  setTimeout(() => el.classList.remove("ring-2", "ring-failed", "border-failed"), 2500);
 }
 
 function collectPreorderPayload(asDraft) {
@@ -16308,7 +16612,11 @@ function collectPreorderPayload(asDraft) {
     is_draft: asDraft,
     items,
   };
-  if (!currentPreorder) payload.deposit = priceValue(document.getElementById("po-deposit"));
+  if (!currentPreorder) {
+    payload.deposit = priceValue(document.getElementById("po-deposit"));
+    payload.deposit_method = document.getElementById("po-deposit-method").value;
+    payload.deposit_confirmed = ["transfer", "qris"].includes(payload.deposit_method) ? document.getElementById("po-deposit-confirmed").checked : null;
+  }
   return payload;
 }
 
@@ -16330,16 +16638,29 @@ function validatePreorderPayload(payload) {
   const publishing = !payload.is_draft && (!currentPreorder || currentPreorder.is_draft);
   const paid = currentPreorder ? currentPreorder.deposit : (payload.deposit || 0);
   if (publishing && paid < soMinDp(total)) {
-    return `DP minimal ${SO_MIN_DP_PERCENT}% (${formatIDR(soMinDp(total))}) sebelum Sales Order diterbitkan. Simpan sebagai draft dulu, atau tambah DP.`;
+    return `DP minimal ${SO_MIN_DP_PERCENT}% (${formatIDR(soMinDp(total))}) sebelum Sales Order diterbitkan. Isi kolom “DP Dibayar” di sebelah kanan, atau simpan sebagai draft dulu.`;
+  }
+  return null;
+}
+
+// "Stok Tersedia" on a new line needs enough free stock; the server checks it again on save.
+function poStockShortError() {
+  for (const r of preorderRowValues()) {
+    if (r.source !== "stok" || !r.product_name || r.rowEl.dataset.itemId) continue;
+    const free = r.rowEl.dataset.available;
+    if (free !== "" && free !== undefined && Number(free) < r.quantity) {
+      return `“${r.product_name}”: stok yang bebas hanya ${Number(free)}, kurang dari ${r.quantity}. Ubah Sumber ke Pesan Supplier, atau kurangi jumlahnya.`;
+    }
   }
   return null;
 }
 
 async function savePreorder(asDraft = false) {
   const payload = collectPreorderPayload(asDraft);
-  const error = validatePreorderPayload(payload);
+  const error = poStockShortError() || validatePreorderPayload(payload) || poSpecialReasonError();
   if (error) {
     showToast(error);
+    if (/^DP/.test(error)) poFocusDeposit();
     return;
   }
   const buttons = [document.getElementById("po-save-btn"), document.getElementById("po-draft-btn")];
@@ -16611,7 +16932,7 @@ function renderPreorderDetail(detail) {
     <tr class="border-b border-line last:border-b-0">
       <td class="px-3 py-2 text-muted tabular-nums">${idx + 1}</td>
       <td class="px-3 py-2 text-ink">${esc(item.product_name)}${item.sku
-        ? ` <span class="ml-1 font-mono text-[11px] text-muted">${esc(item.sku)}</span>` : ""}${soItemSourceHtml(item)}</td>
+        ? ` <span class="ml-1 font-mono text-[11px] text-muted">${esc(item.sku)}</span>` : ""}${soItemSourceHtml(item)}${specialDetailHtml(item, "preorder", detail.id)}</td>
       <td class="px-3 py-2 text-muted">${esc(item.unit || "")}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums">${item.quantity}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(item.unit_price)}</td>
@@ -18242,6 +18563,8 @@ function openPoPaymentModal() {
     showToast("Sales Order ini sudah lunas.", "success");
     return;
   }
+  // A draft Sales Order is published once 30% is paid: offer exactly what is still missing, no calculator needed.
+  const dpNeed = currentPreorder.is_draft ? Math.min(Math.max(soMinDp(currentPreorder.total) - (currentPreorder.deposit || 0), 0), currentPreorder.remaining) : 0;
   openModal("Tambah Pembayaran", `
     <div class="space-y-3">
       <div class="flex items-center justify-between text-sm">
@@ -18255,8 +18578,14 @@ function openPoPaymentModal() {
           <input id="po-pay-amount" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
             class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         </div>
-        <button type="button" onclick="setPriceInput(document.getElementById('po-pay-amount'), currentPreorder.remaining)"
-          class="mt-1.5 text-xs text-accent hover:text-accentDark font-medium">Isi sisa tagihan</button>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+          ${dpNeed > 0 ? `<button type="button" onclick="setPriceInput(document.getElementById('po-pay-amount'), ${dpNeed})"
+            class="text-xs text-accent hover:text-accentDark font-medium">Isi DP minimal ${SO_MIN_DP_PERCENT}% (${formatIDR(dpNeed)})</button>` : ""}
+          <button type="button" onclick="setPriceInput(document.getElementById('po-pay-amount'), currentPreorder.remaining)"
+            class="text-xs text-accent hover:text-accentDark font-medium">Isi sisa tagihan</button>
+        </div>
+        ${currentPreorder.is_draft ? `<p class="text-[11px] text-muted mt-1.5">DP minimal ${SO_MIN_DP_PERCENT}% dari total ${formatIDR(currentPreorder.total)} = <b class="text-ink">${formatIDR(soMinDp(currentPreorder.total))}</b>${currentPreorder.deposit ? `; sudah dibayar ${formatIDR(currentPreorder.deposit)}` : ""}.
+          ${dpNeed > 0 ? "Hanya pembayaran yang sudah sah (bukan Pending) yang dihitung." : "DP sudah cukup untuk menerbitkan."}</p>` : ""}
       </div>
       <div>
         <label for="po-pay-method" class="block text-xs text-muted mb-1.5">Metode Pembayaran</label>
@@ -18278,6 +18607,7 @@ function openPoPaymentModal() {
       </div>
     </div>
   `);
+  if (dpNeed > 0) setPriceInput(document.getElementById("po-pay-amount"), dpNeed);
   setTimeout(() => document.getElementById("po-pay-amount")?.focus(), 0);
 }
 
@@ -19817,8 +20147,9 @@ async function renderSpoForm(detail) {
   spoEditingId = detail ? detail.id : null;
   setSpoHeader(detail ? `Ubah ${detail.po_number}` : "Purchase Order Baru",
     "Buat pesanan pembelian barang dari supplier, seperti menulis faktur pembelian.");
-  document.getElementById("spo-number").value = detail ? detail.po_number : "Otomatis saat disimpan";
+  document.getElementById("spo-number").value = detail ? detail.po_number : "";
   document.getElementById("spo-date").value = detail ? detail.po_date : toDateInputValue(new Date());
+  if (!detail) refreshSpoNumberPreview();
   document.getElementById("spo-notes").value = detail ? (detail.notes || "") : "";
   document.getElementById("spo-invoice-no").value = detail ? (detail.supplier_invoice_no || "") : "";
   document.getElementById("spo-terms").value = detail && detail.payment_terms_days != null ? String(detail.payment_terms_days) : "";
@@ -19843,6 +20174,16 @@ async function renderSpoForm(detail) {
 }
 
 // Termin NET n: the jatuh tempo follows the PO date unless it is typed by hand afterwards.
+// The PO number is automatic, but it is shown (read-only) before saving; the server assigns the real one on save.
+async function refreshSpoNumberPreview() {
+  if (spoEditingId) return;
+  const date = document.getElementById("spo-date").value;
+  try {
+    const resp = await fetch(`/api/supplier-pos/next-number?po_date=${encodeURIComponent(date)}`);
+    if (resp.ok && date === document.getElementById("spo-date").value && !spoEditingId) document.getElementById("spo-number").value = (await resp.json()).po_number;
+  } catch (_) { /* assigned on save anyway */ }
+}
+
 function onSpoTermsChange() {
   const days = document.getElementById("spo-terms").value;
   const date = document.getElementById("spo-date").value;
@@ -20472,6 +20813,7 @@ function rtsEmptyForm() {
 async function rtsNew(preset) {
   await rtsEnsureMeta();
   rtsForm = rtsEmptyForm();
+  try { rtsForm.number_preview = (await rtsApi("/api/supplier-returns/next-number")).return_number; } catch (_) { /* assigned on save anyway */ }
   if (preset?.supplier_id) { rtsForm.supplier_id = String(preset.supplier_id); await rtsLoadSources(); }
   if (preset?.lot) rtsAddLotLine(preset.lot);
   rtsRenderForm();
@@ -20628,7 +20970,7 @@ function rtsStepInfo() {
   const bms = src.inbound_documents.filter(b => !f.supplier_po_id || b.supplier_po_id === f.supplier_po_id || String(b.id) === String(f.inbound_document_id));
   return `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-4 items-start">
     ${rtsCard("Informasi Dokumen", `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      ${rtsField("Nomor Retur (Otomatis)", rtsRO(esc(f.return_number || "Dibuat saat disimpan")))}
+      ${rtsField("Nomor Retur (Otomatis)", rtsRO(esc(f.return_number || f.number_preview || "Dibuat saat disimpan")))}
       ${rtsField("Tanggal Retur", `<input id="rts-return_date" type="date" value="${esc(f.return_date)}" data-no-uppercase class="${RTS_IN}">`, true)}
       ${rtsField("Supplier", `<select id="rts-supplier" class="${RTS_IN}" onchange="rtsSupplierChange(this.value)" ${f.lines.some(l => l.qty > 0) && f.id ? "disabled" : ""}>
         <option value="">Pilih supplier…</option>${suppliersCache.map(s => opt(s.id, s.name, f.supplier_id)).join("")}</select>`, true)}
@@ -21686,7 +22028,7 @@ function svcStepCustomer() {
             <td class="px-3 py-2"><div class="text-ink">${esc(l.product_name)}</div><div class="text-[11px] text-muted">${esc([l.brand_name, l.serial_no ? "SN " + l.serial_no : "", l.profile_name || "Tidak terdaftar di Master Service"].filter(Boolean).join(" · "))}</div>
               ${l.warnings.length ? `<div class="text-[11px] text-failed">${esc(l.warnings.join("; "))}</div>` : ""}</td>
             <td class="px-3 py-2 whitespace-nowrap text-ink">${esc(l.age || "—")}</td>
-            <td class="px-3 py-2"><div>${svcPill("warranty", l.warranty_status)}</div><div class="text-[11px] text-muted mt-0.5">${l.warranty_until ? "s/d " + esc(svcDate(l.warranty_until)) : l.warranty_months ? l.warranty_months + " bln" : ""}</div></td>
+            <td class="px-3 py-2">${svcWarrantyCell(l)}</td>
             <td class="px-3 py-2 text-right"><button type="button" onclick="svcPickLine(${i})" class="${RTS_BTN2} !px-3 !py-1.5 text-xs">Pilih</button></td></tr>`).join("")}</tbody></table></div>`
         : `<p class="text-sm text-muted py-4 text-center">Tidak ada nota yang cocok. Coba kata lain atau pilih Tanpa nota toko.</p>`) : ""}
       ${res && res.services.length ? `<div class="mt-4"><div class="text-xs font-medium text-ink mb-1.5">Riwayat service terkait</div><div class="space-y-1">${res.services.map(s =>
@@ -21812,6 +22154,22 @@ function svcAddAcc() {
 function svcRemoveAcc(i) { svcCollectStep(); svcForm.accessories.splice(i, 1); svcRenderForm(); }
 
 // Step 3: penanganan & garansi
+// The three warranties side by side: product/sparepart (the pill), the shop's installation work, and the result of an
+// earlier repair. A product with no rule reads Belum Diverifikasi, with the reason, never Habis.
+function svcWarrantyCell(l) {
+  const sub = (txt, cls = "text-muted") => `<div class="text-[11px] ${cls} mt-0.5">${txt}</div>`;
+  const state = st => st === "aktif" ? "Aktif" : "Habis";
+  const stCls = st => st === "aktif" ? "text-done" : "text-failed";
+  let product;
+  if (l.warranty_until) product = "Produk s/d " + esc(svcDate(l.warranty_until));
+  else if (l.warranty_status === "belum" && !l.serviceable) product = "Belum ada aturan garansi di Master Service";
+  else if (l.warranty_status === "belum") product = "Masa garansi produk belum diatur";
+  else product = "";
+  return `<div>${svcPill("warranty", l.warranty_status)}</div>${product ? sub(product) : ""}`
+    + (l.install_warranty_status ? sub(`Pemasangan ${state(l.install_warranty_status)} s/d ${esc(svcDate(l.install_warranty_until))}`, stCls(l.install_warranty_status)) : "")
+    + (l.after_service_status ? sub(`Hasil service ${state(l.after_service_status)} s/d ${esc(svcDate(l.after_service_until))}`, stCls(l.after_service_status)) : "");
+}
+
 function svcStepHandling() {
   const f = svcForm, h = f.handling;
   const subs = { internal: "Dicek / diperbaiki teknisi toko dulu", kirim: "Dikirim lewat ekspedisi ke pabrik / principal", sales: "Diambil sales supplier di toko",
@@ -21820,6 +22178,7 @@ function svcStepHandling() {
   const wText = f.mode === "nota"
     ? `Nota ${esc(f.receipt_no || f.line?.receipt_no || "")} tanggal ${esc(svcDate(f.purchase_date || f.line?.purchase_date))}${f.warranty_months != null ? ` · masa garansi ${f.warranty_months} bulan` : ""}${f.warranty_until ? ` s/d ${esc(svcDate(f.warranty_until))}` : ""}.`
     : "Tanpa nota toko: belum ada garansi toko yang bisa diverifikasi.";
+  const wNote = f.mode === "nota" && w === "belum" ? " Belum ada masa garansi untuk barang ini di Master Service, jadi statusnya Belum Diverifikasi. Admin dapat menetapkannya dengan alasan." : "";
   return `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-4 items-start">
     ${rtsCard("Jalur Penanganan", `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 rts-choices">${Object.entries(svcMeta.handling).map(([k, l]) =>
         rtsChoice("svchand", k, esc(l), subs[k], h === k, `svcPickHandling('${k}')`)).join("")}</div>
@@ -21827,7 +22186,7 @@ function svcStepHandling() {
         <div class="sm:col-span-2">${rtsField("Supplier / principal tujuan", `<select id="svc-sup" class="${RTS_IN}">${svcSupplierOpts(f.supplier_id)}</select>`, h === "kirim" || h === "sales")}</div>
         ${rtsField("PIC / teknisi", `<input id="svc-pic" type="text" maxlength="120" value="${esc(f.pic)}" class="${RTS_IN}">`)}
         ${rtsField("Catatan teknisi", `<input id="svc-tech" type="text" maxlength="1000" value="${esc(f.tech_note)}" data-no-uppercase class="${RTS_IN}">`)}</div>`)}
-    ${rtsCard("Status Garansi", `<div class="flex items-center gap-2 mb-2">${svcPill("warranty", w)}</div><p class="text-xs text-muted">${wText}</p>
+    ${rtsCard("Status Garansi", `<div class="flex items-center gap-2 mb-2">${svcPill("warranty", w)}</div><p class="text-xs text-muted">${wText}${wNote}</p>
       <div class="mt-3">${rtsNote("blue", "Ongkir (K-S5)", "Garansi aktif: ongkir kirim ditanggung toko. Non-garansi atau ditolak pabrik: ongkir ditagih ke customer.")}</div>
       ${isAdmin() ? `<div class="mt-4 pt-3 border-t border-line"><div class="text-xs font-medium text-ink mb-2">Ubah status garansi (admin)</div>
         <div class="grid grid-cols-1 gap-2"><select id="svc-ov-status" class="${RTS_IN}">${svcOpt(Object.entries(svcMeta.warranty), f.override_status || "", "Biarkan sesuai sistem")}</select>
@@ -22041,7 +22400,8 @@ function svcRenderDetail() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           ${rtsCard("Customer &amp; Nota", row("Nama", esc(o.customer_name)) + row("HP", esc(o.customer_phone)) + row("Plat / kendaraan", esc([o.plate, o.vehicle].filter(Boolean).join(" · ")))
             + row("Nota asal", o.receipt_no ? esc(`${o.receipt_no} · ${svcDate(o.purchase_date)}`) : esc("Tanpa nota · " + svcLabel("no_invoice_reasons", o.no_invoice_reason)))
-            + row("Umur barang", esc(o.purchase_age || "")) + row("Garansi", esc([o.warranty_months != null ? o.warranty_months + " bulan" : "", o.warranty_until ? "s/d " + svcDate(o.warranty_until) : "", o.warranty_note || ""].filter(Boolean).join(" · ")))
+            + row("Umur barang", esc(o.purchase_age || "")) + row("Garansi produk", esc([o.warranty_months ? o.warranty_months + " bulan" : "belum diatur", o.warranty_until ? "s/d " + svcDate(o.warranty_until) : "", o.warranty_note || ""].filter(Boolean).join(" · ")))
+            + (o.install_warranty_months ? row("Garansi pemasangan", esc(`${o.install_warranty_months} bulan` + (o.install_warranty_until ? ` · s/d ${svcDate(o.install_warranty_until)}` : "") + (o.install_warranty_status ? ` · ${o.install_warranty_status === "aktif" ? "Aktif" : "Habis"}` : ""))) : "")
             + row("Diterima", esc(`${svcWhen(o.received_at)} oleh ${o.received_by || "-"}`)))}
           ${rtsCard("Barang", row("Jenis", esc(o.profile ? `${o.profile.code} · ${o.profile.name}` : "")) + row("Barang", esc([o.brand_name, o.product_name].filter(Boolean).join(" ")))
             + row("Model", esc(o.model)) + row("Nomor seri", esc(o.serial_no)) + (o.serial_new ? row("SN pengganti", esc(o.serial_new)) : "")
@@ -22475,7 +22835,7 @@ function svcHandoverPage() {
             ${admin ? `<div class="mt-2">${rtsField("Serahkan sebelum lunas — alasan (admin)", `<input id="svc-h-unpaid" type="text" maxlength="200" data-no-uppercase class="${RTS_IN}">`)}</div>` : ""}</div>`
           : o.billable > 0 ? `<p class="text-xs text-green-800 mt-2">Lunas.</p>` : `<p class="text-xs text-muted mt-2">Tanpa biaya.</p>`}`)}
       ${rtsField("Catatan", `<input id="svc-h-note" type="text" maxlength="500" data-no-uppercase class="${RTS_IN}">`)}
-      ${o.result === "diperbaiki" ? rtsNote("green", "Garansi service", "Hasil perbaikan bergaransi 30 hari sejak siap diambil (K-S7).") : ""}
+      ${o.result === "diperbaiki" ? rtsNote("green", "Garansi service", o.after_warranty_days ? `Hasil perbaikan bergaransi ${o.after_warranty_days} hari sejak siap diambil (K-S7).` : "Jenis service ini tidak memberi garansi hasil perbaikan.") : ""}
       <button type="button" onclick="svcHandoverSubmit()" class="${RTS_BTN} w-full">Serahkan ke Customer</button></div></div>`;
   svcActionPage("Serah Terima ke Customer", "Unit kembali ke customer; dokumen selesai", html, svcHandoverPage);
   svcRestore(keep);
@@ -22592,15 +22952,17 @@ function msvRenderEdit() {
   const cats = mains.map(m => `<div class="mb-2">${cat(m)}<div class="ml-5 mt-1 space-y-1">${categoriesCache.filter(c => c.parent_id === m.id).sort((a, b) => String(a.code).localeCompare(String(b.code))).map(cat).join("")}</div></div>`).join("");
   const chk = (key, label) => `<label class="flex gap-2 text-sm text-ink"><input id="msv-${key}" type="checkbox" ${p[key] ? "checked" : ""} ${dis}> ${label}</label>`;
   const ovs = p.overrides.map(o => `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2">${esc(o.master_item_id ? `${o.item_name} (${o.sku || "-"})` : "Brand " + (o.brand_name || "-"))}</td>
-    <td class="px-3 py-2 text-right tabular-nums">${o.warranty_months != null ? o.warranty_months + " bln" : "—"}</td><td class="px-3 py-2">${esc(o.supplier_name || "—")}</td>
+    <td class="px-3 py-2 text-xs text-ink">${[o.warranty_months != null ? "Produk " + o.warranty_months + " bln" : "", o.install_warranty_months != null ? "Pasang " + o.install_warranty_months + " bln" : "", o.after_warranty_days != null ? "Hasil service " + o.after_warranty_days + " hr" : ""].filter(Boolean).join(" · ") || "—"}</td><td class="px-3 py-2">${esc(o.supplier_name || "—")}</td>
     <td class="px-3 py-2 text-right">${admin ? `<button type="button" onclick="msvOverrideDel(${o.id})" class="text-xs text-failed hover:underline">Hapus</button>` : ""}</td></tr>`).join("");
   document.getElementById("msv-edit-panel").innerHTML = `${svcHead(p.id ? esc(`${p.code} · ${p.name}`) : "Jenis Service Baru", "Berlaku untuk dokumen service yang dibuat setelah disimpan", "", "msvRenderList()", "Kembali")}
     <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-4 items-start">
       <div class="space-y-4">
       ${rtsCard("Aturan", `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="sm:col-span-2">${rtsField("Nama jenis", `<input id="msv-name" type="text" maxlength="80" value="${esc(p.name)}" ${dis} class="${RTS_IN}">`, true)}</div>
-        ${rtsField("Masa garansi toko (bulan)", `<input id="msv-months" type="number" min="0" max="120" value="${p.warranty_months}" ${dis} class="${RTS_IN}">`, true)}
-        ${rtsField("Garansi hasil service (hari)", `<input id="msv-after" type="number" min="0" max="365" value="${p.after_warranty_days}" ${dis} class="${RTS_IN}">`)}
+        ${rtsField("Garansi produk / sparepart (bulan)", `<input id="msv-months" type="number" min="0" max="120" value="${p.warranty_months || ""}" placeholder="0 = belum diatur" ${dis} class="${RTS_IN}">`, true)}
+        ${rtsField("Garansi pemasangan / jasa (bulan)", `<input id="msv-install" type="number" min="0" max="120" value="${p.install_warranty_months || ""}" placeholder="kosong = tidak ada" ${dis} class="${RTS_IN}">`)}
+        ${rtsField("Garansi hasil service (hari)", `<input id="msv-after" type="number" min="0" max="1095" value="${p.after_warranty_days || ""}" placeholder="kosong = tidak ada" ${dis} class="${RTS_IN}">`)}
+        <p class="sm:col-span-2 text-[11px] text-muted -mt-1">Ikuti ketentuan merek / supplier. Produk yang masa garansinya belum diatur tampil <b>Belum Diverifikasi</b>, bukan Habis. Garansi produk dihitung dari tanggal nota, garansi hasil service dari tanggal siap diambil.</p>
         ${rtsField("Estimasi pengerjaan", `<input id="msv-est" type="text" maxlength="40" value="${esc(p.est_days || "")}" placeholder="mis. 14-21 hari" ${dis} data-no-uppercase class="${RTS_IN}">`)}
         ${rtsField("Tujuan service default", `<select id="msv-sup" ${dis} class="${RTS_IN}">${svcOpt(suppliersCache.map(s => [s.id, s.name]), p.default_supplier_id, "Tidak ada")}</select>`)}
         <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">${chk("require_serial", "Nomor seri wajib saat terima")}${chk("record_serial_at_sale", "Catat nomor seri di Kasir")}
@@ -22611,12 +22973,14 @@ function msvRenderEdit() {
       ${rtsCard("Teks Dokumen", `<div class="grid grid-cols-1 gap-3">
         ${rtsField("Ketentuan di tanda terima", `<textarea id="msv-terms" rows="3" ${dis} data-no-uppercase class="${RTS_IN}">${esc(p.terms_text || "")}</textarea>`)}
         ${rtsField("Syarat garansi", `<textarea id="msv-wterms" rows="2" ${dis} data-no-uppercase class="${RTS_IN}">${esc(p.warranty_terms || "")}</textarea>`)}</div>`)}
-      ${p.id ? rtsCard("Pengecualian Brand / Barang", `${ovs ? `<div class="border border-line rounded-xl overflow-x-auto mb-3"><table class="w-full text-sm"><thead class="bg-bg2"><tr><th class="${RTS_TH}">Untuk</th><th class="${RTS_THR}">Garansi</th><th class="${RTS_TH}">Tujuan</th><th></th></tr></thead><tbody>${ovs}</tbody></table></div>` : '<p class="text-sm text-muted mb-3">Belum ada pengecualian.</p>'}
+      ${p.id ? rtsCard("Pengecualian Brand / Barang", `${ovs ? `<div class="border border-line rounded-xl overflow-x-auto mb-3"><table class="w-full text-sm"><thead class="bg-bg2"><tr><th class="${RTS_TH}">Untuk</th><th class="${RTS_TH}">Garansi</th><th class="${RTS_TH}">Tujuan</th><th></th></tr></thead><tbody>${ovs}</tbody></table></div>` : '<p class="text-sm text-muted mb-3">Belum ada pengecualian.</p>'}
         ${admin ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${rtsField("Brand", `<select id="msv-ov-brand" class="${RTS_IN}">${svcOpt(brandsCache.map(b => [b.id, b.name]), "", "— atau pilih barang —")}</select>`)}
           ${rtsField("Barang", `<div class="relative"><input id="msv-ov-item" type="text" autocomplete="off" placeholder="Cari nama / SKU" data-no-uppercase class="${RTS_IN}" oninput="msvItemSearch(this.value)">
             <div id="msv-ov-results" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-sm max-h-56 overflow-auto"></div></div>`)}
-          ${rtsField("Garansi (bulan)", `<input id="msv-ov-months" type="number" min="0" max="120" class="${RTS_IN}">`)}
+          ${rtsField("Garansi produk (bulan)", `<input id="msv-ov-months" type="number" min="0" max="120" class="${RTS_IN}">`)}
+          ${rtsField("Garansi pemasangan (bulan)", `<input id="msv-ov-install" type="number" min="0" max="120" class="${RTS_IN}">`)}
+          ${rtsField("Garansi hasil service (hari)", `<input id="msv-ov-after" type="number" min="0" max="1095" class="${RTS_IN}">`)}
           ${rtsField("Tujuan service", `<select id="msv-ov-sup" class="${RTS_IN}">${svcOpt(suppliersCache.map(s => [s.id, s.name]), "", "Sama")}</select>`)}</div>
           <button type="button" onclick="msvOverrideAdd()" class="${RTS_BTN2} mt-3">Tambah Pengecualian</button>` : ""}`) : ""}
       </div>
@@ -22636,7 +23000,7 @@ async function msvRefresh(updated) {
 }
 async function msvSave() {
   const p = msvEditing, lines = id => svcVal(id).split("\n").map(x => x.trim()).filter(Boolean);
-  const body = { name: svcVal("msv-name"), warranty_months: svcVal("msv-months"), after_warranty_days: svcVal("msv-after"), est_days: svcVal("msv-est"),
+  const body = { name: svcVal("msv-name"), warranty_months: svcVal("msv-months"), install_warranty_months: svcVal("msv-install"), after_warranty_days: svcVal("msv-after"), est_days: svcVal("msv-est"),
     default_supplier_id: Number(svcVal("msv-sup")) || null, require_serial: svcChecked("msv-require_serial"), record_serial_at_sale: svcChecked("msv-record_serial_at_sale"),
     require_photo: svcChecked("msv-require_photo"), ask_reset: svcChecked("msv-ask_reset"), checklist: lines("msv-checklist"), complaints: lines("msv-complaints"),
     terms_text: svcVal("msv-terms"), warranty_terms: svcVal("msv-wterms"),
@@ -22675,7 +23039,7 @@ function msvItemPick(i) {
   document.getElementById("msv-ov-brand").value = "";
 }
 async function msvOverrideAdd() {
-  const body = { brand_id: Number(svcVal("msv-ov-brand")) || null, master_item_id: msvOvItem?.id || null, warranty_months: svcVal("msv-ov-months"), supplier_id: Number(svcVal("msv-ov-sup")) || null };
+  const body = { brand_id: Number(svcVal("msv-ov-brand")) || null, master_item_id: msvOvItem?.id || null, warranty_months: svcVal("msv-ov-months"), install_warranty_months: svcVal("msv-ov-install"), after_warranty_days: svcVal("msv-ov-after"), supplier_id: Number(svcVal("msv-ov-sup")) || null };
   if (body.brand_id && body.master_item_id) body.master_item_id = null;
   try { await msvRefresh(await rtsApi(`/api/services/profiles/${msvEditing.id}/overrides`, "POST", body)); msvOvItem = null; showToast("Pengecualian ditambahkan.", "success"); }
   catch (e) { showToast(e.message); }

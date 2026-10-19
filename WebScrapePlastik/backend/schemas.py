@@ -47,6 +47,9 @@ class ReceiptItemRequest(BaseModel):
     id: int | None = None  # an existing line, echoed back on edit so its added-by/added-at survive
     item_type: str = "barang"  # "barang" (stock item) or "jasa" (service: never moves stock)
     line_discount: int = 0  # Rp off this line
+    # K-22: a price below Master Barang needs a reason; below cost needs an admin to allow it explicitly.
+    price_reason: str | None = None
+    allow_below_cost: bool = False
     serial_no: str | None = None  # K-S2: SN of a serviceable item, so a later warranty claim can find this line
 
 
@@ -160,6 +163,19 @@ class ReceiptItemOut(BaseModel):
     # Set when the line belongs to a Sales Order: it is changed there, not on the nota.
     preorder_item_id: int | None = None
     returned_qty: int = 0  # how many of `quantity` the customer brought back (Retur Barang)
+    # K-22 Harga Khusus: the Master Barang price at the time, why it was lowered, who asked and who approved it.
+    list_price: int | None = None
+    price_state: str | None = None  # pending | approved; null = normal price
+    price_reason: str | None = None
+    price_requested_by: str | None = None
+    price_requested_at: str | None = None
+    price_approved_by: str | None = None
+    price_approved_at: str | None = None
+    price_below_cost: bool = False
+    # Today's Master Barang price (to tell a normal price from a special one) and the average cost (admin only:
+    # the cost middleware zeroes it for staff).
+    master_price: int | None = None
+    avg_cost_price: int = 0
 
 
 class ReceiptOut(ReceiptExtra):
@@ -990,6 +1006,9 @@ class PreorderItemRequest(BaseModel):
     unit: str | None = None
     quantity: int
     unit_price: int
+    # K-22: a price below Master Barang needs a reason; below cost needs an admin to allow it explicitly.
+    price_reason: str | None = None
+    allow_below_cost: bool = False
     status: str | None = None
     ship_route: str | None = None  # udara|laut|darat|ambil_sendiri|lainnya
     priority: str = "normal"  # normal|urgent
@@ -1136,7 +1155,24 @@ class PreorderItemSupplierPo(BaseModel):
     qty_received: int
 
 
+class PriceDecisionRequest(BaseModel):
+    note: str | None = None
+
+
 class PreorderItemOut(BaseModel):
+    # K-22 Harga Khusus: the Master Barang price at the time, why it was lowered, who asked and who approved it.
+    list_price: int | None = None
+    price_state: str | None = None  # pending | approved; null = normal price
+    price_reason: str | None = None
+    price_requested_by: str | None = None
+    price_requested_at: str | None = None
+    price_approved_by: str | None = None
+    price_approved_at: str | None = None
+    price_below_cost: bool = False
+    # Today's Master Barang price (to tell a normal price from a special one) and the average cost (admin only:
+    # the cost middleware zeroes it for staff).
+    master_price: int | None = None
+    avg_cost_price: int = 0
     supplier_pos: list[PreorderItemSupplierPo] = []
     id: int
     master_item_id: int | None = None

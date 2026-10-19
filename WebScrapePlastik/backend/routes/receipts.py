@@ -26,6 +26,8 @@ from backend.database import (
     RECEIPT_WORK_STATUSES,
     count_receipts,
     create_receipt,
+    decide_price_request,
+    price_actor,
     find_archived_skus,
     delete_receipt,
     delete_transfer_name,
@@ -45,6 +47,7 @@ from backend.database import (
     update_receipt,
 )
 from backend.schemas import (
+    PriceDecisionRequest,
     ReceiptHandoverRequest,
     ReceiptWorkStageRequest,
     PaymentFailRequest,
@@ -139,6 +142,11 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         added_during_work=bool(row.get("added_during_work")),
         preorder_item_id=row.get("preorder_item_id"),
         returned_qty=row.get("returned_qty") or 0,
+        list_price=row.get("list_price"), price_state=row.get("price_state"), price_reason=row.get("price_reason"),
+        price_requested_by=row.get("price_requested_by"), price_requested_at=row.get("price_requested_at"),
+        price_approved_by=row.get("price_approved_by"), price_approved_at=row.get("price_approved_at"),
+        price_below_cost=bool(row.get("price_below_cost")),
+        master_price=row.get("master_price"), avg_cost_price=row.get("avg_cost_price") or 0,
     )
 
 
@@ -272,7 +280,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
             None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
             req.customer_id, transfer_sender, transfer_account, user["username"], req.work_status,
-            _clean_extra(req, False), _override_reason(req, user), req.payment_confirmed,
+            _clean_extra(req, False), _override_reason(req, user), req.payment_confirmed, price_actor(user),
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -503,6 +511,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             req.payment_confirmed,
             req.refund_method,
             req.refund_proof,
+            price_actor(user),
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save, or the new total
@@ -512,6 +521,35 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
     return ReceiptDetail(**updated, item_count=len(result_items), items=[_row_to_item(i) for i in result_items],
                          payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+async def _price_decision(receipt_id: str, item_id: int, approve: bool, req: PriceDecisionRequest, user: dict) -> ReceiptDetail:
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, decide_price_request, "receipt", receipt_id, item_id, approve, req.note, user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    receipt = await loop.run_in_executor(None, get_receipt, receipt_id)
+    items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**receipt, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+@router.post("/receipts/{receipt_id}/items/{item_id}/price/approve", response_model=ReceiptDetail)
+async def approve_receipt_price(receipt_id: str, item_id: int, req: PriceDecisionRequest, user: dict = Depends(get_current_user)):
+    """K-22 (admin): approve a special price a staff member asked for on this nota."""
+    return await _price_decision(receipt_id, item_id, True, req, user)
+
+
+@router.post("/receipts/{receipt_id}/items/{item_id}/price/reject", response_model=ReceiptDetail)
+async def reject_receipt_price(receipt_id: str, item_id: int, req: PriceDecisionRequest, user: dict = Depends(get_current_user)):
+    """K-22 (admin): refuse it; the line goes back to the Master Barang price and the bill is recomputed."""
+    return await _price_decision(receipt_id, item_id, False, req, user)
 
 
 @router.post("/receipts/{receipt_id}/settle", response_model=ReceiptDetail)

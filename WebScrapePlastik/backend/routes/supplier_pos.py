@@ -1,10 +1,12 @@
 import asyncio
+from datetime import date
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    peek_next_supplier_po_no,
     create_purchase_invoice_from_po,
     SPO_ORDER_STATUSES,
     SPO_PAYMENT_STATUSES,
@@ -154,6 +156,17 @@ async def create_new_supplier_po(req: SupplierPoRequest, user: dict = Depends(ge
         po_date=po_date, notes=_text(req.notes), issue=req.issue, created_by=user["username"],
         header=_header(req, False), initial_paid=req.paid_amount,
     )
+
+
+@router.get("/supplier-pos/next-number")
+async def supplier_po_next_number(po_date: str | None = None):
+    """Preview of the automatic PO number for the form; the real number is assigned when saved."""
+    if po_date:
+        try:
+            date.fromisoformat(po_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Tanggal tidak valid, gunakan format YYYY-MM-DD.")
+    return {"po_number": await asyncio.get_event_loop().run_in_executor(None, peek_next_supplier_po_no, po_date or None)}
 
 
 @router.get("/supplier-pos/{supplier_po_id}", response_model=SupplierPoDetail)

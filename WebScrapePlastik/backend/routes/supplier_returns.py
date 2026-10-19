@@ -17,7 +17,7 @@ from backend.database import (
     get_supplier_return, get_supplier_return_photo, list_supplier_returns, mark_supplier_return_received,
     receive_supplier_return_rejected, receive_supplier_return_replacement, record_supplier_return_credit,
     record_supplier_return_decision, return_supplier_return_to_draft, save_supplier_return, submit_supplier_return,
-    supplier_return_candidates, supplier_return_inbound_lines, supplier_return_print_text, supplier_return_sources,
+    peek_supplier_return_number, supplier_return_candidates, supplier_return_inbound_lines, supplier_return_print_text, supplier_return_sources,
 )
 from backend.product_images import matches_content_type
 
@@ -52,6 +52,12 @@ async def sr_meta():
     return {"types": SR_TYPES, "settlements": SR_SETTLEMENTS, "methods": SR_METHODS, "cost_bearers": SR_COST_BEARERS,
             "reasons": SR_REASONS, "reject_fates": SR_REJECT_FATES, "photo_stages": SR_PHOTO_STAGES,
             "doc_status": SR_DOC_STATUS, "handover": SR_HANDOVER, "conditions": QUARANTINE_CONDITIONS}
+
+
+@router.get("/supplier-returns/next-number")
+async def sr_next_number():
+    """Preview of the automatic return number; the real one is assigned when the draft is first saved."""
+    return {"return_number": await _run(peek_supplier_return_number)}
 
 
 @router.get("/supplier-returns")

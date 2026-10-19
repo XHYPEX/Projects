@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+from fractions import Fraction
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -717,6 +718,32 @@ def init_db() -> None:
         ):
             if col not in item_cols:
                 con.execute(f"ALTER TABLE receipt_items ADD COLUMN {col} {ddl}")
+        # K-22 Harga Khusus: a line sold below the Master Barang price carries who asked, why and who approved it.
+        # list_price is the price at that moment (harga awal); the difference to what the customer pays is the discount.
+        for table in ("receipt_items", "preorder_items"):
+            have = {row["name"] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
+            for col, ddl in (("list_price", "INTEGER"), ("price_state", "TEXT"), ("price_reason", "TEXT"),
+                             ("price_requested_by", "TEXT"), ("price_requested_at", "TEXT"), ("price_approved_by", "TEXT"),
+                             ("price_approved_at", "TEXT"), ("price_below_cost", "INTEGER NOT NULL DEFAULT 0")):
+                if col not in have:
+                    con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+        con.execute("""CREATE TABLE IF NOT EXISTS price_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope TEXT NOT NULL,
+            doc_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            qty INTEGER NOT NULL,
+            list_price INTEGER,
+            from_price INTEGER,
+            to_price INTEGER,
+            discount_total INTEGER NOT NULL DEFAULT 0,
+            reason TEXT,
+            below_cost INTEGER NOT NULL DEFAULT 0,
+            by_user TEXT,
+            at TEXT NOT NULL
+        )""")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_price_events_doc ON price_events(scope, doc_id)")
         con.execute("""CREATE TABLE IF NOT EXISTS receipt_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             receipt_id TEXT NOT NULL REFERENCES receipts(id),
@@ -1563,6 +1590,200 @@ def _resolve_master_item_id(con: sqlite3.Connection, sku: str | None) -> int | N
     return row["id"] if row is not None else None
 
 
+# --- K-22 Harga Khusus: a price below Master Barang, per transaction line ------------------------------------------
+# Staff may ask for it, only an admin approves; it never changes the Master Barang price. A line below the shop's
+# cost is refused unless an admin explicitly allows it. While a request is Pending the nota / Sales Order cannot take
+# payment or be published, so nothing is collected on a price nobody approved. Every step is kept in price_events.
+_PRICE_COLS = ("list_price", "price_state", "price_reason", "price_requested_by", "price_requested_at",
+               "price_approved_by", "price_approved_at", "price_below_cost")
+_NO_PRICE = {**{c: None for c in _PRICE_COLS}, "price_below_cost": 0}
+
+
+def price_actor(user: dict | None) -> dict | None:
+    return {"username": user.get("username"), "is_admin": user.get("role") == "admin"} if user else None
+
+
+def _price_event(con: sqlite3.Connection, scope: str, doc_id: str, product_name: str, kind: str, qty: int,
+                 list_price: int | None, from_price: int | None, to_price: int | None, discount_total: int,
+                 reason: str | None, below_cost: int, by: str | None) -> None:
+    con.execute(
+        """INSERT INTO price_events (scope, doc_id, product_name, kind, qty, list_price, from_price, to_price,
+               discount_total, reason, below_cost, by_user, at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (scope, doc_id, product_name, kind, qty, list_price, from_price, to_price, discount_total, reason, below_cost, by, _now()))
+
+
+def _price_review(con: sqlite3.Connection, *, scope: str, doc_id: str, master_item_id: int | None, product_name: str,
+                  qty: int, unit_price: int, line_discount: int, prev: dict | None, reason: str | None,
+                  allow_below_cost: bool, actor: dict | None) -> dict:
+    """The price columns to store for a line. `prev` is the stored line (None for a new one). A line is "special" when
+    what the customer pays is under the Master Barang price; its list price is kept from the first request so a later
+    change of the master price does not rewrite history. actor=None is an internal caller: nothing is reviewed."""
+    was_special = bool(prev and prev.get("price_state"))
+    if actor is None:
+        return {c: (prev or {}).get(c, _NO_PRICE[c]) for c in _PRICE_COLS} if prev else dict(_NO_PRICE)
+    mi = con.execute("SELECT sell_price, avg_cost_price, last_cost_price FROM master_items WHERE id=?", (master_item_id,)).fetchone() \
+        if master_item_id else None
+    ref = (prev["list_price"] if was_special else (mi["sell_price"] if mi else 0)) or 0
+    net_total = qty * unit_price - (line_discount or 0)
+    if mi is None or ref <= 0 or net_total >= qty * ref:
+        if was_special:
+            _price_event(con, scope, doc_id, product_name, "cleared", qty, prev["list_price"], None, unit_price, 0,
+                         "Harga kembali ke harga Master Barang", 0, actor["username"])
+        return dict(_NO_PRICE)
+    cost = (mi["avg_cost_price"] or mi["last_cost_price"] or 0)
+    below = 1 if cost > 0 and net_total < qty * cost else 0
+    if below and not (actor["is_admin"] and allow_below_cost):
+        # Deliberately no numbers here: staff never see the cost.
+        raise ValueError(
+            f"Harga “{product_name}” terlalu rendah dan diblokir. " + (
+                "Harga di bawah modal hanya boleh dengan izin khusus: centang “Izinkan di bawah modal” dan isi alasannya."
+                if actor["is_admin"] else "Hubungi Admin untuk harga ini."))
+    if was_special and prev["quantity"] and Fraction(prev["quantity"] * prev["unit_price"] - (prev.get("line_discount") or 0), prev["quantity"]) \
+            == Fraction(net_total, qty):
+        return {c: prev.get(c) for c in _PRICE_COLS}  # same price per unit as before: the approval stands
+    reason = (reason or "").strip()
+    if len(reason) < 3:
+        raise ValueError(f"Alasan harga khusus “{product_name}” wajib diisi (misal: hasil negosiasi, pelanggan langganan).")
+    now = _now()
+    approved = actor["is_admin"]
+    cols = {"list_price": ref, "price_state": "approved" if approved else "pending", "price_reason": reason[:300],
+            "price_requested_by": actor["username"], "price_requested_at": now,
+            "price_approved_by": actor["username"] if approved else None, "price_approved_at": now if approved else None,
+            "price_below_cost": below}
+    per_unit = round(net_total / qty)
+    _price_event(con, scope, doc_id, product_name, "auto_approved" if approved else "request", qty, ref,
+                 round((prev["quantity"] * prev["unit_price"] - (prev.get("line_discount") or 0)) / prev["quantity"]) if prev and prev.get("quantity") else ref,
+                 per_unit, qty * ref - net_total, cols["price_reason"], below, actor["username"])
+    return cols
+
+
+def _receipt_price_pending(con: sqlite3.Connection, receipt_id: str) -> int:
+    return con.execute("SELECT COUNT(*) AS n FROM receipt_items WHERE receipt_id=? AND price_state='pending'", (receipt_id,)).fetchone()["n"]
+
+
+def _preorder_price_pending(con: sqlite3.Connection, preorder_id: str) -> int:
+    return con.execute("SELECT COUNT(*) AS n FROM preorder_items WHERE preorder_id=? AND price_state='pending' AND status<>?",
+                       (preorder_id, PO_LINE_CANCELLED)).fetchone()["n"]
+
+
+_PRICE_PENDING_MSG = "Ada harga khusus yang menunggu persetujuan Admin. Pembayaran dan penerbitan bisa dilanjutkan setelah disetujui."
+
+
+def _recalc_receipt_money(con: sqlite3.Connection, receipt_id: str, by: str | None) -> None:
+    """Totals and the Lunas/Belum status after a price decision. Payments are never touched: a total that drops below
+    what was paid becomes Kelebihan Bayar, which an admin refunds with proof (K-20)."""
+    rec = dict(con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone())
+    items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,)).fetchall()]
+    subtotal = sum(_line_total(i) for i in items)
+    discount = min(rec["discount"] or 0, subtotal)
+    total = subtotal - discount - (rec.get("return_total") or 0)
+    if rec["status"] == "void":
+        status = "void"
+    elif rec["work_status"] == "draft":
+        status = "pending"
+    else:
+        status = _compute_receipt_status(total, rec["amount_paid"], None)
+        if status == "done" and rec["status"] != "done" and _receipt_price_pending(con, receipt_id):
+            status = "pending"
+    con.execute("UPDATE receipts SET subtotal=?, discount=?, total=?, status=? WHERE id=?", (subtotal, discount, total, status, receipt_id))
+    if total < rec["amount_paid"] and total != rec["total"] and status != "void":
+        _log_receipt_event(con, receipt_id, "overpaid",
+                           f"Total nota turun menjadi Rp {total:,}; kelebihan bayar Rp {rec['amount_paid'] - total:,} perlu dikembalikan ke pelanggan.".replace(",", "."), by)
+
+
+def decide_price_request(scope: str, doc_id: str, item_id: int, approve: bool, note: str | None, user: dict) -> dict:
+    """Admin only. Approve keeps the special price. Reject puts the line back at the Master Barang price (the price
+    it was asked at, no discount) and recomputes the bill; money already paid stays on the record."""
+    if user.get("role") != "admin":
+        raise PermissionError("Hanya Admin yang dapat menyetujui atau menolak harga khusus.")
+    by = user.get("username")
+    note = (note or "").strip()[:300] or None
+    if not approve and not note:
+        raise ValueError("Tulis alasan penolakan harga khusus.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        if scope == "receipt":
+            line = con.execute("SELECT * FROM receipt_items WHERE id=? AND receipt_id=?", (item_id, doc_id)).fetchone()
+            rec = con.execute("SELECT status FROM receipts WHERE id=?", (doc_id,)).fetchone()
+            if line is None or rec is None:
+                raise LookupError("Baris nota tidak ditemukan.")
+            if rec["status"] == "void":
+                raise ValueError("Nota sudah dibatalkan (void).")
+        elif scope == "preorder":
+            line = con.execute("SELECT * FROM preorder_items WHERE id=? AND preorder_id=?", (item_id, doc_id)).fetchone()
+            if line is None:
+                raise LookupError("Baris Sales Order tidak ditemukan.")
+        else:
+            raise ValueError("Jenis dokumen tidak dikenal.")
+        line = dict(line)
+        if line["price_state"] != "pending":
+            raise ValueError("Harga khusus ini tidak sedang menunggu persetujuan.")
+        qty, listp = line["quantity"], line["list_price"] or line["unit_price"]
+        net = qty * line["unit_price"] - (line.get("line_discount") or 0)
+        now = _now()
+        table = "receipt_items" if scope == "receipt" else "preorder_items"
+        if approve:
+            con.execute(f"UPDATE {table} SET price_state='approved', price_approved_by=?, price_approved_at=? WHERE id=?", (by, now, item_id))
+            _price_event(con, scope, doc_id, line["product_name"], "approved", qty, listp, None, round(net / qty), qty * listp - net,
+                         note or line["price_reason"], line["price_below_cost"] or 0, by)
+            if scope == "preorder":
+                con.execute("UPDATE receipt_items SET price_state='approved', price_approved_by=?, price_approved_at=? "
+                            "WHERE preorder_item_id=? AND price_state='pending' AND line_discount=0", (by, now, item_id))
+                for r in con.execute("SELECT DISTINCT receipt_id FROM receipt_items WHERE preorder_item_id=?", (item_id,)).fetchall():
+                    _recalc_receipt_money(con, r["receipt_id"], by)
+            else:
+                _log_receipt_event(con, doc_id, "item_changed", f"{line['product_name']}: harga khusus DISETUJUI Admin ({by})", by)
+                _recalc_receipt_money(con, doc_id, by)
+        else:
+            _price_event(con, scope, doc_id, line["product_name"], "rejected", qty, listp, round(net / qty), listp, 0, note, 0, by)
+            if scope == "receipt":
+                if line.get("preorder_item_id"):
+                    pi = con.execute("SELECT * FROM preorder_items WHERE id=?", (line["preorder_item_id"],)).fetchone()
+                    cols = {c: (pi[c] if pi else _NO_PRICE[c]) for c in _PRICE_COLS}
+                    con.execute(f"UPDATE receipt_items SET line_discount=0, {', '.join(c + '=?' for c in _PRICE_COLS)} WHERE id=?",
+                                (*cols.values(), item_id))
+                else:
+                    con.execute(f"UPDATE receipt_items SET unit_price=?, line_discount=0, {', '.join(c + '=?' for c in _PRICE_COLS)} WHERE id=?",
+                                (listp, *_NO_PRICE.values(), item_id))
+                _log_receipt_event(con, doc_id, "item_changed", f"{line['product_name']}: harga khusus DITOLAK Admin ({by}): {note}; kembali ke harga normal", by)
+                _recalc_receipt_money(con, doc_id, by)
+            else:
+                before = _po_invoice_snapshot(con, doc_id)
+                con.execute(f"UPDATE preorder_items SET unit_price=?, {', '.join(c + '=?' for c in _PRICE_COLS)} WHERE id=?",
+                            (listp, *_NO_PRICE.values(), item_id))
+                con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, doc_id))
+                _po_invoice_sync(con, doc_id, by, before)
+    return {"scope": scope, "doc_id": doc_id, "item_id": item_id, "state": "approved" if approve else "rejected"}
+
+
+def list_pending_prices() -> list[dict]:
+    """Every special price waiting for an admin, newest first, with enough to decide without opening the document."""
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            """SELECT 'receipt' AS scope, ri.receipt_id AS doc_id, r.receipt_no AS doc_no, ri.id AS item_id, ri.product_name, ri.quantity,
+                      ri.unit_price, ri.line_discount, ri.list_price, ri.price_reason, ri.price_requested_by, ri.price_requested_at,
+                      r.customer_name, r.plate_full
+               FROM receipt_items ri JOIN receipts r ON r.id = ri.receipt_id
+               WHERE ri.price_state='pending' AND r.status<>'void'
+               UNION ALL
+               SELECT 'preorder', pi.preorder_id, p.po_number, pi.id, pi.product_name, pi.quantity, pi.unit_price, 0, pi.list_price,
+                      pi.price_reason, pi.price_requested_by, pi.price_requested_at, p.customer_name, p.plate_full
+               FROM preorder_items pi JOIN preorders p ON p.id = pi.preorder_id
+               WHERE pi.price_state='pending' AND pi.status<>? AND p.cancelled_at IS NULL
+               ORDER BY price_requested_at DESC""", (PO_LINE_CANCELLED,))]
+        for r in rows:
+            net = r["quantity"] * r["unit_price"] - (r["line_discount"] or 0)
+            r["special_unit_price"] = round(net / r["quantity"])
+            r["discount_total"] = r["quantity"] * (r["list_price"] or 0) - net
+        return rows
+
+
+def list_price_events(scope: str, doc_id: str) -> list[dict]:
+    with _conn() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT * FROM price_events WHERE scope=? AND doc_id=? ORDER BY id DESC", (scope, doc_id)).fetchall()]
+
+
 # Work stage, independent of payment: draft (parked, no stock, no money) -> belum (Belum Dikerjakan)
 # -> pengerjaan (Dalam Pengerjaan) -> selesai (Pengerjaan Selesai). Payment status is derived from
 # amount_paid vs total and lives in receipts.status (pending / done / void).
@@ -2120,6 +2341,8 @@ def add_receipt_payment(
             raise ValueError("Nota ini sudah lunas, tidak ada sisa pembayaran.")
         if row["work_status"] == "draft":
             raise ValueError("Nota masih Draft. Simpan sebagai Belum Dikerjakan atau mulai pengerjaan dulu.")
+        if _receipt_price_pending(con, receipt_id):
+            raise ValueError(_PRICE_PENDING_MSG)
         remaining = max(row["total"] - row["amount_paid"], 0)
         if amount <= 0:
             raise ValueError("Jumlah pembayaran harus lebih dari 0.")
@@ -2176,6 +2399,7 @@ def create_receipt(
     extra: dict | None = None,
     stock_override_reason: str | None = None,
     payment_confirmed: bool | None = None,
+    price_actor: dict | None = None,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     if payment_method != "transfer":
@@ -2228,15 +2452,24 @@ def create_receipt(
         resolved_items = [
             {**item, "master_item_id": _resolve_master_item_id(con, item.get("sku"))} for item in items
         ]
+        for item in resolved_items:
+            item["_price"] = _price_review(
+                con, scope="receipt", doc_id=receipt_id, master_item_id=item["master_item_id"], product_name=item["product_name"],
+                qty=item["quantity"], unit_price=item["unit_price"], line_discount=item.get("line_discount") or 0, prev=None,
+                reason=item.get("price_reason"), allow_below_cost=bool(item.get("allow_below_cost")), actor=price_actor)
+        if any(i["_price"]["price_state"] == "pending" for i in resolved_items) and (amount_paid > 0 or pending_amount > 0):
+            raise ValueError(_PRICE_PENDING_MSG)
         con.executemany(
             """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
-                                          item_type, line_discount, added_at, added_by, added_during_work, serial_no)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                                          item_type, line_discount, added_at, added_by, added_during_work, serial_no,
+                                          list_price, price_state, price_reason, price_requested_by, price_requested_at,
+                                          price_approved_by, price_approved_at, price_below_cost)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 (
                     receipt_id, item["product_name"], item["quantity"], item["unit_price"], item.get("warranty_date"),
                     item["master_item_id"], item.get("item_type") or "barang", item.get("line_discount") or 0,
-                    created_at, created_by, item.get("serial_no"),
+                    created_at, created_by, item.get("serial_no"), *[item["_price"][c] for c in _PRICE_COLS],
                 )
                 for item in resolved_items
             ],
@@ -2512,6 +2745,7 @@ def update_receipt(
     payment_confirmed: bool | None = None,
     refund_method: str | None = None,
     refund_proof: str | None = None,
+    price_actor: dict | None = None,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -2633,6 +2867,10 @@ def update_receipt(
                     changed_notes.append(f"{old_row['product_name']} dihapus")
             for item in resolved_items:
                 old = old_by_id.get(item.get("id"))
+                item["_price"] = _price_review(
+                    con, scope="receipt", doc_id=receipt_id, master_item_id=item["master_item_id"], product_name=item["product_name"],
+                    qty=item["quantity"], unit_price=item["unit_price"], line_discount=item.get("line_discount") or 0, prev=old,
+                    reason=item.get("price_reason"), allow_below_cost=bool(item.get("allow_below_cost")), actor=price_actor)
                 if old is not None:
                     bits = []
                     if old["product_name"] != item["product_name"]:
@@ -2648,22 +2886,31 @@ def update_receipt(
                     con.execute(
                         """INSERT INTO receipt_items (id, receipt_id, product_name, quantity, unit_price, warranty_date,
                                master_item_id, item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id,
-                               returned_qty, returned_stock_qty, serial_no)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               returned_qty, returned_stock_qty, serial_no,
+                               list_price, price_state, price_reason, price_requested_by, price_requested_at,
+                               price_approved_by, price_approved_at, price_below_cost)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (old["id"], receipt_id, item["product_name"], item["quantity"], item["unit_price"],
                          item.get("warranty_date"), item["master_item_id"], item.get("item_type") or "barang",
                          item.get("line_discount") or 0, old["added_at"], old["added_by"], old["added_during_work"],
                          old.get("preorder_item_id"), old.get("returned_qty") or 0, old.get("returned_stock_qty") or 0,
-                         item.get("serial_no") if "serial_no" in item else old.get("serial_no")),
+                         item.get("serial_no") if "serial_no" in item else old.get("serial_no"),
+                         *[item["_price"][c] for c in _PRICE_COLS]),
                     )
+                    if item["_price"]["price_state"] and item["_price"] != {c: old.get(c) for c in _PRICE_COLS}:
+                        changed_notes.append(f"{item['product_name']}: harga khusus "
+                                             + ("DISETUJUI Admin" if item["_price"]["price_state"] == "approved" else "diajukan, menunggu persetujuan Admin"))
                 else:
                     con.execute(
                         """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date,
-                               master_item_id, item_type, line_discount, added_at, added_by, added_during_work, serial_no)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                               master_item_id, item_type, line_discount, added_at, added_by, added_during_work, serial_no,
+                               list_price, price_state, price_reason, price_requested_by, price_requested_at,
+                               price_approved_by, price_approved_at, price_below_cost)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (receipt_id, item["product_name"], item["quantity"], item["unit_price"],
                          item.get("warranty_date"), item["master_item_id"], item.get("item_type") or "barang",
-                         item.get("line_discount") or 0, now_iso, changed_by, during_work, item.get("serial_no")),
+                         item.get("line_discount") or 0, now_iso, changed_by, during_work, item.get("serial_no"),
+                         *[item["_price"][c] for c in _PRICE_COLS]),
                     )
                     added_names.append(item["product_name"])
             if added_names and not is_draft:
@@ -2705,6 +2952,12 @@ def update_receipt(
             new_status = "pending"
         else:
             new_status = _compute_receipt_status(new_total, new_amount_paid, status)
+        # K-22: a price still waiting for an admin cannot take money or make the nota Lunas.
+        if new_status != "void" and _receipt_price_pending(con, receipt_id):
+            if (amount_paid is not None and amount_paid > existing["amount_paid"]) or pending_delta:
+                raise ValueError(_PRICE_PENDING_MSG)
+            if new_status == "done" and existing["status"] != "done":
+                new_status = "pending"
         new_work_status = existing["work_status"]
         # A total that drops below what has already been paid (an item cancelled after payment) is
         # allowed: the difference is Kelebihan Bayar, kept on the record until an admin refunds it
@@ -2805,6 +3058,8 @@ def settle_receipt(
             raise ValueError("Struk ini sudah selesai (lunas), tidak ada sisa pembayaran.")
         if row["work_status"] == "draft":
             raise ValueError("Nota masih Draft. Simpan sebagai Belum Dikerjakan atau mulai pengerjaan dulu.")
+        if _receipt_price_pending(con, receipt_id):
+            raise ValueError(_PRICE_PENDING_MSG)
         remaining = max(row["total"] - row["amount_paid"], 0)
         if amount is not None and amount != remaining:
             raise ValueError(f"Jumlah dibayar harus sama dengan sisa pembayaran (Rp {remaining:,}).".replace(",", "."))
@@ -3217,7 +3472,8 @@ def get_receipt_items(receipt_id: str) -> list[dict]:
         # just with sku=NULL — reopening it for edit keeps that link, or lack of
         # one, as-is.
         rows = con.execute(
-            """SELECT ri.*, mi.sku AS sku, mi.unit AS unit FROM receipt_items ri
+            """SELECT ri.*, mi.sku AS sku, mi.unit AS unit, mi.sell_price AS master_price, mi.avg_cost_price AS avg_cost_price
+               FROM receipt_items ri
                LEFT JOIN master_items mi ON mi.id = ri.master_item_id
                WHERE ri.receipt_id=? ORDER BY ri.id ASC""",
             (receipt_id,),
@@ -6615,16 +6871,44 @@ def _preorder_item_source(con: sqlite3.Connection, item: dict) -> tuple[str | No
     return source, supplier_id
 
 
+def _require_stock_free(con: sqlite3.Connection, item: dict, own_line_id: int | None = None) -> None:
+    """A line set to 'Stok Tersedia' must be covered by what is free on the shelf right now (stock minus what open
+    Sales Orders already hold), otherwise it would be promised from stock that does not exist. A line the order
+    already holds counts its own reservation as free. Pick 'Pesan Supplier' (or leave it automatic) for the rest."""
+    mid = item.get("master_item_id")
+    if item.get("source") != "stok" or not mid:
+        return
+    mi = con.execute("SELECT stock_qty, unit FROM master_items WHERE id=?", (mid,)).fetchone()
+    if mi is None:
+        return
+    held = _reserved_by_item(con, [mid]).get(mid, 0)
+    if own_line_id:
+        held -= next((ln["reserved"] for ln in _reservation_lines(con, [mid]) if ln["id"] == own_line_id), 0)
+    free = max(max(mi["stock_qty"], 0) - held, 0)
+    if item["quantity"] > free:
+        raise ValueError(
+            f"“{item['product_name']}”: stok yang bebas hanya {free} {mi['unit'] or 'unit'}, kurang dari {item['quantity']} yang dipesan. "
+            "Ubah sumbernya ke Pesan Supplier, atau kurangi jumlahnya.")
+
+
 def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict, position: int, now: str) -> int:
+    _require_stock_free(con, item)
+    price = _price_review(
+        con, scope="preorder", doc_id=preorder_id, master_item_id=item.get("master_item_id"), product_name=item["product_name"],
+        qty=item["quantity"], unit_price=item["unit_price"], line_discount=0, prev=None, reason=item.get("price_reason"),
+        allow_below_cost=bool(item.get("allow_below_cost")), actor=item.get("_price_actor"))
     cur = con.execute(
         """INSERT INTO preorder_items
            (preorder_id, master_item_id, product_name, unit, quantity, unit_price, status, position, created_at,
-            ship_route, priority, eta_date, source, supplier_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ship_route, priority, eta_date, source, supplier_id,
+            list_price, price_state, price_reason, price_requested_by, price_requested_at, price_approved_by,
+            price_approved_at, price_below_cost)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             preorder_id, item.get("master_item_id"), item["product_name"], item.get("unit"),
             item["quantity"], item["unit_price"], item.get("status") or PREORDER_STATUSES[0],
             position, now, *_preorder_item_logistics(item), *_preorder_item_source(con, item),
+            *[price[c] for c in _PRICE_COLS],
         ),
     )
     item_id = cur.lastrowid
@@ -6738,6 +7022,7 @@ def create_preorder(
     deposit_method: str = "cash",
     supplier_id: int | None = None,
     deposit_confirmed: bool | None = None,
+    price_actor: dict | None = None,
 ) -> dict:
     """A deposit given at creation is recorded as the first payment ("DP awal"); on a published PO it
     is booked straight onto the PO's invoice, which is created here too."""
@@ -6758,7 +7043,9 @@ def create_preorder(
                 (preorder_id, now, deposit, "DP awal", changed_by),
             )
         for position, item in enumerate(items):
-            _insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now)
+            _insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by, "_price_actor": price_actor}, position, now)
+        if deposit > 0 and _preorder_price_pending(con, preorder_id):
+            raise ValueError(_PRICE_PENDING_MSG)
         if deposit > 0 and deposit_method != "cash":
             con.execute("UPDATE preorder_payments SET method=? WHERE preorder_id=?", (deposit_method, preorder_id))
             # K-18: a transfer/QRIS DP nobody has confirmed yet is Pending; it does not count towards the 30% to publish.
@@ -6812,7 +7099,8 @@ def get_preorder_items(preorder_id: str) -> list[dict]:
     tied to Master Barang; it is null for a free-text line."""
     with _conn() as con:
         rows = con.execute(
-            """SELECT preorder_items.*, master_items.sku AS sku, suppliers.name AS supplier_name
+            """SELECT preorder_items.*, master_items.sku AS sku, suppliers.name AS supplier_name,
+                      master_items.sell_price AS master_price, master_items.avg_cost_price AS avg_cost_price
                FROM preorder_items
                LEFT JOIN master_items ON master_items.id = preorder_items.master_item_id
                LEFT JOIN suppliers ON suppliers.id = preorder_items.supplier_id
@@ -6867,6 +7155,8 @@ def add_preorder_payment(
     with _conn() as con:
         if con.execute("SELECT 1 FROM preorders WHERE id=?", (preorder_id,)).fetchone() is None:
             raise ValueError(f"Preorder {preorder_id} tidak ditemukan.")
+        if _preorder_price_pending(con, preorder_id):
+            raise ValueError(_PRICE_PENDING_MSG)
         pending = _pay_pending(method, confirmed)
         cur = con.execute(
             "INSERT INTO preorder_payments (preorder_id, paid_at, amount, note, created_by, method, state, confirmed_by, confirmed_at) "
@@ -7200,21 +7490,30 @@ def _po_invoice_sync_one(con: sqlite3.Connection, po: dict, receipt_id: str, po_
         if ln is None:
             con.execute(
                 """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
-                       item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id)
-                   VALUES (?, ?, ?, ?, NULL, ?, ?, 0, ?, ?, ?, ?)""",
+                       item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id,
+                       list_price, price_state, price_reason, price_requested_by, price_requested_at,
+                       price_approved_by, price_approved_at, price_below_cost)
+                   VALUES (?, ?, ?, ?, NULL, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (receipt_id, pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"],
                  "jasa" if pi.get("source") == "jasa" else "barang", now, by,
-                 0 if created or rec["work_status"] in ("menunggu", "belum") else 1, pi["id"]),
+                 0 if created or rec["work_status"] in ("menunggu", "belum") else 1, pi["id"],
+                 *[pi.get(c) if c != "price_below_cost" else (pi.get(c) or 0) for c in _PRICE_COLS]),
             )
             added.append(pi["product_name"])
         elif (ln["product_name"], ln["quantity"], ln["unit_price"], ln["master_item_id"]) != \
-                (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"]):
+                (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"]) or (
+                (ln["line_discount"] or 0) == 0 and [ln.get(c) for c in _PRICE_COLS] != [pi.get(c) for c in _PRICE_COLS]):
             if ln["returned_qty"]:
                 raise ValueError(f"Barang {ln['product_name']} sudah pernah diretur, jadi tidak bisa diubah lagi di Sales Order.")
             con.execute(
                 "UPDATE receipt_items SET product_name=?, quantity=?, unit_price=?, master_item_id=? WHERE id=?",
                 (pi["product_name"], pi["quantity"], pi["unit_price"], pi["master_item_id"], ln["id"]),
             )
+            if not (ln["line_discount"] or 0):
+                # The special price belongs to the Sales Order line; the invoice line mirrors it (a discount typed on
+                # the nota itself keeps its own request).
+                con.execute(f"UPDATE receipt_items SET {', '.join(c + '=?' for c in _PRICE_COLS)} WHERE id=?",
+                            (*[pi.get(c) if c != "price_below_cost" else (pi.get(c) or 0) for c in _PRICE_COLS], ln["id"]))
             bits = []
             if ln["quantity"] != pi["quantity"]:
                 bits.append(f"qty {ln['quantity']} -> {pi['quantity']}")
@@ -7238,6 +7537,8 @@ def _po_invoice_sync_one(con: sqlite3.Connection, po: dict, receipt_id: str, po_
     discount = min(rec["discount"] or 0, subtotal)
     total = subtotal - discount - (rec.get("return_total") or 0)
     status = _compute_receipt_status(total, rec["amount_paid"], None)
+    if status == "done" and rec["status"] != "done" and _receipt_price_pending(con, receipt_id):
+        status = "pending"  # K-22: not Lunas on a price nobody approved yet
     work = rec["work_status"]
     if work == "menunggu" and po_items and all(pi["status"] in PO_ARRIVED_STATUSES for pi in po_items):
         work = "belum"
@@ -7618,6 +7919,8 @@ def _require_publish_dp(con: sqlite3.Connection, preorder_id: str) -> None:
     """K-03: a Sales Order is published only once the customer has paid at least SO_MIN_DP_PERCENT
     of its total as down payment. No exceptions; until then it stays a draft. Checked at the moment of
     publishing only, so later edits to a published order are not blocked by it."""
+    if _preorder_price_pending(con, preorder_id):
+        raise ValueError(_PRICE_PENDING_MSG)
     total = con.execute(
         "SELECT COALESCE(SUM(quantity*unit_price),0) AS t FROM preorder_items WHERE preorder_id=?", (preorder_id,)
     ).fetchone()["t"]
@@ -7652,6 +7955,7 @@ def update_preorder(
     po_date: str | None = None,
     set_supplier: bool = False,
     supplier_id: int | None = None,
+    price_actor: dict | None = None,
 ) -> dict:
     """Items are matched by id rather than deleted and re-inserted (the pattern
     receipts use), because a line item owns its stage and its status history —
@@ -7705,24 +8009,32 @@ def update_preorder(
                     if new_status == PO_LINE_CANCELLED:
                         raise ValueError("Barang hanya bisa dibatalkan lewat tombol Batalkan Sales Order / Pembatalan Khusus.")
                     source, supplier_id = _preorder_item_source(con, item)
+                    if source == "stok" and (prev.get("source") != "stok" or item["quantity"] > prev["quantity"]
+                                             or item.get("master_item_id") != prev.get("master_item_id")):
+                        _require_stock_free(con, {**item, "source": source}, item_id)
                     if (prev.get("source"), prev.get("supplier_id")) != (source, supplier_id) and prev["status"] not in PO_CLOSED_LINE_STATUSES:
                         # Draft Purchase Orders made for the old choice are dropped (an issued one refuses).
                         _release_preorder_line_from_pos(con, prev, changed_by, changing=True)
+                    price = _price_review(
+                        con, scope="preorder", doc_id=preorder_id, master_item_id=item.get("master_item_id"),
+                        product_name=item["product_name"], qty=item["quantity"], unit_price=item["unit_price"], line_discount=0,
+                        prev=prev, reason=item.get("price_reason"), allow_below_cost=bool(item.get("allow_below_cost")), actor=price_actor)
                     con.execute(
                         """UPDATE preorder_items SET master_item_id=?, product_name=?, unit=?,
                            quantity=?, unit_price=?, status=?, position=?, ship_route=?, priority=?, eta_date=?,
-                           source=?, supplier_id=? WHERE id=?""",
+                           source=?, supplier_id=?, list_price=?, price_state=?, price_reason=?, price_requested_by=?,
+                           price_requested_at=?, price_approved_by=?, price_approved_at=?, price_below_cost=? WHERE id=?""",
                         (
                             item.get("master_item_id"), item["product_name"], item.get("unit"),
                             item["quantity"], item["unit_price"], new_status, position,
-                            *_preorder_item_logistics(item), source, supplier_id, item_id,
+                            *_preorder_item_logistics(item), source, supplier_id, *[price[c] for c in _PRICE_COLS], item_id,
                         ),
                     )
                     if new_status != prev["status"]:
                         _log_preorder_status(con, preorder_id, item_id, item["product_name"],
                                              new_status, now, changed_by, prev["status"])
                 else:
-                    kept.add(_insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by}, position, now))
+                    kept.add(_insert_preorder_item(con, preorder_id, {**item, "changed_by": changed_by, "_price_actor": price_actor}, position, now))
 
             for stale_id in set(current) - kept:
                 if current[stale_id]["status"] == PO_LINE_CANCELLED:
@@ -8193,6 +8505,12 @@ def _next_supplier_po_no(con: sqlite3.Connection, po_date: str) -> str:
         (len(prefix) + 1, prefix + "%"),
     ).fetchone()
     return f"{prefix}{(row['n'] or 0) + 1:03d}"
+
+
+def peek_next_supplier_po_no(po_date: str | None = None) -> str:
+    """The number the next Purchase Order dated `po_date` will get (shown read-only on the form)."""
+    with _conn() as con:
+        return _next_supplier_po_no(con, po_date or shop_today().isoformat())
 
 
 def _next_internal_invoice_no(con: sqlite3.Connection, po_date: str) -> str:
@@ -9659,6 +9977,12 @@ def _sr_number(con: sqlite3.Connection, prefix: str, table: str, column: str) ->
     return f"{head}{seq:03d}"
 
 
+def peek_supplier_return_number() -> str:
+    """The number the next Retur Supplier will get, shown read-only on the new-return form."""
+    with _conn() as con:
+        return _sr_number(con, "RTS", "supplier_returns", "return_number")
+
+
 def _sr_event(con: sqlite3.Connection, return_id: int, kind: str, note: str | None, by: str | None) -> None:
     con.execute("INSERT INTO supplier_return_events (return_id, kind, note, by_user, at) VALUES (?, ?, ?, ?, ?)",
                 (return_id, kind, note, by, _now()))
@@ -11047,6 +11371,17 @@ def _svc_init(con: sqlite3.Connection) -> None:
     ric = {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}
     if "serial_no" not in ric:
         con.execute("ALTER TABLE receipt_items ADD COLUMN serial_no TEXT")
+    # Three separate warranties: product/sparepart (warranty_months), installation work, and the result of a repair
+    # (after_warranty_days). 0 / empty means "not set": the status then reads Belum Diverifikasi, never Habis.
+    for table, cols in (
+        ("service_profiles", (("install_warranty_months", "INTEGER NOT NULL DEFAULT 0"),)),
+        ("service_profile_overrides", (("install_warranty_months", "INTEGER"), ("after_warranty_days", "INTEGER"))),
+        ("service_orders", (("install_warranty_months", "INTEGER"), ("install_warranty_until", "TEXT"), ("install_warranty_status", "TEXT"))),
+    ):
+        have = {r["name"] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
+        for col, ddl in cols:
+            if col not in have:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
     if not con.execute("SELECT 1 FROM app_migrations WHERE name='service_profiles_seed'").fetchone():
         now = _now()
         for code, name, months, cats, serial, sale_sn, reset, checklist, complaints, est in _SVC_SEED:
@@ -11177,8 +11512,18 @@ def _svc_profile_for(con: sqlite3.Connection, master_item_id: int | None, profil
     p["effective_months"] = over["warranty_months"] if over and over["warranty_months"] is not None else p["warranty_months"]
     p["effective_supplier_id"] = (over["supplier_id"] if over and over["supplier_id"] else None) or p["default_supplier_id"] \
         or (mi["supplier_id"] if mi else None)
+    p["effective_install_months"] = over["install_warranty_months"] if over and over["install_warranty_months"] is not None else p["install_warranty_months"]
+    p["effective_after_days"] = over["after_warranty_days"] if over and over["after_warranty_days"] is not None else p["after_warranty_days"]
     p["override_id"] = over["id"] if over else None
     return p
+
+
+def _svc_install_warranty(purchase_date: str | None, months: int | None, on: date | None = None) -> tuple[str | None, str | None]:
+    """Warranty on the shop's installation work, counted from the nota date. (None, None) when the shop gives none."""
+    if not months or not purchase_date:
+        return None, None
+    until = _svc_add_months(date.fromisoformat(purchase_date[:10]), months).isoformat()
+    return ("aktif" if (on or shop_today()).isoformat() <= until else "habis"), until
 
 
 def _svc_warranty(purchase_date: str | None, months: int | None, warranty_date: str | None, on: date | None = None) -> tuple[str, str | None]:
@@ -11189,7 +11534,7 @@ def _svc_warranty(purchase_date: str | None, months: int | None, warranty_date: 
     until = warranty_date[:10] if warranty_date else (
         _svc_add_months(date.fromisoformat(purchase_date[:10]), months).isoformat() if months else None)
     if until is None:
-        return "habis", purchase_date[:10]
+        return "belum", None  # no warranty rule or date on record: unverified, not expired
     return ("aktif" if (on or shop_today()).isoformat() <= until else "habis"), until
 
 
@@ -11289,7 +11634,8 @@ def save_service_profile(profile_id: int | None, data: dict, user: dict) -> dict
     if not name:
         raise ValueError("Nama jenis service wajib diisi.")
     months = _svc_int(data.get("warranty_months"), "Masa garansi (bulan)", 0, 120)
-    after = _svc_int(data.get("after_warranty_days") if data.get("after_warranty_days") is not None else 30, "Garansi service (hari)", 0, 365)
+    after = _svc_int(data.get("after_warranty_days") if data.get("after_warranty_days") not in (None, "") else 0, "Garansi hasil service (hari)", 0, 1095)
+    install = _svc_int(data.get("install_warranty_months") if data.get("install_warranty_months") not in (None, "") else 0, "Garansi pemasangan (bulan)", 0, 120)
     checklist = [str(x).strip()[:60] for x in (data.get("checklist") or []) if str(x).strip()]
     if not checklist:
         raise ValueError("Isi minimal satu item kelengkapan.")
@@ -11310,7 +11656,7 @@ def save_service_profile(profile_id: int | None, data: dict, user: dict) -> dict
                 raise ValueError(f"Kategori itu sudah tercakup di {other['code']} {other['name']}.")
         if sup and not con.execute("SELECT 1 FROM suppliers WHERE id=?", (sup,)).fetchone():
             raise ValueError("Supplier tujuan tidak ditemukan.")
-        vals = (name, months, after, (data.get("est_days") or "").strip()[:40] or None, 1 if data.get("require_serial") else 0,
+        vals = (name, months, after, install, (data.get("est_days") or "").strip()[:40] or None, 1 if data.get("require_serial") else 0,
                 1 if data.get("require_photo", True) else 0, 1 if data.get("record_serial_at_sale") else 0, 1 if data.get("ask_reset") else 0,
                 (data.get("terms_text") or "").strip() or SVC_TERMS_DEFAULT, (data.get("warranty_terms") or "").strip() or None,
                 json.dumps(checklist), json.dumps(complaints), sup)
@@ -11319,13 +11665,13 @@ def save_service_profile(profile_id: int | None, data: dict, user: dict) -> dict
             row = con.execute("SELECT code FROM service_profiles ORDER BY code DESC LIMIT 1").fetchone()
             seq = int(row["code"].split("-")[1]) + 1 if row and row["code"].startswith("SV-") else 1
             profile_id = con.execute(
-                """INSERT INTO service_profiles (name, warranty_months, after_warranty_days, est_days, require_serial, require_photo,
+                """INSERT INTO service_profiles (name, warranty_months, after_warranty_days, install_warranty_months, est_days, require_serial, require_photo,
                        record_serial_at_sale, ask_reset, terms_text, warranty_terms, checklist, complaints, default_supplier_id,
-                       code, created_by, created_at, updated_by, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       code, created_by, created_at, updated_by, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (*vals, f"SV-{seq:02d}", by, now, by, now)).lastrowid
         else:
             n = con.execute(
-                """UPDATE service_profiles SET name=?, warranty_months=?, after_warranty_days=?, est_days=?, require_serial=?, require_photo=?,
+                """UPDATE service_profiles SET name=?, warranty_months=?, after_warranty_days=?, install_warranty_months=?, est_days=?, require_serial=?, require_photo=?,
                        record_serial_at_sale=?, ask_reset=?, terms_text=?, warranty_terms=?, checklist=?, complaints=?, default_supplier_id=?,
                        updated_by=?, updated_at=? WHERE id=?""", (*vals, by, now, profile_id)).rowcount
             if n != 1:
@@ -11352,9 +11698,13 @@ def save_service_override(profile_id: int, data: dict, user: dict) -> dict:
         raise ValueError("Pilih salah satu: brand atau barang.")
     months = data.get("warranty_months")
     months = None if months in (None, "") else _svc_int(months, "Masa garansi (bulan)", 0, 120)
+    inst = data.get("install_warranty_months")
+    inst = None if inst in (None, "") else _svc_int(inst, "Garansi pemasangan (bulan)", 0, 120)
+    aft = data.get("after_warranty_days")
+    aft = None if aft in (None, "") else _svc_int(aft, "Garansi hasil service (hari)", 0, 1095)
     sup = data.get("supplier_id") or None
-    if months is None and not sup:
-        raise ValueError("Isi masa garansi atau tujuan service yang berbeda.")
+    if months is None and inst is None and aft is None and not sup:
+        raise ValueError("Isi salah satu: masa garansi, garansi pemasangan, garansi hasil service, atau tujuan service yang berbeda.")
     with _conn() as con:
         con.execute("BEGIN IMMEDIATE")
         _svc_profile_row(con, profile_id)
@@ -11367,8 +11717,9 @@ def save_service_override(profile_id: int, data: dict, user: dict) -> dict:
             con.execute("SELECT 1 FROM service_profile_overrides WHERE master_item_id=?", (item_id,)).fetchone()
         if dup:
             raise ValueError("Pengecualian untuk itu sudah ada.")
-        con.execute("""INSERT INTO service_profile_overrides (profile_id, brand_id, master_item_id, warranty_months, supplier_id, created_by, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""", (profile_id, brand_id, item_id, months, sup, user.get("username"), _now()))
+        con.execute("""INSERT INTO service_profile_overrides (profile_id, brand_id, master_item_id, warranty_months, install_warranty_months,
+                           after_warranty_days, supplier_id, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (profile_id, brand_id, item_id, months, inst, aft, sup, user.get("username"), _now()))
     return next(p for p in list_service_profiles(True) if p["id"] == profile_id)
 
 
@@ -11436,6 +11787,10 @@ def service_invoice_search(query: str) -> dict:
             prof = _svc_profile_for(con, r["master_item_id"])
             pdate = _svc_local_date(r["created_at"])
             st, until = _svc_warranty(pdate, prof["effective_months"] if prof else 0, r["warranty_date"])
+            ist, iuntil = _svc_install_warranty(pdate, prof["effective_install_months"] if prof else 0)
+            after_until = con.execute(
+                "SELECT MAX(after_warranty_until) AS u FROM service_orders WHERE receipt_item_id=? AND result='diperbaiki' AND after_warranty_until IS NOT NULL",
+                (r["receipt_item_id"],)).fetchone()["u"]
             active = con.execute("SELECT service_no FROM service_orders WHERE receipt_item_id=? AND stage IN ({})".format(_placeholders(SVC_OPEN)),
                                  (r["receipt_item_id"], *SVC_OPEN)).fetchone()
             warn = []
@@ -11449,7 +11804,10 @@ def service_invoice_search(query: str) -> dict:
                 warn.append(f"Sudah ada service aktif {active['service_no']}")
             lines.append({**r, "purchase_date": pdate, "age": _svc_age(pdate), "profile_id": prof["id"] if prof else None,
                           "profile_name": prof["name"] if prof else None, "warranty_months": prof["effective_months"] if prof else None,
-                          "warranty_status": st, "warranty_until": until, "warnings": warn, "serviceable": prof is not None})
+                          "warranty_status": st, "warranty_until": until, "warnings": warn, "serviceable": prof is not None,
+                          "install_warranty_months": prof["effective_install_months"] if prof else None, "install_warranty_status": ist, "install_warranty_until": iuntil,
+                          "after_service_until": after_until,
+                          "after_service_status": (None if not after_until else ("aktif" if shop_today().isoformat() <= after_until else "habis"))})
         services = [dict(r) for r in con.execute(
             """SELECT id, service_no, stage, result, product_name, serial_no, received_at, customer_name FROM service_orders
                WHERE service_no IS NOT NULL AND (customer_phone LIKE ? OR serial_no LIKE ? OR serial_new LIKE ? OR service_no LIKE ?)
@@ -11550,7 +11908,9 @@ def save_service_order(order_id: int | None, data: dict, user: dict) -> dict:
             wst, until = _svc_warranty(f["purchase_date"], prof["effective_months"], line["warranty_date"])
             if line["r_status"] == "void" or (line["returned_qty"] and line["returned_qty"] >= line["quantity"]):
                 wst = "belum"
-            f.update(warranty_basis="nota", warranty_months=prof["effective_months"], warranty_until=until, warranty_status=wst)
+            ist, iuntil = _svc_install_warranty(f["purchase_date"], prof["effective_install_months"])
+            f.update(warranty_basis="nota", warranty_months=prof["effective_months"], warranty_until=until, warranty_status=wst,
+                     install_warranty_months=prof["effective_install_months"] or None, install_warranty_until=iuntil, install_warranty_status=ist)
         else:
             reason = data.get("no_invoice_reason") or None
             if reason and reason not in SVC_NO_INVOICE_REASONS:
@@ -11560,10 +11920,11 @@ def save_service_order(order_id: int | None, data: dict, user: dict) -> dict:
             basis = data.get("warranty_basis") or "tanpa"
             if basis not in ("kartu", "tanpa"):
                 basis = "tanpa"
-            f.update(warranty_basis=basis, warranty_months=prof["effective_months"] if prof else None, warranty_until=None, warranty_status="belum")
+            f.update(warranty_basis=basis, warranty_months=prof["effective_months"] if prof else None, warranty_until=None, warranty_status="belum",
+                     install_warranty_months=None, install_warranty_until=None, install_warranty_status=None)
         f["profile_id"] = prof["id"] if prof else None
         if prof:
-            f.update(est_days=prof["est_days"], terms_text=prof["terms_text"], after_warranty_days=prof["after_warranty_days"])
+            f.update(est_days=prof["est_days"], terms_text=prof["terms_text"], after_warranty_days=prof["effective_after_days"])
             if not f["supplier_id"] and prof.get("effective_supplier_id"):
                 f["supplier_id"] = prof["effective_supplier_id"]
         ov = data.get("warranty_override")
@@ -12700,8 +13061,9 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
         L.append(rule)
         L += _svc_wrap("Kelengkapan kembali: ", "  ".join(f"[{'x' if a['returned'] or o['location'] != 'diserahkan' else ' '}] {a['name']}" for a in acc if a["brought"]))
         if o["result"] == "diperbaiki":
-            until = o["after_warranty_until"] or ((date.fromisoformat(_svc_local_date(o["ready_at"])) + timedelta(days=o["after_warranty_days"] or 30)).isoformat() if o["ready_at"] else None)
-            L.append(f"Garansi service: {o['after_warranty_days'] or 30} hari untuk kerusakan yang sama, s/d {d(until)}.")
+            until = o["after_warranty_until"] or ((date.fromisoformat(_svc_local_date(o["ready_at"])) + timedelta(days=o["after_warranty_days"])).isoformat() if o["ready_at"] and o["after_warranty_days"] else None)
+            if until:
+                L.append(f"Garansi service: {o['after_warranty_days']} hari untuk kerusakan yang sama, s/d {d(until)}.")
         elif o["result"] == "diganti":
             L.append("Garansi unit pengganti mengikuti ketentuan pabrik.")
         L += ["", "   Diserahkan (toko),                          Diterima (customer),", "", "",

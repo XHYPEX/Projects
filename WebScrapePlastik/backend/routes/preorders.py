@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    decide_price_request,
+    price_actor,
     peek_next_po_no,
     get_supplier,
     PREORDER_STATUSES,
@@ -42,6 +44,7 @@ from backend.database import (
     update_preorder,
 )
 from backend.schemas import (
+    PriceDecisionRequest,
     PaymentFailRequest,
     PreorderCancelRequest,
     PreorderSpecialCancelRequest,
@@ -102,7 +105,7 @@ def _require_invoice_plate(plate: str) -> None:
 
 def _po_error(e: ValueError) -> HTTPException:
     msg = str(e)
-    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat", "Uang muka", "Bukti")) else 409
+    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat", "Uang muka", "Bukti", "Harga", "Alasan", "Ada harga")) else 409
     return HTTPException(status_code=status, detail=msg)
 
 
@@ -171,6 +174,11 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         cancelled_by=row.get("cancelled_by"),
         cancel_kind=row.get("cancel_kind"),
         cancel_reason=row.get("cancel_reason"),
+        list_price=row.get("list_price"), price_state=row.get("price_state"), price_reason=row.get("price_reason"),
+        price_requested_by=row.get("price_requested_by"), price_requested_at=row.get("price_requested_at"),
+        price_approved_by=row.get("price_approved_by"), price_approved_at=row.get("price_approved_at"),
+        price_below_cost=bool(row.get("price_below_cost")),
+        master_price=row.get("master_price"), avg_cost_price=row.get("avg_cost_price") or 0,
     )
 
 
@@ -252,7 +260,7 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
             None, lambda: create_preorder(
                 preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
                 plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
-                deposit_confirmed=req.deposit_confirmed,
+                deposit_confirmed=req.deposit_confirmed, price_actor=price_actor(user),
             ),
         )
     except ValueError as e:
@@ -329,12 +337,37 @@ async def update_preorder_route(
                 preorder_id, customer_name=customer_name, customer_phone=customer_phone, items=items,
                 notes=notes, update_notes=update_notes, changed_by=user["username"],
                 is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
-                set_supplier=set_supplier, supplier_id=req.supplier_id,
+                set_supplier=set_supplier, supplier_id=req.supplier_id, price_actor=price_actor(user),
             ),
         )
     except ValueError as e:
         raise _po_error(e)
     return await _detail(preorder_id)
+
+
+async def _price_decision(preorder_id: str, item_id: int, approve: bool, req: PriceDecisionRequest, user: dict) -> PreorderDetail:
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, decide_price_request, "preorder", preorder_id, item_id, approve, req.note, user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/items/{item_id}/price/approve", response_model=PreorderDetail)
+async def approve_preorder_price(preorder_id: str, item_id: int, req: PriceDecisionRequest, user: dict = Depends(get_current_user)):
+    """K-22 (admin): approve a special price a staff member asked for on this Sales Order line."""
+    return await _price_decision(preorder_id, item_id, True, req, user)
+
+
+@router.post("/preorders/{preorder_id}/items/{item_id}/price/reject", response_model=PreorderDetail)
+async def reject_preorder_price(preorder_id: str, item_id: int, req: PriceDecisionRequest, user: dict = Depends(get_current_user)):
+    """K-22 (admin): refuse it; the line goes back to the Master Barang price (the invoice follows)."""
+    return await _price_decision(preorder_id, item_id, False, req, user)
 
 
 @router.patch("/preorders/{preorder_id}/items/{item_id}/status", response_model=PreorderDetail)

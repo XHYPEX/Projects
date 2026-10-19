@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import require_admin
-from backend.database import get_sales_summary, list_cash_outs
+from backend.database import get_sales_summary, list_cash_outs, list_pending_prices, list_price_events
 from backend.schemas import SalesSummaryOut
 
 router = APIRouter()
@@ -41,3 +41,17 @@ async def cash_outs(date_from: str, date_to: str, method: str | None = None):
     if method and method not in ("cash", "transfer", "qris", "debit"):
         raise HTTPException(status_code=422, detail="Metode harus salah satu dari: cash, transfer, qris, debit.")
     return await asyncio.get_event_loop().run_in_executor(None, list_cash_outs, date_from, date_to, method or None)
+
+
+@router.get("/price-requests/pending", dependencies=[Depends(require_admin)])
+async def price_requests_pending():
+    """K-22 (admin): special prices staff asked for, waiting for approval."""
+    return await asyncio.get_event_loop().run_in_executor(None, list_pending_prices)
+
+
+@router.get("/price-events")
+async def price_events(scope: str, doc_id: str):
+    """K-22: every request / approval / rejection on one nota or Sales Order, newest first."""
+    if scope not in ("receipt", "preorder"):
+        raise HTTPException(status_code=422, detail="scope harus receipt atau preorder.")
+    return await asyncio.get_event_loop().run_in_executor(None, list_price_events, scope, doc_id)

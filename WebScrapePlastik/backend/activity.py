@@ -50,6 +50,8 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/receipts/[^/]+/reopen$"), "POST", "Buka kembali nota tertutup", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+/returns$"), "POST", "Retur barang nota", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+/work-status$"), "POST", "Ubah status pengerjaan nota", "receipt"),
+    (re.compile(r"^/api/receipts/[^/]+/items/\d+/price/approve$"), "POST", "Setujui harga khusus nota", "receipt"),
+    (re.compile(r"^/api/receipts/[^/]+/items/\d+/price/reject$"), "POST", "Tolak harga khusus nota", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "PATCH", "Ubah nota penjualan", "receipt"),
     (re.compile(r"^/api/receipts/[^/]+$"), "DELETE", "Hapus nota penjualan", "receipt"),
 
@@ -59,6 +61,8 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 
     (re.compile(r"^/api/preorders/[^/]+/items/\d+/status$"), "PATCH", "Ubah status Sales Order", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/status$"), "PATCH", "Ubah status Sales Order", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+/items/\d+/price/approve$"), "POST", "Setujui harga khusus Sales Order", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+/items/\d+/price/reject$"), "POST", "Tolak harga khusus Sales Order", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/payments$"), "POST", "Catat pembayaran Sales Order", "preorder"),
     # No DELETE rule: there is no DELETE /preorders/{id} route (removed --
     # preorders are archived as drafts via PATCH is_draft, never deleted).

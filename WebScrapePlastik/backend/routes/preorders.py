@@ -1,11 +1,13 @@
 import asyncio
 import re
+from datetime import date
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    peek_next_po_no,
     get_supplier,
     PREORDER_STATUSES,
     PO_LINE_CANCELLED,
@@ -265,6 +267,17 @@ async def list_preorders(query: str | None = None, status: str | None = None, dr
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(None, get_all_preorders, query, status, draft)
     return [PreorderOut(**r) for r in rows]
+
+
+@router.get("/preorders/next-number")
+async def preorder_next_number(po_date: str | None = None):
+    """Preview of the automatic SO number for the form; the real number is assigned when saved."""
+    if po_date:
+        try:
+            date.fromisoformat(po_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Tanggal tidak valid, gunakan format YYYY-MM-DD.")
+    return {"po_number": await asyncio.get_event_loop().run_in_executor(None, peek_next_po_no, po_date or None)}
 
 
 @router.get("/preorders/{preorder_id}", response_model=PreorderDetail)

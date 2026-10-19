@@ -1869,6 +1869,11 @@
 
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
           <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Informasi Customer &amp; Kendaraan</div>
+          <div class="mb-3 sm:w-64">
+            <label for="po-number" class="block text-xs text-muted mb-1.5">Nomor Sales Order <span class="text-muted/70">(otomatis)</span></label>
+            <input id="po-number" type="text" readonly tabindex="-1" aria-readonly="true" data-no-uppercase
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-ink font-semibold cursor-default focus:outline-none" />
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
             <div>
               <label for="po-customer-name" class="block text-xs text-muted mb-1.5">Nama Customer <span class="text-failed">*</span></label>
@@ -1900,7 +1905,7 @@
             </div>
             <div>
               <label for="po-date" class="block text-xs text-muted mb-1.5">Tanggal Sales Order</label>
-              <input id="po-date" type="date" data-no-uppercase
+              <input id="po-date" type="date" data-no-uppercase onchange="refreshPoNumberPreview()"
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
           </div>
@@ -13367,6 +13372,7 @@ function applyInboundPoPicker() {
       customer_po_number: item.customer_po_number, customer_name: item.customer_name, ship_method: item.ship_method,
       item_status: item.item_status, qty_po: item.quantity - item.qty_cancelled, qty_before: item.qty_received, left: max,
       qty_in: qty, cost_price: prev ? prev.cost_price : inboundNetCost(item), condition: prev ? prev.condition : "baik",
+      sell_price: item.sell_price, barcode: item.barcode || "",
     });
   }
   if (!lines.length) { showToast("Pilih minimal satu barang dengan jumlah lebih dari 0."); return; }
@@ -13394,7 +13400,7 @@ function renderInboundPoRows() {
       <td class="px-3 py-2 text-right"><input type="number" min="1" max="${l.left}" step="1" value="${l.qty_in}" oninput="onInboundPoQty(${idx}, this)" class="${inp} w-16 text-right"></td>
       <td class="px-3 py-2 text-right tabular-nums" data-ibr-left="${idx}">${l.qty_po - l.qty_before - l.qty_in}</td>
       <td class="px-3 py-2 text-right"><input type="text" inputmode="numeric" data-ibr-cost="${idx}" class="price-input ${inp} w-24 text-right" oninput="onInboundPoCost(${idx}, this)"></td>
-      <td class="px-3 py-2"><select onchange="inboundPoLines[${idx}].condition = this.value" class="${inp}">${Object.entries(INBOUND_COND).map(([k, v]) => `<option value="${k}" ${l.condition === k ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+      <td class="px-3 py-2"><select onchange="inboundPoLines[${idx}].condition = this.value; updateInboundBarcodeButton()" class="${inp}">${Object.entries(INBOUND_COND).map(([k, v]) => `<option value="${k}" ${l.condition === k ? "selected" : ""}>${v}</option>`).join("")}</select></td>
       <td class="px-3 py-2"><button type="button" onclick="removeInboundPoLine(${idx})" class="text-muted hover:text-failed" aria-label="Hapus baris">&times;</button></td></tr>`).join("")}
     </tbody></table>`;
   box.querySelectorAll("[data-ibr-cost]").forEach(el => setPriceInput(el, inboundPoLines[parseInt(el.dataset.ibrCost, 10)].cost_price));
@@ -13500,7 +13506,8 @@ async function renderInboundFormFromDocument(doc) {
         const left = (it.quantity || 0) - (it.qty_cancelled || 0) - (it.qty_received || 0);
         return { spo_item_id: i.spo_item_id, master_item_id: i.master_item_id, product_name: i.resolved_name || it.product_name || "", sku: i.resolved_sku || it.sku || "",
           customer_po_number: it.customer_po_number, customer_name: it.customer_name, ship_method: it.ship_method, item_status: it.item_status,
-          qty_po: (it.quantity || 0) - (it.qty_cancelled || 0), qty_before: it.qty_received || 0, left, qty_in: i.qty_in, cost_price: i.cost_price, condition: i.condition || "baik" };
+          qty_po: (it.quantity || 0) - (it.qty_cancelled || 0), qty_before: it.qty_received || 0, left, qty_in: i.qty_in, cost_price: i.cost_price, condition: i.condition || "baik",
+          sell_price: it.sell_price, barcode: it.barcode || "" };
       });
     }
     setInboundMode("po");
@@ -14234,6 +14241,14 @@ async function submitVoidDocument(docId) {
 // Barang keeps its own single-label print for reprints.
 const BARCODE_CONFIRM_THRESHOLD = 100;
 
+// Labels are only for what becomes shelf stock. Goods bought for a customer's Sales Order
+// are handed over as they are, and damaged or wrong goods go to Stok Karantina, so neither is
+// labelled. A line with no Sales Order is all stock.
+function inboundStockLabelQty(l) {
+  if ((l.condition || "baik") !== "baik" || l.customer_po_number) return 0;
+  return Math.max(0, l.qty_in || 0);
+}
+
 function collectInboundBarcodeLabels() {
   const labels = [];
   let skipped = 0;
@@ -14257,8 +14272,9 @@ function collectInboundBarcodeLabels() {
   });
   if (inboundMode === "po") {
     for (const l of inboundPoLines) {
-      if (!l.sku) { if (l.qty_in > 0) skipped++; continue; }
-      for (let i = 0; i < l.qty_in; i++) labels.push({ sku: l.sku, barcode: "", name: l.product_name, sellPrice: null });
+      const n = inboundStockLabelQty(l);
+      if (!l.sku) { if (n > 0) skipped++; continue; }
+      for (let i = 0; i < n; i++) labels.push({ sku: l.sku, barcode: l.barcode || "", name: l.product_name, sellPrice: l.sell_price || null });
     }
   }
   return { labels, skipped };
@@ -15947,6 +15963,8 @@ async function renderPreorderForm(detail) {
   document.getElementById("po-customer-phone").value = editing ? detail.customer_phone : "";
   poPhoneVehicleLookup();
   document.getElementById("po-date").value = editing ? detail.po_date : toDateInputValue(new Date());
+  document.getElementById("po-number").value = editing ? detail.po_number : "";
+  if (!editing) refreshPoNumberPreview();
   document.getElementById("po-notes").value = editing ? (detail.notes || "") : "";
   document.getElementById("po-item-rows").innerHTML = "";
   if (editing) for (const item of detail.items) addPreorderRow(item);
@@ -16041,6 +16059,16 @@ function applyPoRowSource(rowEl) {
   rowEl.querySelector(".po-row-supplier-wrap").classList.toggle("hidden", source !== "supplier");
   rowEl.querySelector(".po-row-eta-wrap").classList.toggle("hidden", !buys);
   rowEl.querySelector(".po-row-route-wrap").classList.toggle("hidden", !buys);
+}
+
+async function refreshPoNumberPreview() {
+  const field = document.getElementById("po-number");
+  if (!field || currentPreorder) return;
+  const date = document.getElementById("po-date").value;
+  try {
+    const resp = await fetch(`/api/preorders/next-number?po_date=${encodeURIComponent(date)}`);
+    if (resp.ok && date === document.getElementById("po-date").value) field.value = (await resp.json()).po_number;
+  } catch (_) { /* the number is assigned on save anyway */ }
 }
 
 function addPreorderRow(prefill) {

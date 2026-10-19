@@ -6498,6 +6498,12 @@ def _next_po_no(con: sqlite3.Connection, po_date: str) -> str:
     return f"{prefix}{(row['n'] or 0) + 1:04d}"
 
 
+def peek_next_po_no(po_date: str | None = None) -> str:
+    """The number the next Sales Order saved on `po_date` will get (shown read-only on the form)."""
+    with _conn() as con:
+        return _next_po_no(con, po_date or shop_today().isoformat())
+
+
 def _preorder_paid_by_order(con: sqlite3.Connection) -> dict[str, int]:
     return {
         r["preorder_id"]: r["paid"]
@@ -8356,10 +8362,12 @@ def _spo_attach_faktur(con: sqlite3.Connection, pos: list[dict]) -> None:
 
 def _spo_items(con: sqlite3.Connection, supplier_po_id: str) -> list[dict]:
     rows = con.execute(
-        """SELECT spi.*, p.po_number AS customer_po_number, p.customer_name, p.plate_full
+        """SELECT spi.*, p.po_number AS customer_po_number, p.customer_name, p.plate_full,
+                  mi.sell_price AS sell_price, mi.barcode AS barcode
            FROM supplier_po_items spi
            LEFT JOIN preorder_items pi ON pi.id = spi.preorder_item_id
            LEFT JOIN preorders p ON p.id = pi.preorder_id
+           LEFT JOIN master_items mi ON mi.id = spi.master_item_id
            WHERE spi.supplier_po_id=? ORDER BY spi.position ASC, spi.id ASC""",
         (supplier_po_id,),
     ).fetchall()

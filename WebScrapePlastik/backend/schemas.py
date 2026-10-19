@@ -1407,6 +1407,9 @@ class SupplierPoItemOut(BaseModel):
     customer_po_number: str | None = None
     customer_name: str | None = None
     plate_full: str | None = None
+    # From the linked Master Barang: the shelf price and product code printed on the stock label.
+    sell_price: int | None = None
+    barcode: str | None = None
 
 
 class SupplierPoEventOut(BaseModel):

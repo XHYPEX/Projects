@@ -869,7 +869,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
               </span>
               <h2 id="cashier-info-title" class="font-serif text-base font-semibold text-ink">Informasi Transaksi</h2>
-              <span id="cashier-form-title" class="inline-flex items-baseline gap-2 font-serif text-2xl font-semibold text-accentDark tabular-nums leading-none">Nota baru</span>
+              <span id="cashier-form-title" class="inline-flex items-baseline gap-1.5 text-sm text-muted">Nota baru</span>
               <div class="ml-auto flex flex-wrap items-center gap-2">
                 <button id="cashier-settle-btn" type="button" onclick="openCashierSettleModal()"
                   class="hidden px-4 py-1.5 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">Tambah Pembayaran</button>
@@ -6480,10 +6480,10 @@ async function refreshCashierNextNo() {
 function renderCashierNotaNo(tab) {
   if (tab.receiptNo) cashierNextNo = "";  // a number was just used: the next new nota needs a fresh preview
   const no = tab.receiptNo || cashierNextNo;
-  const note = tab.receiptNo ? (tab.workStatus === "draft" ? "Draft" : "") : "otomatis saat disimpan";
+  const note = tab.receiptNo && tab.workStatus === "draft" ? "Draft" : "";
   const title = document.getElementById("cashier-form-title");
   if (title) title.innerHTML = no
-    ? `${esc(no)}${note ? ` <span class="font-sans text-[11px] font-medium text-muted">${esc(note)}</span>` : ""}`
+    ? `<span>Nomor Nota</span><span class="font-mono text-sm font-semibold text-accentDark tabular-nums">${esc(no)}</span>${note ? `<span class="text-[11px]">· ${esc(note)}</span>` : ""}`
     : (tab.receiptId ? "Ubah nota" : "Nota baru");
   const sum = document.getElementById("cashier-summary-no");
   if (sum) { sum.textContent = no || ""; sum.classList.toggle("hidden", !no); }
@@ -12878,7 +12878,7 @@ function renderMasterAllocation(res) {
     ? `Stok fisik ${formatInt(res.stock_qty)} ${unit}, ditahan ${formatInt(res.reserved_qty)} untuk Sales Order, jadi tersedia dijual ${formatInt(res.available_qty)} ${unit}.` : "";
   g("dt-alloc-empty").classList.toggle("hidden", lines.length > 0);
   g("dt-alloc-tbody").innerHTML = lines.map(l => `<tr class="border-b border-line last:border-b-0">
-    <td class="px-3 py-2.5"><button type="button" onclick="openPreorderFromDashboard(${l.preorder_id})" class="font-mono text-xs text-accentDark underline">${esc(l.po_number)}</button></td>
+    <td class="px-3 py-2.5"><button type="button" onclick="openPreorderFromDashboard('${esc(l.preorder_id)}')" class="font-mono text-xs text-accentDark underline">${esc(l.po_number)}</button></td>
     <td class="px-3 py-2.5 text-ink">${esc(l.customer_name || "-")}</td>
     <td class="px-3 py-2.5">${preorderStatusBadgeHtml(l.status)}</td>
     <td class="px-3 py-2.5 text-right tabular-nums">${formatInt(l.quantity)}</td>

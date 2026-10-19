@@ -3764,11 +3764,21 @@
                 </div>
                 <p id="detail-item-meta" class="text-xs text-muted mt-0.5 mb-3"></p>
                 <dl id="detail-item-info" class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm"></dl>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
                   <div class="relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-failed/10 text-failed"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Stok Fisik</div>
                 <div id="dt-stock" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-stock-sub" class="text-xs text-muted mt-0.5"></div>
+              </div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-orange-100 text-orange-600"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Dialokasikan</div>
+                <div id="dt-alloc" class="text-xl font-semibold text-ink tabular-nums"></div>
+                <div id="dt-alloc-sub" class="text-xs text-muted mt-0.5"></div>
+              </div>
+                  <div class="relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Tersedia</div>
+                <div id="dt-avail" class="text-xl font-semibold text-ink tabular-nums"></div>
+                <div id="dt-avail-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
                   <div class="relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-pending/10 text-pending"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Stok Minimum</div>
@@ -3845,6 +3855,7 @@
           <section class="bg-white border border-line rounded-xl mt-4">
             <div class="flex items-center gap-1 px-3 border-b border-line" role="tablist">
               <button type="button" role="tab" data-dtab="ringkasan" onclick="setMasterDetailTab('ringkasan')" class="dt-tab px-3 py-3 text-sm font-medium">Ringkasan</button>
+              <button type="button" role="tab" data-dtab="alokasi" onclick="setMasterDetailTab('alokasi')" class="dt-tab px-3 py-3 text-sm font-medium">Alokasi SO</button>
               <button type="button" role="tab" data-dtab="aktivitas" onclick="setMasterDetailTab('aktivitas')" class="dt-tab px-3 py-3 text-sm font-medium">Aktivitas</button>
               <button type="button" role="tab" data-dtab="perubahan" onclick="setMasterDetailTab('perubahan')" class="dt-tab px-3 py-3 text-sm font-medium">Riwayat Perubahan</button>
             </div>
@@ -3858,6 +3869,19 @@
                   <tbody id="batch-history-tbody"></tbody>
                 </table>
                 <div id="batch-history-empty" class="hidden text-center py-8"><p class="text-sm text-muted">Belum ada riwayat batch.</p></div>
+              </div>
+            </div>
+            <div id="dt-pane-alokasi" class="hidden p-4">
+              <h4 class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-1">Stok yang Ditahan untuk Sales Order</h4>
+              <p id="dt-alloc-note" class="text-xs text-muted mb-3"></p>
+              <div class="border border-line rounded-xl overflow-hidden overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-bg2"><tr>
+                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sales Order</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Dipesan</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Ditahan dari Stok</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Datang dari Supplier</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Belum Ada Sumber</th>
+                  </tr></thead>
+                  <tbody id="dt-alloc-tbody"></tbody>
+                </table>
+                <div id="dt-alloc-empty" class="hidden text-center py-8"><p class="text-sm text-muted">Tidak ada Sales Order yang menahan stok barang ini.</p></div>
               </div>
             </div>
             <div id="dt-pane-aktivitas" class="hidden p-4">
@@ -12126,7 +12150,7 @@ async function archiveMasterItemFromRow(id) {
   if (!item) return;
   currentMasterItemId = item.id;
   currentMasterItem = item;
-  masterDetailExtra = { usage: null, ledger: null, prices: null };
+  masterDetailExtra = { usage: null, ledger: null, prices: null, reservations: null };
   archiveFromList = true;
   if (item.is_active) await openArchiveModal();
   else await restoreMasterItem();
@@ -12762,14 +12786,14 @@ async function viewMasterItem(id) {
   const item = await resp.json();
   currentMasterItemId = id;
   currentMasterItem = item;
-  masterDetailExtra = { usage: null, ledger: null, prices: null };
+  masterDetailExtra = { usage: null, ledger: null, prices: null, reservations: null };
   renderMasterItemDetail(item);
   setMasterDetailTab("ringkasan");
   showMasterDetailPanel();
   loadMasterDetailExtras(id);
 }
 
-let masterDetailExtra = { usage: null, ledger: null, prices: null };
+let masterDetailExtra = { usage: null, ledger: null, prices: null, reservations: null };
 
 const MASTER_STATE_STYLE = {
   habis: ["Habis", "bg-failed/10 text-failed"],
@@ -12795,6 +12819,12 @@ function renderMasterItemDetail(item) {
     `<div class="space-y-1.5">${row("Kategori Produk", item.category_parent_name || item.category_name)}${row("Subkategori Produk", item.category_parent_name ? item.category_name : "")}${row("Satuan", item.unit)}${row("Lokasi Rak / Gudang", item.location)}${row("Deskripsi Singkat", item.description)}</div>`;
   g("dt-stock").textContent = formatInt(item.stock_qty);
   g("dt-stock-sub").textContent = `${item.unit} di gudang`;
+  const held = item.reserved_qty || 0, free = item.available_qty ?? Math.max(item.stock_qty - held, 0);
+  g("dt-alloc").textContent = formatInt(held);
+  g("dt-alloc-sub").textContent = held > 0 ? `${item.unit} ditahan untuk Sales Order` : "tidak ada yang ditahan";
+  g("dt-avail").textContent = formatInt(free);
+  g("dt-avail").className = "text-xl font-semibold tabular-nums " + (free <= 0 ? "text-failed" : "text-done");
+  g("dt-avail-sub").textContent = held > 0 ? `${formatInt(item.stock_qty)} − ${formatInt(held)} = bisa dijual` : `${item.unit} bisa dijual`;
   g("dt-min").textContent = formatInt(item.min_stock ?? 5);
   g("dt-min-sub").textContent = item.unit;
   const state = masterStockStateOf(item);
@@ -12822,9 +12852,10 @@ function renderMasterItemDetail(item) {
 
 async function loadMasterDetailExtras(id) {
   const get = path => fetch(`/api/inventory/master-items/${id}/${path}`).then(r => r.ok ? r.json() : null).catch(() => null);
-  const [usage, ledger, prices] = await Promise.all([get("usage"), get("ledger"), get("prices")]);
+  const [usage, ledger, prices, reservations] = await Promise.all([get("usage"), get("ledger"), get("prices"), get("reservations")]);
   if (currentMasterItemId !== id) return;
-  masterDetailExtra = { usage, ledger, prices };
+  masterDetailExtra = { usage, ledger, prices, reservations };
+  renderMasterAllocation(reservations);
   const g = i => document.getElementById(i);
   const u = usage || {};
   g("dt-use-kasir").textContent = u.kasir ?? "-";
@@ -12839,8 +12870,25 @@ async function loadMasterDetailExtras(id) {
   renderMasterChangeHistory();
 }
 
+function renderMasterAllocation(res) {
+  const g = i => document.getElementById(i);
+  const unit = currentMasterItem?.unit || "";
+  const lines = res?.lines || [];
+  g("dt-alloc-note").textContent = res
+    ? `Stok fisik ${formatInt(res.stock_qty)} ${unit}, ditahan ${formatInt(res.reserved_qty)} untuk Sales Order, jadi tersedia dijual ${formatInt(res.available_qty)} ${unit}.` : "";
+  g("dt-alloc-empty").classList.toggle("hidden", lines.length > 0);
+  g("dt-alloc-tbody").innerHTML = lines.map(l => `<tr class="border-b border-line last:border-b-0">
+    <td class="px-3 py-2.5"><button type="button" onclick="openPreorderFromDashboard(${l.preorder_id})" class="font-mono text-xs text-accentDark underline">${esc(l.po_number)}</button></td>
+    <td class="px-3 py-2.5 text-ink">${esc(l.customer_name || "-")}</td>
+    <td class="px-3 py-2.5">${preorderStatusBadgeHtml(l.status)}</td>
+    <td class="px-3 py-2.5 text-right tabular-nums">${formatInt(l.quantity)}</td>
+    <td class="px-3 py-2.5 text-right tabular-nums ${l.reserved ? "font-semibold text-orange-600" : "text-muted"}">${l.reserved ? formatInt(l.reserved) : "-"}</td>
+    <td class="px-3 py-2.5 text-right tabular-nums ${l.coming ? "text-ink" : "text-muted"}">${l.coming ? formatInt(l.coming) : "-"}</td>
+    <td class="px-3 py-2.5 text-right tabular-nums ${l.shortfall ? "text-failed font-medium" : "text-muted"}">${l.shortfall ? formatInt(l.shortfall) : "-"}</td></tr>`).join("");
+}
+
 function setMasterDetailTab(tab) {
-  for (const t of ["ringkasan", "aktivitas", "perubahan"]) {
+  for (const t of ["ringkasan", "alokasi", "aktivitas", "perubahan"]) {
     document.getElementById(`dt-pane-${t}`).classList.toggle("hidden", t !== tab);
   }
   document.querySelectorAll(".dt-tab").forEach(b => {

@@ -10,6 +10,7 @@ from backend import product_images
 from backend.auth import get_current_user, require_admin, require_inbound_poster
 from backend.database import (
     reserved_qty_by_item,
+    get_stock_reservations,
     category_subtree_ids,
     get_category_row,
     autocomplete_master_items,
@@ -864,6 +865,18 @@ async def master_item_usage(master_item_id: int):
     if await loop.run_in_executor(None, get_master_item, master_item_id) is None:
         raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
     return await loop.run_in_executor(None, get_master_item_usage, master_item_id)
+
+
+@router.get("/inventory/master-items/{master_item_id}/reservations")
+async def master_item_reservations(master_item_id: int):
+    """Which Sales Orders hold this item's shelf stock (K-02), for the Alokasi SO tab."""
+    loop = asyncio.get_event_loop()
+    row = await loop.run_in_executor(None, get_master_item, master_item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Barang {master_item_id} tidak ditemukan.")
+    lines = await loop.run_in_executor(None, get_stock_reservations, master_item_id)
+    held = sum(ln["reserved"] for ln in lines)
+    return {"stock_qty": row["stock_qty"], "reserved_qty": held, "available_qty": max(row["stock_qty"] - held, 0), "lines": lines}
 
 
 @router.get("/inventory/master-items/{master_item_id}/prices")

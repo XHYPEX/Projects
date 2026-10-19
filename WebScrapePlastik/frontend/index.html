@@ -22512,7 +22512,7 @@ function svcEmptyForm() {
   return { id: null, version: null, service_no: null, step: 0, mode: "nota", search: "", searchRes: null, line: null, receipt_item_id: null,
     customer_name: "", customer_phone: "", customer_id: null, plate: "", vehicle: "", vehicle_id: null, vehicle_pick: null, summary: null, no_invoice_reason: "", warranty_basis: "tanpa",
     profile_id: "", master_item_id: null, brand_name: "", product_name: "", model: "", serial_no: "", qty: 1, condition_in: "", complaint: "",
-    accessories: [], reset_consent: null, lock_removed: null, handling: "", supplier_id: "", pic: "", tech_note: "", photos: [],
+    accessories: [], reset_consent: null, lock_removed: null, handling: "", supplier_id: "", pic: "", tech_note: "", ship_courier: "", ship_mode: "", ship_awb: "", photos: [],
     warranty_status: "belum", warranty_until: null, warranty_months: null, receipt_no: null, purchase_date: null, override_status: "", override_note: "",
     skip_reason: "" };
 }
@@ -22526,6 +22526,8 @@ function svcFromServer(o, keep = {}) {
   f.warranty_basis = o.warranty_basis === "kartu" ? "kartu" : "tanpa";
   f.profile_id = o.profile_id ? String(o.profile_id) : "";
   f.supplier_id = o.supplier_id ? String(o.supplier_id) : "";
+  const plan = (o.shipments || []).find(x => x.direction === "keluar" && x.status === "draft") || {};
+  f.ship_courier = plan.courier || ""; f.ship_mode = plan.mode || ""; f.ship_awb = plan.awb || "";
   f.qty = o.qty || 1;
   f.mode = o.receipt_item_id ? "nota" : (o.no_invoice_reason ? "tanpa" : (keep.mode || "nota"));
   f.accessories = (o.accessories || []).map(a => ({ name: a.name, brought: Boolean(a.brought) }));
@@ -22567,7 +22569,7 @@ function svcCollectStep() {
     if (document.getElementById("svc-lock")) f.lock_removed = svcChecked("svc-lock");
   }
   if (f.step === 2) {
-    read("svc-sup", "supplier_id"); read("svc-pic", "pic"); read("svc-tech", "tech_note"); read("svc-ov-status", "override_status"); read("svc-ov-note", "override_note");
+    read("svc-sup", "supplier_id"); read("svc-ship-courier", "ship_courier"); read("svc-ship-mode", "ship_mode"); read("svc-ship-awb", "ship_awb"); read("svc-pic", "pic"); read("svc-tech", "tech_note"); read("svc-ov-status", "override_status"); read("svc-ov-note", "override_note");
   }
   if (f.step === 3) read("svc-skip", "skip_reason");
 }
@@ -22576,7 +22578,7 @@ function svcPayload() {
   const body = { version: f.version, customer_name: f.customer_name, customer_phone: f.customer_phone, customer_id: f.customer_id, plate: f.plate, vehicle: f.vehicle,
     brand_name: f.brand_name, product_name: f.product_name, model: f.model, serial_no: (f.serial_no || "").toUpperCase(), qty: f.qty, condition_in: f.condition_in,
     complaint: f.complaint, pic: f.pic, tech_note: f.tech_note, reset_consent: f.reset_consent, lock_removed: f.lock_removed, handling: f.handling || null,
-    supplier_id: f.supplier_id ? Number(f.supplier_id) : null, profile_id: f.profile_id ? Number(f.profile_id) : null, master_item_id: f.master_item_id,
+    supplier_id: f.supplier_id ? Number(f.supplier_id) : null, ship_courier: f.ship_courier || null, ship_mode: f.ship_mode || null, ship_awb: f.ship_awb || null, profile_id: f.profile_id ? Number(f.profile_id) : null, master_item_id: f.master_item_id,
     accessories: f.accessories };
   // K-15: the picked vehicle only counts while plate and vehicle text still match what it filled in.
   if (f.vehicle_id && f.vehicle_pick && f.vehicle_pick.plate === f.plate && f.vehicle_pick.vehicle === f.vehicle) body.vehicle_id = f.vehicle_id;
@@ -22830,6 +22832,11 @@ function svcStepHandling() {
       ${h === "menunggu" ? rtsNote("blue", "Note", "Jalur belum diputuskan, unit disimpan di toko. Supplier tujuan, PIC / teknisi, dan catatan teknisi diisi setelah memilih jalur Pemeriksaan Internal, Kirim ke Pabrik, atau Dibawa Sales Supplier.")
       : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         ${h === "internal" ? `<div class="sm:col-span-2">${rtsNote("blue", "Note", "Pemeriksaan internal dilakukan teknisi toko, jadi tidak perlu memilih supplier / principal tujuan.")}</div>` : `<div class="sm:col-span-2">${rtsField("Supplier / principal tujuan", `<select id="svc-sup" class="${RTS_IN}">${svcSupplierOpts(f.supplier_id)}</select>`, h === "kirim" || h === "sales")}</div>`}
+        ${h === "kirim" ? `<div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          ${rtsField("Ekspedisi", `<select id="svc-ship-courier" class="${RTS_IN}">${svcOpt(RTS_COURIERS.map(c => [c, c]), f.ship_courier, "Pilih ekspedisi…")}</select>`)}
+          ${rtsField("Jalur kirim", `<select id="svc-ship-mode" class="${RTS_IN}">${svcOpt(Object.entries(svcMeta.ship_modes), f.ship_mode, "Laut / udara / darat…")}</select>`)}
+          ${rtsField("No. resi", `<input id="svc-ship-awb" type="text" maxlength="60" value="${esc(f.ship_awb)}" class="${RTS_IN}">`)}
+          <div class="sm:col-span-3 text-[11px] text-muted -mt-1">Boleh dikosongkan sekarang; wajib lengkap saat unit diserahkan ke ekspedisi.</div></div>` : ""}
         ${rtsField("PIC / teknisi", `<input id="svc-pic" type="text" maxlength="120" value="${esc(f.pic)}" class="${RTS_IN}">`)}
         ${rtsField("Catatan teknisi", `<input id="svc-tech" type="text" maxlength="1000" value="${esc(f.tech_note)}" data-no-uppercase class="${RTS_IN}">`)}</div>`}`)}
     ${rtsCard("Status Garansi", `<div class="flex items-center gap-2 mb-2">${svcPill("warranty", w)}</div><p class="text-xs text-muted">${wText}${wNote}</p>
@@ -22839,7 +22846,7 @@ function svcStepHandling() {
         <input id="svc-ov-note" type="text" maxlength="300" value="${esc(f.override_note)}" placeholder="Alasan, mis. kartu garansi pabrik masih berlaku" data-no-uppercase class="${RTS_IN}"></div></div>` : ""}`)}
   </div>${svcFormFooter(`<button type="button" onclick="svcGo(3)" class="${RTS_BTN}">Lanjut ›</button>`)}`;
 }
-function svcPickHandling(k) { svcCollectStep(); svcForm.handling = k; if (k === "internal" || k === "menunggu") svcForm.supplier_id = null; svcRenderForm(); }
+function svcPickHandling(k) { svcCollectStep(); svcForm.handling = k; if (k === "internal" || k === "menunggu") svcForm.supplier_id = null; if (k !== "kirim") { svcForm.ship_courier = ""; svcForm.ship_mode = ""; svcForm.ship_awb = ""; } svcRenderForm(); }
 
 // Step 4: review
 function svcStepReview() {
@@ -22857,7 +22864,8 @@ function svcStepReview() {
         ${row("Nota asal", esc(f.mode === "nota" ? `${f.receipt_no || f.line?.receipt_no || ""} · ${svcDate(f.purchase_date || f.line?.purchase_date)}` : "Tanpa nota · " + svcLabel("no_invoice_reasons", f.no_invoice_reason)))}
         ${row("Garansi", svcPill("warranty", f.warranty_status))}</div>
       <div>${row("Jenis", esc(p ? `${p.code} · ${p.name}` : ""))}${row("Barang", esc([f.brand_name, f.product_name, f.model].filter(Boolean).join(" ")))}${row("Nomor seri", esc(f.serial_no))}
-        ${row("Jalur", esc(svcLabel("handling", f.handling)))}${row("Tujuan", esc(suppliersCache.find(s => String(s.id) === String(f.supplier_id))?.name || ""))}</div></div>
+        ${row("Jalur", esc(svcLabel("handling", f.handling)))}${row("Tujuan", esc(suppliersCache.find(s => String(s.id) === String(f.supplier_id))?.name || ""))}
+        ${f.handling === "kirim" ? row("Ekspedisi", esc(f.ship_courier)) + row("Jalur kirim", esc(svcMeta.ship_modes[f.ship_mode] || "")) + row("No. resi", esc(f.ship_awb)) : ""}</div></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-sm">
         <div class="rounded-lg bg-bg2 px-3 py-2"><div class="text-[11px] text-muted">Kondisi fisik</div><div class="text-ink whitespace-pre-wrap">${esc(f.condition_in)}</div></div>
         <div class="rounded-lg bg-bg2 px-3 py-2"><div class="text-[11px] text-muted">Keluhan</div><div class="text-ink whitespace-pre-wrap">${esc(f.complaint)}</div></div></div>
@@ -22867,8 +22875,7 @@ function svcStepReview() {
     ${rtsCard("Simpan &amp; Terima", `${miss.length ? rtsNote("red", "Belum lengkap", miss.map(esc).join("<br>")) : rtsNote("green", "Siap diterima", "Nomor service dibuat saat Simpan &amp; Terima. Setelah itu foto masuk dan data barang terkunci.")}
       ${lackPhoto.length && isAdmin() ? `<div class="mt-3">${rtsField("Alasan lewati foto wajib (admin)", `<input id="svc-skip" type="text" maxlength="200" value="${esc(f.skip_reason)}" data-no-uppercase class="${RTS_IN}">`)}</div>` : ""}
       <div class="mt-3 text-[11px] text-muted whitespace-pre-wrap">${esc(p?.terms_text || "")}</div>
-      <div class="flex flex-col gap-2 mt-4"><button type="button" onclick="svcReceive()" class="${RTS_BTN}">Simpan &amp; Terima</button>
-        <button type="button" onclick="svcSave()" class="${RTS_BTN2}">Simpan Draft</button></div>`)}
+      <div class="flex flex-col gap-2 mt-4"><button type="button" onclick="svcReceive()" class="${RTS_BTN}">Simpan &amp; Terima</button></div>`)}
   </div>${svcFormFooter("")}`;
 }
 async function svcReceive() {

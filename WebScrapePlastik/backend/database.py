@@ -12991,6 +12991,13 @@ def save_service_order(order_id: int | None, data: dict, user: dict) -> dict:
             f["vehicle_id"] = v["id"] if v else None
         cols = list(f)
         con.execute(f"UPDATE service_orders SET {', '.join(c + '=?' for c in cols)} WHERE id=?", (*[f[c] for c in cols], order_id))
+        # Kirim ke Pabrik: the planned courier / route / waybill ride on the draft shipment so the handover form comes prefilled.
+        if handling == "kirim":
+            plan = {k: data.get("ship_" + k) for k in ("courier", "mode", "awb") if "ship_" + k in data}
+            if plan:
+                _svc_apply_shipment(con, _svc_get(con, order_id), _svc_draft_shipment(con, order_id, by), plan)
+        else:
+            con.execute("DELETE FROM service_shipments WHERE order_id=? AND status='draft'", (order_id,))
         if "accessories" in data:
             con.execute("DELETE FROM service_accessories WHERE order_id=?", (order_id,))
             for pos, a in enumerate(data.get("accessories") or []):

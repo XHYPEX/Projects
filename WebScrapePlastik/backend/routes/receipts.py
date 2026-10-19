@@ -3,13 +3,21 @@ import re
 from datetime import date
 from uuid import uuid4
 
+import base64
+import binascii
+
 from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import FileResponse
 
 from backend.auth import get_current_user, require_admin
+from backend.product_images import matches_content_type
 from backend.database import (
     merge_followup_invoice,
     confirm_receipt_payment,
     hand_over_receipt,
+    peek_next_receipt_no,
+    get_handover_file,
+    get_handover_files,
     set_work_stage,
     undo_handover,
     fail_receipt_payment,
@@ -26,6 +34,7 @@ from backend.database import (
     RECEIPT_WORK_STATUSES,
     count_receipts,
     create_receipt,
+    decide_discount_request,
     decide_price_request,
     price_actor,
     find_archived_skus,
@@ -281,6 +290,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
             req.customer_id, transfer_sender, transfer_account, user["username"], req.work_status,
             _clean_extra(req, False), _override_reason(req, user), req.payment_confirmed, price_actor(user),
+            req.discount_reason, req.allow_discount_below_cost, req.allow_discount_stack,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -354,6 +364,12 @@ async def list_receipts(
     )
     response.headers["X-Total-Count"] = str(total)
     return [ReceiptOut(**r) for r in rows]
+
+
+@router.get("/receipts/next-number")
+async def next_receipt_number():
+    """Preview of the automatic nota number (PJSG/YY/MM/NNNN) for a new nota."""
+    return {"receipt_no": await asyncio.get_event_loop().run_in_executor(None, peek_next_receipt_no)}
 
 
 @router.get("/receipts/summary")
@@ -512,6 +528,9 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             req.refund_method,
             req.refund_proof,
             price_actor(user),
+            req.discount_reason,
+            req.allow_discount_below_cost,
+            req.allow_discount_stack,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save, or the new total
@@ -538,6 +557,35 @@ async def _price_decision(receipt_id: str, item_id: int, approve: bool, req: Pri
     payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
     return ReceiptDetail(**receipt, item_count=len(items), items=[_row_to_item(i) for i in items],
                          payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+async def _discount_decision(receipt_id: str, approve: bool, req: PriceDecisionRequest, user: dict) -> ReceiptDetail:
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, decide_discount_request, receipt_id, approve, req.note, user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    receipt = await loop.run_in_executor(None, get_receipt, receipt_id)
+    items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
+    payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
+    return ReceiptDetail(**receipt, item_count=len(items), items=[_row_to_item(i) for i in items],
+                         payments=[ReceiptPaymentOut(**p) for p in payments])
+
+
+@router.post("/receipts/{receipt_id}/discount/approve", response_model=ReceiptDetail)
+async def approve_receipt_discount(receipt_id: str, req: PriceDecisionRequest, user: dict = Depends(get_current_user)):
+    """Diskon nota (admin): approve the discount a staff member asked for on this nota."""
+    return await _discount_decision(receipt_id, True, req, user)
+
+
+@router.post("/receipts/{receipt_id}/discount/reject", response_model=ReceiptDetail)
+async def reject_receipt_discount(receipt_id: str, req: PriceDecisionRequest, user: dict = Depends(get_current_user)):
+    """Diskon nota (admin): reject it; the nota goes back to its last approved discount."""
+    return await _discount_decision(receipt_id, False, req, user)
 
 
 @router.post("/receipts/{receipt_id}/items/{item_id}/price/approve", response_model=ReceiptDetail)
@@ -657,18 +705,51 @@ async def set_work_stage_route(receipt_id: str, req: ReceiptWorkStageRequest, us
                    await loop.run_in_executor(None, get_receipt_payments, receipt_id))
 
 
+def _decode_data_url(raw: str, kind: str) -> dict:
+    mime = ""
+    if raw.startswith("data:"):
+        head, _, raw = raw.partition(",")
+        mime = head[5:].split(";")[0]
+    try:
+        data = base64.b64decode(raw, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=422, detail="Isi lampiran serah terima tidak valid.")
+    if not matches_content_type(mime, data):
+        raise HTTPException(status_code=422, detail="Lampiran bukan gambar JPG, PNG, atau WEBP yang valid.")
+    return {"kind": kind, "mime": mime, "data": data}
+
+
 @router.post("/receipts/{receipt_id}/handover", response_model=ReceiptDetail)
 async def hand_over_receipt_route(receipt_id: str, req: ReceiptHandoverRequest, user: dict = Depends(get_current_user)):
-    """K-08/K-09 Serah Terima Kendaraan. With a balance owed only an admin may, with a reason."""
+    """K-08/K-09 Serah Terima Kendaraan. With a balance owed only an admin may, with a reason. May carry
+    the receiver's name, photos of the vehicle and the receiver's signature."""
     loop = asyncio.get_event_loop()
+    files = [_decode_data_url(p, "foto") for p in req.photos] + ([_decode_data_url(req.signature, "tanda_tangan")] if req.signature else [])
     try:
-        updated = await loop.run_in_executor(None, hand_over_receipt, receipt_id, req.note, req.reason, user["username"], user.get("role") == "admin")
+        updated = await loop.run_in_executor(None, lambda: hand_over_receipt(
+            receipt_id, req.note, req.reason, user["username"], user.get("role") == "admin",
+            receiver_name=req.receiver_name, files=files))
     except ValueError as e:
         msg = str(e)
         status = 404 if "tidak ditemukan" in msg else 403 if msg.startswith("Hanya admin") else 422 if msg.startswith("Alasan") else 409
         raise HTTPException(status_code=status, detail=msg)
     return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
                    await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
+@router.get("/receipts/{receipt_id}/handover-files")
+async def list_handover_files_route(receipt_id: str):
+    """Photos and signature taken at Serah Terima (only those of the current, not cancelled, handover)."""
+    return await asyncio.get_event_loop().run_in_executor(None, get_handover_files, receipt_id)
+
+
+@router.get("/receipts/handover-files/{file_id}")
+async def handover_file_route(file_id: int):
+    try:
+        f = await asyncio.get_event_loop().run_in_executor(None, get_handover_file, file_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(f["path"], media_type=f["mime"])
 
 
 @router.post("/receipts/{receipt_id}/handover/undo", response_model=ReceiptDetail, dependencies=[Depends(require_admin)])

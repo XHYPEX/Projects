@@ -291,7 +291,7 @@
       .cashier-strip { grid-area: 1 / 1; border-bottom-color: transparent; }
       .cashier-main  { grid-area: 2 / 1; overflow-y: auto; min-height: 0; padding-right: 0.75rem; }
       .cashier-bar   { grid-area: 3 / 1; }
-      .cashier-rail  { grid-area: 1 / 2 / 4 / 3; overflow: hidden; padding-left: 0.75rem; padding-top: 1rem; }
+      .cashier-rail  { grid-area: 1 / 2 / 4 / 3; overflow-y: auto; overflow-x: hidden; padding-left: 0.75rem; padding-top: 1rem; }
       .cashier-strip > .cashier-inner { padding-right: 0.75rem; }
       .cashier-bar > .cashier-inner { padding-right: 0.75rem; }
       .cashier-rail > * { flex: none; }
@@ -869,7 +869,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
               </span>
               <h2 id="cashier-info-title" class="font-serif text-base font-semibold text-ink">Informasi Transaksi</h2>
-              <span id="cashier-form-title" class="inline-flex items-center rounded-full bg-bg2 px-2.5 py-0.5 text-[11px] font-medium text-muted">Nota baru</span>
+              <span id="cashier-form-title" class="inline-flex items-baseline gap-2 font-serif text-2xl font-semibold text-accentDark tabular-nums leading-none">Nota baru</span>
               <div class="ml-auto flex flex-wrap items-center gap-2">
                 <button id="cashier-settle-btn" type="button" onclick="openCashierSettleModal()"
                   class="hidden px-4 py-1.5 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">Tambah Pembayaran</button>
@@ -1077,6 +1077,16 @@
                   </div>
                 </div>
                 <p id="discount-error" class="hidden text-xs text-failed text-right px-3 py-1.5"></p>
+                <div id="discount-extra" class="hidden px-3 pb-2 space-y-1.5">
+                  <div class="flex items-center justify-end gap-2 text-xs text-muted">atau
+                    <input id="discount-pct" type="number" min="0" max="100" step="0.5" placeholder="0" oninput="discountFromPercent(this)"
+                      class="w-16 text-right border border-line rounded-lg px-2 py-1 text-xs bg-white text-ink tabular-nums disabled:opacity-40" /> % dari subtotal</div>
+                  <input id="discount-reason" type="text" maxlength="300" data-no-uppercase placeholder="Alasan diskon (wajib) — mis. pelanggan langganan"
+                    class="w-full border border-line rounded-lg px-2.5 py-1.5 text-xs bg-white text-ink disabled:opacity-40" />
+                  <label id="discount-below-wrap" class="hidden flex items-center gap-2 text-xs text-ink"><input id="discount-below" type="checkbox" class="accent-[#D97757]"> Izinkan harga akhir di bawah modal (izin khusus Admin)</label>
+                  <label id="discount-stack-wrap" class="hidden flex items-center gap-2 text-xs text-ink"><input id="discount-stack" type="checkbox" class="accent-[#D97757]"> Gabungkan dengan harga khusus yang sudah ada</label>
+                  <div id="discount-state" class="text-xs"></div>
+                </div>
                 <div id="service-total-row" class="hidden flex items-center justify-between text-xs px-3 py-1.5">
                   <span class="text-muted">Termasuk Biaya Jasa</span>
                   <span id="service-total-display" class="text-ink tabular-nums">Rp 0</span>
@@ -1170,6 +1180,8 @@
               </span>
             </div>
             <div class="px-4 pb-4">
+              <div class="text-[11px] text-muted">Nomor Nota</div>
+              <div id="cashier-summary-no" class="hidden font-serif text-2xl font-semibold text-accentDark tabular-nums leading-tight mb-2 break-all"></div>
               <div class="rounded-xl bg-accent/10 px-4 py-3.5 flex items-center gap-3">
                 <span class="w-10 h-10 rounded-full bg-white/70 text-accentDark grid place-items-center shrink-0" aria-hidden="true">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-5a2 2 0 0 1 1.9-1.3h10.2A2 2 0 0 1 19 7l2 5"/><path d="M3 12h18v5a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5Z"/><path d="M7 14.5h.01M17 14.5h.01"/></svg>
@@ -2490,6 +2502,10 @@
             </table>
           </div>
           <div id="spo-items-summary" class="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 mb-4"></div>
+          <div id="spo-refund-card" class="hidden bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
+            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Piutang Refund / Kredit Supplier</div>
+            <div id="spo-refund-list" class="space-y-3 text-sm"></div>
+          </div>
           <div id="spo-cancel-card" class="hidden bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
             <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Pembatalan Item</div>
             <div id="spo-detail-cancels" class="space-y-2 text-sm"></div>
@@ -2497,6 +2513,7 @@
         </div>
 
         <div data-spo-tab="pengiriman">
+          <div id="spo-pkg-section" class="mb-4"></div>
           <div id="spo-ship-cards" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4"></div>
           <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
             <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Riwayat Pengiriman Item</div>
@@ -2989,6 +3006,15 @@
           <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Dokumen Masuk (30 hari)</div>
           <div id="ov-inbound-count" class="font-sans text-2xl font-semibold text-ink">0</div>
         </div>
+      </div>
+
+      <!-- Notice Center: what needs attention, worked out from the documents (read-only). Hidden when nothing. -->
+      <div id="notice-center" class="hidden mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Pusat Notifikasi</h2>
+          <span id="notice-summary" class="text-xs text-muted"></span>
+        </div>
+        <div id="notice-grid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3"></div>
       </div>
 
       <!-- K-08: work finished, vehicle not yet handed back. Hidden when none. -->
@@ -4929,7 +4955,7 @@ function renderRoute() {
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
   if (route === "/cashier") { itemEntryInput()?.focus(); svcLoadSerialSkus(); }
-  if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); }
+  if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); loadNotices(); }
   if (route === "/kas-keluar") koInit();
   if (route === "/master-kategori") katInit();
   if (route === "/stock-opname") opInit();
@@ -5560,6 +5586,37 @@ async function resolveItemRowImage(row, sku) {
 // ── K-22 Harga Khusus: a price below Master Barang, per line ─────────────────────────────────────────
 // The reason is typed on the line itself. Staff's request waits for an admin; an admin's is approved on the spot.
 // Below cost needs an admin's explicit tick. The server enforces all of this; the panel only makes it visible.
+// Diskon nota (reviewed like Harga Khusus): the reason field, the % helper, and the pending / approved state of the nota.
+function discountFromPercent(el) {
+  const pct = Math.min(100, Math.max(0, parseFloat(el.value) || 0));
+  const b = cashierLastBreakdown || { gross: 0, lineDiscount: 0 };
+  setPriceInput(document.getElementById("discount-input"), Math.round((b.gross - b.lineDiscount) * pct / 100));
+  recomputeTotals();
+}
+function refreshDiscountPanel(net, discount) {
+  const box = document.getElementById("discount-extra");
+  if (!box) return;
+  const tab = getActiveTab();
+  const saved = tab && tab.receiptId ? Number(tab.discount) || 0 : 0;
+  box.classList.toggle("hidden", !(discount > 0 || (tab && tab.discountState)));
+  document.getElementById("discount-below-wrap").classList.toggle("hidden", !isAdmin() || document.getElementById("discount-below-wrap").dataset.show !== "1");
+  const st = document.getElementById("discount-state");
+  if (!tab || !tab.receiptId || !tab.discountState || discount !== saved) { st.innerHTML = ""; return; }
+  if (tab.discountState === "pending") {
+    st.innerHTML = `<div class="rounded-lg bg-pending/10 border border-pending/30 px-2.5 py-2 text-ink">Diskon <b>menunggu persetujuan Admin</b> (diajukan ${esc(tab.discountBy || "-")}). Pembayaran ditahan sampai disetujui.
+      ${isAdmin() ? `<div class="mt-1.5 flex gap-2"><button type="button" onclick="priceDecide('receipt_discount','${esc(tab.receiptId)}',0,true)" class="px-2.5 py-1 rounded-md bg-done text-white font-medium">Setujui</button>
+        <button type="button" onclick="priceDecide('receipt_discount','${esc(tab.receiptId)}',0,false)" class="px-2.5 py-1 rounded-md border border-failed text-failed font-medium">Tolak</button></div>` : ""}</div>`;
+  } else {
+    st.innerHTML = `<div class="text-muted">Diskon disetujui${tab.discountApprovedBy ? " oleh " + esc(tab.discountApprovedBy) : ""}.</div>`;
+  }
+}
+// A rejected save may need a deliberate choice: show the matching checkbox so the cashier / admin can confirm and save again.
+function revealDiscountChoice(message) {
+  const m = message || "";
+  if (/Gabungkan/.test(m)) document.getElementById("discount-stack-wrap")?.classList.remove("hidden");
+  if (/izin khusus/.test(m) && isAdmin()) { const w = document.getElementById("discount-below-wrap"); if (w) { w.dataset.show = "1"; w.classList.remove("hidden"); } }
+}
+
 function itemSpecialInfo(row) {
   const list = Number(row.dataset.listPrice) || 0;
   const qty = parseInt(row.querySelector(".item-qty").value, 10) || 0;
@@ -5615,8 +5672,8 @@ function refreshItemSpecial(row) {
 // Approve / reject a special price (admin). A refusal needs a reason; the line goes back to the normal price.
 function priceDecide(scope, docId, itemId, approve) {
   if (approve) { submitPriceDecision(scope, docId, itemId, true, ""); return; }
-  openModal("Tolak Harga Khusus", `<div class="space-y-3">
-    <p class="text-sm text-muted">Baris ini kembali ke harga normal Master Barang dan tagihan dihitung ulang. Pembayaran yang sudah masuk tidak dihapus.</p>
+  openModal(scope === "receipt_discount" ? "Tolak Diskon Nota" : "Tolak Harga Khusus", `<div class="space-y-3">
+    <p class="text-sm text-muted">${scope === "receipt_discount" ? "Nota kembali ke diskon yang disetujui sebelumnya (atau tanpa diskon) dan tagihan dihitung ulang." : "Baris ini kembali ke harga normal Master Barang dan tagihan dihitung ulang."} Pembayaran yang sudah masuk tidak dihapus.</p>
     <div><label for="price-reject-note" class="block text-xs text-muted mb-1.5">Alasan penolakan <span class="text-failed">*</span></label>
       <input id="price-reject-note" type="text" maxlength="300" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink"></div>
     <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
@@ -5627,12 +5684,15 @@ function priceDecide(scope, docId, itemId, approve) {
 async function submitPriceDecision(scope, docId, itemId, approve, note) {
   if (!approve && !(note || "").trim()) { showToast("Tulis alasan penolakan."); return; }
   try {
-    const resp = await fetch(`/api/${scope === "receipt" ? "receipts" : "preorders"}/${docId}/items/${itemId}/price/${approve ? "approve" : "reject"}`, {
+    const url = scope === "receipt_discount" ? `/api/receipts/${docId}/discount/${approve ? "approve" : "reject"}`
+      : `/api/${scope === "receipt" ? "receipts" : "preorders"}/${docId}/items/${itemId}/price/${approve ? "approve" : "reject"}`;
+    const resp = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: note || null }) });
     if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.detail || "Gagal memproses harga khusus."); }
     const data = await resp.json();
     closeModal();
-    showToast(approve ? "Harga khusus disetujui." : "Harga khusus ditolak, kembali ke harga normal.", "success");
+    const what = scope === "receipt_discount" ? "Diskon nota" : "Harga khusus";
+    showToast(approve ? `${what} disetujui.` : `${what} ditolak, kembali ke ${scope === "receipt_discount" ? "diskon sebelumnya" : "harga normal"}.`, "success");
     await afterPriceDecision(scope, docId, data);
   } catch (e) { showToast(e.message); }
 }
@@ -6336,6 +6396,7 @@ function recomputeTotals() {
   } else {
     discountError.classList.add("hidden");
   }
+  refreshDiscountPanel(net, discount);
 
   // Jumlah Dibayar is always entered by hand and starts at 0 — it is never
   // auto-filled from Total, so a sale is only ever marked paid for an amount
@@ -6378,10 +6439,38 @@ function recomputeTotals() {
 let cashierLastTotal = 0;
 let cashierLastBreakdown = { gross: 0, lineDiscount: 0, serviceTotal: 0, discount: 0 };
 
+// The nota number is the primary identifier: large in the form header and at the top of Ringkasan Pesanan.
+// A nota not saved yet shows the number it will get (assigned for real when it is saved).
+let cashierNextNo = "", cashierNextNoBusy = false;
+async function refreshCashierNextNo() {
+  if (cashierNextNoBusy) return;
+  cashierNextNoBusy = true;
+  let got = "";
+  try { const r = await fetch("/api/receipts/next-number"); if (r.ok) got = (await r.json()).receipt_no; } catch (_) {}
+  cashierNextNoBusy = false;
+  if (!got) return;  // no preview available: the header just says "Nota baru"
+  cashierNextNo = got;
+  const tab = getActiveTab();
+  if (tab && !tab.receiptNo) renderCashierNotaNo(tab);
+}
+function renderCashierNotaNo(tab) {
+  if (tab.receiptNo) cashierNextNo = "";  // a number was just used: the next new nota needs a fresh preview
+  const no = tab.receiptNo || cashierNextNo;
+  const note = tab.receiptNo ? (tab.workStatus === "draft" ? "Draft" : "") : "otomatis saat disimpan";
+  const title = document.getElementById("cashier-form-title");
+  if (title) title.innerHTML = no
+    ? `${esc(no)}${note ? ` <span class="font-sans text-[11px] font-medium text-muted">${esc(note)}</span>` : ""}`
+    : (tab.receiptId ? "Ubah nota" : "Nota baru");
+  const sum = document.getElementById("cashier-summary-no");
+  if (sum) { sum.textContent = no || ""; sum.classList.toggle("hidden", !no); }
+  if (!tab.receiptNo && !cashierNextNo && !cashierNextNoBusy) refreshCashierNextNo();
+}
+
 function renderCashierSummary() {
   const tab = getActiveTab();
   const plateEl = document.getElementById("cashier-summary-plate");
   if (!tab || !plateEl) return;
+  renderCashierNotaNo(tab);
 
   const plate = ["plate-region", "plate-number", "plate-suffix"]
     .map(id => document.getElementById(id).value.trim()).filter(Boolean).join(" ");
@@ -6474,6 +6563,10 @@ function collectReceiptPayload() {
     customer_name: customerName || null,
     items,
     discount: priceValue(document.getElementById("discount-input")),
+    // Diskon nota is reviewed like Harga Khusus: a reason is required, and an admin may allow a final price below cost.
+    discount_reason: text("discount-reason"),
+    allow_discount_below_cost: !!document.getElementById("discount-below")?.checked,
+    allow_discount_stack: !!document.getElementById("discount-stack")?.checked,
     work_notes: text("work-notes-input"),
     cashier_name: text("cashier-name-input"),
     estimated_finish_at: text("est-finish-input"),
@@ -6717,13 +6810,13 @@ async function saveReceipt(mode = "save") {
     if (!isUpdate) {
       payload.work_status = target || "draft";
       const resp = await fetchWithStockOverride("/api/receipts", { method: "POST", headers, body: JSON.stringify(payload) });
-      if (!resp.ok) { showToast(await responseErrorDetail(resp, "Nota tidak bisa disimpan.")); return; }
+      if (!resp.ok) { const m = await responseErrorDetail(resp, "Nota tidak bisa disimpan."); revealDiscountChoice(m); showToast(m); return; }
       tab.receiptId = (await resp.json()).receipt_id;
     } else {
       if (tab.dirty) {
         if (tab.revision) payload.expected_revision = tab.revision;   // refused (409) if someone else changed the nota meanwhile
         const resp = await fetchWithStockOverride(`/api/receipts/${tab.receiptId}`, { method: "PATCH", headers, body: JSON.stringify(payload) });
-        if (!resp.ok) { showToast(await responseErrorDetail(resp, "Nota tidak bisa disimpan.")); return; }
+        if (!resp.ok) { const m = await responseErrorDetail(resp, "Nota tidak bisa disimpan."); revealDiscountChoice(m); showToast(m); return; }
       }
       if (target && target !== "draft" && tab.workStatus !== target) {
         const resp = await fetchWithStockOverride(`/api/receipts/${tab.receiptId}/work-status`, {
@@ -6769,15 +6862,19 @@ async function openHandoverModal() {
     openModal("Serah Terima Kendaraan", `<div class="space-y-3">${head}
       <p class="text-sm text-ink">Diserahkan pada <b>${esc(formatDateTimeSeconds(d.handed_over_at).slice(0, 16))}</b> oleh <b>${esc(d.handed_over_by || "-")}</b>.</p>
       ${d.handover_debt > 0 ? `<p class="text-xs bg-failed/10 border border-failed/30 rounded-lg px-3 py-2 text-ink">Keluar dengan piutang <b>${formatIDR(d.handover_debt)}</b>. Sisa tagihan sekarang ${formatIDR(owed)}.</p>` : ""}
+      ${d.handover_receiver ? `<p class="text-sm text-ink">Diterima oleh <b>${esc(d.handover_receiver)}</b>.</p>` : ""}
       ${d.handover_note ? `<p class="text-sm text-muted">${esc(d.handover_note)}</p>` : ""}
+      <div id="ho-files" class="flex flex-wrap gap-2"></div>
       ${isAdmin() ? `<div><label for="ho-undo-reason" class="${REFUND_LABEL_CLS}">Salah catat? Alasan pembatalan</label>
         <input id="ho-undo-reason" type="text" maxlength="150" data-no-uppercase class="${REFUND_INPUT_CLS}"></div>` : ""}
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Tutup</button>
         ${isAdmin() ? `<button type="button" onclick="submitUndoHandover()" class="px-4 py-1.5 border border-failed/40 text-failed rounded-lg text-sm font-medium hover:bg-failed/10">Batalkan Serah Terima</button>` : ""}
       </div></div>`);
+    hoShowFiles(tab.receiptId);
     return;
   }
+  hoPhotos = []; hoSigDirty = false;
   const blocked = owed > 0 && !isAdmin();
   openModal("Serah Terima Kendaraan", `<div class="space-y-3">${head}
     <p class="text-sm text-muted">Catat bahwa mobil dan barang sudah diserahkan ke pelanggan. Jam ambil yang dijadwalkan bukan bukti serah terima.</p>
@@ -6786,12 +6883,79 @@ async function openHandoverModal() {
         ${isAdmin() ? `<div><label for="ho-reason" class="${REFUND_LABEL_CLS}">Alasan izin <span class="text-failed">*</span></label>
           <input id="ho-reason" type="text" maxlength="200" data-no-uppercase placeholder="mis. pelanggan langganan, janji bayar Jumat" class="${REFUND_INPUT_CLS}"></div>` : ""}
       </div>` : ""}
+    <div><label for="ho-receiver" class="${REFUND_LABEL_CLS}">Nama penerima <span class="normal-case text-muted/60">(yang mengambil kendaraan)</span></label>
+      <input id="ho-receiver" type="text" maxlength="80" data-no-uppercase value="${esc(d.customer_full_name || d.customer_name || "")}" class="${REFUND_INPUT_CLS}"></div>
+    <div><div class="${REFUND_LABEL_CLS}">Foto kendaraan <span class="normal-case text-muted/60">(opsional, maksimal 4)</span></div>
+      <input id="ho-photo-input" type="file" accept="image/*" capture="environment" multiple onchange="hoAddPhotos(this)" class="text-xs">
+      <div id="ho-photos" class="flex flex-wrap gap-2 mt-2"></div></div>
+    <div><div class="flex items-center justify-between"><div class="${REFUND_LABEL_CLS}">Tanda tangan penerima <span class="normal-case text-muted/60">(opsional)</span></div>
+        <button type="button" onclick="hoSigClear()" class="text-[11px] text-accentDark hover:underline">Hapus tanda tangan</button></div>
+      <canvas id="ho-sig" width="520" height="160" class="w-full border border-line rounded-lg bg-white touch-none cursor-crosshair"></canvas></div>
     <div><label for="ho-note" class="${REFUND_LABEL_CLS}">Catatan <span class="normal-case text-muted/60">(opsional)</span></label>
       <input id="ho-note" type="text" maxlength="200" data-no-uppercase placeholder="mis. diambil oleh Pak Budi" class="${REFUND_INPUT_CLS}"></div>
     <div class="flex justify-end gap-2 pt-1">
       <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
       <button type="button" id="ho-submit" ${blocked ? "disabled" : ""} onclick="submitHandover(${owed})" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Catat Serah Terima</button>
     </div></div>`);
+  hoSigInit();
+}
+
+// Serah Terima attachments: vehicle photos (shrunk before upload) and a signature drawn on a canvas.
+let hoPhotos = [], hoSigDirty = false;
+
+function hoRenderPhotos() {
+  const box = document.getElementById("ho-photos");
+  if (!box) return;
+  box.innerHTML = hoPhotos.map((u, i) => `<div class="relative"><img src="${u}" class="w-20 h-20 object-cover rounded-md border border-line" alt="Foto ${i + 1}">
+    <button type="button" onclick="hoRemovePhoto(${i})" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-failed text-white text-xs leading-none" aria-label="Hapus foto">&times;</button></div>`).join("");
+}
+function hoRemovePhoto(i) { hoPhotos.splice(i, 1); hoRenderPhotos(); }
+
+function hoShrinkImage(file) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); resolve(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+async function hoAddPhotos(input) {
+  for (const f of [...input.files]) {
+    if (hoPhotos.length >= 4) { showToast("Foto maksimal 4."); break; }
+    const u = await hoShrinkImage(f);
+    if (u) hoPhotos.push(u); else showToast("File bukan gambar yang bisa dibaca.");
+  }
+  input.value = ""; hoRenderPhotos();
+}
+
+function hoSigInit() {
+  const c = document.getElementById("ho-sig"); if (!c) return;
+  const ctx = c.getContext("2d");
+  ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#141413";
+  let drawing = false;
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.onpointerdown = e => { drawing = true; c.setPointerCapture(e.pointerId); const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 0.1, y + 0.1); ctx.stroke(); hoSigDirty = true; };
+  c.onpointermove = e => { if (!drawing) return; const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); };
+  c.onpointerup = c.onpointercancel = () => { drawing = false; };
+}
+function hoSigClear() {
+  const c = document.getElementById("ho-sig"); if (!c) return;
+  c.getContext("2d").clearRect(0, 0, c.width, c.height); hoSigDirty = false;
+}
+
+async function hoShowFiles(receiptId) {
+  const box = document.getElementById("ho-files");
+  if (!box) return;
+  try {
+    const files = await fetch(`/api/receipts/${encodeURIComponent(receiptId)}/handover-files`).then(r => r.ok ? r.json() : []);
+    box.innerHTML = files.map(f => `<a href="/api/receipts/handover-files/${f.id}" target="_blank" rel="noopener" title="${f.kind === "tanda_tangan" ? "Tanda tangan" : "Foto kendaraan"}">
+      <img src="/api/receipts/handover-files/${f.id}" alt="${f.kind === "tanda_tangan" ? "Tanda tangan" : "Foto kendaraan"}" class="h-20 ${f.kind === "tanda_tangan" ? "bg-white" : "w-20 object-cover"} rounded-md border border-line"></a>`).join("");
+  } catch (_) {}
 }
 
 async function submitHandover(owed) {
@@ -6801,7 +6965,9 @@ async function submitHandover(owed) {
   if (owed > 0 && reason.length < 3) { showToast("Alasan izin wajib diisi (minimal 3 karakter)."); return; }
   const resp = await fetch(`/api/receipts/${tab.receiptId}/handover`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ note: document.getElementById("ho-note").value.trim() || null, reason: reason || null }),
+    body: JSON.stringify({ note: document.getElementById("ho-note").value.trim() || null, reason: reason || null,
+      receiver_name: document.getElementById("ho-receiver").value.trim() || null, photos: hoPhotos,
+      signature: hoSigDirty ? document.getElementById("ho-sig").toDataURL("image/png") : null }),
   });
   if (!resp.ok) { showToast(await responseErrorDetail(resp, "Serah terima tidak bisa dicatat.")); return; }
   closeModal();
@@ -7486,6 +7652,8 @@ function tabStateFromReceipt(tabId, r) {
     startedAt: r.started_at || r.created_at,
     createdAt: r.created_at,
     discount: String(r.discount),
+    discountState: r.discount_state || null, discountReason: r.discount_reason || "", discountBy: r.discount_requested_by || "",
+    discountApprovedBy: r.discount_approved_by || "",
     amountPaid: String(r.amount_paid),
     pendingAmount: r.pending_amount || 0,
     paymentMethod: r.payment_method || "cash",
@@ -7569,6 +7737,7 @@ function captureFormIntoActiveTab() {
   tab.customerPhone = document.getElementById("customer-phone").value;
   tab.customerName = document.getElementById("customer-name").value;
   tab.discount = document.getElementById("discount-input").value;
+  tab.discountReason = document.getElementById("discount-reason").value;
   tab.amountPaid = String(priceValue(document.getElementById("amount-paid-input")));
   tab.paymentMethod = document.getElementById("payment-method-select").value;
   tab.transferSender = document.getElementById("transfer-sender-input").value;
@@ -7688,6 +7857,9 @@ function renderCashierForm() {
   for (const item of tab.items) addItemRow(item);
 
   setPriceInput(document.getElementById("discount-input"), tab.discount || 0);
+  document.getElementById("discount-reason").value = tab.discountReason || "";
+  document.getElementById("discount-pct").value = "";
+  for (const id of ["discount-below", "discount-stack"]) { const c = document.getElementById(id); if (c) c.checked = false; }
   setPriceInput(document.getElementById("amount-paid-input"), tab.amountPaid ?? 0);
   document.getElementById("payment-method-select").value = tab.paymentMethod || "cash";
   document.getElementById("transfer-sender-input").value = tab.transferSender || "";
@@ -7703,9 +7875,7 @@ function renderCashierForm() {
   document.getElementById("veh-year-input").value = tab.vehYear || "";
   renderCashierVehicleChips();
 
-  document.getElementById("cashier-form-title").textContent = tab.receiptNo
-    ? `No. Nota ${tab.receiptNo}${tab.workStatus === "draft" ? " (Draft)" : ""}`
-    : tab.receiptId ? "Ubah nota" : "Nota baru";
+  renderCashierNotaNo(tab);
   document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId);
   loadCashierTimeline();
 
@@ -7737,7 +7907,7 @@ function applyCashierVoidLock(tab) {
   const lockIds = [
     "plate-region", "plate-number", "plate-suffix", "customer-phone", "customer-name",
     "cashier-customer-search", "cashier-customer-new-btn",
-    "add-item-btn", "add-service-btn", "discount-input", "amount-paid-input",
+    "add-item-btn", "add-service-btn", "discount-input", "discount-reason", "discount-pct", "discount-below", "discount-stack", "amount-paid-input",
     "payment-method-select", "cashier-name-input", "est-finish-input", "work-notes-input",
     "veh-make-input", "veh-model-input", "veh-color-input", "veh-year-input",
   ];
@@ -11156,6 +11326,52 @@ async function loadPendingPayments() {
   }).join("");
 }
 
+// Notice Center: computed on the server from the documents, so there is nothing to keep in step. A notice only
+// opens the module where the action is taken.
+const NOTICE_TONE = {
+  tinggi: { border: "border-failed/40", dot: "bg-failed", label: "Mendesak" },
+  sedang: { border: "border-pending/40", dot: "bg-pending", label: "Perlu dicek" },
+  info: { border: "border-line", dot: "bg-muted", label: "Info" },
+};
+
+function noticeOpen(type, id) {
+  if (type === "preorder") openPreorderFromDashboard(id);
+  else if (type === "supplier_po") openSupplierPoFromActivity(id);
+  else if (type === "receipt") openReceiptFromHistory(id);
+  else if (type === "purchase_invoice") openPurchaseInvoiceById(id);
+  else if (type === "inbound_doc") jumpToInboundDocument(Number(id));
+  else if (type === "master_item") goToInventoryRoute("/master-barang", () => viewMasterItem(Number(id)));
+  else if (type === "supplier_po_list") location.hash = "/supplier-po";
+}
+
+async function loadNotices() {
+  const box = document.getElementById("notice-center");
+  if (!box) return;
+  let data = null;
+  try { const resp = await fetch("/api/notices"); if (resp.ok) data = await resp.json(); } catch (_) {}
+  const groups = data ? data.groups : [];
+  box.classList.toggle("hidden", groups.length === 0);
+  if (!groups.length) return;
+  document.getElementById("notice-summary").textContent = data.urgent ? `${data.urgent} hal mendesak` : "Tidak ada yang mendesak";
+  document.getElementById("notice-grid").innerHTML = groups.map(g => {
+    const tone = NOTICE_TONE[g.severity] || NOTICE_TONE.info;
+    const rows = g.items.map(it => `<button type="button" onclick="noticeOpen('${esc(it.link.type)}','${esc(it.link.id)}')"
+        class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg2 transition-colors">
+        <div class="text-sm text-ink truncate">${esc(it.title)}</div><div class="text-xs text-muted truncate">${esc(it.sub || "")}</div></button>`).join("");
+    const head = g.link ? `<button type="button" onclick="noticeOpen('${esc(g.link.type)}','')" class="text-left">` : "<div>";
+    const headEnd = g.link ? "</button>" : "</div>";
+    return `<section class="bg-white border ${tone.border} rounded-xl p-3">
+      <div class="flex items-start justify-between gap-2">
+        ${head}<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${tone.dot}" title="${tone.label}"></span><h3 class="font-serif text-sm font-semibold text-ink">${esc(g.title)}</h3></div>
+          <p class="text-[11px] text-muted mt-0.5">${esc(g.hint)}</p>${headEnd}
+        <span class="shrink-0 text-xs font-semibold tabular-nums text-ink bg-bg2 border border-line rounded-full px-2 py-0.5">${g.count}</span>
+      </div>
+      ${rows ? `<div class="mt-2 -mx-1">${rows}</div>` : ""}
+      ${g.more ? `<div class="text-[11px] text-muted mt-1 px-2">+ ${g.more} lainnya</div>` : ""}
+    </section>`;
+  }).join("");
+}
+
 // K-22 dashboard card (admin): special prices waiting for approval, newest first.
 async function loadPricePending() {
   const card = document.getElementById("price-card");
@@ -13544,6 +13760,31 @@ function inboundNetCost(i) {
   return i.est_unit_price - Math.round(i.est_unit_price * (i.discount_pct || 0) / 100);
 }
 
+// Paket Pengiriman in the Barang Masuk picker: a line split into packages names the package that arrived.
+function inboundOpenPackages(item) { return inboundPoDoc ? spoOpenPackagesFor(inboundPoDoc, item.id) : []; }
+function inboundPkgMax(item, pkgId, left) {
+  const pks = inboundOpenPackages(item);
+  if (!pks.length) return left;
+  const pk = pks.find(x => x.id === pkgId) || pks[0];
+  return Math.min(left, pk.lines.find(l => l.item_id === item.id).remaining);
+}
+function inboundPkgSelect(item, picked) {
+  const pks = inboundOpenPackages(item);
+  if (!pks.length) return '<span class="text-muted text-[11px]">Tanpa paket</span>';
+  const cur = picked ? picked.spo_package_id : null;
+  return `<select data-ibp-pkg="${item.id}" onchange="inboundPkgChange(${item.id})" class="border border-line rounded-md px-2 py-1 text-xs bg-white text-ink w-40">${pks.map(p => {
+    const rem = p.lines.find(l => l.item_id === item.id).remaining;
+    return `<option value="${p.id}" ${p.id === cur ? "selected" : ""}>${esc(p.package_no.split("-").pop())} · ${esc(p.forwarder_name || "tanpa ekspedisi")} · sisa ${rem}</option>`; }).join("")}</select>`;
+}
+function inboundPkgChange(itemId) {
+  const item = inboundPoDoc.items.find(i => i.id === itemId);
+  const left = item.quantity - item.qty_cancelled - item.qty_received;
+  const sel = document.querySelector(`#modal-body [data-ibp-pkg="${itemId}"]`);
+  const qEl = document.querySelector(`#modal-body [data-ibp-qty="${itemId}"]`);
+  const max = inboundPkgMax(item, parseInt(sel.value, 10), left);
+  qEl.dataset.max = String(max); qEl.max = String(max); qEl.value = String(max);
+}
+
 function openInboundPoPicker() {
   if (!inboundPoDoc) { showToast("Pilih Purchase Order terlebih dahulu."); return; }
   const picked = new Map(inboundPoLines.map(l => [l.spo_item_id, l]));
@@ -13556,13 +13797,14 @@ function openInboundPoPicker() {
       <div class="border border-line rounded-lg p-2.5"><div class="text-[10px] uppercase text-muted">Supplier Terpilih</div><div class="font-semibold text-ink">${esc(inboundPoDoc.supplier_name_snapshot)}</div><div class="text-muted">Nomor PO: ${esc(inboundPoDoc.po_number)}</div></div>
       <div class="border border-line rounded-lg p-2.5"><div class="text-[10px] uppercase text-muted">Surat Jalan</div><div class="font-semibold text-ink">${esc(document.getElementById("inbound-sj").value || "belum diisi")}</div></div></div>
     <div class="border border-line rounded-lg overflow-x-auto"><table class="w-full text-xs"><thead class="bg-bg2"><tr>
-      <th class="${SPO_TH} w-8"></th><th class="${SPO_TH}">Produk / Sales Order</th><th class="${SPO_TH}">Jalur / Status</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah</th><th class="${SPO_THR}">Belum</th><th class="${SPO_THR}">Terima Kini</th></tr></thead><tbody>
+      <th class="${SPO_TH} w-8"></th><th class="${SPO_TH}">Produk / Sales Order</th><th class="${SPO_TH}">Jalur / Status</th><th class="${SPO_TH}">Paket</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah</th><th class="${SPO_THR}">Belum</th><th class="${SPO_THR}">Terima Kini</th></tr></thead><tbody>
       ${rows.map(({ i, left }) => { const p = picked.get(i.id); const linked = i.master_item_id != null; return `<tr class="border-b border-line last:border-b-0 ${linked ? "" : "opacity-50"}">
         <td class="px-3 py-2"><input type="checkbox" data-ibp-check="${i.id}" ${p ? "checked" : ""} ${linked ? "" : "disabled"} class="accent-[#D97757]"></td>
         <td class="px-3 py-2"><div class="font-medium text-ink">${esc(i.product_name)}</div><div class="text-[11px] text-muted">${i.sku ? "SKU " + esc(i.sku) + " · " : ""}${esc(i.customer_po_number || "tanpa Sales Order")}${i.customer_name ? " · " + esc(i.customer_name) : ""}${linked ? "" : " · belum terhubung ke Master Barang"}</div></td>
         <td class="px-3 py-2">${spoShipMethodPill(i.ship_method)} <div class="mt-1">${spoItemStatusPill(i.item_status)}</div></td>
+        <td class="px-3 py-2">${inboundPkgSelect(i, p)}</td>
         <td class="px-3 py-2 text-right tabular-nums">${i.quantity - i.qty_cancelled}</td><td class="px-3 py-2 text-right tabular-nums">${i.qty_received}</td><td class="px-3 py-2 text-right tabular-nums">${left}</td>
-        <td class="px-3 py-2 text-right"><input type="number" min="1" max="${left}" step="1" value="${p ? p.qty_in : left}" data-ibp-qty="${i.id}" data-max="${left}" ${linked ? "" : "disabled"} class="${inp}"></td></tr>`; }).join("")}
+        <td class="px-3 py-2 text-right"><input type="number" min="1" max="${inboundPkgMax(i, p ? p.spo_package_id : null, left)}" step="1" value="${p ? p.qty_in : inboundPkgMax(i, null, left)}" data-ibp-qty="${i.id}" data-max="${inboundPkgMax(i, p ? p.spo_package_id : null, left)}" ${linked ? "" : "disabled"} class="${inp}"></td></tr>`; }).join("")}
     </tbody></table></div>
     <div class="flex justify-end gap-2 pt-3"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
       <button type="button" onclick="applyInboundPoPicker()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">Tambahkan ke Dokumen</button></div>`, { wide: true });
@@ -13578,13 +13820,15 @@ function applyInboundPoPicker() {
     const max = parseInt(qEl.dataset.max, 10);
     const qty = Math.min(Math.max(parseInt(qEl.value, 10) || 0, 0), max);
     if (qty <= 0) continue;
+    const pkSel = document.querySelector(`#modal-body [data-ibp-pkg="${id}"]`);
+    const pkgId = pkSel ? parseInt(pkSel.value, 10) : null;
     const prev = inboundPoLines.find(l => l.spo_item_id === id);
     lines.push({
       spo_item_id: id, master_item_id: item.master_item_id, product_name: item.product_name, sku: item.sku || "",
       customer_po_number: item.customer_po_number, customer_name: item.customer_name, ship_method: item.ship_method,
       item_status: item.item_status, qty_po: item.quantity - item.qty_cancelled, qty_before: item.qty_received, left: max,
       qty_in: qty, cost_price: prev ? prev.cost_price : inboundNetCost(item), condition: prev ? prev.condition : "baik",
-      sell_price: item.sell_price, barcode: item.barcode || "",
+      sell_price: item.sell_price, barcode: item.barcode || "", spo_package_id: pkgId,
     });
   }
   if (!lines.length) { showToast("Pilih minimal satu barang dengan jumlah lebih dari 0."); return; }
@@ -13602,12 +13846,13 @@ function renderInboundPoRows() {
     return;
   }
   const inp = "border border-line rounded-md px-2 py-1 text-xs bg-white text-ink";
-  box.innerHTML = `<table class="w-full min-w-[900px] text-sm"><thead class="bg-bg2"><tr>
-    <th class="${SPO_TH}">Barang / Sales Order</th><th class="${SPO_TH}">Jalur Pengiriman</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah Terima</th>
+  box.innerHTML = `<table class="w-full min-w-[1000px] text-sm"><thead class="bg-bg2"><tr>
+    <th class="${SPO_TH}">Barang / Sales Order</th><th class="${SPO_TH}">Jalur Pengiriman</th><th class="${SPO_TH}">Paket</th><th class="${SPO_THR}">Qty PO</th><th class="${SPO_THR}">Sudah Terima</th>
     <th class="${SPO_THR}">Terima Sekarang</th><th class="${SPO_THR}">Sisa Setelah</th><th class="${SPO_THR}">Harga Beli</th><th class="${SPO_TH}">Kondisi</th><th class="${SPO_TH} w-10"></th></tr></thead><tbody>
     ${inboundPoLines.map((l, idx) => `<tr class="border-b border-line last:border-b-0 align-middle">
       <td class="px-3 py-2"><div class="font-medium text-ink">${esc(l.product_name)}</div><div class="text-[11px] text-muted">${l.sku ? "SKU " + esc(l.sku) + " · " : ""}${esc(l.customer_po_number || "—")}${l.customer_name ? " · " + esc(l.customer_name) : ""}</div></td>
       <td class="px-3 py-2">${spoShipMethodPill(l.ship_method)}</td>
+      <td class="px-3 py-2 text-xs text-ink">${esc(inboundPkgLabel(l))}</td>
       <td class="px-3 py-2 text-right tabular-nums">${l.qty_po}</td><td class="px-3 py-2 text-right tabular-nums">${l.qty_before}</td>
       <td class="px-3 py-2 text-right"><input type="number" min="1" max="${l.left}" step="1" value="${l.qty_in}" oninput="onInboundPoQty(${idx}, this)" class="${inp} w-16 text-right"></td>
       <td class="px-3 py-2 text-right tabular-nums" data-ibr-left="${idx}">${l.qty_po - l.qty_before - l.qty_in}</td>
@@ -13616,6 +13861,11 @@ function renderInboundPoRows() {
       <td class="px-3 py-2"><button type="button" onclick="removeInboundPoLine(${idx})" class="text-muted hover:text-failed" aria-label="Hapus baris">&times;</button></td></tr>`).join("")}
     </tbody></table>`;
   box.querySelectorAll("[data-ibr-cost]").forEach(el => setPriceInput(el, inboundPoLines[parseInt(el.dataset.ibrCost, 10)].cost_price));
+}
+
+function inboundPkgLabel(l) {
+  const pk = l.spo_package_id && inboundPoDoc ? (inboundPoDoc.packages || []).find(p => p.id === l.spo_package_id) : null;
+  return pk ? `${pk.package_no.split("-").pop()} · ${pk.forwarder_name || "—"}` : "—";
 }
 
 function onInboundPoQty(idx, el) {
@@ -13719,7 +13969,7 @@ async function renderInboundFormFromDocument(doc) {
         return { spo_item_id: i.spo_item_id, master_item_id: i.master_item_id, product_name: i.resolved_name || it.product_name || "", sku: i.resolved_sku || it.sku || "",
           customer_po_number: it.customer_po_number, customer_name: it.customer_name, ship_method: it.ship_method, item_status: it.item_status,
           qty_po: (it.quantity || 0) - (it.qty_cancelled || 0), qty_before: it.qty_received || 0, left, qty_in: i.qty_in, cost_price: i.cost_price, condition: i.condition || "baik",
-          sell_price: it.sell_price, barcode: it.barcode || "" };
+          sell_price: it.sell_price, barcode: it.barcode || "", spo_package_id: i.spo_package_id || null };
       });
     }
     setInboundMode("po");
@@ -14092,7 +14342,7 @@ function returnToCashierWithItem(item) {
 function collectInboundPayload() {
   const po = inboundMode === "po";
   const items = po
-    ? inboundPoLines.map(l => ({ master_item_id: l.master_item_id, qty_in: l.qty_in, cost_price: l.cost_price, spo_item_id: l.spo_item_id, condition: l.condition || "baik" }))
+    ? inboundPoLines.map(l => ({ master_item_id: l.master_item_id, qty_in: l.qty_in, cost_price: l.cost_price, spo_item_id: l.spo_item_id, spo_package_id: l.spo_package_id || null, condition: l.condition || "baik" }))
     : [...document.querySelectorAll("#inbound-item-rows .inbound-item-row")].map(row => ({
       master_item_id: row.dataset.masterItemId ? parseInt(row.dataset.masterItemId, 10) : null,
       qty_in: parseInt(row.querySelector(".row-qty").value, 10) || 0,
@@ -16379,6 +16629,14 @@ function onPoProductBlur(inputEl) {
   setTimeout(() => poRowDropdown(inputEl).classList.add("hidden"), 150);
 }
 
+// Stock left to sell (shelf stock minus what is already held for other Sales Orders), shown in the product picker.
+function poStockBadge(item) {
+  const avail = item.available_qty != null ? item.available_qty : Math.max((item.stock_qty || 0) - (item.reserved_qty || 0), 0);
+  const held = item.reserved_qty || 0;
+  const cls = avail <= 0 ? "text-failed font-medium" : "text-done font-medium";
+  return `<span class="${cls}">· Tersedia ${avail}${item.unit ? " " + esc(item.unit) : ""}</span>${held > 0 ? `<span>· dicadangkan ${held}</span>` : ""}`;
+}
+
 async function searchPoProducts(inputEl, query) {
   let results = [];
   try {
@@ -16399,6 +16657,7 @@ async function searchPoProducts(inputEl, query) {
           <span class="font-mono">${esc(item.sku)}</span>
           <span>· ${esc(item.unit)}</span>
           <span>· Jual ${formatIDR(item.sell_price)}</span>
+          ${poStockBadge(item)}
         </div>
       </button>
     `).join("");
@@ -16888,7 +17147,9 @@ function soItemSourceHtml(item) {
   const sup = item.source === "supplier"
     ? (item.supplier_name ? ` · ${esc(item.supplier_name)}` : ' · <span class="text-failed">supplier belum dipilih</span>') : "";
   const pos = (item.supplier_pos || []).map(sp => `<button type="button" onclick="event.stopPropagation(); openSupplierPoFromActivity('${esc(sp.supplier_po_id)}')" class="text-accentDark hover:underline tabular-nums">${esc(sp.po_number)}</button>`).join(", ");
-  return `<div class="text-[11px] text-muted mt-0.5">${esc(label)}${sup}${item.eta_date ? ` · estimasi ${esc(formatPoDate(item.eta_date))}` : ""}${pos ? ` · ${pos}` : ""}</div>`;
+  const pkgs = (item.supplier_pos || []).flatMap(sp => sp.packages || []).map(pk =>
+    `<div class="text-[11px] text-muted">Paket ${esc(pk.package_no.split("-").pop())} · ${esc(pk.forwarder_name || "ekspedisi belum dipilih")}${pk.ship_method ? " · " + esc(SPO_SHIP_METHODS[pk.ship_method] || pk.ship_method) : ""} · ${pk.qty} pcs · ${spoItemStatusPill(pk.state)}${pk.received ? ` · diterima ${pk.received}` : ""}${pk.eta_date ? " · ETA " + esc(formatPoDate(pk.eta_date)) : ""}</div>`).join("");
+  return `<div class="text-[11px] text-muted mt-0.5">${esc(label)}${sup}${item.eta_date ? ` · estimasi ${esc(formatPoDate(item.eta_date))}` : ""}${pos ? ` · ${pos}` : ""}</div>${pkgs}`;
 }
 
 function renderPreorderDetail(detail) {
@@ -19215,6 +19476,7 @@ function spoShipMethodPill(m) {
 }
 
 function renderSpoShippingTab(po) {
+  renderSpoPackages(po);
   const live = po.items.filter(i => i.item_status !== "dibatalkan");
   document.getElementById("spo-ship-cards").innerHTML = live.length ? live.map(i => {
     const left = spoItemLeft(i);
@@ -19230,7 +19492,8 @@ function renderSpoShippingTab(po) {
         <dt class="text-muted">Tgl Kirim</dt><dd class="text-ink">${i.shipped_date ? esc(formatPoDate(i.shipped_date)) : "—"}</dd>
         <dt class="text-muted">ETA</dt><dd class="text-ink">${i.eta_date ? esc(formatPoDate(i.eta_date)) : "—"}</dd>
         <dt class="text-muted">Lokasi</dt><dd class="text-ink">${esc(i.transit_location || "—")}</dd></dl>
-      ${(po.status === "dipesan" || po.status === "sebagian_diterima") && left > 0 ? `<div class="mt-3 text-right">${spoActionButton("Update Status Pengiriman", `openSpoItemShippingModal(${i.id})`, true)}</div>` : ""}
+      ${i.has_packages ? `<div class="mt-3 text-xs text-muted">Dibagi ke paket pengiriman: ${i.pkg_open} pcs di jalan${i.pkg_free > 0 ? `, ${i.pkg_free} pcs belum dipaketkan` : ""}. Status diatur lewat paketnya.</div>`
+        : (po.status === "dipesan" || po.status === "sebagian_diterima") && left > 0 ? `<div class="mt-3 text-right">${spoActionButton("Update Status Pengiriman", `openSpoItemShippingModal(${i.id})`, true)}</div>` : ""}
     </div>`;
   }).join("") : '<p class="text-sm text-muted">Belum ada item.</p>';
   const names = Object.fromEntries(po.items.map(i => [i.id, i.product_name]));
@@ -19243,6 +19506,294 @@ function renderSpoShippingTab(po) {
     <td class="px-3 py-2 tabular-nums text-ink">${h.eta_date ? esc(formatPoDate(h.eta_date)) : "—"}</td>
     <td class="px-3 py-2 text-muted">${esc(h.by_user || "—")}</td></tr>`).join("")
     : `<tr><td colspan="7" class="px-3 py-6 text-center text-muted">Belum ada pembaruan pengiriman per item.</td></tr>`;
+}
+
+// ── Batal PO dengan persetujuan supplier, Piutang Refund / Kredit Supplier ─────────────────────────
+function spoRefundKindField() {
+  const paid = currentSpo ? currentSpo.paid_amount : 0;
+  return `<div><label for="spo-rc-kind" class="${SPO_LABEL}">Uang muka yang sudah dibayar${paid ? " (" + formatIDR(paid) + ")" : ""}: kembali sebagai</label>
+    <select id="spo-rc-kind" class="${SPO_INPUT}"><option value="">Tidak ada uang yang kembali</option><option value="refund">Refund (uang kembali ke rekening/kas)</option><option value="kredit">Kredit Supplier (potong tagihan berikutnya)</option></select>
+    <p class="text-[11px] text-muted mt-1">Hanya dicatat sebagai piutang. Refund dianggap diterima setelah uang benar-benar masuk; kredit baru bisa dipakai setelah nota kredit supplier dikonfirmasi.</p></div>`;
+}
+
+function openSpoCancelAllModal() {
+  const po = currentSpo; if (!po) return;
+  const left = po.items.reduce((a, i) => a + Math.max(spoItemLeft(i), 0), 0);
+  openModal("Ajukan Batal PO ke Supplier", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink">${esc(po.po_number)}: seluruh sisa barang yang belum datang (<b>${left} pcs</b>) diajukan batal. PO tetap berjalan sampai supplier menjawab. ${po.paid_amount ? "Uang muka " + formatIDR(po.paid_amount) + " sudah dibayar." : ""}</p>
+      <p class="text-xs text-muted">Barang yang sudah diterima toko tidak ikut dibatalkan; gunakan Retur Supplier untuk itu. Barang inden customer tidak otomatis batal.</p>
+      <div><label for="spo-ca-reason" class="${SPO_LABEL}">Alasan <span class="text-failed">*</span></label><input id="spo-ca-reason" type="text" maxlength="200" data-no-uppercase class="${SPO_INPUT}"></div>
+      <div><label for="spo-ca-action" class="${SPO_LABEL}">Tindakan lanjutan untuk barangnya</label>
+        <select id="spo-ca-action" class="${SPO_INPUT}">${SPO_CANCEL_ACTIONS.map(a => `<option value="${a.key}" ${a.key === "tidak_ada" ? "selected" : ""}>${esc(a.label)}</option>`).join("")}</select></div>
+      ${spoModalButtons("Ajukan ke Supplier", "submitSpoCancelAll()", true)}
+    </div>`);
+}
+function submitSpoCancelAll() {
+  const reason = document.getElementById("spo-ca-reason").value.trim();
+  if (!reason) { showToast("Alasan wajib diisi."); return; }
+  spoSend("cancel-all", { reason, action: document.getElementById("spo-ca-action").value }, "Pembatalan diajukan. Catat jawaban supplier setelah ada kabar.");
+}
+function openSpoResolveAllModal(approved) {
+  openModal(approved ? "Supplier Menyetujui Pembatalan PO" : "Supplier Menolak Pembatalan PO", `
+    <div class="space-y-3">
+      <p class="text-sm text-muted">${approved ? "Seluruh sisa barang dikeluarkan dari PO. Barang yang sudah diterima tetap tercatat." : "Permintaan ditutup; PO tetap berjalan seperti semula."}</p>
+      ${approved ? spoRefundKindField() : ""}
+      <div><label for="spo-rc-note" class="${SPO_LABEL}">Catatan <span class="normal-case font-normal">(opsional)</span></label><textarea id="spo-rc-note" rows="2" maxlength="300" data-no-uppercase class="${SPO_INPUT}"></textarea></div>
+      ${spoModalButtons(approved ? "Catat Persetujuan" : "Catat Penolakan", `submitSpoResolveAll(${approved})`, !approved)}
+    </div>`);
+}
+function submitSpoResolveAll(approved) {
+  spoSend("cancel-all/resolve", { approved, note: document.getElementById("spo-rc-note").value.trim() || null, refund_kind: document.getElementById("spo-rc-kind")?.value || null },
+    approved ? "Pembatalan disetujui supplier dan diterapkan." : "Penolakan supplier dicatat. PO tetap berjalan.");
+}
+
+const REFUND_STATUS = { menunggu: ["Menunggu", "bg-amber-100 text-amber-800"], diterima: ["Uang Sudah Diterima", "bg-green-100 text-green-800"],
+  dikonfirmasi: ["Kredit Dikonfirmasi", "bg-green-100 text-green-800"], dibatalkan: ["Dibatalkan", "bg-red-100 text-red-800"] };
+function renderSpoRefundCard(po) {
+  const claims = isAdmin() ? (po.refund_claims || []) : [];
+  document.getElementById("spo-refund-card").classList.toggle("hidden", claims.length === 0);
+  document.getElementById("spo-refund-list").innerHTML = claims.map(c => {
+    const st = REFUND_STATUS[c.status] || [c.status, "bg-bg2 text-muted"];
+    return `<div class="border border-line rounded-lg px-3 py-2.5">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div><span class="font-mono text-ink">${esc(c.claim_no)}</span> <span class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${st[1]}">${esc(st[0])}</span>
+          <div class="text-xs text-muted">${c.kind === "refund" ? "Piutang Refund Supplier" : "Kredit Supplier"} &middot; ${esc(formatReceiptWhen(c.created_at, true))}${c.created_by ? " &middot; " + esc(c.created_by) : ""}</div></div>
+        <div class="text-right tabular-nums"><div class="text-ink font-medium">${formatIDR(c.amount)}</div><div class="text-xs text-muted">${c.kind === "refund" ? "uang masuk" : "kredit dikonfirmasi"} ${formatIDR(c.settled_amount)}${c.status === "menunggu" ? " · sisa " + formatIDR(c.left) : ""}</div></div></div>
+      ${c.credit_notes.map(n => `<div class="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs bg-bg2 rounded-md px-2.5 py-1.5">
+        <span class="text-ink">${n.kind === "refund" ? "Refund diterima " + esc((n.method || "") + (n.reference_no ? " · " + n.reference_no : "")) : "Nota kredit " + esc(n.cn_number || "") + (n.supplier_cn_no ? " (supplier " + esc(n.supplier_cn_no) + ")" : "")}
+          <span class="text-muted"> · ${esc(n.issued_at || "")}</span></span>
+        <span class="tabular-nums text-ink">${formatIDR(n.amount)}${n.kind === "kredit" && n.status === "aktif" ? ` · saldo ${formatIDR(n.unallocated)}` : ""}
+          ${n.kind === "kredit" && n.unallocated > 0 && (po.open_invoices || []).length ? `<button type="button" onclick="openCreditAllocateModal(${n.id}, ${n.unallocated})" class="ml-2 text-accentDark hover:underline">Alokasikan ke Faktur</button>` : ""}</span></div>`).join("")}
+      ${c.status === "menunggu" ? `<div class="mt-2 flex justify-end gap-1.5">
+        <button type="button" onclick="openRefundSettleModal(${c.id})" class="px-2.5 py-1 border border-accent text-accentDark rounded-lg text-xs font-medium bg-white hover:bg-accent/10">${c.kind === "refund" ? "Catat Uang Masuk" : "Konfirmasi Nota Kredit"}</button>
+        <button type="button" onclick="openRefundCancelModal(${c.id})" class="px-2.5 py-1 border border-line rounded-lg text-xs font-medium text-failed bg-white hover:bg-failed/10">Batalkan Klaim</button></div>` : ""}
+      ${c.close_reason ? `<div class="text-xs text-muted mt-1">${esc(c.close_reason)}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+function openRefundSettleModal(claimId) {
+  const c = (currentSpo.refund_claims || []).find(x => x.id === claimId); if (!c) return;
+  const refund = c.kind === "refund";
+  openModal(refund ? "Catat Uang Refund Masuk" : "Konfirmasi Nota Kredit Supplier", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink">${esc(c.claim_no)} · sisa klaim <b>${formatIDR(c.left)}</b>. ${refund ? "Catat hanya bila uangnya benar-benar sudah masuk." : "Catat setelah supplier menerbitkan nota kredit."}</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label for="rf-amount" class="${SPO_LABEL}">Nilai <span class="text-failed">*</span></label><input id="rf-amount" type="text" inputmode="numeric" class="price-input ${SPO_INPUT} text-right"></div>
+        <div><label for="rf-date" class="${SPO_LABEL}">Tanggal</label><input id="rf-date" type="date" value="${toDateInputValue(new Date())}" data-no-uppercase class="${SPO_INPUT}"></div>
+        ${refund ? `<div><label for="rf-method" class="${SPO_LABEL}">Metode <span class="text-failed">*</span></label><select id="rf-method" class="${SPO_INPUT}"><option value="transfer">Transfer</option><option value="cash">Tunai</option><option value="giro">Giro</option></select></div>
+          <div><label for="rf-ref" class="${SPO_LABEL}">Nomor referensi / bukti <span class="text-failed">*</span></label><input id="rf-ref" type="text" maxlength="60" data-no-uppercase class="${SPO_INPUT}"></div>`
+        : `<div class="col-span-2"><label for="rf-cn" class="${SPO_LABEL}">Nomor nota kredit dari supplier <span class="text-failed">*</span></label><input id="rf-cn" type="text" maxlength="60" data-no-uppercase class="${SPO_INPUT}"></div>`}</div>
+      ${spoModalButtons(refund ? "Catat Uang Masuk" : "Konfirmasi Kredit", `submitRefundSettle(${claimId})`)}
+    </div>`);
+  setPriceInput(document.getElementById("rf-amount"), c.left);
+}
+async function submitRefundSettle(claimId) {
+  const g = id => document.getElementById(id)?.value.trim() || null;
+  const body = { amount: priceValue(document.getElementById("rf-amount")), received_at: g("rf-date"), method: g("rf-method"), reference_no: g("rf-ref"), supplier_cn_no: g("rf-cn") };
+  await refundCall(`/api/supplier-refund-claims/${claimId}/settle`, body, "Tercatat.");
+}
+function openRefundCancelModal(claimId) {
+  openModal("Batalkan Klaim", `<div class="space-y-3"><p class="text-sm text-muted">Klaim ini ditutup tanpa uang / kredit. Yang sudah dicatat masuk tetap tersimpan.</p>
+    <div><label for="rf-why" class="${SPO_LABEL}">Alasan <span class="text-failed">*</span></label><input id="rf-why" type="text" maxlength="300" data-no-uppercase class="${SPO_INPUT}"></div>
+    ${spoModalButtons("Batalkan Klaim", `submitRefundCancel(${claimId})`, true)}</div>`);
+}
+async function submitRefundCancel(claimId) {
+  const reason = document.getElementById("rf-why").value.trim();
+  if (!reason) { showToast("Alasan wajib diisi."); return; }
+  await refundCall(`/api/supplier-refund-claims/${claimId}/cancel`, { reason }, "Klaim dibatalkan.");
+}
+async function refundCall(url, body, okMsg) {
+  const resp = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!resp.ok) { const err = await resp.json().catch(() => ({})); showToast(typeof err.detail === "string" ? err.detail : "Gagal."); return; }
+  closeModal();
+  const po = await fetchSupplierPo(currentSpo.id);
+  if (po) renderSupplierPoDetail(po);
+  showToast(okMsg, "success");
+}
+function openCreditAllocateModal(cnId, left) {
+  const invs = currentSpo.open_invoices || [];
+  openModal("Alokasikan Kredit ke Faktur", `<div class="space-y-3"><p class="text-sm text-muted">Saldo kredit ${formatIDR(left)} dipakai untuk melunasi faktur pembelian supplier ini.</p>
+    <div><label for="ca-inv" class="${SPO_LABEL}">Faktur</label><select id="ca-inv" class="${SPO_INPUT}">${invs.map(i => `<option value="${i.id}">${esc(i.invoice_number)} · sisa ${formatIDR(i.outstanding)}</option>`).join("")}</select></div>
+    <div><label for="ca-amount" class="${SPO_LABEL}">Nilai</label><input id="ca-amount" type="text" inputmode="numeric" class="price-input ${SPO_INPUT} text-right"></div>
+    ${spoModalButtons("Alokasikan", `submitCreditAllocate(${cnId})`)}</div>`);
+  setPriceInput(document.getElementById("ca-amount"), Math.min(left, invs[0] ? invs[0].outstanding : left));
+}
+async function submitCreditAllocate(cnId) {
+  await refundCall(`/api/supplier-returns/credits/${cnId}/allocate`, { invoice_id: parseInt(document.getElementById("ca-inv").value, 10), amount: priceValue(document.getElementById("ca-amount")) }, "Kredit dialokasikan ke faktur.");
+}
+
+// ── Paket Pengiriman + Master Ekspedisi ──────────────────────────────────────
+let spoForwarders = [];
+
+async function loadSpoForwarders() {
+  try { const r = await fetch("/api/forwarders"); if (r.ok) spoForwarders = await r.json(); } catch (_) {}
+  return spoForwarders;
+}
+
+function spoPkgIssued(po) { return po.status === "dipesan" || po.status === "sebagian_diterima"; }
+
+function renderSpoPackages(po) {
+  const box = document.getElementById("spo-pkg-section");
+  if (!box) return;
+  const issued = spoPkgIssued(po);
+  const pkgs = po.packages || [];
+  const unpacked = po.items.reduce((a, i) => a + (i.pkg_free || 0), 0);
+  const soOf = Object.fromEntries(po.items.map(i => [i.id, i.customer_po_number]));
+  const cards = pkgs.map(p => {
+    const dead = p.cancelled;
+    return `<div class="bg-white border border-line rounded-xl p-4 ${dead ? "opacity-60" : ""}">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div><div class="font-mono text-sm font-semibold text-ink">${esc(p.package_no)}</div>
+          <div class="text-[11px] text-muted">${esc(p.forwarder_name || "Ekspedisi belum dipilih")}${p.tracking_no ? " · resi " + esc(p.tracking_no) : ""}</div></div>
+        <div class="flex items-center gap-1.5">${spoShipMethodPill(p.ship_method)}${spoItemStatusPill(p.state)}</div></div>
+      <dl class="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-1 text-xs mt-3">
+        <dt class="text-muted">Tgl Kirim</dt><dd class="text-ink">${p.shipped_date ? esc(formatPoDate(p.shipped_date)) : "—"}</dd>
+        <dt class="text-muted">ETA</dt><dd class="text-ink">${p.eta_date ? esc(formatPoDate(p.eta_date)) : "—"}</dd>
+        <dt class="text-muted">Lokasi</dt><dd class="text-ink col-span-3">${esc(p.transit_location || "—")}</dd></dl>
+      <div class="overflow-x-auto mt-3"><table class="w-full text-xs"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Barang</th><th class="${SPO_TH}">Sales Order</th><th class="${SPO_THR}">Qty Paket</th><th class="${SPO_THR}">Diterima</th><th class="${SPO_THR}">Sisa</th></tr></thead><tbody>
+        ${p.lines.map(l => `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-1.5 text-ink">${esc(l.product_name)}</td><td class="px-3 py-1.5 text-accentDark">${esc(soOf[l.item_id] || "Stok toko")}</td><td class="px-3 py-1.5 text-right tabular-nums">${l.quantity}</td><td class="px-3 py-1.5 text-right tabular-nums">${l.received}</td><td class="px-3 py-1.5 text-right tabular-nums">${l.remaining}</td></tr>`).join("")}</tbody></table></div>
+      ${p.note ? `<div class="text-[11px] text-muted mt-2">${esc(p.note)}</div>` : ""}
+      ${dead ? `<div class="text-[11px] text-failed mt-2">Dibatalkan: ${esc(p.cancel_reason || "")}</div>` : issued && p.open ? `<div class="mt-3 flex justify-end gap-2">
+        ${p.received_qty === 0 ? spoActionButton("Batalkan Paket", `openSpoPackageCancel(${p.id})`, false, true) : ""}
+        ${spoActionButton("Update Paket", `openSpoPackageModal(${p.id})`, true)}</div>` : ""}
+    </div>`;
+  }).join("");
+  const hist = [...(po.package_history || [])].reverse();
+  const pkgNo = Object.fromEntries(pkgs.map(p => [p.id, p.package_no.split("-").pop()]));
+  box.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Paket Pengiriman</div>
+        <div class="text-xs text-muted">Satu PO bisa dikirim dalam beberapa paket; satu barang bisa dibagi ke beberapa paket.${issued && unpacked > 0 ? ` <b class="text-ink">${unpacked} pcs belum masuk paket.</b>` : ""}</div></div>
+      <div class="flex gap-2">${spoActionButton("Master Ekspedisi", "openForwarderMaster()")}${issued && unpacked > 0 ? spoActionButton("+ Buat Paket", "openSpoPackageModal(null)", true) : ""}</div></div>
+    ${cards ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">${cards}</div>` : `<div class="text-sm text-muted bg-white border border-dashed border-line rounded-xl p-4 mb-3">Belum ada paket. Barang tetap bisa diatur per item di bawah, atau bagi ke paket dengan “+ Buat Paket”.</div>`}
+    ${hist.length ? `<details class="bg-white border border-line rounded-xl p-3 mb-3"><summary class="text-xs font-medium text-ink cursor-pointer">Riwayat paket (${hist.length})</summary>
+      <div class="overflow-x-auto mt-2"><table class="w-full text-xs"><tbody>${hist.map(h => `<tr class="border-b border-line last:border-b-0"><td class="px-2 py-1.5 tabular-nums text-muted whitespace-nowrap">${esc(formatReceiptWhen(h.at, true))}</td><td class="px-2 py-1.5">${esc(pkgNo[h.package_id] || "")}</td><td class="px-2 py-1.5">${spoItemStatusPill(h.status)}</td><td class="px-2 py-1.5 text-ink">${esc([h.forwarder_name, h.tracking_no].filter(Boolean).join(" · ") || "—")}</td><td class="px-2 py-1.5 text-muted">${esc(h.by_user || "")}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
+}
+
+async function openSpoPackageModal(pkgId) {
+  const po = currentSpo; if (!po) return;
+  await loadSpoForwarders();
+  const pkg = pkgId ? (po.packages || []).find(p => p.id === pkgId) : null;
+  const today = toDateInputValue(new Date());
+  const fld = (id, label, inner, req) => `<div><label for="${id}" class="${SPO_LABEL}">${label}${req ? ' <span class="text-failed">*</span>' : ""}</label>${inner}</div>`;
+  const stOpts = SPO_SHIP_STATUS_KEYS.map(k => `<option value="${k}" ${k === (pkg ? pkg.status : "menunggu_konfirmasi") ? "selected" : ""}>${esc(SPO_ITEM_STATUS[k][0])}</option>`).join("");
+  const mOpts = Object.entries(SPO_SHIP_METHODS).map(([k, v]) => `<option value="${k}" ${pkg && pkg.ship_method === k ? "selected" : ""}>${esc(v)}</option>`).join("");
+  const lineRows = po.items.map(i => {
+    const own = pkg ? (pkg.lines.find(l => l.item_id === i.id) || null) : null;
+    const max = (own ? own.quantity : 0) + (i.pkg_free || 0);
+    if (max <= 0) return "";
+    const val = own ? own.quantity : (i.pkg_free || 0);
+    return `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2"><div class="font-medium text-ink">${esc(i.product_name)}</div><div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}</div></td>
+      <td class="px-3 py-2 text-right tabular-nums">${i.pkg_free || 0}</td>
+      <td class="px-3 py-2 text-right"><input type="number" min="${own ? own.received : 0}" max="${max}" step="1" value="${val}" data-pk-item="${i.id}" class="w-20 border border-line rounded-lg px-2 py-1.5 text-sm text-right bg-white text-ink tabular-nums" /></td></tr>`;
+  }).join("");
+  openModal(pkg ? `Update Paket ${pkg.package_no.split("-").pop()}` : "Buat Paket Pengiriman", `
+    <div class="space-y-3">
+      <p class="text-xs text-muted -mt-2">Paket hanya mencatat pengiriman. Stok baru bertambah setelah barang diterima dan Barang Masuk diposting.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        ${fld("pk-fwd", "Ekspedisi (Master Ekspedisi)", `<select id="pk-fwd" class="${SPO_INPUT}"><option value="">Pilih ekspedisi</option>${spoForwarders.filter(f => f.is_active || (pkg && pkg.forwarder_id === f.id)).map(f => `<option value="${f.id}" ${pkg && pkg.forwarder_id === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>`)}
+        ${fld("pk-fwd-new", "Ekspedisi belum ada? Tambah", `<div class="flex gap-2"><input id="pk-fwd-new" type="text" maxlength="60" placeholder="Nama ekspedisi baru" class="${SPO_INPUT}" /><button type="button" onclick="addForwarderInline()" class="px-3 py-2 border border-line rounded-lg text-sm bg-white hover:bg-bg2 whitespace-nowrap">Tambah</button></div>`)}
+        ${fld("pk-method", "Jalur Pengiriman", `<select id="pk-method" class="${SPO_INPUT}"><option value="">Pilih jalur</option>${mOpts}</select>`)}
+        ${fld("pk-status", "Status Paket", `<select id="pk-status" class="${SPO_INPUT}">${stOpts}</select>`, true)}
+        ${fld("pk-awb", "Nomor Resi / AWB / BL", `<input id="pk-awb" type="text" maxlength="80" value="${esc(pkg ? pkg.tracking_no || "" : "")}" data-no-uppercase class="${SPO_INPUT}" />`)}
+        ${fld("pk-sent", "Tanggal Kirim", `<input id="pk-sent" type="date" value="${esc(pkg ? pkg.shipped_date || "" : "")}" data-no-uppercase class="${SPO_INPUT}" />`)}
+        ${fld("pk-eta", "Estimasi Tiba", `<input id="pk-eta" type="date" value="${esc(pkg ? pkg.eta_date || "" : "")}" data-no-uppercase class="${SPO_INPUT}" />`)}
+        ${fld("pk-transit", "Lokasi Transit", `<input id="pk-transit" type="text" maxlength="100" value="${esc(pkg ? pkg.transit_location || "" : "")}" class="${SPO_INPUT}" />`)}</div>
+      ${fld("pk-note", "Catatan", `<textarea id="pk-note" rows="2" maxlength="500" data-no-uppercase class="${SPO_INPUT}"></textarea>`)}
+      <div class="border border-line rounded-lg overflow-x-auto"><table class="w-full text-xs"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Barang / Sales Order</th><th class="${SPO_THR}">Belum Masuk Paket</th><th class="${SPO_THR}">Qty di Paket Ini</th></tr></thead><tbody>${lineRows || `<tr><td colspan="3" class="px-3 py-4 text-center text-muted">Semua barang sudah masuk paket.</td></tr>`}</tbody></table></div>
+      <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2">Batal</button>
+        <button type="button" onclick="submitSpoPackage(${pkgId || "null"})" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">${pkg ? "Simpan Perubahan" : "Simpan Paket"}</button></div>
+    </div>`, { wide: true });
+  if (pkg && pkg.note) document.getElementById("pk-note").value = pkg.note;
+  if (!pkg) document.getElementById("pk-sent").value = "";
+}
+
+async function addForwarderInline() {
+  const name = document.getElementById("pk-fwd-new").value.trim();
+  if (!name) { showToast("Isi nama ekspedisi baru."); return; }
+  const resp = await fetch("/api/forwarders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(typeof data.detail === "string" ? data.detail : "Gagal menambah ekspedisi."); return; }
+  await loadSpoForwarders();
+  const sel = document.getElementById("pk-fwd");
+  sel.innerHTML = '<option value="">Pilih ekspedisi</option>' + spoForwarders.filter(f => f.is_active).map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join("");
+  sel.value = String(data.id);
+  document.getElementById("pk-fwd-new").value = "";
+  showToast("Ekspedisi ditambahkan ke Master Ekspedisi.", "success");
+}
+
+async function submitSpoPackage(pkgId) {
+  const g = id => document.getElementById(id);
+  const v = id => g(id).value.trim() || null;
+  const lines = [...document.querySelectorAll("#modal-body [data-pk-item]")]
+    .map(el => ({ item_id: parseInt(el.dataset.pkItem, 10), quantity: parseInt(el.value, 10) || 0 })).filter(l => l.quantity > 0);
+  if (!lines.length) { showToast("Isi jumlah barang yang ada di paket ini."); return; }
+  const body = { forwarder_id: g("pk-fwd").value ? parseInt(g("pk-fwd").value, 10) : null, ship_method: v("pk-method"), status: g("pk-status").value,
+    tracking_no: v("pk-awb"), shipped_date: v("pk-sent"), eta_date: v("pk-eta"), transit_location: v("pk-transit"), note: v("pk-note"), lines };
+  await spoSend(pkgId ? `packages/${pkgId}` : "packages", body, pkgId ? "Paket diperbarui." : "Paket pengiriman dibuat.", pkgId ? "PUT" : "POST");
+}
+
+function openSpoPackageCancel(pkgId) {
+  const pkg = (currentSpo.packages || []).find(p => p.id === pkgId); if (!pkg) return;
+  openModal("Batalkan Paket " + pkg.package_no.split("-").pop(), `
+    <div class="space-y-3"><p class="text-sm text-ink">Jumlah barang di paket ini kembali menjadi “belum masuk paket”. Stok tidak berubah.</p>
+      <div><label for="pk-cancel-reason" class="${SPO_LABEL}">Alasan <span class="text-failed">*</span></label><input id="pk-cancel-reason" type="text" maxlength="300" data-no-uppercase class="${SPO_INPUT}" /></div>
+      <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm bg-white hover:bg-bg2">Kembali</button>
+        <button type="button" onclick="submitSpoPackageCancel(${pkgId})" class="px-4 py-2 bg-failed text-white rounded-lg text-sm font-medium">Batalkan Paket</button></div></div>`);
+}
+async function submitSpoPackageCancel(pkgId) {
+  const reason = document.getElementById("pk-cancel-reason").value.trim();
+  if (!reason) { showToast("Alasan wajib diisi."); return; }
+  await spoSend(`packages/${pkgId}/cancel`, { reason }, "Paket dibatalkan.");
+}
+
+let fwdEditId = null;
+async function openForwarderMaster() {
+  await loadSpoForwarders();
+  fwdEditId = null;
+  renderForwarderMaster();
+}
+function renderForwarderMaster() {
+  const admin = isAdmin();
+  const e = spoForwarders.find(f => f.id === fwdEditId) || {};
+  openModal("Master Ekspedisi", `
+    <div class="space-y-3">
+      <p class="text-xs text-muted -mt-2">Daftar ekspedisi / forwarder untuk paket pengiriman. Terpisah dari Master Supplier.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <input id="fw-name" type="text" maxlength="60" placeholder="Nama ekspedisi *" value="${esc(e.name || "")}" class="${SPO_INPUT}" />
+        <input id="fw-phone" type="text" maxlength="30" placeholder="Telepon" value="${esc(e.phone || "")}" data-no-uppercase class="${SPO_INPUT}" />
+        <input id="fw-contact" type="text" maxlength="80" placeholder="Kontak" value="${esc(e.contact || "")}" class="${SPO_INPUT}" />
+        <button type="button" onclick="saveForwarder()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">${fwdEditId ? "Simpan" : "Tambah"}</button></div>
+      <div class="border border-line rounded-lg overflow-x-auto"><table class="w-full text-xs"><thead class="bg-bg2"><tr><th class="${SPO_TH}">Nama</th><th class="${SPO_TH}">Telepon</th><th class="${SPO_TH}">Kontak</th><th class="${SPO_THR}">Paket</th><th class="${SPO_TH}">Status</th><th class="${SPO_TH}"></th></tr></thead><tbody>
+        ${spoForwarders.map(f => `<tr class="border-b border-line last:border-b-0 ${f.is_active ? "" : "opacity-60"}"><td class="px-3 py-2 font-medium text-ink">${esc(f.name)}</td><td class="px-3 py-2">${esc(f.phone || "—")}</td><td class="px-3 py-2">${esc(f.contact || "—")}</td><td class="px-3 py-2 text-right tabular-nums">${f.package_count}</td><td class="px-3 py-2">${f.is_active ? "Aktif" : "Nonaktif"}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">${admin ? `<button type="button" onclick="editForwarder(${f.id})" class="text-accentDark hover:underline mr-2">Ubah</button><button type="button" onclick="toggleForwarder(${f.id})" class="text-ink hover:underline mr-2">${f.is_active ? "Nonaktifkan" : "Aktifkan"}</button><button type="button" onclick="deleteForwarder(${f.id})" class="text-failed hover:underline">Hapus</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="px-3 py-4 text-center text-muted">Belum ada ekspedisi.</td></tr>`}</tbody></table></div>
+      ${admin ? "" : '<p class="text-[11px] text-muted">Mengubah atau menghapus ekspedisi hanya untuk Admin.</p>'}</div>`, { wide: true });
+}
+async function forwarderCall(method, path, body) {
+  const resp = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(typeof data.detail === "string" ? data.detail : "Aksi gagal."); return null; }
+  return data;
+}
+async function saveForwarder() {
+  const g = id => document.getElementById(id).value.trim();
+  const body = { name: g("fw-name"), phone: g("fw-phone") || null, contact: g("fw-contact") || null };
+  if (fwdEditId) { const cur = spoForwarders.find(f => f.id === fwdEditId); body.is_active = cur ? !!cur.is_active : true; }
+  const r = fwdEditId ? await forwarderCall("PUT", `/api/forwarders/${fwdEditId}`, body) : await forwarderCall("POST", "/api/forwarders", body);
+  if (!r) return;
+  fwdEditId = null; await loadSpoForwarders(); renderForwarderMaster(); showToast("Master Ekspedisi disimpan.", "success");
+}
+function editForwarder(id) { fwdEditId = id; renderForwarderMaster(); }
+async function toggleForwarder(id) {
+  const f = spoForwarders.find(x => x.id === id); if (!f) return;
+  const r = await forwarderCall("PUT", `/api/forwarders/${id}`, { name: f.name, phone: f.phone, contact: f.contact, note: f.note, is_active: !f.is_active });
+  if (r) { await loadSpoForwarders(); renderForwarderMaster(); }
+}
+async function deleteForwarder(id) {
+  const r = await forwarderCall("DELETE", `/api/forwarders/${id}`);
+  if (!r) return;
+  await loadSpoForwarders(); renderForwarderMaster();
+  showToast(r.deleted ? "Ekspedisi dihapus." : "Ekspedisi sudah dipakai paket, jadi hanya dinonaktifkan.", "success");
 }
 
 function openSpoItemShippingModal(itemId) {
@@ -19437,6 +19988,8 @@ function renderSupplierPoDetail(po) {
     po.status !== "draft" && po.status !== "batal" ? spoActionButton("Ringkasan Tagihan", "openSpoInvoicePage()") : "",
     ...spoMoneyActions(po).slice(0, 1),
     canCancel && (isAdmin() || po.status === "draft") ? spoActionButton("Batalkan PO", "confirmCancelSupplierPo()", false, true) : "",
+    // A PO that is paid (or has partly arrived) is cancelled only with the supplier's agreement.
+    issued && isAdmin() && !canCancel && po.items.some(i => spoItemLeft(i) > 0) ? spoActionButton("Ajukan Batal PO ke Supplier", "openSpoCancelAllModal()", false, true) : "",
   ].join("");
 
   const canShip = issued;
@@ -19521,8 +20074,13 @@ function renderSupplierPoDetail(po) {
       </div>`).join("")
     : '<p class="text-muted">Belum ada penerimaan.</p>';
 
+  renderSpoRefundCard(po);
+  const pendingCancels = po.cancellations.filter(c => c.status === "menunggu_persetujuan");
   document.getElementById("spo-cancel-card").classList.toggle("hidden", po.cancellations.length === 0);
-  document.getElementById("spo-detail-cancels").innerHTML = po.cancellations.map(c => {
+  document.getElementById("spo-detail-cancels").innerHTML = (pendingCancels.length > 1 && isAdmin() ? `<div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg2 px-3 py-2">
+      <div class="text-xs text-ink"><b>${pendingCancels.length} permintaan</b> menunggu jawaban supplier (pembatalan PO).</div>
+      <div class="flex gap-1.5"><button type="button" onclick="openSpoResolveAllModal(true)" class="px-2.5 py-1 border border-line rounded-lg text-xs font-medium text-ink bg-white hover:bg-bg2">Supplier Setuju Semua</button>
+        <button type="button" onclick="openSpoResolveAllModal(false)" class="px-2.5 py-1 border border-line rounded-lg text-xs font-medium text-failed bg-white hover:bg-failed/10">Supplier Menolak Semua</button></div></div>` : "") + po.cancellations.map(c => {
     const st = SPO_CANCEL_STATUS[c.status] || [c.status, "bg-bg2 text-muted"];
     return `
     <div class="flex flex-wrap items-start justify-between gap-2 border border-line rounded-lg px-3 py-2">
@@ -19693,15 +20251,16 @@ function openSpoReceivePage() {
         ${fld("spo-recv-note", "Catatan", `<input id="spo-recv-note" type="text" maxlength="300" data-no-uppercase class="${SPO_INPUT}" />`)}</div></div>
     <div class="bg-white border border-line rounded-xl overflow-x-auto mb-4">
       <div class="px-4 py-3 font-serif font-semibold text-ink">Daftar Item Penerimaan</div>
-      <table class="w-full min-w-[1000px] text-sm"><thead class="bg-bg2"><tr>
-        <th class="${SPO_TH} w-10">No</th><th class="${SPO_TH}">Produk</th><th class="${SPO_TH}">Referensi Sales Order</th><th class="${SPO_THR}">Qty Pesan</th><th class="${SPO_THR}">Sudah Diterima Sebelumnya</th>
+      <table class="w-full min-w-[1150px] text-sm"><thead class="bg-bg2"><tr>
+        <th class="${SPO_TH} w-10">No</th><th class="${SPO_TH}">Produk</th><th class="${SPO_TH}">Referensi Sales Order</th><th class="${SPO_TH}">Paket Pengiriman</th><th class="${SPO_THR}">Qty Pesan</th><th class="${SPO_THR}">Sudah Diterima Sebelumnya</th>
         <th class="${SPO_THR}">Qty Diterima Sekarang</th><th class="${SPO_THR}">Total Diterima</th><th class="${SPO_THR}">Qty Sisa</th><th class="${SPO_TH}">Kondisi</th><th class="${SPO_TH}">Lokasi Simpan</th><th class="${SPO_TH}">Status Item Setelah Penerimaan</th></tr></thead>
       <tbody>${open.map((i, idx) => { const left = spoItemLeft(i); const qty = i.quantity - i.qty_cancelled; return `<tr class="border-b border-line last:border-b-0 align-middle">
         <td class="px-3 py-2 text-muted">${idx + 1}</td>
         <td class="px-3 py-2 font-medium text-ink">${esc(i.product_name)}${i.sku ? `<div class="text-[11px] text-muted font-mono font-normal">SKU: ${esc(i.sku)}</div>` : ""}</td>
         <td class="px-3 py-2 text-accentDark text-xs font-medium">${esc(i.customer_po_number || "—")}${i.customer_name ? `<div class="text-muted font-normal">${esc(i.customer_name)}</div>` : ""}</td>
+        <td class="px-3 py-2">${spoRecvPkgCell(po, i)}</td>
         <td class="px-3 py-2 text-right tabular-nums">${qty}</td><td class="px-3 py-2 text-right tabular-nums">${i.qty_received}</td>
-        <td class="px-3 py-2 text-right"><input data-r-item="${i.id}" data-left="${left}" data-got="${i.qty_received}" data-qty="${qty}" type="number" min="0" max="${left}" step="1" value="${left}" oninput="spoRecvRecalc()" class="spo-recv-input w-20 border border-line rounded-lg px-2 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30" /></td>
+        <td class="px-3 py-2 text-right"><input data-r-item="${i.id}" data-left="${spoRecvDefaultMax(po, i, left)}" data-got="${i.qty_received}" data-qty="${qty}" type="number" min="0" max="${spoRecvDefaultMax(po, i, left)}" step="1" value="${spoRecvDefaultMax(po, i, left)}" oninput="spoRecvRecalc()" class="spo-recv-input w-20 border border-line rounded-lg px-2 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30" /></td>
         <td class="px-3 py-2 text-right tabular-nums" data-r-total="${i.id}"></td><td class="px-3 py-2 text-right tabular-nums" data-r-left="${i.id}"></td>
         <td class="px-3 py-2"><select data-r-cond="${i.id}" class="${SPO_INPUT} w-28">${Object.entries(SPO_CONDITIONS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></td>
         <td class="px-3 py-2"><input data-r-loc="${i.id}" type="text" maxlength="60" placeholder="Rak" class="${SPO_INPUT} w-28" /></td>
@@ -19730,6 +20289,8 @@ function openSpoReceivePage() {
       if (q) q.value = l.quantity;
       const c = document.querySelector(`[data-r-cond="${l.item_id}"]`); if (c && l.condition) c.value = l.condition;
       const lo = document.querySelector(`[data-r-loc="${l.item_id}"]`); if (lo && l.location) lo.value = l.location;
+      const pk = document.querySelector(`[data-r-pkg="${l.item_id}"]`);
+      if (pk && l.package_id && [...pk.options].some(o => o.value === String(l.package_id))) { pk.value = String(l.package_id); spoRecvPkgChange(l.item_id, true); q.value = l.quantity; }
     });
     showToast(`Draft penerimaan dimuat (disimpan ${formatDateTimeSeconds(dr.saved_at).slice(0, 16)}).`, "success");
   }
@@ -19740,7 +20301,8 @@ async function saveSpoReceiveDraft() {
   const lines = [...document.querySelectorAll("#spo-recv-root .spo-recv-input")].map(el => {
     const id = el.dataset.rItem;
     return { item_id: parseInt(id, 10), quantity: parseInt(el.value, 10) || 0,
-      condition: document.querySelector(`[data-r-cond="${id}"]`).value, location: document.querySelector(`[data-r-loc="${id}"]`).value.trim() || null };
+      condition: document.querySelector(`[data-r-cond="${id}"]`).value, location: document.querySelector(`[data-r-loc="${id}"]`).value.trim() || null,
+      package_id: spoRecvPkgId(id) };
   });
   const val = id => document.getElementById(id).value;
   const form = { date: val("spo-recv-date"), officer: val("spo-recv-officer").trim(), sj: val("spo-recv-sj").trim(),
@@ -19758,6 +20320,38 @@ async function saveSpoReceiveDraft() {
   } catch (e) {
     showToast(e.message);
   }
+}
+
+// Paket Pengiriman on the receiving form: a line split into packages names the package the goods came in.
+function spoOpenPackagesFor(po, itemId) {
+  return (po.packages || []).filter(p => !p.cancelled && p.lines.some(l => l.item_id === itemId && l.remaining > 0));
+}
+function spoRecvDefaultMax(po, item, left) {
+  const pks = spoOpenPackagesFor(po, item.id);
+  if (!pks.length) return left;
+  return Math.min(left, pks[0].lines.find(l => l.item_id === item.id).remaining);
+}
+function spoRecvPkgCell(po, item) {
+  const pks = spoOpenPackagesFor(po, item.id);
+  if (!pks.length) return '<span class="text-muted text-xs">Tanpa paket</span>';
+  return `<select data-r-pkg="${item.id}" onchange="spoRecvPkgChange(${item.id})" class="${SPO_INPUT} w-44">${pks.map(p => {
+    const rem = p.lines.find(l => l.item_id === item.id).remaining;
+    return `<option value="${p.id}">${esc(p.package_no.split("-").pop())} · ${esc(p.forwarder_name || "tanpa ekspedisi")} · sisa ${rem}</option>`; }).join("")}</select>`;
+}
+function spoRecvPkgId(itemId) {
+  const el = document.querySelector(`[data-r-pkg="${itemId}"]`);
+  return el ? parseInt(el.value, 10) : null;
+}
+function spoRecvPkgChange(itemId, keepQty) {
+  const po = currentSpo, item = po.items.find(i => i.id === itemId);
+  const pk = (po.packages || []).find(p => p.id === spoRecvPkgId(itemId));
+  const inp = document.querySelector(`[data-r-item="${itemId}"]`);
+  if (!pk || !item || !inp) return;
+  const rem = pk.lines.find(l => l.item_id === itemId).remaining;
+  const max = Math.min(spoItemLeft(item), rem);
+  inp.dataset.left = String(max);
+  if (!keepQty) inp.value = String(max);
+  spoRecvRecalc();
 }
 
 // K-11: an admin may accept more than the PO still expects; the excess becomes general stock.
@@ -19793,7 +20387,8 @@ async function submitSpoReceive() {
     const id = el.dataset.rItem;
     const raw = parseInt(el.value, 10) || 0;
     return { item_id: parseInt(id, 10), quantity: spoRecvOverOn() ? raw : Math.min(raw, parseInt(el.dataset.left, 10)),
-      condition: document.querySelector(`[data-r-cond="${id}"]`).value, location: document.querySelector(`[data-r-loc="${id}"]`).value.trim() || null };
+      condition: document.querySelector(`[data-r-cond="${id}"]`).value, location: document.querySelector(`[data-r-loc="${id}"]`).value.trim() || null,
+      package_id: spoRecvPkgId(id) };
   }).filter(l => l.quantity > 0);
   if (items.length === 0) { showToast("Isi jumlah barang yang diterima."); return; }
   const overReason = (document.getElementById("spo-recv-over-reason")?.value || "").trim();
@@ -20107,6 +20702,7 @@ function openSpoResolveCancelModal(cancellationId, approved) {
       <p class="text-sm text-muted">${approved
         ? "Jumlah ini dikeluarkan dari PO dan tagihan menyusut. Tindakan lanjutan yang dipilih: " + esc((SPO_CANCEL_ACTIONS.find(a => a.key === c.action) || {}).label || c.action) + "."
         : "Permintaan ditutup dan item tetap dipesan seperti semula."}</p>
+      ${approved ? spoRefundKindField() : ""}
       <div><label for="spo-rc-note" class="${SPO_LABEL}">Catatan <span class="normal-case font-normal">(opsional)</span></label>
         <textarea id="spo-rc-note" rows="2" maxlength="300" data-no-uppercase class="${SPO_INPUT}"></textarea></div>
       ${spoModalButtons(approved ? "Catat Persetujuan" : "Catat Penolakan", `submitSpoResolveCancel(${cancellationId}, ${approved})`, !approved)}
@@ -20114,7 +20710,8 @@ function openSpoResolveCancelModal(cancellationId, approved) {
 }
 
 function submitSpoResolveCancel(cancellationId, approved) {
-  spoSend(`cancellations/${cancellationId}/resolve`, { approved, note: document.getElementById("spo-rc-note").value.trim() || null },
+  spoSend(`cancellations/${cancellationId}/resolve`, { approved, note: document.getElementById("spo-rc-note").value.trim() || null,
+      refund_kind: document.getElementById("spo-rc-kind")?.value || null },
     approved ? "Pembatalan disetujui supplier dan diterapkan." : "Penolakan supplier dicatat. Item tetap dipesan.");
 }
 
@@ -20229,7 +20826,7 @@ function renderSpoFormItems() {
         ? `<input type="text" maxlength="40" value="${esc(item.sku || "")}" placeholder="SKU" aria-label="SKU" data-no-uppercase oninput="onSpoItemText(${idx}, 'sku', this)" class="${SPO_CELL_INPUT} font-mono" />`
         : `<span class="text-xs text-muted font-mono">${esc(item.sku || "—")}</span>`}</td>
       <td class="px-3 py-2 text-ink ${manual ? "min-w-[12rem]" : ""}">${manual
-        ? `<input type="text" maxlength="120" value="${esc(item.product_name)}" placeholder="Nama barang" aria-label="Nama barang" oninput="onSpoItemText(${idx}, 'product_name', this)" class="spo-manual-name ${SPO_CELL_INPUT}" />`
+        ? `<input type="text" maxlength="120" value="${esc(item.product_name)}" placeholder="Ketik nama / SKU, pilih dari Master Barang" aria-label="Nama barang" autocomplete="off" oninput="onSpoNameInput(${idx}, this)" onblur="setTimeout(spoNameHide, 150)" class="spo-manual-name ${SPO_CELL_INPUT}" />`
         : esc(item.product_name)}</td>
       <td class="px-3 py-2 text-muted ${manual ? "w-24" : ""}">${manual
         ? `<input type="text" maxlength="20" value="${esc(item.unit || "")}" placeholder="pcs" aria-label="Satuan" oninput="onSpoItemText(${idx}, 'unit', this)" class="${SPO_CELL_INPUT}" />`
@@ -20279,6 +20876,54 @@ function updateSpoFormTotals() {
     const cell = document.getElementById(`spo-form-sub-${idx}`);
     if (cell) cell.textContent = formatIDR(spoCalc([spoFormLine(item)], 0, 0, 0).sub);
   });
+}
+
+// Manual PO line: typing a name or SKU suggests Master Barang, so the line is linked to it (stock, SKU, unit, last cost).
+let spoNameTimer = null, spoNameResults = [], spoNameIdx = null;
+function spoNameDropdown() {
+  let dd = document.getElementById("spo-name-dd");
+  if (!dd) {
+    dd = document.createElement("div");
+    dd.id = "spo-name-dd";
+    dd.className = "hidden fixed z-[70] bg-white border border-line rounded-lg shadow-lg max-h-72 overflow-y-auto";
+    document.body.appendChild(dd);
+  }
+  return dd;
+}
+function spoNameHide() { document.getElementById("spo-name-dd")?.classList.add("hidden"); }
+function onSpoNameInput(idx, el) {
+  const item = spoItems[idx];
+  item.product_name = el.value;
+  if (item.master_item_id != null && el.value !== item._pickedName) item.master_item_id = null; // edited by hand: no longer that master item
+  clearTimeout(spoNameTimer);
+  const q = el.value.trim();
+  if (q.length < 2) { spoNameHide(); return; }
+  spoNameTimer = setTimeout(() => spoNameSearch(idx, el, q), 200);
+}
+async function spoNameSearch(idx, el, q) {
+  let results = [];
+  try {
+    const resp = await fetch(`/api/inventory/master-items/autocomplete?query=${encodeURIComponent(q)}&limit=8`);
+    if (resp.ok) results = await resp.json();
+  } catch (_) {}
+  if (el.value.trim() !== q) return;
+  spoNameResults = results; spoNameIdx = idx;
+  const dd = spoNameDropdown(), r = el.getBoundingClientRect();
+  dd.style.left = r.left + "px"; dd.style.top = (r.bottom + 2) + "px"; dd.style.width = Math.max(r.width, 340) + "px";
+  dd.innerHTML = results.length ? results.map((m, i) => `
+    <button type="button" onmousedown="event.preventDefault()" onclick="spoNamePick(${i})" class="w-full text-left px-3 py-2 hover:bg-bg2 border-b border-line last:border-b-0">
+      <div class="text-sm text-ink">${esc(m.name)}</div>
+      <div class="text-[11px] text-muted flex flex-wrap gap-x-2"><span class="font-mono">${esc(m.sku)}</span><span>· ${esc(m.unit)}</span>${m.supplier_name ? `<span>· ${esc(m.supplier_name)}</span>` : ""}${poStockBadge(m)}</div>
+    </button>`).join("") : '<div class="px-3 py-2 text-xs text-muted">Tidak ada di Master Barang — teks bebas tetap bisa dipakai.</div>';
+  dd.classList.remove("hidden");
+}
+function spoNamePick(i) {
+  const m = spoNameResults[i], row = spoItems[spoNameIdx];
+  if (!m || !row) return;
+  Object.assign(row, { master_item_id: m.id, sku: m.sku, product_name: m.name, unit: m.unit || "", _pickedName: m.name,
+    est_unit_price: row.est_unit_price || m.last_cost_price || m.avg_cost_price || 0 });
+  spoNameHide();
+  renderSpoFormItems();
 }
 
 function onSpoItemText(idx, field, el) {
@@ -21710,7 +22355,7 @@ const SVC_TONE = {
   warranty: { belum: "gray", aktif: "green", habis: "amber", ditolak: "red" },
   fee: { tanpa_biaya: "gray", menunggu_estimasi: "gray", menunggu_persetujuan: "amber", disetujui: "blue", ditolak: "red", sudah_dibayar: "green" },
 };
-const SVC_RECEIVE_PHOTOS = ["masuk", "sn", "kelengkapan", "segel", "kartu_garansi"];
+const SVC_RECEIVE_PHOTOS = ["masuk", "sn", "kelengkapan", "segel", "kartu_garansi", "nota_manual"];
 const SVC_OUT_PHOTOS = ["kemasan", "resi", "isi_paket", "serah_sales", "ttd_sales"];
 
 let svcMeta = null;
@@ -22110,9 +22755,9 @@ function svcStepItem() {
   const f = svcForm, p = svcProfile(f.profile_id);
   if (!f.accessories.length) svcResetAccessories();
   const chips = (p?.complaints || []).map((c, i) => `<button type="button" onclick="svcAddComplaint(${i})" class="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-ink hover:bg-bg2">${esc(c)}</button>`).join("");
-  const photos = SVC_RECEIVE_PHOTOS.map(st => {
+  const photos = SVC_RECEIVE_PHOTOS.filter(st => st !== "nota_manual" || f.mode === "tanpa").map(st => {
     const req = st === "masuk" ? p?.require_photo : st === "sn" ? (p?.require_photo && p?.require_serial) : false;
-    return `<div class="mb-3"><div class="text-xs font-medium text-ink mb-1">${esc(svcMeta.photo_stages[st])}${req ? ' <span class="text-failed">*</span>' : ""}</div>${svcPhotoZone(st, "Boleh beberapa foto", false)}</div>`;
+    return `<div class="mb-3"><div class="text-xs font-medium text-ink mb-1">${esc(svcMeta.photo_stages[st])}${req ? ' <span class="text-failed">*</span>' : ""}</div>${svcPhotoZone(st, st === "nota_manual" ? "Nota kertas / bukti beli dari toko lain (tidak wajib)" : "Boleh beberapa foto", false)}</div>`;
   }).join("");
   return `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-4 items-start">
     <div class="space-y-4">

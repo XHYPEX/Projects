@@ -3,8 +3,8 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth import require_admin
-from backend.database import get_sales_summary, list_cash_outs, list_pending_prices, list_price_events
+from backend.auth import get_current_user, require_admin
+from backend.database import get_notices, get_sales_summary, list_cash_outs, list_pending_prices, list_price_events
 from backend.schemas import SalesSummaryOut
 
 router = APIRouter()
@@ -55,3 +55,9 @@ async def price_events(scope: str, doc_id: str):
     if scope not in ("receipt", "preorder"):
         raise HTTPException(status_code=422, detail="scope harus receipt atau preorder.")
     return await asyncio.get_event_loop().run_in_executor(None, list_price_events, scope, doc_id)
+
+
+@router.get("/notices")
+async def notices(user: dict = Depends(get_current_user)):
+    """Notice Center: what needs attention, computed from the documents (read-only). Supplier debt is admin-only."""
+    return await asyncio.get_event_loop().run_in_executor(None, get_notices, user.get("role") == "admin")

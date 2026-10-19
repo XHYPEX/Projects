@@ -794,7 +794,7 @@ def init_db() -> None:
             if col not in ib_cols:
                 con.execute(f"ALTER TABLE inbound_documents ADD COLUMN {col} {ddl}")
         ibi_cols = {row["name"] for row in con.execute("PRAGMA table_info(inbound_items)").fetchall()}
-        for col, ddl in (("spo_item_id", "INTEGER"), ("condition", "TEXT"), ("location", "TEXT")):
+        for col, ddl in (("spo_item_id", "INTEGER"), ("condition", "TEXT"), ("location", "TEXT"), ("spo_package_id", "INTEGER")):
             if col not in ibi_cols:
                 con.execute(f"ALTER TABLE inbound_items ADD COLUMN {col} {ddl}")
         con.execute("""CREATE TABLE IF NOT EXISTS inbound_events (
@@ -868,6 +868,48 @@ def init_db() -> None:
                 shipped_date TEXT, eta_date TEXT, transit_location TEXT, note TEXT, notify_customer INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_spo_item_shipments_po ON spo_item_shipments(supplier_po_id);
+            -- Master Ekspedisi: the carriers / forwarders a shipment can travel with (separate from suppliers).
+            CREATE TABLE IF NOT EXISTS forwarders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE COLLATE NOCASE, phone TEXT, contact TEXT, note TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT
+            );
+            -- Paket Pengiriman: one PO can travel in several packages; a PO line can be split over packages.
+            CREATE TABLE IF NOT EXISTS spo_packages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_po_id TEXT NOT NULL REFERENCES supplier_pos(id),
+                package_no TEXT NOT NULL,
+                forwarder_id INTEGER REFERENCES forwarders(id), forwarder_name TEXT,
+                ship_method TEXT, tracking_no TEXT, shipped_date TEXT, eta_date TEXT, transit_location TEXT,
+                status TEXT NOT NULL DEFAULT 'menunggu_konfirmasi', note TEXT,
+                cancelled INTEGER NOT NULL DEFAULT 0, cancel_reason TEXT,
+                created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_spo_packages_po ON spo_packages(supplier_po_id);
+            CREATE TABLE IF NOT EXISTS spo_package_lines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                package_id INTEGER NOT NULL REFERENCES spo_packages(id),
+                item_id INTEGER NOT NULL REFERENCES supplier_po_items(id),
+                quantity INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_spo_package_lines_pkg ON spo_package_lines(package_id);
+            CREATE TABLE IF NOT EXISTS spo_package_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                package_id INTEGER NOT NULL REFERENCES spo_packages(id),
+                supplier_po_id TEXT NOT NULL,
+                at TEXT NOT NULL, by_user TEXT, status TEXT NOT NULL, ship_method TEXT, forwarder_name TEXT,
+                tracking_no TEXT, eta_date TEXT, transit_location TEXT, note TEXT, notify_customer INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_spo_package_history_pkg ON spo_package_history(package_id);
+            -- Photos of the vehicle and the customer's signature taken at Serah Terima Kendaraan. A handover that is
+            -- cancelled voids its files (kept on disk and in this table for the audit trail, hidden from the nota).
+            CREATE TABLE IF NOT EXISTS receipt_handover_files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_id TEXT NOT NULL REFERENCES receipts(id),
+                kind TEXT NOT NULL, mime TEXT NOT NULL, path TEXT NOT NULL, size INTEGER NOT NULL,
+                created_by TEXT, created_at TEXT NOT NULL, voided INTEGER NOT NULL DEFAULT 0, void_reason TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_handover_files_receipt ON receipt_handover_files(receipt_id);
         """)
         # Stok Karantina: goods that are in the shop but may not be sold (damaged / wrong at Terima Barang,
         # customer returns meant for the supplier or broken). master_items.stock_qty stays the sellable
@@ -1035,6 +1077,19 @@ def init_db() -> None:
                 created_by TEXT, created_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_sca_note ON supplier_credit_allocations(credit_note_id);
+            -- Piutang Refund / Kredit Supplier: what a supplier owes back after agreeing to cancel a Purchase Order that
+            -- was already paid. A claim is only a promise (counts for nothing) until the money arrives (refund) or the
+            -- supplier's credit note is confirmed (kredit); each confirmation writes a supplier_credit_notes row.
+            CREATE TABLE IF NOT EXISTS supplier_refund_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_no TEXT UNIQUE NOT NULL,
+                supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+                supplier_po_id TEXT NOT NULL REFERENCES supplier_pos(id),
+                kind TEXT NOT NULL, amount INTEGER NOT NULL, settled_amount INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'menunggu', note TEXT,
+                created_by TEXT, created_at TEXT NOT NULL, closed_by TEXT, closed_at TEXT, close_reason TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_refund_claims_po ON supplier_refund_claims(supplier_po_id);
         """)
         # K-12: supplier debt lives on Faktur Pembelian. Each settlement is a row (cash payment, supplier DP
         # carried over from the PO, or a return credit), so the paid total is always explained.
@@ -1070,8 +1125,10 @@ def init_db() -> None:
             # Received in bad condition (went to quarantine): not usable for the Sales Order line.
             ("supplier_po_items", (("qty_bad", "INTEGER NOT NULL DEFAULT 0"),)),
             ("spo_receipts", (("gr_number", "TEXT"), ("officer", "TEXT"))),
-            ("spo_receipt_lines", (("condition", "TEXT NOT NULL DEFAULT 'baik'"), ("location", "TEXT"))),
+            ("spo_receipt_lines", (("condition", "TEXT NOT NULL DEFAULT 'baik'"), ("location", "TEXT"), ("package_id", "INTEGER"))),
             ("spo_payments", (("reference_no", "TEXT"), ("bank_account", "TEXT"))),
+            # A credit note / refund that came from a cancelled Purchase Order (not a Retur Supplier) names the PO and the claim.
+            ("supplier_credit_notes", (("supplier_po_id", "TEXT"), ("claim_id", "INTEGER"))),
             # K-19: kind='pindah' marks the paired rows of a DP moved between two invoices of one Sales Order
             # (they net to zero and are left out of sales figures).
             ("receipt_payments", (("reversed_of", "INTEGER"), ("kind", "TEXT"),
@@ -1088,7 +1145,13 @@ def init_db() -> None:
                           ("work_stage", "TEXT"),
                           # K-08/K-09: the vehicle handed back to the customer, who did it, and any balance it left with.
                           ("handed_over_at", "TEXT"), ("handed_over_by", "TEXT"), ("handover_note", "TEXT"),
-                          ("handover_debt", "INTEGER NOT NULL DEFAULT 0"))),
+                          ("handover_debt", "INTEGER NOT NULL DEFAULT 0"), ("handover_receiver", "TEXT"),
+                          # Diskon nota (like Harga Khusus, K-22): staff ask, only an admin approves; kept with the amount it
+                          # replaced so a rejection puts the nota back where it was.
+                          ("discount_state", "TEXT"), ("discount_reason", "TEXT"), ("discount_requested_by", "TEXT"),
+                          ("discount_requested_at", "TEXT"), ("discount_approved_by", "TEXT"), ("discount_approved_at", "TEXT"),
+                          ("discount_prev", "INTEGER NOT NULL DEFAULT 0"), ("discount_prev_reason", "TEXT"),
+                          ("discount_below_cost", "INTEGER NOT NULL DEFAULT 0"), ("discount_stacked", "INTEGER NOT NULL DEFAULT 0"))),
             ("preorder_payments", (("method", "TEXT NOT NULL DEFAULT 'cash'"), ("state", "TEXT NOT NULL DEFAULT 'sah'"),
                                    ("confirmed_by", "TEXT"), ("confirmed_at", "TEXT"), ("fail_reason", "TEXT"))),
             # K-13: when the order was confirmed (the 24-hour cancellation clock) and how it was cancelled.
@@ -1658,7 +1721,9 @@ def _price_review(con: sqlite3.Connection, *, scope: str, doc_id: str, master_it
 
 
 def _receipt_price_pending(con: sqlite3.Connection, receipt_id: str) -> int:
-    return con.execute("SELECT COUNT(*) AS n FROM receipt_items WHERE receipt_id=? AND price_state='pending'", (receipt_id,)).fetchone()["n"]
+    """Lines with a special price, plus the nota's own discount, still waiting for an admin."""
+    return (con.execute("SELECT COUNT(*) AS n FROM receipt_items WHERE receipt_id=? AND price_state='pending'", (receipt_id,)).fetchone()["n"]
+            + con.execute("SELECT COUNT(*) AS n FROM receipts WHERE id=? AND discount_state='pending'", (receipt_id,)).fetchone()["n"])
 
 
 def _preorder_price_pending(con: sqlite3.Connection, preorder_id: str) -> int:
@@ -1666,7 +1731,109 @@ def _preorder_price_pending(con: sqlite3.Connection, preorder_id: str) -> int:
                        (preorder_id, PO_LINE_CANCELLED)).fetchone()["n"]
 
 
-_PRICE_PENDING_MSG = "Ada harga khusus yang menunggu persetujuan Admin. Pembayaran dan penerbitan bisa dilanjutkan setelah disetujui."
+_PRICE_PENDING_MSG = "Ada harga khusus atau diskon nota yang menunggu persetujuan Admin. Pembayaran dan penerbitan bisa dilanjutkan setelah disetujui."
+
+
+_DISC_COLS = ("discount_state", "discount_reason", "discount_requested_by", "discount_requested_at", "discount_approved_by",
+              "discount_approved_at", "discount_prev", "discount_prev_reason", "discount_below_cost", "discount_stacked")
+_NO_DISC = {"discount_state": None, "discount_reason": None, "discount_requested_by": None, "discount_requested_at": None,
+            "discount_approved_by": None, "discount_approved_at": None, "discount_prev": 0, "discount_prev_reason": None,
+            "discount_below_cost": 0, "discount_stacked": 0}
+DISCOUNT_STAFF_MAX_PCT = 50  # a nota discount above this share of the subtotal is only for an admin
+
+
+def _discount_review(con: sqlite3.Connection, *, receipt_id: str, items: list[dict], subtotal: int, prev: dict | None,
+                     new_discount: int, reason: str | None, allow_below_cost: bool, allow_stack: bool,
+                     actor: dict | None) -> dict:
+    """The discount columns to store for a nota whose discount is being set. `prev` is the stored receipt (None for a
+    new one). Staff's request is Pending (applied, but the nota takes no payment until an admin approves); an admin's is
+    approved at once. Never changes Master Barang. actor=None is an internal caller: nothing is reviewed."""
+    old = (prev or {}).get("discount") or 0
+    stored = {c: (prev or {}).get(c, _NO_DISC[c]) for c in _DISC_COLS}
+    if actor is None or new_discount == old:
+        return stored
+    by = actor["username"]
+    if new_discount <= 0:
+        if old > 0:
+            _price_event(con, "receipt", receipt_id, "Diskon nota", "cleared", 1, subtotal, old, 0, 0, "Diskon nota dihapus", 0, by)
+        return dict(_NO_DISC)
+    if new_discount > subtotal:
+        raise ValueError("Diskon tidak boleh melebihi subtotal.")
+    reason = (reason or "").strip()
+    if len(reason) < 3:
+        raise ValueError("Alasan diskon nota wajib diisi (misal: pelanggan langganan, paket pemasangan).")
+    if new_discount * 100 > subtotal * DISCOUNT_STAFF_MAX_PCT and not actor["is_admin"]:
+        raise ValueError(f"Diskon di atas {DISCOUNT_STAFF_MAX_PCT}% dari subtotal hanya bisa diatur Admin.")
+    cost = 0
+    for i in items:
+        if i.get("master_item_id"):
+            mi = con.execute("SELECT avg_cost_price, last_cost_price FROM master_items WHERE id=?", (i["master_item_id"],)).fetchone()
+            if mi:
+                cost += i["quantity"] * (mi["avg_cost_price"] or mi["last_cost_price"] or 0)
+    below = 1 if cost > 0 and subtotal - new_discount < cost else 0
+    if below and not (actor["is_admin"] and allow_below_cost):
+        # No numbers here: staff never see the cost.
+        raise ValueError("Diskon nota terlalu besar dan diblokir. " + (
+            "Harga akhir di bawah modal hanya boleh dengan izin khusus: centang “Izinkan di bawah modal” dan isi alasannya."
+            if actor["is_admin"] else "Hubungi Admin untuk diskon ini."))
+    stacked = 1 if any(i.get("price_state") for i in items) else 0
+    if stacked and not allow_stack:
+        raise ValueError("Nota ini sudah memakai harga khusus. Diskon nota menambah potongan di atasnya; "
+                         "centang “Gabungkan dengan harga khusus” bila memang sengaja.")
+    now = _now()
+    approved = actor["is_admin"]
+    was_pending = (prev or {}).get("discount_state") == "pending"
+    cols = {"discount_state": "approved" if approved else "pending", "discount_reason": reason[:300],
+            "discount_requested_by": by, "discount_requested_at": now,
+            "discount_approved_by": by if approved else None, "discount_approved_at": now if approved else None,
+            # the amount (and its reason) a rejection goes back to: the last approved one
+            "discount_prev": stored["discount_prev"] if was_pending else old,
+            "discount_prev_reason": stored["discount_prev_reason"] if was_pending else (stored["discount_reason"] if old > 0 else None),
+            "discount_below_cost": below, "discount_stacked": stacked}
+    _price_event(con, "receipt", receipt_id, "Diskon nota", "auto_approved" if approved else "request", 1, subtotal, old, new_discount,
+                 new_discount, cols["discount_reason"], below, by)
+    return cols
+
+
+def decide_discount_request(receipt_id: str, approve: bool, note: str | None, user: dict) -> dict:
+    """Admin only. Approve keeps the discount. Reject puts the nota back at the last approved discount (none if there
+    was none) and recomputes the bill; money already paid stays on the record."""
+    if user.get("role") != "admin":
+        raise PermissionError("Hanya Admin yang dapat menyetujui atau menolak diskon nota.")
+    by = user.get("username")
+    note = (note or "").strip()[:300] or None
+    if not approve and not note:
+        raise ValueError("Tulis alasan penolakan diskon nota.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        rec = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+        if rec is None:
+            raise LookupError("Nota tidak ditemukan.")
+        if rec["status"] == "void":
+            raise ValueError("Nota sudah dibatalkan (void).")
+        if rec["discount_state"] != "pending":
+            raise ValueError("Diskon nota ini tidak sedang menunggu persetujuan.")
+        now = _now()
+        subtotal = rec["subtotal"]
+        if approve:
+            con.execute("UPDATE receipts SET discount_state='approved', discount_approved_by=?, discount_approved_at=?, discount_prev=0, "
+                        "discount_prev_reason=NULL WHERE id=?", (by, now, receipt_id))
+            _price_event(con, "receipt", receipt_id, "Diskon nota", "approved", 1, subtotal, None, rec["discount"], rec["discount"],
+                         note or rec["discount_reason"], rec["discount_below_cost"] or 0, by)
+            _log_receipt_event(con, receipt_id, "item_changed", f"Diskon nota Rp {rec['discount']:,} DISETUJUI Admin ({by})".replace(",", "."), by)
+        else:
+            back = rec["discount_prev"] or 0
+            cols = dict(_NO_DISC)
+            if back > 0:  # the earlier, approved discount stands again
+                cols.update(discount_state="approved", discount_reason=rec["discount_prev_reason"], discount_requested_by=None,
+                            discount_approved_by="(disetujui sebelumnya)")
+            con.execute(f"UPDATE receipts SET discount=?, {', '.join(c + '=?' for c in _DISC_COLS)} WHERE id=?",
+                        (back, *cols.values(), receipt_id))
+            _price_event(con, "receipt", receipt_id, "Diskon nota", "rejected", 1, subtotal, rec["discount"], back, back, note, 0, by)
+            _log_receipt_event(con, receipt_id, "item_changed",
+                               f"Diskon nota Rp {rec['discount']:,} DITOLAK Admin ({by}): {note}; kembali ke Rp {back:,}".replace(",", "."), by)
+            _recalc_receipt_money(con, receipt_id, by)
+        return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
 
 def _recalc_receipt_money(con: sqlite3.Connection, receipt_id: str, by: str | None) -> None:
@@ -1756,6 +1923,150 @@ def decide_price_request(scope: str, doc_id: str, item_id: int, approve: bool, n
     return {"scope": scope, "doc_id": doc_id, "item_id": item_id, "state": "approved" if approve else "rejected"}
 
 
+# --- Notice Center (diagram 26) --------------------------------------------------------------------------------
+# Read-only: every notice is worked out from the documents each time the dashboard opens, nothing is stored or edited.
+NOTICE_LIMIT = 8
+
+
+def _days_between(a: str, b: str) -> int:
+    return (date.fromisoformat(b[:10]) - date.fromisoformat(a[:10])).days
+
+
+def get_notices(is_admin: bool = False) -> dict:
+    """What needs someone's attention, grouped, most urgent first. Money owed to suppliers is admin-only."""
+    today = shop_today().isoformat()
+    groups: list[dict] = []
+
+    def add(key: str, severity: str, title: str, hint: str, rows: list[dict]) -> None:
+        if rows:
+            groups.append({"key": key, "severity": severity, "title": title, "hint": hint, "count": len(rows),
+                           "items": rows[:NOTICE_LIMIT], "more": max(len(rows) - NOTICE_LIMIT, 0)})
+
+    with _conn() as con:
+        # Sales Order lines that must be bought but have no supplier yet.
+        add("no_supplier", "tinggi", "Supplier belum dipilih", "Pilih supplier di Sales Order agar draft Purchase Order bisa dibuat.", [
+            {"title": f"{r['po_number']} · {r['customer_name']}", "sub": f"{r['product_name']} × {r['quantity']}",
+             "link": {"type": "preorder", "id": r["preorder_id"]}}
+            for r in con.execute(
+                f"""SELECT pi.preorder_id, pi.product_name, pi.quantity, p.po_number, p.customer_name
+                    FROM preorder_items pi JOIN preorders p ON p.id = pi.preorder_id
+                    WHERE p.is_draft=0 AND p.cancelled_at IS NULL AND pi.source='supplier' AND pi.supplier_id IS NULL
+                      AND pi.status NOT IN ({_placeholders(PO_CLOSED_LINE_STATUSES + PO_ARRIVED_STATUSES)})
+                    ORDER BY p.created_at""", (*PO_CLOSED_LINE_STATUSES, *PO_ARRIVED_STATUSES))])
+
+        # Lines with a supplier that are on no Purchase Order at all.
+        add("unordered", "tinggi", "Barang belum dipesan", "Barang Sales Order yang belum masuk Purchase Order mana pun.", [
+            {"title": f"{r['po_number']} · {r['customer_name']}", "sub": f"{r['product_name']} × {r['quantity']} · {r['supplier_name']}",
+             "link": {"type": "preorder", "id": r["preorder_id"]}}
+            for r in con.execute(
+                f"""SELECT pi.preorder_id, pi.product_name, pi.quantity, p.po_number, p.customer_name, s.name AS supplier_name
+                    FROM preorder_items pi JOIN preorders p ON p.id = pi.preorder_id JOIN suppliers s ON s.id = pi.supplier_id
+                    WHERE p.is_draft=0 AND p.cancelled_at IS NULL AND pi.source='supplier'
+                      AND pi.status NOT IN ({_placeholders(PO_CLOSED_LINE_STATUSES + PO_ARRIVED_STATUSES)})
+                      AND NOT EXISTS (SELECT 1 FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+                                      WHERE spi.preorder_item_id = pi.id AND sp.status <> 'batal')
+                    ORDER BY p.created_at""", (*PO_CLOSED_LINE_STATUSES, *PO_ARRIVED_STATUSES))])
+
+        # Draft Purchase Orders that serve a customer but were never sent to the supplier.
+        add("draft_po", "sedang", "Draft Purchase Order belum diterbitkan", "Review lalu terbitkan agar barang benar-benar dipesan.", [
+            {"title": r["po_number"], "sub": f"{r['supplier_name_snapshot']} · {r['n']} barang untuk Sales Order · dibuat {_days_between(r['created_at'], today)} hari lalu",
+             "link": {"type": "supplier_po", "id": r["id"]}}
+            for r in con.execute(
+                """SELECT sp.id, sp.po_number, sp.supplier_name_snapshot, sp.created_at, COUNT(*) AS n
+                   FROM supplier_pos sp JOIN supplier_po_items spi ON spi.supplier_po_id = sp.id AND spi.preorder_item_id IS NOT NULL
+                   WHERE sp.status='draft' GROUP BY sp.id ORDER BY sp.created_at""")])
+
+        # ETA passed and goods still outstanding.
+        late = []
+        for r in con.execute(
+            """SELECT sp.id, sp.po_number, sp.supplier_name_snapshot, spi.product_name,
+                      spi.quantity - spi.qty_cancelled - spi.qty_received AS left, COALESCE(spi.eta_date, sp.est_arrival_date) AS eta
+               FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+               WHERE sp.status IN ('dipesan','sebagian_diterima') AND spi.quantity - spi.qty_cancelled - spi.qty_received > 0
+                 AND COALESCE(spi.eta_date, sp.est_arrival_date) IS NOT NULL AND COALESCE(spi.eta_date, sp.est_arrival_date) < ?
+               ORDER BY eta""", (today,)):
+            late.append({"title": f"{r['po_number']} · {r['supplier_name_snapshot']}",
+                         "sub": f"{r['product_name']} × {r['left']} · ETA {r['eta'][8:10]}/{r['eta'][5:7]}/{r['eta'][:4]}, terlambat {_days_between(r['eta'], today)} hari",
+                         "link": {"type": "supplier_po", "id": r["id"]}})
+        add("late_shipping", "tinggi", "Pengiriman terlambat", "Hubungi supplier atau perbarui ETA.", late)
+
+        add("partial", "sedang", "Barang datang sebagian", "Sebagian sudah diterima, sisanya masih ditunggu.", [
+            {"title": f"{r['po_number']} · {r['supplier_name_snapshot']}", "sub": f"sisa {r['left']} dari {r['total']} unit",
+             "link": {"type": "supplier_po", "id": r["id"]}}
+            for r in con.execute(
+                """SELECT sp.id, sp.po_number, sp.supplier_name_snapshot, SUM(spi.quantity - spi.qty_cancelled) AS total,
+                          SUM(spi.quantity - spi.qty_cancelled - spi.qty_received) AS left
+                   FROM supplier_pos sp JOIN supplier_po_items spi ON spi.supplier_po_id = sp.id
+                   WHERE sp.status='sebagian_diterima' GROUP BY sp.id HAVING left > 0 ORDER BY sp.created_at""")])
+
+        # Goods counted at the PO but the Barang Masuk was never posted: stock has not moved yet (K-10).
+        add("inbound_draft", "sedang", "Barang Masuk belum diposting", "Posting agar stok bertambah dan Sales Order ikut maju.", [
+            {"title": r["doc_number"], "sub": f"{r['supplier_name']} · tanggal terima {r['received_date']} · {_days_between(r['received_date'], today)} hari lalu",
+             "link": {"type": "inbound_doc", "id": r["id"]}}
+            for r in con.execute(
+                """SELECT d.id, d.doc_number, d.received_date, s.name AS supplier_name FROM inbound_documents d
+                   JOIN suppliers s ON s.id = d.supplier_id WHERE d.status='draft' AND d.supplier_po_id IS NOT NULL
+                   ORDER BY d.received_date""")])
+
+        # Stock In Allocation: what open Sales Orders need but nobody has ordered or stocked.
+        lines = [ln for ln in _reservation_lines(con) if ln["shortfall"] > 0]
+        add("shortfall", "tinggi", "Kebutuhan Sales Order belum tertutup", "Stok dan Purchase Order belum cukup untuk barang ini.", [
+            {"title": f"{ln['po_number']} · {ln['customer_name']}", "sub": f"{ln['product_name']} kurang {ln['shortfall']} dari {ln['quantity']}",
+             "link": {"type": "preorder", "id": ln["preorder_id"]}} for ln in lines])
+
+        reserved = _reserved_by_item(con)
+        out_rows, held_rows = [], []
+        for r in con.execute("SELECT id, sku, name, stock_qty, min_stock, unit FROM master_items WHERE is_active=1 AND archived_at IS NULL ORDER BY name"):
+            held = reserved.get(r["id"], 0)
+            if r["stock_qty"] <= 0 and (r["min_stock"] or 0) > 0:
+                out_rows.append({"title": r["name"], "sub": f"{r['sku']} · stok habis" + (f" · {held} dicadangkan" if held else ""),
+                                 "link": {"type": "master_item", "id": r["id"]}})
+            elif held > 0 and r["stock_qty"] - held <= 0:
+                held_rows.append({"title": r["name"], "sub": f"{r['sku']} · stok {r['stock_qty']} semuanya dicadangkan untuk Sales Order",
+                                  "link": {"type": "master_item", "id": r["id"]}})
+        add("stock_out", "tinggi", "Stok habis", "Barang dengan stok minimum yang kini kosong.", out_rows)
+        add("stock_held", "sedang", "Stok bebas habis (dicadangkan)", "Seluruh stok sudah dicadangkan; penjualan langsung perlu izin Admin.", held_rows)
+
+        # All goods of a Sales Order have arrived and the work has not started.
+        add("ready_install", "info", "Barang siap dipasang", "Semua barang Sales Order sudah sampai; jadwalkan pengerjaan.", [
+            {"title": f"{r['receipt_no']} · {r['plate_full']}", "sub": f"{r['customer_name'] or '-'} · {r['po_number'] or 'Sales Order'}",
+             "link": {"type": "receipt", "id": r["id"]}}
+            for r in con.execute(
+                """SELECT r.id, r.receipt_no, r.plate_full, r.customer_name, p.po_number FROM receipts r
+                   JOIN preorders p ON p.id = r.preorder_id WHERE r.status<>'void' AND r.work_status='belum' ORDER BY r.created_at""")])
+
+        if is_admin:
+            debt_over, debt_soon = [], []
+            soon = (shop_today() + timedelta(days=7)).isoformat()
+            for r in con.execute(
+                """SELECT id, invoice_number, supplier_name_snapshot, due_date, total - amount_paid AS owed FROM purchase_invoices
+                   WHERE status='posted' AND total - amount_paid > 0 AND due_date <= ? ORDER BY due_date""", (soon,)):
+                row = {"title": f"{r['invoice_number']} · {r['supplier_name_snapshot']}", "link": {"type": "purchase_invoice", "id": r["id"]},
+                       "sub": f"sisa Rp {r['owed']:,}".replace(",", ".") + f" · jatuh tempo {r['due_date'][8:10]}/{r['due_date'][5:7]}/{r['due_date'][:4]}"}
+                if r["due_date"] < today:
+                    row["sub"] += f", lewat {_days_between(r['due_date'], today)} hari"
+                    debt_over.append(row)
+                else:
+                    debt_soon.append(row)
+            add("refund_claims", "sedang", "Refund / Kredit Supplier belum diterima", "Uang muka PO yang dibatalkan, menunggu uang masuk atau nota kredit supplier.", [
+                {"title": f"{r['claim_no']} · {r['supplier_name']}", "link": {"type": "supplier_po", "id": r["supplier_po_id"]},
+                 "sub": f"{'Refund' if r['kind'] == 'refund' else 'Kredit'} sisa Rp {r['amount'] - r['settled_amount']:,}".replace(",", ".")
+                        + f" · {r['po_number']} · {_days_between(r['created_at'], today)} hari lalu"}
+                for r in con.execute(
+                    """SELECT c.*, s.name AS supplier_name, p.po_number FROM supplier_refund_claims c JOIN suppliers s ON s.id = c.supplier_id
+                       JOIN supplier_pos p ON p.id = c.supplier_po_id WHERE c.status='menunggu' ORDER BY c.created_at""")])
+            add("debt_overdue", "tinggi", "Utang supplier lewat jatuh tempo", "Faktur pembelian yang belum lunas dan sudah lewat tempo.", debt_over)
+            add("debt_soon", "sedang", "Utang supplier jatuh tempo 7 hari", "Siapkan pembayaran.", debt_soon)
+
+        active = con.execute("SELECT COUNT(*) AS n FROM supplier_pos WHERE status IN ('dipesan','sebagian_diterima')").fetchone()["n"]
+        if active:
+            groups.append({"key": "active_pos", "severity": "info", "title": "Purchase Order aktif", "hint": "Sedang dipesan atau menunggu barang datang.",
+                           "count": active, "items": [], "more": 0, "link": {"type": "supplier_po_list"}})
+    order = {"tinggi": 0, "sedang": 1, "info": 2}
+    groups.sort(key=lambda g: order[g["severity"]])
+    return {"generated_at": _now(), "urgent": sum(g["count"] for g in groups if g["severity"] == "tinggi"), "groups": groups}
+
+
 def list_pending_prices() -> list[dict]:
     """Every special price waiting for an admin, newest first, with enough to decide without opening the document."""
     with _conn() as con:
@@ -1775,6 +2086,17 @@ def list_pending_prices() -> list[dict]:
             net = r["quantity"] * r["unit_price"] - (r["line_discount"] or 0)
             r["special_unit_price"] = round(net / r["quantity"])
             r["discount_total"] = r["quantity"] * (r["list_price"] or 0) - net
+        # The nota's own discount: shown as one row ("Diskon nota", item_id 0) from the subtotal to the discounted total.
+        for d in con.execute(
+            """SELECT r.id AS doc_id, r.receipt_no AS doc_no, r.subtotal, r.discount, r.discount_reason, r.discount_requested_by,
+                      r.discount_requested_at, r.customer_name, r.plate_full FROM receipts r
+               WHERE r.discount_state='pending' AND r.status<>'void'"""):
+            rows.append({"scope": "receipt_discount", "doc_id": d["doc_id"], "doc_no": d["doc_no"], "item_id": 0, "product_name": "Diskon nota",
+                         "quantity": 1, "unit_price": d["subtotal"], "line_discount": d["discount"], "list_price": d["subtotal"],
+                         "price_reason": d["discount_reason"], "price_requested_by": d["discount_requested_by"],
+                         "price_requested_at": d["discount_requested_at"] or "", "customer_name": d["customer_name"],
+                         "plate_full": d["plate_full"], "special_unit_price": d["subtotal"] - d["discount"], "discount_total": d["discount"]})
+        rows.sort(key=lambda r: r["price_requested_at"] or "", reverse=True)
         return rows
 
 
@@ -2137,6 +2459,12 @@ def _next_receipt_no(con: sqlite3.Connection, created_at: str) -> str:
     return f"{prefix}{(row['n'] or 0) + 1:04d}"
 
 
+def peek_next_receipt_no() -> str:
+    """The number the next nota will get, shown read-only on a new nota; the real one is assigned when it is saved."""
+    with _conn() as con:
+        return _next_receipt_no(con, _now())
+
+
 # Pick lists for a transfer payment: who sent it, and which of the shop's accounts received
 # it. Filled as transfers are saved; the cashier removes stale entries from the payment pop-up.
 # Keys are fixed here, so the table name in the SQL below never comes from a request.
@@ -2400,6 +2728,9 @@ def create_receipt(
     stock_override_reason: str | None = None,
     payment_confirmed: bool | None = None,
     price_actor: dict | None = None,
+    discount_reason: str | None = None,
+    allow_discount_below_cost: bool = False,
+    allow_discount_stack: bool = False,
 ) -> dict:
     plate_full = f"{plate_region} {plate_number} {plate_suffix}"
     if payment_method != "transfer":
@@ -2457,8 +2788,14 @@ def create_receipt(
                 con, scope="receipt", doc_id=receipt_id, master_item_id=item["master_item_id"], product_name=item["product_name"],
                 qty=item["quantity"], unit_price=item["unit_price"], line_discount=item.get("line_discount") or 0, prev=None,
                 reason=item.get("price_reason"), allow_below_cost=bool(item.get("allow_below_cost")), actor=price_actor)
-        if any(i["_price"]["price_state"] == "pending" for i in resolved_items) and (amount_paid > 0 or pending_amount > 0):
+        disc = _discount_review(
+            con, receipt_id=receipt_id, items=[{**i, "price_state": i["_price"]["price_state"]} for i in resolved_items], subtotal=subtotal,
+            prev=None, new_discount=discount, reason=discount_reason, allow_below_cost=allow_discount_below_cost,
+            allow_stack=allow_discount_stack, actor=price_actor)
+        if (disc["discount_state"] == "pending" or any(i["_price"]["price_state"] == "pending" for i in resolved_items)) \
+                and (amount_paid > 0 or pending_amount > 0):
             raise ValueError(_PRICE_PENDING_MSG)
+        con.execute(f"UPDATE receipts SET {', '.join(c + '=?' for c in _DISC_COLS)} WHERE id=?", (*disc.values(), receipt_id))
         con.executemany(
             """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
                                           item_type, line_discount, added_at, added_by, added_during_work, serial_no,
@@ -2746,6 +3083,9 @@ def update_receipt(
     refund_method: str | None = None,
     refund_proof: str | None = None,
     price_actor: dict | None = None,
+    discount_reason: str | None = None,
+    allow_discount_below_cost: bool = False,
+    allow_discount_stack: bool = False,
 ) -> dict:
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
@@ -2937,6 +3277,11 @@ def update_receipt(
             new_discount = existing["discount"]
             new_total = existing["total"]
 
+        if discount is not None and discount != existing["discount"] and status != "void" and existing["status"] != "void":
+            disc = _discount_review(
+                con, receipt_id=receipt_id, items=effective_items or [], subtotal=new_subtotal, prev=existing, new_discount=discount,
+                reason=discount_reason, allow_below_cost=allow_discount_below_cost, allow_stack=allow_discount_stack, actor=price_actor)
+            con.execute(f"UPDATE receipts SET {', '.join(c + '=?' for c in _DISC_COLS)} WHERE id=?", (*disc.values(), receipt_id))
         if discount is not None and discount != existing["discount"] and not is_draft and status != "void":
             _log_receipt_event(
                 con, receipt_id, "item_changed",
@@ -3407,46 +3752,117 @@ def _clear_handover(con: sqlite3.Connection, receipt_id: str, why: str, by: str 
     """The nota is being worked on again, so the vehicle is no longer 'handed over'."""
     row = con.execute("SELECT handed_over_at FROM receipts WHERE id=?", (receipt_id,)).fetchone()
     if row is not None and row["handed_over_at"]:
-        con.execute("UPDATE receipts SET handed_over_at=NULL, handed_over_by=NULL, handover_note=NULL, handover_debt=0 WHERE id=?", (receipt_id,))
+        con.execute("UPDATE receipts SET handed_over_at=NULL, handed_over_by=NULL, handover_note=NULL, handover_debt=0, handover_receiver=NULL WHERE id=?", (receipt_id,))
+        con.execute("UPDATE receipt_handover_files SET voided=1, void_reason=? WHERE receipt_id=? AND voided=0", (why, receipt_id))
         _log_receipt_event(con, receipt_id, "handover", f"Serah terima dibatalkan otomatis: {why}", by)
 
 
-def hand_over_receipt(receipt_id: str, note: str | None, reason: str | None, by: str | None, is_admin: bool) -> dict:
+HANDOVER_MAX_PHOTOS = 4
+HANDOVER_FILE_MAX_BYTES = 4 * 1024 * 1024
+HANDOVER_MIMES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+
+
+def _handover_upload_dir(receipt_id: str) -> Path:
+    d = DB_PATH.parent / "uploads" / "handover" / re.sub(r"[^A-Za-z0-9_-]", "_", receipt_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _check_handover_files(files: list[dict] | None) -> list[dict]:
+    """Validates what came with a handover: any number up to 4 vehicle photos and one signature. Each file is
+    {kind: 'foto'|'tanda_tangan', mime, data: bytes}; the caller already checked the bytes match the type."""
+    out = []
+    photos = sigs = 0
+    for f in files or []:
+        kind = f.get("kind")
+        if kind not in ("foto", "tanda_tangan"):
+            raise ValueError("Jenis lampiran serah terima tidak dikenal.")
+        if f.get("mime") not in HANDOVER_MIMES:
+            raise ValueError("Lampiran harus berupa gambar JPG, PNG, atau WEBP.")
+        if not f.get("data") or len(f["data"]) > HANDOVER_FILE_MAX_BYTES:
+            raise ValueError("Ukuran tiap lampiran maksimal 4 MB.")
+        photos += kind == "foto"
+        sigs += kind == "tanda_tangan"
+        out.append(f)
+    if photos > HANDOVER_MAX_PHOTOS:
+        raise ValueError(f"Foto serah terima maksimal {HANDOVER_MAX_PHOTOS}.")
+    if sigs > 1:
+        raise ValueError("Tanda tangan hanya satu.")
+    return out
+
+
+def get_handover_files(receipt_id: str) -> list[dict]:
+    with _conn() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT id, kind, mime, size, created_by, created_at FROM receipt_handover_files "
+            "WHERE receipt_id=? AND voided=0 ORDER BY id", (receipt_id,))]
+
+
+def get_handover_file(file_id: int) -> dict:
+    with _conn() as con:
+        row = con.execute("SELECT * FROM receipt_handover_files WHERE id=?", (file_id,)).fetchone()
+    if row is None:
+        raise LookupError("Lampiran tidak ditemukan.")
+    return dict(row)
+
+
+def hand_over_receipt(receipt_id: str, note: str | None, reason: str | None, by: str | None, is_admin: bool,
+                      receiver_name: str | None = None, files: list[dict] | None = None) -> dict:
     """K-08/K-09 Serah Terima Kendaraan: the vehicle (and goods) are given back to the customer. Recorded apart
     from payment and from closing: only after Pengerjaan Selesai, with who and when. With money still owed
     (a piutang) only an admin may do it, with a reason, and the balance is kept on the record.
     Messages: 'tidak ditemukan' -> 404, 'Alasan' -> 422, 'Hanya admin' -> 403, the rest -> 409."""
     note = (note or "").strip() or None
     reason = (reason or "").strip()
-    with _conn() as con:
-        row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
-        if row is None:
-            raise ValueError("Nota tidak ditemukan.")
-        if row["status"] == "void":
-            raise ValueError("Nota sudah dibatalkan (void).")
-        if row["work_status"] != "selesai":
-            raise ValueError("Serah terima hanya bisa dicatat setelah Pengerjaan Selesai.")
-        if row["handed_over_at"]:
-            raise ValueError("Kendaraan ini sudah dicatat diserahkan.")
-        owed = max(row["total"] - row["amount_paid"], 0)
-        if owed > 0:
-            if not is_admin:
-                raise ValueError("Hanya admin yang boleh menyerahkan kendaraan dengan sisa tagihan (piutang).")
-            if len(reason) < 3:
-                raise ValueError("Alasan wajib diisi (minimal 3 karakter) untuk serah terima dengan piutang.")
-        now = _now()
-        cur = con.execute(
-            "UPDATE receipts SET handed_over_at=?, handed_over_by=?, handover_note=?, handover_debt=? "
-            "WHERE id=? AND handed_over_at IS NULL AND work_status='selesai'",
-            (now, by, (f"{reason}" + (f". {note}" if note else "")) if owed > 0 else note, owed, receipt_id),
-        )
-        if cur.rowcount == 0:
-            raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
-        text = "Kendaraan diserahkan ke pelanggan" + (f" dengan piutang Rp {owed:,}. Izin admin: {reason}".replace(",", ".") if owed else "")
-        if note:
-            text += f" — {note}"
-        _log_receipt_event(con, receipt_id, "handover", text, by)
-        return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
+    receiver = (receiver_name or "").strip()[:80] or None
+    files = _check_handover_files(files)
+    written: list[Path] = []
+    try:
+        with _conn() as con:
+            row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+            if row is None:
+                raise ValueError("Nota tidak ditemukan.")
+            if row["status"] == "void":
+                raise ValueError("Nota sudah dibatalkan (void).")
+            if row["work_status"] != "selesai":
+                raise ValueError("Serah terima hanya bisa dicatat setelah Pengerjaan Selesai.")
+            if row["handed_over_at"]:
+                raise ValueError("Kendaraan ini sudah dicatat diserahkan.")
+            owed = max(row["total"] - row["amount_paid"], 0)
+            if owed > 0:
+                if not is_admin:
+                    raise ValueError("Hanya admin yang boleh menyerahkan kendaraan dengan sisa tagihan (piutang).")
+                if len(reason) < 3:
+                    raise ValueError("Alasan wajib diisi (minimal 3 karakter) untuk serah terima dengan piutang.")
+            now = _now()
+            cur = con.execute(
+                "UPDATE receipts SET handed_over_at=?, handed_over_by=?, handover_note=?, handover_debt=?, handover_receiver=? "
+                "WHERE id=? AND handed_over_at IS NULL AND work_status='selesai'",
+                (now, by, (f"{reason}" + (f". {note}" if note else "")) if owed > 0 else note, owed, receiver, receipt_id),
+            )
+            if cur.rowcount == 0:
+                raise ValueError("Nota ini baru saja berubah. Muat ulang lalu coba lagi.")
+            for f in files:
+                path = _handover_upload_dir(receipt_id) / f"{uuid.uuid4().hex}{HANDOVER_MIMES[f['mime']]}"
+                path.write_bytes(f["data"])
+                written.append(path)
+                con.execute(
+                    "INSERT INTO receipt_handover_files (receipt_id, kind, mime, path, size, created_by, created_at) VALUES (?,?,?,?,?,?,?)",
+                    (receipt_id, f["kind"], f["mime"], str(path), len(f["data"]), by, now))
+            text = "Kendaraan diserahkan ke pelanggan" + (f" dengan piutang Rp {owed:,}. Izin admin: {reason}".replace(",", ".") if owed else "")
+            if receiver:
+                text += f", diterima {receiver}"
+            if note:
+                text += f" — {note}"
+            n_photo = sum(1 for f in files if f["kind"] == "foto")
+            if n_photo or any(f["kind"] == "tanda_tangan" for f in files):
+                text += " [" + ", ".join(x for x in (f"{n_photo} foto" if n_photo else "", "tanda tangan" if any(f["kind"] == "tanda_tangan" for f in files) else "") if x) + "]"
+            _log_receipt_event(con, receipt_id, "handover", text, by)
+            return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
+    except Exception:
+        for path in written:
+            path.unlink(missing_ok=True)
+        raise
 
 
 def undo_handover(receipt_id: str, reason: str, by: str | None = None) -> dict:
@@ -3460,7 +3876,8 @@ def undo_handover(receipt_id: str, reason: str, by: str | None = None) -> dict:
             raise ValueError("Nota tidak ditemukan.")
         if not row["handed_over_at"]:
             raise ValueError("Nota ini belum dicatat diserahkan.")
-        con.execute("UPDATE receipts SET handed_over_at=NULL, handed_over_by=NULL, handover_note=NULL, handover_debt=0 WHERE id=?", (receipt_id,))
+        con.execute("UPDATE receipts SET handed_over_at=NULL, handed_over_by=NULL, handover_note=NULL, handover_debt=0, handover_receiver=NULL WHERE id=?", (receipt_id,))
+        con.execute("UPDATE receipt_handover_files SET voided=1, void_reason=? WHERE receipt_id=? AND voided=0", (reason, receipt_id))
         _log_receipt_event(con, receipt_id, "handover", f"Serah terima dibatalkan: {reason}", by)
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
@@ -3931,20 +4348,14 @@ def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
     both have NOT NULL FK columns pointing at these tables, and SQLite here runs
     without FK enforcement, so a delete would silently orphan them."""
     if table == "suppliers":
-        row = con.execute(
-            "SELECT 1 FROM master_items WHERE supplier_id=? "
-            "UNION SELECT 1 FROM inbound_documents WHERE supplier_id=? "
-            "UNION SELECT 1 FROM purchase_invoices WHERE supplier_id=? "
-            "UNION SELECT 1 FROM supplier_pos WHERE supplier_id=? "
-            "UNION SELECT 1 FROM preorders WHERE supplier_id=? LIMIT 1",
-            (entity_id, entity_id, entity_id, entity_id, entity_id),
-        ).fetchone()
+        # Every table that names a supplier: documents, Sales Order lines, returns, quarantine, service rules.
+        refs = (("master_items", "supplier_id"), ("inbound_documents", "supplier_id"), ("purchase_invoices", "supplier_id"),
+                ("supplier_pos", "supplier_id"), ("preorders", "supplier_id"), ("preorder_items", "supplier_id"),
+                ("quarantine_lots", "supplier_id"), ("supplier_returns", "supplier_id"), ("supplier_credit_notes", "supplier_id"),
+                ("service_profiles", "default_supplier_id"), ("service_profile_overrides", "supplier_id"), ("service_orders", "supplier_id"))
     else:
-        row = con.execute(
-            "SELECT 1 FROM master_items WHERE brand_id=? "
-            "UNION SELECT 1 FROM inbound_items WHERE pending_brand_id=? LIMIT 1",
-            (entity_id, entity_id),
-        ).fetchone()
+        refs = (("master_items", "brand_id"), ("inbound_items", "pending_brand_id"), ("service_profile_overrides", "brand_id"))
+    row = con.execute(" UNION ".join(f"SELECT 1 FROM {t} WHERE {c}=?" for t, c in refs) + " LIMIT 1", (entity_id,) * len(refs)).fetchone()
     return row is not None
 
 
@@ -4175,6 +4586,12 @@ def get_all_units(active_only: bool = False) -> list[dict]:
     return out
 
 
+def _unit_same_word(old: str, new: str) -> bool:
+    """A rename that only fixes spelling or abbreviation (PCS/PC, ROLL/ROL, METER/MTR) rather than naming a different unit."""
+    a, b = re.sub(r"[^A-Z0-9]", "", old.upper()), re.sub(r"[^A-Z0-9]", "", new.upper())
+    return bool(a) and bool(b) and (a == b or fuzz.ratio(a, b) >= 60)
+
+
 def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = None, description: str | None = None,
                 reason: str | None = None, confirm_rename: bool = False, fields_set: set | None = None) -> dict:
     fields_set = fields_set if fields_set is not None else {k for k, v in (("name", name), ("is_active", is_active), ("description", description)) if v is not None}
@@ -4193,7 +4610,13 @@ def update_unit(unit_id: int, name: str | None = None, is_active: bool | None = 
                 raise ValueError(_clash_message(new_name, clash))
         renamed = name is not None and new_name != row["name"]
         if renamed:
-            usage = _unit_usage(con).get(_unit_key(row["name"]), {"products": 0})
+            usage = _unit_usage(con).get(_unit_key(row["name"]), {"products": 0, "docs": 0})
+            # Changing what a unit MEANS (PCS -> METER) is not a spelling fix: stock, prices and printed notas in the old
+            # unit would silently change meaning. Refused for a unit that is in use; make a new unit instead.
+            if (usage["products"] > 0 or usage.get("docs", 0) > 0) and not _unit_same_word(row["name"], new_name):
+                raise ValueError(
+                    f"'{row['name']}' ke '{new_name}' mengubah arti satuan, bukan perbaikan penulisan, dan satuan ini sudah dipakai. "
+                    f"Buat satuan baru '{new_name}' dan pilih di barangnya; konversi antar satuan belum didukung.")
             if usage["products"] > 0 and not confirm_rename:
                 raise ValueError(
                     f"Satuan '{row['name']}' dipakai {usage['products']} produk. Konfirmasi dulu bahwa perubahan ini hanya perbaikan penulisan, bukan mengganti arti satuan."
@@ -4978,8 +5401,9 @@ def _insert_inbound_items(con: sqlite3.Connection, document_id: int, items: list
     con.executemany(
         """INSERT INTO inbound_items
            (document_id, master_item_id, pending_brand_id, pending_product_name, pending_unit,
-            pending_sell_price, qty_in, cost_price, qty_remaining, received_date, spo_item_id, condition, location)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)""",
+            pending_sell_price, qty_in, cost_price, qty_remaining, received_date, spo_item_id, condition, location,
+            spo_package_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)""",
         [
             (
                 document_id,
@@ -4993,6 +5417,7 @@ def _insert_inbound_items(con: sqlite3.Connection, document_id: int, items: list
                 item.get("spo_item_id"),
                 item.get("condition"),
                 item.get("location"),
+                item.get("spo_package_id") if item.get("spo_item_id") else None,
             )
             for item in items
         ],
@@ -5224,8 +5649,8 @@ def _spo_apply_inbound_receipt(con: sqlite3.Connection, header, lines: list[dict
         counted = i.get("_counted", i["qty_in"])  # K-11: never count past what the PO expects
         con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ?, qty_bad = qty_bad + ? WHERE id=?",
                     (counted, counted if bad else 0, i["spo_item_id"]))
-        con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location) VALUES (?, ?, ?, ?, ?)",
-                    (cur.lastrowid, i["spo_item_id"], counted, i.get("condition") or "baik", i.get("location")))
+        con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location, package_id) VALUES (?, ?, ?, ?, ?, ?)",
+                    (cur.lastrowid, i["spo_item_id"], counted, i.get("condition") or "baik", i.get("location"), i.get("_package_id")))
         total += counted
     _spo_finish_if_settled(con, supplier_po_id)
     _spo_event(con, supplier_po_id, "receive",
@@ -5300,6 +5725,8 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
                     # K-11: the PO is counted only up to what it still expects; the rest is plain stock.
                     i["_counted"] = max(left, 0)
                     over_notes.append(f"{i['qty_in'] - max(left, 0)} pcs “{spi['product_name']}”")
+                i["_package_id"] = _spo_check_receive_package(
+                    con, header["supplier_po_id"], i["spo_item_id"], i.get("spo_package_id"), i.get("_counted", i["qty_in"]))
 
         # Step 4: flip status to posted FIRST — the avg-cost recompute below filters
         # on d.status='posted' and must see this document's own new rows.
@@ -7112,13 +7539,21 @@ def get_preorder_items(preorder_id: str) -> list[dict]:
         for it in items:
             links = con.execute(
                 """SELECT sp.id AS supplier_po_id, sp.po_number, sp.status AS po_status, spi.quantity - spi.qty_cancelled AS qty_ordered,
-                          spi.qty_received
+                          spi.qty_received, spi.id AS spo_item_id
                    FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
                    WHERE spi.preorder_item_id=? AND sp.status != 'batal' AND spi.quantity - spi.qty_cancelled > 0
                    ORDER BY sp.created_at ASC""",
                 (it["id"],),
             ).fetchall()
             it["supplier_pos"] = [dict(l) for l in links]
+            # Paket Pengiriman of each linked PO line: where this line's goods are on the road.
+            for link in it["supplier_pos"]:
+                link["packages"] = [
+                    {"package_no": p["package_no"], "forwarder_name": p["forwarder_name"], "ship_method": p["ship_method"],
+                     "state": p["state"], "eta_date": p["eta_date"], "tracking_no": p["tracking_no"], "qty": ln["quantity"],
+                     "received": ln["received"]}
+                    for p in _spo_packages(con, link["supplier_po_id"]) if not p["cancelled"]
+                    for ln in p["lines"] if ln["item_id"] == link["spo_item_id"]]
         held = {ln["id"]: ln for ln in _reservation_lines(con, [it["master_item_id"] for it in items])}
         for it in items:
             ln = held.get(it["id"])
@@ -8690,11 +9125,18 @@ def _spo_items(con: sqlite3.Connection, supplier_po_id: str) -> list[dict]:
         (supplier_po_id,),
     ).fetchall()
     po_stage = con.execute("SELECT stage FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()["stage"]
-    out = []
-    for r in rows:
-        d = dict(r)
+    out = [dict(r) for r in rows]
+    _spo_attach_pkg(out, _spo_packages(con, supplier_po_id))
+    for d in out:
         d["item_status"] = _spo_item_effective_status(d, po_stage)
-        out.append(d)
+        pkg = d.get("_pkg")
+        d["pkg_open"] = pkg["open"] if pkg else 0
+        d["pkg_moving"] = pkg["moving"] if pkg else 0
+        d["pkg_free"] = pkg["free"] if pkg else max(d["quantity"] - d["qty_cancelled"] - d["qty_received"], 0)
+        d["has_packages"] = bool(pkg)
+        if pkg and pkg["etas"]:
+            d["eta_date"] = min(pkg["etas"])
+        d.pop("_pkg", None)
     return out
 
 
@@ -8706,9 +9148,17 @@ def _spo_item_effective_status(item: dict, po_stage: str | None) -> str:
         return "dibatalkan"
     if item["qty_received"] >= live:
         return "diterima"
+    base = item.get("item_status") or (po_stage if po_stage in SPO_STAGES else SPO_STAGES[0])
+    pkg = item.get("_pkg")
+    if pkg and pkg["open"] > 0 and item["qty_received"] < live:
+        # A line split into packages is as far along as its least advanced package still on the road
+        # (and its unpackaged part, if any, counts at the line's own status).
+        seen = list(pkg["statuses"]) + ([base] if pkg["free"] > 0 else [])
+        rank = lambda st: SPO_ITEM_SHIP_STATUSES.index(st) if st in SPO_ITEM_SHIP_STATUSES else 0
+        base = min(seen, key=rank)
     if item["qty_received"] > 0:
         return "diterima_sebagian"
-    return item.get("item_status") or (po_stage if po_stage in SPO_STAGES else SPO_STAGES[0])
+    return base
 
 
 def get_supplier_po(supplier_po_id: str) -> dict | None:
@@ -8729,11 +9179,14 @@ def get_supplier_po(supplier_po_id: str) -> dict | None:
             "SELECT * FROM spo_receipts WHERE supplier_po_id=? ORDER BY created_at ASC, id ASC", (supplier_po_id,)
         ).fetchall():
             lines = [dict(l) for l in con.execute(
-                """SELECT l.item_id, l.quantity, l.condition, l.location, spi.product_name FROM spo_receipt_lines l
+                """SELECT l.item_id, l.quantity, l.condition, l.location, l.package_id, spi.product_name FROM spo_receipt_lines l
                    JOIN supplier_po_items spi ON spi.id = l.item_id WHERE l.receipt_id=?""", (r["id"],))]
             receipts.append({**dict(r), "lines": lines})
         shipments = [dict(r) for r in con.execute(
             "SELECT * FROM spo_item_shipments WHERE supplier_po_id=? ORDER BY at ASC, id ASC", (supplier_po_id,))]
+        packages = _spo_packages(con, supplier_po_id)
+        pkg_history = [dict(r) for r in con.execute(
+            "SELECT * FROM spo_package_history WHERE supplier_po_id=? ORDER BY at ASC, id ASC", (supplier_po_id,))]
         dr = con.execute("SELECT * FROM spo_receive_drafts WHERE supplier_po_id=?", (supplier_po_id,)).fetchone()
         receive_draft = {**json.loads(dr["payload"]), "saved_by": dr["saved_by"], "saved_at": dr["saved_at"]} if dr else None
         # K-13: lines still coming whose customer line was cancelled (Pembatalan Khusus). They stay
@@ -8747,9 +9200,15 @@ def get_supplier_po(supplier_po_id: str) -> dict | None:
             (supplier_po_id, PO_LINE_CANCELLED))] if po["status"] not in ("draft", "batal") else []
     with _conn() as con:
         _spo_attach_faktur(con, [po])
-    return {**po, **_spo_totals(po, items), "items": items, "events": events, "payments": payments,
+    claims = list_refund_claims(supplier_po_id)
+    with _conn() as con:
+        open_invoices = [dict(r) for r in con.execute(
+            """SELECT id, invoice_number, total, amount_paid, total - amount_paid AS outstanding, due_date FROM purchase_invoices
+               WHERE supplier_id=? AND status='posted' AND total > amount_paid ORDER BY due_date, id""", (po["supplier_id"],))] if claims else []
+    return {**po, **_spo_totals(po, items), "refund_claims": claims, "open_invoices": open_invoices,
+            "items": items, "events": events, "payments": payments,
             "receipts": receipts, "cancellations": cancellations, "shipments": shipments,
-            "receive_draft": receive_draft, "so_cancelled_lines": so_cancelled}
+            "packages": packages, "package_history": pkg_history, "receive_draft": receive_draft, "so_cancelled_lines": so_cancelled}
 
 
 def _spo_shipping_status(po: dict, items: list[dict]) -> str | None:
@@ -8815,6 +9274,9 @@ def get_all_supplier_pos(
         items_by_po: dict[str, list[dict]] = {}
         for item in con.execute("SELECT * FROM supplier_po_items").fetchall():
             items_by_po.setdefault(item["supplier_po_id"], []).append(dict(item))
+        all_pkgs = _spo_packages(con)
+        for po_id, its_ in items_by_po.items():
+            _spo_attach_pkg(its_, [p for p in all_pkgs if p["supplier_po_id"] == po_id])
         refs_by_po: dict[str, list[dict]] = {}
         for ref in con.execute(
             """SELECT spi.supplier_po_id AS po_id, p.po_number, p.customer_name FROM supplier_po_items spi
@@ -8953,6 +9415,30 @@ def _sync_preorder_line(con: sqlite3.Connection, preorder_item_id: int, changed_
         target = "sampai_di_toko"
     elif agg["ordered"] + shelf >= line["quantity"]:
         target = "sudah_dipesankan"
+        # Diagram 08: once the supplier PO items covering the whole line are on their way
+        # (Status Item Pengiriman = dalam_pengiriman / tiba_di_hub), the line follows.
+        moving = 0
+        pkgs_of_po: dict[str, list[dict]] = {}
+        for spi in con.execute(
+            f"""SELECT spi.*, sp.stage AS po_stage FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+                WHERE spi.preorder_item_id=? AND sp.status IN ({_placeholders(_SPO_ISSUED)})""",
+            (preorder_item_id, *_SPO_ISSUED),
+        ).fetchall():
+            if spi["supplier_po_id"] not in pkgs_of_po:
+                pkgs_of_po[spi["supplier_po_id"]] = _spo_packages(con, spi["supplier_po_id"])
+            summary = _spo_pkg_summary(pkgs_of_po[spi["supplier_po_id"]]).get(spi["id"])
+            left = spi["quantity"] - spi["qty_cancelled"] - spi["qty_received"]
+            if summary:
+                # Split into packages: only the packages already on the road count; the unpackaged part
+                # moves with the line's own status.
+                free = max(left - summary["open"], 0)
+                moving += summary["moving"]
+                if free > 0 and (spi["item_status"] or spi["po_stage"]) in SPO_PKG_MOVING:
+                    moving += free
+            elif (spi["item_status"] or spi["po_stage"]) in SPO_PKG_MOVING:
+                moving += max(left, 0)
+        if agg["received"] - agg["awaiting_post"] + moving + shelf >= line["quantity"]:
+            target = "dalam_pengiriman"
     else:
         return
     if PREORDER_STATUSES.index(target) <= PREORDER_STATUSES.index(line["status"]):
@@ -9162,6 +9648,7 @@ def set_supplier_po_stage(supplier_po_id: str, to_stage: str, note: str, changed
             raise ValueError("PO sudah berstatus itu.")
         con.execute("UPDATE supplier_pos SET stage=?, updated_at=? WHERE id=?", (to_stage, _now(), supplier_po_id))
         _spo_event(con, supplier_po_id, "stage", f"Status: {_STAGE_LABELS[to_stage]} — {note.strip()}", changed_by)
+        _spo_sync_all(con, supplier_po_id, changed_by, _now())
     return get_supplier_po(supplier_po_id)
 
 
@@ -9230,6 +9717,8 @@ def update_supplier_po_item_shipping(
             raise LookupError(f"Baris {item_id} tidak ada di PO ini.")
         if item["quantity"] - item["qty_cancelled"] - item["qty_received"] <= 0:
             raise ValueError("Item ini sudah diterima lengkap atau dibatalkan, status pengiriman tidak bisa diubah.")
+        if _spo_pkg_open_qty(con, supplier_po_id, item_id) > 0:
+            raise ValueError("Item ini sudah dibagi ke paket pengiriman. Ubah status lewat paketnya.")
         con.execute(
             """UPDATE supplier_po_items SET item_status=?, ship_method=?, courier=?, tracking_no=?, shipped_date=?,
                       eta_date=?, transit_location=? WHERE id=?""",
@@ -9248,7 +9737,362 @@ def update_supplier_po_item_shipping(
         _spo_event(con, supplier_po_id, "item_shipping",
                    f"{item['product_name']}: {_SHIP_STATUS_LABELS[status]}"
                    + (f" ({method})" if method else "") + (f" — {data['note']}" if data.get("note") else ""), changed_by)
+        _spo_sync_all(con, supplier_po_id, changed_by, now)
     return get_supplier_po(supplier_po_id)
+
+
+# ---------------------------------------------------------------------------
+# Master Ekspedisi and Paket Pengiriman
+# ---------------------------------------------------------------------------
+# A Purchase Order can travel in several packages; one PO line can be split over packages with a quantity
+# each. A package has its own forwarder (Master Ekspedisi), route, resi, ETA and status. Goods arriving
+# (Terima Barang / Barang Masuk) name the package they came in, so the package knows what is still on the
+# road. Stock still moves only when the Barang Masuk is posted; a package never touches stock.
+
+SPO_PKG_MOVING = ("dalam_pengiriman", "tiba_di_hub")
+
+
+def _fwd_text(value, label: str, limit: int, required: bool = False) -> str | None:
+    text = (value or "").strip()
+    if required and not text:
+        raise ValueError(f"{label} wajib diisi.")
+    if len(text) > limit:
+        raise ValueError(f"{label} maksimal {limit} karakter.")
+    return text or None
+
+
+def list_forwarders(include_inactive: bool = True) -> list[dict]:
+    with _conn() as con:
+        rows = [dict(r) for r in con.execute(
+            "SELECT * FROM forwarders" + ("" if include_inactive else " WHERE is_active=1") + " ORDER BY name COLLATE NOCASE")]
+        used = {r["fid"]: r["n"] for r in con.execute(
+            "SELECT forwarder_id AS fid, COUNT(*) AS n FROM spo_packages WHERE forwarder_id IS NOT NULL GROUP BY forwarder_id")}
+    for r in rows:
+        r["package_count"] = used.get(r["id"], 0)
+    return rows
+
+
+def _forwarder_fields(data: dict) -> dict:
+    return {"name": _fwd_text(data.get("name"), "Nama ekspedisi", 60, True), "phone": _fwd_text(data.get("phone"), "Telepon", 30),
+            "contact": _fwd_text(data.get("contact"), "Kontak", 80), "note": _fwd_text(data.get("note"), "Catatan", 300)}
+
+
+def create_forwarder(data: dict) -> dict:
+    f = _forwarder_fields(data)
+    with _conn() as con:
+        if con.execute("SELECT 1 FROM forwarders WHERE name=? COLLATE NOCASE", (f["name"],)).fetchone():
+            raise ValueError("Ekspedisi dengan nama itu sudah ada.")
+        cur = con.execute("INSERT INTO forwarders (name, phone, contact, note, is_active, created_at) VALUES (?,?,?,?,1,?)",
+                          (f["name"], f["phone"], f["contact"], f["note"], _now()))
+        return dict(con.execute("SELECT * FROM forwarders WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def update_forwarder(forwarder_id: int, data: dict) -> dict:
+    """Renaming is fine: packages keep the name they were made with, so old shipments stay readable."""
+    f = _forwarder_fields(data)
+    active = 0 if data.get("is_active") in (False, 0, "0") else 1
+    with _conn() as con:
+        if con.execute("SELECT 1 FROM forwarders WHERE id=?", (forwarder_id,)).fetchone() is None:
+            raise LookupError("Ekspedisi tidak ditemukan.")
+        if con.execute("SELECT 1 FROM forwarders WHERE name=? COLLATE NOCASE AND id<>?", (f["name"], forwarder_id)).fetchone():
+            raise ValueError("Ekspedisi dengan nama itu sudah ada.")
+        con.execute("UPDATE forwarders SET name=?, phone=?, contact=?, note=?, is_active=?, updated_at=? WHERE id=?",
+                    (f["name"], f["phone"], f["contact"], f["note"], active, _now(), forwarder_id))
+        return dict(con.execute("SELECT * FROM forwarders WHERE id=?", (forwarder_id,)).fetchone())
+
+
+def delete_forwarder(forwarder_id: int) -> dict:
+    """A forwarder that never carried a package is deleted; one already used is only switched off."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM forwarders WHERE id=?", (forwarder_id,)).fetchone()
+        if row is None:
+            raise LookupError("Ekspedisi tidak ditemukan.")
+        if con.execute("SELECT 1 FROM spo_packages WHERE forwarder_id=?", (forwarder_id,)).fetchone():
+            con.execute("UPDATE forwarders SET is_active=0, updated_at=? WHERE id=?", (_now(), forwarder_id))
+            return {"deleted": False, "deactivated": True}
+        con.execute("DELETE FROM forwarders WHERE id=?", (forwarder_id,))
+        return {"deleted": True, "deactivated": False}
+
+
+def _pkg_received(con: sqlite3.Connection, supplier_po_id: str) -> dict[tuple[int, int], int]:
+    """(package_id, item_id) → quantity that arrived through that package."""
+    return {(r["package_id"], r["item_id"]): r["q"] for r in con.execute(
+        """SELECT l.package_id, l.item_id, SUM(l.quantity) AS q FROM spo_receipt_lines l
+           JOIN spo_receipts r ON r.id = l.receipt_id
+           WHERE r.supplier_po_id=? AND l.package_id IS NOT NULL GROUP BY l.package_id, l.item_id""", (supplier_po_id,))}
+
+
+def _spo_packages(con: sqlite3.Connection, supplier_po_id: str | None = None) -> list[dict]:
+    """Packages with their lines, how much of each arrived and the state shown to the user. With no PO id,
+    every package of every PO (used by the PO list)."""
+    where, params = ("WHERE supplier_po_id=?", (supplier_po_id,)) if supplier_po_id else ("", ())
+    pkgs = [dict(r) for r in con.execute(f"SELECT * FROM spo_packages {where} ORDER BY id", params)]
+    if not pkgs:
+        return []
+    by_id = {p["id"]: p for p in pkgs}
+    received: dict[tuple[int, int], int] = {}
+    for po_id in ({p["supplier_po_id"] for p in pkgs}):
+        received.update(_pkg_received(con, po_id))
+    for p in pkgs:
+        p["lines"] = []
+    for ln in con.execute(
+        f"""SELECT pl.*, spi.product_name, spi.unit, spi.sku FROM spo_package_lines pl
+            JOIN supplier_po_items spi ON spi.id = pl.item_id
+            WHERE pl.package_id IN ({','.join('?' * len(by_id))}) ORDER BY pl.id""", tuple(by_id)):
+        d = dict(ln)
+        d["received"] = min(received.get((d["package_id"], d["item_id"]), 0), d["quantity"])
+        d["remaining"] = max(d["quantity"] - d["received"], 0)
+        by_id[d["package_id"]]["lines"].append(d)
+    for p in pkgs:
+        total = sum(l["quantity"] for l in p["lines"])
+        got = sum(l["received"] for l in p["lines"])
+        p["total_qty"], p["received_qty"], p["remaining_qty"] = total, got, total - got
+        if p["cancelled"]:
+            p["state"] = "dibatalkan"
+        elif total > 0 and got >= total:
+            p["state"] = "diterima"
+        elif got > 0:
+            p["state"] = "diterima_sebagian"
+        else:
+            p["state"] = p["status"]
+        p["open"] = (not p["cancelled"]) and p["remaining_qty"] > 0
+    return pkgs
+
+
+def _spo_pkg_summary(pkgs: list[dict]) -> dict[int, dict]:
+    """item_id → what the packages say about that PO line: qty still travelling, qty moving, statuses."""
+    out: dict[int, dict] = {}
+    for p in pkgs:
+        if p["cancelled"]:
+            continue
+        for l in p["lines"]:
+            if l["remaining"] <= 0:
+                continue
+            e = out.setdefault(l["item_id"], {"open": 0, "moving": 0, "statuses": [], "etas": []})
+            e["open"] += l["remaining"]
+            if p["status"] in SPO_PKG_MOVING:
+                e["moving"] += l["remaining"]
+            e["statuses"].append(p["status"])
+            if p["eta_date"]:
+                e["etas"].append(p["eta_date"])
+    return out
+
+
+def _spo_attach_pkg(items: list[dict], pkgs: list[dict]) -> None:
+    """Gives each PO line its package summary (`_pkg`), so its effective status follows its packages."""
+    summary = _spo_pkg_summary(pkgs)
+    for it in items:
+        e = summary.get(it["id"])
+        if e is None:
+            continue
+        left = it["quantity"] - it["qty_cancelled"] - it["qty_received"]
+        it["_pkg"] = {**e, "free": max(left - e["open"], 0)}
+
+
+def _spo_pkg_free(con: sqlite3.Connection, supplier_po_id: str, item_id: int, exclude_package: int | None = None) -> int:
+    """How much of a PO line is not yet put in any open package (can be added to a package)."""
+    item = con.execute("SELECT * FROM supplier_po_items WHERE id=? AND supplier_po_id=?", (item_id, supplier_po_id)).fetchone()
+    if item is None:
+        raise ValueError(f"Baris {item_id} tidak ada di PO ini.")
+    left = item["quantity"] - item["qty_cancelled"] - item["qty_received"]
+    taken = sum(l["remaining"] for p in _spo_packages(con, supplier_po_id) if not p["cancelled"] and p["id"] != exclude_package
+                for l in p["lines"] if l["item_id"] == item_id)
+    return max(left - taken, 0)
+
+
+def _spo_pkg_open_qty(con: sqlite3.Connection, supplier_po_id: str, item_id: int) -> int:
+    return sum(l["remaining"] for p in _spo_packages(con, supplier_po_id) if not p["cancelled"]
+               for l in p["lines"] if l["item_id"] == item_id)
+
+
+def _spo_check_receive_package(con: sqlite3.Connection, supplier_po_id: str, item_id: int, package_id, qty: int) -> int | None:
+    """Barang Masuk / Terima Barang must name the package the goods came in once the line is split into
+    packages. Returns the package id to store (or None for a line with no open package)."""
+    pkgs = [p for p in _spo_packages(con, supplier_po_id) if not p["cancelled"]]
+    open_here = [p for p in pkgs if any(l["item_id"] == item_id and l["remaining"] > 0 for l in p["lines"])]
+    if package_id in (None, "", 0):
+        if open_here:
+            names = ", ".join(p["package_no"] for p in open_here)
+            raise ValueError(f"Barang ini sedang dalam paket pengiriman ({names}). Pilih paket yang datang.")
+        return None
+    package_id = int(package_id)
+    pkg = next((p for p in pkgs if p["id"] == package_id), None)
+    if pkg is None:
+        raise ValueError("Paket pengiriman tidak ditemukan di PO ini atau sudah dibatalkan.")
+    line = next((l for l in pkg["lines"] if l["item_id"] == item_id), None)
+    if line is None:
+        raise ValueError(f"Barang ini tidak ada di paket {pkg['package_no']}.")
+    if qty > line["remaining"]:
+        raise ValueError(f"Jumlah melebihi sisa paket {pkg['package_no']} untuk barang ini ({line['remaining']}). "
+                         "Ubah isi paket dulu bila jumlah kirimnya memang berbeda.")
+    return package_id
+
+
+def _pkg_validate_info(data: dict) -> dict:
+    status = data.get("status") or "menunggu_konfirmasi"
+    if status not in SPO_ITEM_SHIP_STATUSES:
+        raise ValueError(f"Status paket harus salah satu dari: {', '.join(SPO_ITEM_SHIP_STATUSES)}.")
+    method = data.get("ship_method") or None
+    if method is not None and method not in SPO_SHIP_METHODS:
+        raise ValueError(f"Jalur pengiriman harus salah satu dari: {', '.join(SPO_SHIP_METHODS)}.")
+    for key, label in (("shipped_date", "Tanggal kirim"), ("eta_date", "Estimasi tiba")):
+        if data.get(key):
+            try:
+                date.fromisoformat(data[key])
+            except ValueError:
+                raise ValueError(f"{label} harus berformat YYYY-MM-DD.")
+    if status in SPO_PKG_MOVING:
+        if not method:
+            raise ValueError("Jalur pengiriman (laut/udara/darat) wajib diisi untuk status ini.")
+        if not data.get("forwarder_id"):
+            raise ValueError("Ekspedisi wajib dipilih dari Master Ekspedisi untuk status ini.")
+    return {"status": status, "ship_method": method,
+            "tracking_no": _fwd_text(data.get("tracking_no"), "Nomor resi", 80),
+            "shipped_date": data.get("shipped_date") or None, "eta_date": data.get("eta_date") or None,
+            "transit_location": _fwd_text(data.get("transit_location"), "Lokasi transit", 100),
+            "note": _fwd_text(data.get("note"), "Catatan", 500)}
+
+
+def _pkg_forwarder(con: sqlite3.Connection, forwarder_id, keep: int | None = None) -> tuple[int | None, str | None]:
+    if not forwarder_id:
+        return None, None
+    row = con.execute("SELECT * FROM forwarders WHERE id=?", (int(forwarder_id),)).fetchone()
+    if row is None:
+        raise ValueError("Ekspedisi tidak ditemukan di Master Ekspedisi.")
+    if not row["is_active"] and int(forwarder_id) != keep:
+        raise ValueError(f"Ekspedisi {row['name']} sudah dinonaktifkan.")
+    return row["id"], row["name"]
+
+
+def _pkg_lines_input(con: sqlite3.Connection, supplier_po_id: str, lines: list[dict], exclude_package: int | None,
+                     received_by_item: dict[int, int] | None = None) -> list[tuple[int, int]]:
+    seen: set[int] = set()
+    out: list[tuple[int, int]] = []
+    for ln in lines or []:
+        item_id, qty = int(ln.get("item_id") or 0), int(ln.get("quantity") or 0)
+        if qty <= 0:
+            continue
+        if item_id in seen:
+            raise ValueError("Satu barang hanya boleh muncul sekali dalam satu paket.")
+        seen.add(item_id)
+        free = _spo_pkg_free(con, supplier_po_id, item_id, exclude_package)
+        floor = (received_by_item or {}).get(item_id, 0)
+        if qty < floor:
+            raise ValueError(f"Jumlah paket tidak boleh di bawah yang sudah diterima ({floor}).")
+        # `free` already excludes this package's own open remainder, so the package may hold up to free + received.
+        if qty - floor > free:
+            name = con.execute("SELECT product_name FROM supplier_po_items WHERE id=?", (item_id,)).fetchone()["product_name"]
+            raise ValueError(f"Jumlah “{name}” melebihi yang belum masuk paket mana pun ({free}).")
+        out.append((item_id, qty))
+    return out
+
+
+def _pkg_history(con: sqlite3.Connection, pkg_id: int, supplier_po_id: str, info: dict, fwd_name: str | None,
+                 by: str | None, notify: bool = False) -> None:
+    con.execute(
+        """INSERT INTO spo_package_history (package_id, supplier_po_id, at, by_user, status, ship_method, forwarder_name,
+                                            tracking_no, eta_date, transit_location, note, notify_customer)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (pkg_id, supplier_po_id, _now(), by, info["status"], info["ship_method"], fwd_name, info["tracking_no"],
+         info["eta_date"], info["transit_location"], info["note"], 1 if notify else 0))
+
+
+def create_spo_package(supplier_po_id: str, data: dict, by: str | None = None) -> dict:
+    info = _pkg_validate_info(data)
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        po = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
+        if po is None:
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
+        if po["status"] not in ("dipesan", "sebagian_diterima"):
+            raise ValueError("Paket pengiriman hanya untuk PO yang sudah diterbitkan dan belum selesai.")
+        lines = _pkg_lines_input(con, supplier_po_id, data.get("lines"), None)
+        if not lines:
+            raise ValueError("Isi minimal satu barang beserta jumlahnya di paket ini.")
+        fid, fname = _pkg_forwarder(con, data.get("forwarder_id"))
+        n = con.execute("SELECT COUNT(*) AS n FROM spo_packages WHERE supplier_po_id=?", (supplier_po_id,)).fetchone()["n"] + 1
+        package_no = f"{po['po_number']}-P{n}"
+        now = _now()
+        cur = con.execute(
+            """INSERT INTO spo_packages (supplier_po_id, package_no, forwarder_id, forwarder_name, ship_method, tracking_no,
+                                         shipped_date, eta_date, transit_location, status, note, created_by, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (supplier_po_id, package_no, fid, fname, info["ship_method"], info["tracking_no"], info["shipped_date"],
+             info["eta_date"], info["transit_location"], info["status"], info["note"], by, now, now))
+        pkg_id = cur.lastrowid
+        con.executemany("INSERT INTO spo_package_lines (package_id, item_id, quantity) VALUES (?,?,?)",
+                        [(pkg_id, i, q) for i, q in lines])
+        _pkg_history(con, pkg_id, supplier_po_id, info, fname, by, bool(data.get("notify_customer")))
+        con.execute("UPDATE supplier_pos SET updated_at=? WHERE id=?", (now, supplier_po_id))
+        _spo_event(con, supplier_po_id, "package", f"Paket {package_no} dibuat ({sum(q for _, q in lines)} pcs)"
+                   + (f" lewat {fname}" if fname else "") + f", status {_SHIP_STATUS_LABELS[info['status']]}", by)
+        _spo_sync_all(con, supplier_po_id, by, now)
+    return get_supplier_po(supplier_po_id)
+
+
+def update_spo_package(supplier_po_id: str, package_id: int, data: dict, by: str | None = None) -> dict:
+    """Changes a package's shipping info/status and, when `lines` is given, what it holds. Every change is
+    kept in the package history. Lines may not drop below what already arrived through the package."""
+    info = _pkg_validate_info(data)
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        po = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
+        if po is None:
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
+        if po["status"] not in ("dipesan", "sebagian_diterima"):
+            raise ValueError("Paket pengiriman hanya bisa diubah pada PO yang sudah diterbitkan dan belum selesai.")
+        pkg = next((p for p in _spo_packages(con, supplier_po_id) if p["id"] == package_id), None)
+        if pkg is None:
+            raise LookupError("Paket tidak ditemukan di PO ini.")
+        if pkg["cancelled"]:
+            raise ValueError("Paket ini sudah dibatalkan.")
+        if pkg["remaining_qty"] <= 0:
+            raise ValueError("Paket ini sudah diterima lengkap.")
+        fid, fname = _pkg_forwarder(con, data.get("forwarder_id"), keep=pkg["forwarder_id"])
+        now = _now()
+        con.execute(
+            """UPDATE spo_packages SET forwarder_id=?, forwarder_name=?, ship_method=?, tracking_no=?, shipped_date=?, eta_date=?,
+                      transit_location=?, status=?, note=?, updated_at=? WHERE id=?""",
+            (fid, fname, info["ship_method"], info["tracking_no"], info["shipped_date"], info["eta_date"],
+             info["transit_location"], info["status"], info["note"], now, package_id))
+        if data.get("lines") is not None:
+            got = {l["item_id"]: l["received"] for l in pkg["lines"]}
+            new = _pkg_lines_input(con, supplier_po_id, data["lines"], package_id, got)
+            # A line that already had goods arrive stays (at least at what arrived) even if the form dropped it.
+            keep = {i for i, _ in new}
+            new += [(i, g) for i, g in got.items() if g > 0 and i not in keep]
+            if not any(q - got.get(i, 0) > 0 for i, q in new) and not any(got.values()):
+                raise ValueError("Paket tidak boleh kosong. Batalkan paketnya bila memang tidak jadi dikirim.")
+            con.execute("DELETE FROM spo_package_lines WHERE package_id=?", (package_id,))
+            con.executemany("INSERT INTO spo_package_lines (package_id, item_id, quantity) VALUES (?,?,?)",
+                            [(package_id, i, q) for i, q in new])
+        _pkg_history(con, package_id, supplier_po_id, info, fname, by, bool(data.get("notify_customer")))
+        con.execute("UPDATE supplier_pos SET updated_at=? WHERE id=?", (now, supplier_po_id))
+        _spo_event(con, supplier_po_id, "package", f"Paket {pkg['package_no']}: {_SHIP_STATUS_LABELS[info['status']]}"
+                   + (f" ({info['ship_method']})" if info["ship_method"] else "") + (f" — {info['note']}" if info["note"] else ""), by)
+        _spo_sync_all(con, supplier_po_id, by, now)
+    return get_supplier_po(supplier_po_id)
+
+
+def cancel_spo_package(supplier_po_id: str, package_id: int, reason: str, by: str | None = None) -> dict:
+    """Cancels a package that carried nothing yet; its quantity becomes free to put in another package.
+    Goods that already arrived through it are not undone (they are on their Barang Masuk)."""
+    reason = _fwd_text(reason, "Alasan", 300, True)
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        pkg = next((p for p in _spo_packages(con, supplier_po_id) if p["id"] == package_id), None)
+        if pkg is None:
+            raise LookupError("Paket tidak ditemukan di PO ini.")
+        if pkg["cancelled"]:
+            raise ValueError("Paket ini sudah dibatalkan.")
+        if pkg["received_qty"] > 0:
+            raise ValueError("Paket ini sudah ada barangnya yang diterima, tidak bisa dibatalkan. Kecilkan jumlah di paket untuk menutup sisanya.")
+        now = _now()
+        con.execute("UPDATE spo_packages SET cancelled=1, cancel_reason=?, updated_at=? WHERE id=?", (reason, now, package_id))
+        con.execute("UPDATE supplier_pos SET updated_at=? WHERE id=?", (now, supplier_po_id))
+        _spo_event(con, supplier_po_id, "package", f"Paket {pkg['package_no']} dibatalkan — {reason}", by)
+    return get_supplier_po(supplier_po_id)
+
 
 
 def _spo_finish_if_settled(con: sqlite3.Connection, supplier_po_id: str) -> None:
@@ -9351,10 +10195,11 @@ def receive_supplier_po(
                 over_list.append((dict(item), r["quantity"] - counted))
             cond = r.get("condition") or "baik"
             bad = cond in BAD_RECEIVE_CONDITIONS
+            pkg_id = _spo_check_receive_package(con, supplier_po_id, r["item_id"], r.get("package_id"), counted)
             con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ?, qty_bad = qty_bad + ? WHERE id=?",
                         (counted, counted if bad else 0, r["item_id"]))
-            con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location) VALUES (?, ?, ?, ?, ?)",
-                        (receipt_id, r["item_id"], counted, cond, r.get("location") or warehouse_location))
+            con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location, package_id) VALUES (?, ?, ?, ?, ?, ?)",
+                        (receipt_id, r["item_id"], counted, cond, r.get("location") or warehouse_location, pkg_id))
             if bad:
                 # Decision 3: damaged / wrong goods never reach the sellable shelf; they wait in quarantine
                 # as a candidate for a return to this supplier.
@@ -9532,41 +10377,236 @@ def release_spo_line_to_stock(supplier_po_id: str, item_id: int, reason: str, by
     return get_supplier_po(supplier_po_id)
 
 
+def _resolve_cancellation_tx(con: sqlite3.Connection, supplier_po_id: str, c, approved: bool, note: str | None, by: str | None) -> None:
+    now = _now()
+    if c["status"] != "menunggu_persetujuan":
+        raise ValueError("Permintaan pembatalan ini sudah diputuskan.")
+    item = con.execute("SELECT * FROM supplier_po_items WHERE id=?", (c["item_id"],)).fetchone()
+    if approved:
+        left = item["quantity"] - item["qty_cancelled"] - item["qty_received"]
+        if c["quantity"] > left:
+            raise ValueError(
+                f"Barang sudah datang sebagian: sisa yang belum diterima hanya {left}, tidak bisa dibatalkan {c['quantity']}. "
+                "Tolak permintaan ini atau ajukan jumlah yang lebih kecil."
+            )
+        packed = _spo_pkg_open_qty(con, supplier_po_id, c["item_id"])
+        if left - c["quantity"] < packed:
+            raise ValueError(f"Sebagian barang ini masih ada di paket pengiriman yang belum datang ({packed}). "
+                             "Kecilkan atau batalkan paketnya dulu sebelum membatalkan item.")
+        con.execute("UPDATE supplier_po_items SET qty_cancelled = qty_cancelled + ? WHERE id=?", (c["quantity"], c["item_id"]))
+    con.execute(
+        "UPDATE spo_cancellations SET status=?, resolved_by=?, resolved_at=?, resolution_note=? WHERE id=?",
+        ("disetujui" if approved else "ditolak", by, now, (note or "").strip() or None, c["id"]),
+    )
+    _spo_event(
+        con, supplier_po_id, "cancel_item" if approved else "cancel_rejected",
+        (f"Pembatalan disetujui supplier: {c['product_name']} x{c['quantity']}" if approved
+         else f"Pembatalan ditolak supplier: {c['product_name']} x{c['quantity']} tetap dipesan")
+        + (f" — {note.strip()}" if note and note.strip() else ""), by)
+
+
+REFUND_KINDS = {"refund": "Refund (uang kembali)", "kredit": "Kredit Supplier (potong tagihan berikutnya)"}
+
+
+def _spo_refund_claimed(con: sqlite3.Connection, supplier_po_id: str) -> int:
+    return con.execute("SELECT COALESCE(SUM(amount), 0) AS n FROM supplier_refund_claims WHERE supplier_po_id=? AND status<>'dibatalkan'",
+                       (supplier_po_id,)).fetchone()["n"]
+
+
+def _spo_open_refund(con: sqlite3.Connection, supplier_po_id: str) -> int:
+    """Money paid on a PO that its (shrunk or cancelled) bill no longer covers and no claim covers yet. Zero while a
+    Faktur Pembelian exists: from then on the debt, and what was paid, live on the faktur."""
+    po = dict(con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone())
+    if _active_po_faktur(con, supplier_po_id):
+        return 0
+    bill = 0 if po["status"] == "batal" else _spo_money(po, _spo_items(con, supplier_po_id))["grand_total"]
+    return max((po["paid_amount"] or 0) - bill - _spo_refund_claimed(con, supplier_po_id), 0)
+
+
+def _spo_make_refund_claim(con: sqlite3.Connection, supplier_po_id: str, kind: str | None, by: str | None) -> int:
+    """Called after a cancellation was approved: if the PO now holds more money than it bills, the surplus becomes a
+    Piutang Refund / Kredit Supplier claim. Returns the amount (0 when nothing is owed back)."""
+    due = _spo_open_refund(con, supplier_po_id)
+    if due <= 0:
+        return 0
+    if kind not in REFUND_KINDS:
+        raise ValueError(f"PO ini sudah dibayar Rp {due:,} melebihi tagihan setelah pembatalan. Pilih apakah uang kembali sebagai Refund atau Kredit Supplier.".replace(",", "."))
+    po = con.execute("SELECT supplier_id, po_number FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
+    open_claim = con.execute("SELECT * FROM supplier_refund_claims WHERE supplier_po_id=? AND status='menunggu' ORDER BY id DESC LIMIT 1",
+                             (supplier_po_id,)).fetchone()
+    if open_claim is not None:
+        if open_claim["kind"] != kind:
+            raise ValueError(f"Klaim yang sudah ada untuk PO ini berupa {REFUND_KINDS[open_claim['kind']]}. Gunakan pilihan yang sama.")
+        con.execute("UPDATE supplier_refund_claims SET amount = amount + ? WHERE id=?", (due, open_claim["id"]))
+        no = open_claim["claim_no"]
+    else:
+        no = _sr_number(con, "RFS", "supplier_refund_claims", "claim_no")
+        con.execute("INSERT INTO supplier_refund_claims (claim_no, supplier_id, supplier_po_id, kind, amount, created_by, created_at) VALUES (?,?,?,?,?,?,?)",
+                    (no, po["supplier_id"], supplier_po_id, kind, due, by, _now()))
+    _spo_event(con, supplier_po_id, "refund_claim",
+               (f"{'Piutang Refund Supplier' if kind == 'refund' else 'Kredit Supplier'} {no} Rp {due:,}: uang muka yang sudah dibayar melebihi tagihan setelah pembatalan. "
+                "Belum dianggap diterima sampai uang benar-benar masuk / nota kredit dikonfirmasi.").replace(",", "."), by)
+    return due
+
+
 def resolve_spo_cancellation(
-    supplier_po_id: str, cancellation_id: int, approved: bool, note: str | None = None, by: str | None = None
+    supplier_po_id: str, cancellation_id: int, approved: bool, note: str | None = None, by: str | None = None,
+    refund_kind: str | None = None,
 ) -> dict:
     """The supplier's answer to a cancellation request. Approved: the quantity is dropped from the line
-    (the bill shrinks, the PO may finish). Rejected: the request is closed and the line is untouched."""
-    now = _now()
+    (the bill shrinks, the PO may finish) and money already paid beyond the new bill becomes a refund / credit claim.
+    Rejected: the request is closed and the line is untouched, the PO carries on."""
     with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
         c = con.execute(
             "SELECT * FROM spo_cancellations WHERE id=? AND supplier_po_id=?", (cancellation_id, supplier_po_id)
         ).fetchone()
         if c is None:
             raise LookupError("Permintaan pembatalan tidak ditemukan.")
-        if c["status"] != "menunggu_persetujuan":
-            raise ValueError("Permintaan pembatalan ini sudah diputuskan.")
-        item = con.execute("SELECT * FROM supplier_po_items WHERE id=?", (c["item_id"],)).fetchone()
-        if approved:
-            left = item["quantity"] - item["qty_cancelled"] - item["qty_received"]
-            if c["quantity"] > left:
-                raise ValueError(
-                    f"Barang sudah datang sebagian: sisa yang belum diterima hanya {left}, tidak bisa dibatalkan {c['quantity']}. "
-                    "Tolak permintaan ini atau ajukan jumlah yang lebih kecil."
-                )
-            con.execute("UPDATE supplier_po_items SET qty_cancelled = qty_cancelled + ? WHERE id=?", (c["quantity"], c["item_id"]))
-        con.execute(
-            "UPDATE spo_cancellations SET status=?, resolved_by=?, resolved_at=?, resolution_note=? WHERE id=?",
-            ("disetujui" if approved else "ditolak", by, now, (note or "").strip() or None, cancellation_id),
-        )
-        _spo_event(
-            con, supplier_po_id, "cancel_item" if approved else "cancel_rejected",
-            (f"Pembatalan disetujui supplier: {c['product_name']} x{c['quantity']}" if approved
-             else f"Pembatalan ditolak supplier: {c['product_name']} x{c['quantity']} tetap dipesan")
-            + (f" — {note.strip()}" if note and note.strip() else ""), by)
+        _resolve_cancellation_tx(con, supplier_po_id, c, approved, note, by)
         if approved:
             _spo_finish_if_settled(con, supplier_po_id)
+            _spo_make_refund_claim(con, supplier_po_id, refund_kind, by)
     return get_supplier_po(supplier_po_id)
+
+
+def request_spo_cancel_all(supplier_po_id: str, reason: str, action: str, note: str | None = None, by: str | None = None) -> dict:
+    """Batalkan PO: asks the supplier to cancel everything of the PO that has not arrived. Nothing changes on the PO until the
+    supplier agrees (resolve_spo_cancel_all); goods already received stay and are handled by Retur Supplier."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
+        if row is None:
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
+        if row["status"] not in ("dipesan", "sebagian_diterima"):
+            raise ValueError("Pembatalan ke supplier hanya untuk PO yang sudah diterbitkan dan belum selesai.")
+        if not (reason or "").strip():
+            raise ValueError("Alasan pembatalan wajib diisi.")
+        if action not in SPO_CANCEL_ACTIONS:
+            raise ValueError(f"Tindakan lanjutan harus salah satu dari: {', '.join(SPO_CANCEL_ACTIONS)}.")
+        made = 0
+        for item in con.execute("SELECT * FROM supplier_po_items WHERE supplier_po_id=?", (supplier_po_id,)).fetchall():
+            pending = con.execute("SELECT COALESCE(SUM(quantity), 0) AS q FROM spo_cancellations WHERE item_id=? AND status='menunggu_persetujuan'",
+                                  (item["id"],)).fetchone()["q"]
+            left = item["quantity"] - item["qty_cancelled"] - item["qty_received"] - pending
+            if left > 0:
+                con.execute(
+                    """INSERT INTO spo_cancellations (supplier_po_id, item_id, product_name, quantity, reason, action, note,
+                                                      cancelled_by, cancelled_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'menunggu_persetujuan')""",
+                    (supplier_po_id, item["id"], item["product_name"], left, reason.strip(), action, (note or "").strip() or None, by, _now()))
+                made += 1
+        if not made:
+            raise ValueError("Tidak ada sisa barang yang bisa dibatalkan (sudah diterima semua atau sudah diajukan).")
+        _spo_event(con, supplier_po_id, "cancel_request",
+                   f"Pembatalan seluruh sisa PO diajukan ({made} barang), menunggu persetujuan supplier — {reason.strip()}", by)
+    return get_supplier_po(supplier_po_id)
+
+
+def resolve_spo_cancel_all(supplier_po_id: str, approved: bool, note: str | None = None, by: str | None = None,
+                           refund_kind: str | None = None) -> dict:
+    """The supplier's answer to every pending cancellation request of a PO at once. Agreed: the PO is cancelled for what
+    has not arrived (and any money paid beyond what remains becomes a claim). Refused: the PO simply continues."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        pend = con.execute("SELECT * FROM spo_cancellations WHERE supplier_po_id=? AND status='menunggu_persetujuan'", (supplier_po_id,)).fetchall()
+        if not pend:
+            raise LookupError("Tidak ada permintaan pembatalan yang menunggu supplier.")
+        for c in pend:
+            _resolve_cancellation_tx(con, supplier_po_id, c, approved, note, by)
+        if approved:
+            _spo_finish_if_settled(con, supplier_po_id)
+            if con.execute("SELECT status FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()["status"] == "batal":
+                con.execute("UPDATE spo_packages SET cancelled=1, cancel_reason='PO dibatalkan', updated_at=? WHERE supplier_po_id=? AND cancelled=0",
+                            (_now(), supplier_po_id))
+            _spo_make_refund_claim(con, supplier_po_id, refund_kind, by)
+    return get_supplier_po(supplier_po_id)
+
+
+def list_refund_claims(supplier_po_id: str | None = None, status: str | None = None) -> list[dict]:
+    with _conn() as con:
+        where, params = [], []
+        if supplier_po_id:
+            where.append("c.supplier_po_id=?"); params.append(supplier_po_id)
+        if status:
+            where.append("c.status=?"); params.append(status)
+        rows = [dict(r) for r in con.execute(
+            f"""SELECT c.*, s.name AS supplier_name, p.po_number FROM supplier_refund_claims c
+                JOIN suppliers s ON s.id = c.supplier_id JOIN supplier_pos p ON p.id = c.supplier_po_id
+                {('WHERE ' + ' AND '.join(where)) if where else ''} ORDER BY c.id DESC""", params)]
+        for r in rows:
+            r["left"] = r["amount"] - r["settled_amount"] if r["status"] == "menunggu" else 0
+            r["credit_notes"] = []
+            for cn in con.execute("SELECT * FROM supplier_credit_notes WHERE claim_id=? ORDER BY id", (r["id"],)):
+                cn = dict(cn)
+                cn["allocated"] = _sr_cn_allocated(con, cn["id"])
+                cn["unallocated"] = cn["amount"] - cn["allocated"] if cn["kind"] == "kredit" and cn["status"] == "aktif" else 0
+                r["credit_notes"].append(cn)
+        return rows
+
+
+def settle_refund_claim(claim_id: int, data: dict, user: dict) -> dict:
+    """Admin: the refund money really arrived (kind refund: amount, method, reference) or the supplier's credit note is
+    confirmed (kind kredit: the supplier's credit note number). Only then does the claim count."""
+    _sr_require_admin(user, "mencatat refund / kredit supplier")
+    by = user.get("username")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        cl = con.execute("SELECT * FROM supplier_refund_claims WHERE id=?", (claim_id,)).fetchone()
+        if cl is None:
+            raise LookupError("Klaim tidak ditemukan.")
+        if cl["status"] != "menunggu":
+            raise ValueError("Klaim ini sudah selesai atau dibatalkan.")
+        left = cl["amount"] - cl["settled_amount"]
+        amount = int(data.get("amount") or 0)
+        if amount <= 0 or amount > left:
+            raise ValueError(f"Nilai harus antara 1 dan sisa klaim (Rp {left:,}).".replace(",", "."))
+        issued = _sr_text(data.get("received_at") or data.get("issued_at")) or shop_today().isoformat()
+        try:
+            date.fromisoformat(issued[:10])
+        except ValueError:
+            raise ValueError("Tanggal harus berformat YYYY-MM-DD.")
+        if cl["kind"] == "refund":
+            if data.get("method") not in ("transfer", "cash", "giro"):
+                raise ValueError("Pilih metode uang masuk (transfer / cash / giro).")
+            if not _sr_text(data.get("reference_no")):
+                raise ValueError("Isi nomor referensi / bukti uang masuk.")
+        elif not _sr_text(data.get("supplier_cn_no")):
+            raise ValueError("Isi nomor nota kredit dari supplier.")
+        con.execute(
+            """INSERT INTO supplier_credit_notes (cn_number, kind, supplier_id, return_id, amount, supplier_cn_no, issued_at, method,
+                   reference_no, note, created_by, created_at, supplier_po_id, claim_id) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (_sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number") if cl["kind"] == "kredit" else None, cl["kind"], cl["supplier_id"],
+             amount, _sr_text(data.get("supplier_cn_no")), issued, data.get("method") if cl["kind"] == "refund" else None,
+             _sr_text(data.get("reference_no")), _sr_text(data.get("note")), by, _now(), cl["supplier_po_id"], claim_id))
+        settled = cl["settled_amount"] + amount
+        done = settled >= cl["amount"]
+        con.execute("UPDATE supplier_refund_claims SET settled_amount=?, status=?, closed_by=?, closed_at=? WHERE id=?",
+                    (settled, ("diterima" if cl["kind"] == "refund" else "dikonfirmasi") if done else "menunggu",
+                     by if done else None, _now() if done else None, claim_id))
+        _spo_event(con, cl["supplier_po_id"], "refund_claim",
+                   (f"Refund diterima Rp {amount:,} ({data.get('method')}, ref {_sr_text(data.get('reference_no'))})" if cl["kind"] == "refund"
+                    else f"Nota kredit supplier {_sr_text(data.get('supplier_cn_no'))} Rp {amount:,} dikonfirmasi; saldo kredit bisa dipakai").replace(",", ".")
+                   + f" — klaim {cl['claim_no']}" + ("" if done else f", sisa Rp {left - amount:,}".replace(",", ".")), by)
+    return next(c for c in list_refund_claims() if c["id"] == claim_id)
+
+
+def cancel_refund_claim(claim_id: int, reason: str, user: dict) -> dict:
+    """Admin: drops a claim that was entered by mistake or that the supplier will not honour. Only what has not been
+    settled yet; money / credit already recorded stays on its own rows."""
+    _sr_require_admin(user, "membatalkan klaim refund / kredit supplier")
+    if not (reason or "").strip():
+        raise ValueError("Alasan wajib diisi.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        cl = con.execute("SELECT * FROM supplier_refund_claims WHERE id=?", (claim_id,)).fetchone()
+        if cl is None:
+            raise LookupError("Klaim tidak ditemukan.")
+        if cl["status"] != "menunggu":
+            raise ValueError("Klaim ini sudah selesai atau dibatalkan.")
+        con.execute("UPDATE supplier_refund_claims SET status='dibatalkan', closed_by=?, closed_at=?, close_reason=? WHERE id=?",
+                    (user.get("username"), _now(), reason.strip()[:300], claim_id))
+        _spo_event(con, cl["supplier_po_id"], "refund_claim", f"Klaim {cl['claim_no']} dibatalkan: {reason.strip()}", user.get("username"))
+    return next(c for c in list_refund_claims() if c["id"] == claim_id)
 
 
 def cancel_supplier_po(supplier_po_id: str, by: str | None = None) -> dict:
@@ -9585,11 +10625,14 @@ def cancel_supplier_po(supplier_po_id: str, by: str | None = None) -> dict:
         ).fetchone():
             raise ValueError("Purchase Order ini sudah menerima barang, tidak bisa dibatalkan.")
         if row["paid_amount"] > 0:
-            raise ValueError("Purchase Order ini sudah ada pembayaran, tidak bisa dibatalkan.")
+            raise ValueError("Purchase Order ini sudah ada pembayaran. Ajukan pembatalan ke supplier (Batalkan PO): setelah supplier setuju, "
+                             "uang muka dicatat sebagai Piutang Refund atau Kredit Supplier.")
         faktur = _active_po_faktur(con, supplier_po_id)
         if faktur:
             raise ValueError(f"Purchase Order ini sudah punya Faktur Pembelian {faktur['invoice_number']}. Hapus/void fakturnya dulu.")
         con.execute("UPDATE supplier_pos SET status='batal', updated_at=? WHERE id=?", (now, supplier_po_id))
+        con.execute("UPDATE spo_packages SET cancelled=1, cancel_reason='PO dibatalkan', updated_at=? WHERE supplier_po_id=? AND cancelled=0",
+                    (now, supplier_po_id))
         _spo_event(con, supplier_po_id, "cancel", "PO dibatalkan", by)
     return get_supplier_po(supplier_po_id)
 
@@ -11174,12 +12217,12 @@ SVC_MEDIA = {"wa": "WhatsApp", "telepon": "Telepon", "datang": "Datang ke toko"}
 SVC_REPLACE_MODES = {"pabrik": "Pabrik mengirim unit pengganti", "stok_toko": "Tukar dari stok toko"}
 SVC_PHOTO_STAGES = {
     "masuk": "Unit masuk", "sn": "Nomor seri", "kelengkapan": "Kelengkapan", "segel": "Segel / stiker garansi",
-    "kartu_garansi": "Kartu garansi", "uji": "Bukti uji di toko", "kemasan": "Kemasan", "resi": "Resi / bukti serah ekspedisi",
+    "kartu_garansi": "Kartu garansi", "nota_manual": "Foto nota / bukti pembelian (manual)", "uji": "Bukti uji di toko", "kemasan": "Kemasan", "resi": "Resi / bukti serah ekspedisi",
     "isi_paket": "Isi paket", "serah_sales": "Foto serah terima sales", "ttd_sales": "Tanda tangan sales",
     "diagnosis": "Bukti diagnosis", "persetujuan": "Bukti persetujuan customer", "penolakan": "Bukti penolakan",
     "balik": "Bukti penerimaan balik", "serah_customer": "Foto serah ke customer", "ttd_customer": "Tanda tangan customer",
 }
-_SVC_PHOTO_LOCK_RECEIVE = ("masuk", "sn", "kelengkapan", "segel", "kartu_garansi")
+_SVC_PHOTO_LOCK_RECEIVE = ("masuk", "sn", "kelengkapan", "segel", "kartu_garansi", "nota_manual")
 _SVC_PHOTO_LOCK_OUT = ("kemasan", "resi", "isi_paket", "serah_sales", "ttd_sales")
 SVC_OPEN = ("diterima", "pengecekan", "menunggu_kirim", "di_supplier", "menunggu_customer", "kembali", "siap_diambil")
 _SVC_AWAY = ("di_ekspedisi", "dibawa_sales", "di_pabrik", "perjalanan_balik")

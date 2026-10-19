@@ -15,9 +15,14 @@ COST_KEYS = {"last_cost_price", "avg_cost_price", "cost_price", "total_inventory
              "unit_cost", "cost_value", "writeoffs_cost_value", "factory_cost", "factory_total"}
 
 
+# Whole sections that are an admin's business (what a supplier owes back) and are emptied for staff.
+HIDDEN_FOR_STAFF = {"refund_claims", "open_invoices"}
+
+
 def _strip(node):
     if isinstance(node, dict):
-        return {k: (0 if k in COST_KEYS and isinstance(v, (int, float)) else _strip(v)) for k, v in node.items()}
+        return {k: ([] if k in HIDDEN_FOR_STAFF and isinstance(v, list) else 0 if k in COST_KEYS and isinstance(v, (int, float)) else _strip(v))
+                for k, v in node.items()}
     if isinstance(node, list):
         return [_strip(v) for v in node]
     return node

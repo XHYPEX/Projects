@@ -80,6 +80,11 @@ class ReceiptRequest(ReceiptExtra):
     customer_id: int | None = None
     items: list[ReceiptItemRequest]
     discount: int = 0
+    # Diskon nota is reviewed like Harga Khusus: a reason is required; an admin may allow a final price below cost
+    # and may knowingly combine the discount with lines that already have a special price.
+    discount_reason: str | None = None
+    allow_discount_below_cost: bool = False
+    allow_discount_stack: bool = False
     amount_paid: int = 0
     # When the cashier opened this transaction. Server-sanitised on create and
     # never accepted on update -- see _sanitize_started_at / update_receipt.
@@ -112,6 +117,9 @@ class ReceiptUpdateRequest(ReceiptExtra):
     customer_id: int | None = None
     items: list[ReceiptItemRequest] | None = None
     discount: int | None = None
+    discount_reason: str | None = None
+    allow_discount_below_cost: bool = False
+    allow_discount_stack: bool = False
     amount_paid: int | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
@@ -217,6 +225,17 @@ class ReceiptOut(ReceiptExtra):
     handed_over_by: str | None = None
     handover_note: str | None = None
     handover_debt: int = 0  # K-09: balance still owed when it left (needs admin)
+    handover_receiver: str | None = None  # who took the vehicle
+    # Diskon nota review: pending (waiting for an admin) or approved; the amount a rejection goes back to.
+    discount_state: str | None = None
+    discount_reason: str | None = None
+    discount_requested_by: str | None = None
+    discount_requested_at: str | None = None
+    discount_approved_by: str | None = None
+    discount_approved_at: str | None = None
+    discount_prev: int = 0
+    discount_below_cost: int = 0
+    discount_stacked: int = 0
     closed_at: str | None = None
     # Set on a Nota Jasa Service (the fee of a Service / Garansi document).
     service_order_id: int | None = None
@@ -242,6 +261,9 @@ class ReceiptWorkStageRequest(BaseModel):
 
 class ReceiptHandoverRequest(BaseModel):
     note: str | None = None
+    receiver_name: str | None = None  # who took the vehicle
+    signature: str | None = None  # the receiver's signature as a PNG data URL
+    photos: list[str] = []  # up to 4 photos of the vehicle as image data URLs
     reason: str | None = None  # required (admin only) when the nota still has a balance
 
 
@@ -630,6 +652,7 @@ class InboundItemRequest(BaseModel):
     qty_in: int
     cost_price: int
     spo_item_id: int | None = None  # the Purchase Order line this quantity counts against
+    spo_package_id: int | None = None  # the Paket Pengiriman it came in (required once the line is split into packages)
     condition: str | None = None  # baik | rusak | tidak_sesuai
     location: str | None = None
 
@@ -654,6 +677,7 @@ class InboundItemOut(BaseModel):
     resolved_sell_price: int | None = None
     pending_brand_name: str | None = None
     spo_item_id: int | None = None
+    spo_package_id: int | None = None
     condition: str | None = None
     location: str | None = None
 
@@ -1153,6 +1177,7 @@ class PreorderItemSupplierPo(BaseModel):
     po_status: str
     qty_ordered: int
     qty_received: int
+    packages: list[dict] = []  # Paket Pengiriman carrying this line (package_no, forwarder, route, state, eta, qty)
 
 
 class PriceDecisionRequest(BaseModel):
@@ -1348,6 +1373,7 @@ class SupplierPoUpdateRequest(SupplierPoInvoiceFields):
 class SupplierPoReceiveLine(BaseModel):
     item_id: int
     quantity: int
+    package_id: int | None = None  # which Paket Pengiriman these goods came in
     condition: str | None = None  # baik | rusak | tidak_sesuai
     location: str | None = None   # lokasi simpan
 
@@ -1409,6 +1435,36 @@ class SupplierPoItemShippingRequest(BaseModel):
     notify_customer: bool = False
 
 
+class SpoPackageLineRequest(BaseModel):
+    item_id: int
+    quantity: int
+
+
+class SpoPackageRequest(BaseModel):
+    forwarder_id: int | None = None  # from Master Ekspedisi
+    ship_method: str | None = None  # udara | laut | darat | ambil_sendiri | lainnya
+    tracking_no: str | None = None
+    shipped_date: str | None = None
+    eta_date: str | None = None
+    transit_location: str | None = None
+    status: str = "menunggu_konfirmasi"
+    note: str | None = None
+    notify_customer: bool = False
+    lines: list[SpoPackageLineRequest] | None = None
+
+
+class SpoPackageCancelRequest(BaseModel):
+    reason: str
+
+
+class ForwarderRequest(BaseModel):
+    name: str
+    phone: str | None = None
+    contact: str | None = None
+    note: str | None = None
+    is_active: bool = True
+
+
 class SupplierPoReleaseRequest(BaseModel):
     reason: str
 
@@ -1439,6 +1495,12 @@ class SupplierPoItemOut(BaseModel):
     item_status: str | None = None
     shipped_date: str | None = None
     transit_location: str | None = None
+    # Paket Pengiriman: how much of the line sits in packages still on the road, how much of that is
+    # already moving, and how much is not in any package yet.
+    has_packages: bool = False
+    pkg_open: int = 0
+    pkg_moving: int = 0
+    pkg_free: int = 0
     # Which customer order the line serves; null for a barang added by hand.
     customer_po_number: str | None = None
     customer_name: str | None = None
@@ -1471,6 +1533,7 @@ class SupplierPoReceiptLineOut(BaseModel):
     item_id: int
     product_name: str
     quantity: int
+    package_id: int | None = None
     condition: str = "baik"
     location: str | None = None
 
@@ -1525,6 +1588,26 @@ class SupplierPoCancellationOut(BaseModel):
 class SupplierPoResolveCancelRequest(BaseModel):
     approved: bool
     note: str | None = None
+    refund_kind: str | None = None  # refund | kredit — needed when money already paid exceeds what the PO bills after the cancellation
+
+
+class SupplierPoCancelAllRequest(BaseModel):
+    reason: str
+    action: str = "tidak_ada"
+    note: str | None = None
+
+
+class RefundClaimSettleRequest(BaseModel):
+    amount: int
+    received_at: str | None = None
+    method: str | None = None  # refund: transfer | cash | giro
+    reference_no: str | None = None
+    supplier_cn_no: str | None = None  # kredit: the supplier's credit note number
+    note: str | None = None
+
+
+class RefundClaimCancelRequest(BaseModel):
+    reason: str
 
 
 class SupplierPoOut(BaseModel):
@@ -1589,6 +1672,11 @@ class SupplierPoDetail(SupplierPoOut):
     receipts: list[SupplierPoReceiptOut] = []
     cancellations: list[SupplierPoCancellationOut] = []
     shipments: list[SupplierPoShipmentOut] = []
+    packages: list[dict] = []
+    package_history: list[dict] = []
+    # Piutang Refund / Kredit Supplier after a paid PO was cancelled (admin only) and the supplier's open fakturs to put credit on.
+    refund_claims: list[dict] = []
+    open_invoices: list[dict] = []
     receive_draft: dict | None = None
     # K-13: lines still coming whose customer cancelled (Pembatalan Khusus) — the admin must act.
     so_cancelled_lines: list[dict] = []

@@ -14,9 +14,17 @@ from backend.database import (
     add_supplier_po_payment,
     cancel_supplier_po,
     cancel_supplier_po_item,
+    cancel_spo_package,
+    create_spo_package,
+    update_spo_package,
     delete_spo_receive_draft,
     save_spo_receive_draft,
     resolve_spo_cancellation,
+    request_spo_cancel_all,
+    resolve_spo_cancel_all,
+    list_refund_claims,
+    settle_refund_claim,
+    cancel_refund_claim,
     create_supplier_po,
     get_all_supplier_pos,
     get_supplier_po,
@@ -33,6 +41,11 @@ from backend.database import (
     update_supplier_po_invoice,
 )
 from backend.schemas import (
+    SupplierPoCancelAllRequest,
+    RefundClaimSettleRequest,
+    RefundClaimCancelRequest,
+    SpoPackageCancelRequest,
+    SpoPackageRequest,
     SupplierPoReceiveDraft,
     SupplierPoItemShippingRequest,
     SupplierPoCancelItemRequest,
@@ -298,10 +311,49 @@ async def release_to_stock_route(
 
 @router.post("/supplier-pos/{supplier_po_id}/cancellations/{cancellation_id}/resolve", response_model=SupplierPoDetail)
 async def resolve_cancellation_route(
-    supplier_po_id: str, cancellation_id: int, req: SupplierPoResolveCancelRequest, user: dict = Depends(get_current_user)
+    supplier_po_id: str, cancellation_id: int, req: SupplierPoResolveCancelRequest, user: dict = Depends(require_admin)
 ):
-    """Records the supplier's answer to a pending cancellation request."""
-    return await _run(resolve_spo_cancellation, supplier_po_id, cancellation_id, req.approved, _text(req.note), user["username"])
+    """Admin: records the supplier's answer to a pending cancellation request. If the supplier agreed and money was already
+    paid beyond the new bill, `refund_kind` says whether it comes back as a Refund or a Kredit Supplier."""
+    return await _run(resolve_spo_cancellation, supplier_po_id, cancellation_id, req.approved, _text(req.note), user["username"],
+                      _text(req.refund_kind))
+
+
+@router.post("/supplier-pos/{supplier_po_id}/cancel-all", response_model=SupplierPoDetail)
+async def request_cancel_all_route(supplier_po_id: str, req: SupplierPoCancelAllRequest, user: dict = Depends(require_admin)):
+    """Admin: ask the supplier to cancel everything of the PO that has not arrived (works for a paid PO)."""
+    return await _run(request_spo_cancel_all, supplier_po_id, req.reason, req.action, _text(req.note), user["username"])
+
+
+@router.post("/supplier-pos/{supplier_po_id}/cancel-all/resolve", response_model=SupplierPoDetail)
+async def resolve_cancel_all_route(supplier_po_id: str, req: SupplierPoResolveCancelRequest, user: dict = Depends(require_admin)):
+    """Admin: the supplier's answer to all pending cancellation requests of this PO."""
+    return await _run(resolve_spo_cancel_all, supplier_po_id, req.approved, _text(req.note), user["username"], _text(req.refund_kind))
+
+
+@router.get("/supplier-refund-claims")
+async def list_refund_claims_route(status: str | None = None, user: dict = Depends(require_admin)):
+    return await _run(list_refund_claims, None, status or None)
+
+
+def _perm(fn, *args):
+    async def go():
+        try:
+            return await _run(fn, *args)
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e))
+    return go()
+
+
+@router.post("/supplier-refund-claims/{claim_id}/settle")
+async def settle_refund_claim_route(claim_id: int, req: RefundClaimSettleRequest, user: dict = Depends(require_admin)):
+    """Admin: the refund money arrived, or the supplier's credit note is confirmed."""
+    return await _perm(settle_refund_claim, claim_id, req.model_dump(), user)
+
+
+@router.post("/supplier-refund-claims/{claim_id}/cancel")
+async def cancel_refund_claim_route(claim_id: int, req: RefundClaimCancelRequest, user: dict = Depends(require_admin)):
+    return await _perm(cancel_refund_claim, claim_id, req.reason, user)
 
 
 @router.post("/supplier-pos/{supplier_po_id}/cancel", response_model=SupplierPoDetail)
@@ -319,3 +371,32 @@ async def cancel_supplier_po_route(supplier_po_id: str, user: dict = Depends(get
 
 # There is deliberately no DELETE route: a PO that should not stand is cancelled
 # (status 'batal'), which keeps the record and frees its quantities.
+
+
+def _package_data(req: SpoPackageRequest) -> dict:
+    data = req.model_dump()
+    for key in ("tracking_no", "shipped_date", "eta_date", "transit_location", "note", "ship_method"):
+        data[key] = _text(data[key])
+    if req.lines is None:
+        data["lines"] = None
+    return data
+
+
+@router.post("/supplier-pos/{supplier_po_id}/packages", response_model=SupplierPoDetail, status_code=201)
+async def create_package_route(supplier_po_id: str, req: SpoPackageRequest, user: dict = Depends(get_current_user)):
+    """Paket Pengiriman: a shipment of this PO with its own forwarder, route, resi, ETA, status and quantities."""
+    return await _run(create_spo_package, supplier_po_id, _package_data(req), user["username"])
+
+
+@router.put("/supplier-pos/{supplier_po_id}/packages/{package_id}", response_model=SupplierPoDetail)
+async def update_package_route(
+    supplier_po_id: str, package_id: int, req: SpoPackageRequest, user: dict = Depends(get_current_user)
+):
+    return await _run(update_spo_package, supplier_po_id, package_id, _package_data(req), user["username"])
+
+
+@router.post("/supplier-pos/{supplier_po_id}/packages/{package_id}/cancel", response_model=SupplierPoDetail)
+async def cancel_package_route(
+    supplier_po_id: str, package_id: int, req: SpoPackageCancelRequest, user: dict = Depends(get_current_user)
+):
+    return await _run(cancel_spo_package, supplier_po_id, package_id, req.reason, user["username"])

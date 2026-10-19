@@ -153,7 +153,9 @@ def _validate_inbound_po(req) -> None:
         raise HTTPException(status_code=422, detail="Purchase Order tidak ditemukan.")
     if po["supplier_id"] != req.supplier_id:
         raise HTTPException(status_code=422, detail="Supplier dokumen berbeda dari supplier PO.")
-    if po["status"] not in ("dipesan", "sebagian_diterima"):
+    # A draft opened from the PO's own "Terima Barang" carries no PO lines: the PO already counted those goods
+    # (and may be complete by now), so only a document that still counts quantities against the PO needs it open.
+    if any(i.spo_item_id for i in req.items) and po["status"] not in ("dipesan", "sebagian_diterima"):
         raise HTTPException(status_code=422, detail="Purchase Order belum diterbitkan atau sudah selesai/dibatalkan.")
     lines = {i["id"]: i for i in po["items"]}
     for it in req.items:
@@ -167,6 +169,20 @@ def _validate_inbound_po(req) -> None:
         left = line["quantity"] - line["qty_cancelled"] - line["qty_received"]
         if it.qty_in > left:
             raise HTTPException(status_code=422, detail=f"Jumlah untuk {line['product_name']} melebihi sisa pesanan PO ({left}).")
+        # Paket Pengiriman: a line split into packages must say which package the goods came in.
+        open_pk = [p for p in po.get("packages", []) if not p["cancelled"]
+                   and any(l["item_id"] == it.spo_item_id and l["remaining"] > 0 for l in p["lines"])]
+        if it.spo_package_id is None:
+            if open_pk:
+                raise HTTPException(status_code=422, detail=f"{line['product_name']} sedang dalam paket pengiriman "
+                                    f"({', '.join(p['package_no'] for p in open_pk)}). Pilih paket yang datang.")
+        else:
+            pk = next((p for p in open_pk if p["id"] == it.spo_package_id), None)
+            if pk is None:
+                raise HTTPException(status_code=422, detail=f"Paket untuk {line['product_name']} tidak ditemukan atau sudah diterima/dibatalkan.")
+            remaining = next(l["remaining"] for l in pk["lines"] if l["item_id"] == it.spo_item_id)
+            if it.qty_in > remaining:
+                raise HTTPException(status_code=422, detail=f"Jumlah untuk {line['product_name']} melebihi sisa paket {pk['package_no']} ({remaining}).")
 
 
 def _validate_inbound_items(items: list) -> None:
@@ -321,6 +337,7 @@ def _row_to_inbound_item(row: dict) -> InboundItemOut:
         qty_in=row["qty_in"],
         cost_price=row["cost_price"],
         spo_item_id=row.get("spo_item_id"),
+        spo_package_id=row.get("spo_package_id"),
         condition=row.get("condition"),
         location=row.get("location"),
         qty_remaining=row["qty_remaining"],

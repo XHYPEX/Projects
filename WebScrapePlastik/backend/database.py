@@ -13083,7 +13083,7 @@ def set_service_handling(order_id: int, data: dict, user: dict) -> dict:
         o = _svc_get(con, order_id)
         if o["stage"] not in ("diterima", "pengecekan", "menunggu_kirim") or o["location"] not in _SVC_AT_SHOP:
             raise ValueError("Jalur hanya bisa diubah selagi unit ada di toko dan belum dikirim.")
-        sup = data.get("supplier_id") or o["supplier_id"]
+        sup = None if handling in ("internal", "menunggu") else (data.get("supplier_id") or o["supplier_id"])
         if handling in ("kirim", "sales") and not sup:
             raise ValueError("Pilih supplier / principal tujuan.")
         stage = {"internal": "pengecekan", "kirim": "menunggu_kirim", "sales": "menunggu_kirim", "menunggu": "diterima"}[handling]

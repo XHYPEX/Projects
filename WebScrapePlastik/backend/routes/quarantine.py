@@ -12,6 +12,7 @@ from backend.database import (
     list_quarantine,
     list_quarantine_writeoffs,
     quarantine_from_stock,
+    quarantine_to_secondhand,
     release_quarantine,
     request_quarantine_writeoff,
     review_quarantine_writeoff,
@@ -56,6 +57,18 @@ async def quarantine_detail(lot_id: int):
 @router.post("/quarantine/{lot_id}/release", dependencies=[Depends(require_admin)])
 async def quarantine_release(lot_id: int, req: QuarantineQtyRequest, user: dict = Depends(get_current_user)):
     return await _run(release_quarantine, lot_id, req.qty, req.reason, user["username"])
+
+
+@router.post("/quarantine/{lot_id}/secondhand", dependencies=[Depends(require_admin)])
+async def quarantine_secondhand(lot_id: int, body: dict, user: dict = Depends(get_current_user)):
+    try:
+        qty, price = int(body.get("qty") or 0), int(body.get("sell_price") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Jumlah dan harga harus angka.")
+    try:
+        return await _run(quarantine_to_secondhand, lot_id, qty, price, body.get("note") or "", user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 @router.post("/quarantine/{lot_id}/writeoffs")

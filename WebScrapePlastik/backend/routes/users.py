@@ -10,6 +10,7 @@ from backend.database import (
     reset_user_password,
     set_user_active,
     set_user_owner,
+    set_user_post_inbound,
     update_user_role,
 )
 from backend.schemas import PasswordResetRequest, UserCreateRequest, UserOut, UserUpdateRequest
@@ -27,6 +28,7 @@ def _row_to_user(row: dict) -> UserOut:
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
         is_owner=bool(row.get("is_owner")),
+        can_post_inbound=bool(row.get("can_post_inbound")),
     )
 
 
@@ -74,6 +76,8 @@ async def patch_user(user_id: int, req: UserUpdateRequest, me: dict = Depends(ge
             row = await loop.run_in_executor(None, set_user_active, user_id, req.is_active)
         if req.is_owner is not None:
             row = await loop.run_in_executor(None, set_user_owner, user_id, req.is_owner, me)
+        if req.can_post_inbound is not None:
+            row = await loop.run_in_executor(None, set_user_post_inbound, user_id, req.can_post_inbound)
     except ValueError as e:
         _raise_from_value_error(e)
     if row is None:

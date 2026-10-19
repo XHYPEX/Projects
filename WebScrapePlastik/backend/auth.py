@@ -65,12 +65,19 @@ async def get_current_user(session_token: str | None = Cookie(default=None, alia
     if not session["is_active"]:
         raise HTTPException(status_code=401, detail="Akun sudah dinonaktifkan.")
     return {"id": session["user_id"], "username": session["username"], "role": session["role"],
-            "is_owner": bool(session.get("is_owner"))}
+            "is_owner": bool(session.get("is_owner")), "can_post_inbound": bool(session.get("can_post_inbound"))}
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Hanya admin yang diizinkan.")
+    return user
+
+
+async def require_inbound_poster(user: dict = Depends(get_current_user)) -> dict:
+    """K-22: posting Barang Masuk only for users given that permission (Pengguna page)."""
+    if not user.get("can_post_inbound"):
+        raise HTTPException(status_code=403, detail="Anda belum diberi izin posting Barang Masuk. Minta admin mengaktifkannya di halaman Pengguna.")
     return user
 
 

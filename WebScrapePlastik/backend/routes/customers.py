@@ -4,12 +4,17 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from backend.auth import require_admin
+from backend.auth import get_current_user, require_admin
 from backend.database import (
     PHONE_RE,
     autocomplete_customers,
     create_customer,
+    create_vehicle,
     delete_customer,
+    find_vehicles_by_plate,
+    get_vehicle,
+    list_customer_vehicles,
+    update_vehicle,
     get_customer,
     list_customers,
     normalize_phone,
@@ -236,3 +241,40 @@ async def delete_customer_route(customer_id: int):
     except ValueError as e:
         _raise_from_value_error(e)
     return Response(status_code=204)
+
+
+# ---- Master Kendaraan (K-15): a customer's vehicles ----
+
+async def _veh_run(fn, *args):
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, lambda: fn(*args))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.get("/customers/{customer_id}/vehicles")
+async def customer_vehicles(customer_id: int, include_inactive: bool = False):
+    return await _veh_run(list_customer_vehicles, customer_id, include_inactive)
+
+
+@router.post("/customers/{customer_id}/vehicles", status_code=201)
+async def customer_vehicle_add(customer_id: int, body: dict, user: dict = Depends(get_current_user)):
+    return await _veh_run(create_vehicle, customer_id, body, user["username"])
+
+
+@router.get("/vehicles/by-plate")
+async def vehicles_by_plate(plate: str):
+    return await _veh_run(find_vehicles_by_plate, plate)
+
+
+@router.get("/vehicles/{vehicle_id}")
+async def vehicle_detail(vehicle_id: int):
+    return await _veh_run(get_vehicle, vehicle_id)
+
+
+@router.patch("/vehicles/{vehicle_id}")
+async def vehicle_update(vehicle_id: int, body: dict, user: dict = Depends(get_current_user)):
+    return await _veh_run(update_vehicle, vehicle_id, body, user["username"])

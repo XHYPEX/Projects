@@ -33,6 +33,7 @@ def _row_to_user(row: dict) -> UserOut:
         is_active=bool(row["is_active"]),
         created_at=row["created_at"],
         is_owner=bool(row.get("is_owner")),
+        can_post_inbound=bool(row.get("can_post_inbound")),
     )
 
 

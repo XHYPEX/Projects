@@ -7,6 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    merge_followup_invoice,
+    confirm_receipt_payment,
+    hand_over_receipt,
+    set_work_stage,
+    undo_handover,
+    fail_receipt_payment,
+    list_pending_payments,
     refund_receipt_overpay,
     reopen_closed_receipt,
     return_receipt_item,
@@ -38,6 +45,9 @@ from backend.database import (
     update_receipt,
 )
 from backend.schemas import (
+    ReceiptHandoverRequest,
+    ReceiptWorkStageRequest,
+    PaymentFailRequest,
     ReceiptPaymentReverseRequest,
     ReceiptRefundRequest,
     ReceiptReopenRequest,
@@ -98,7 +108,9 @@ def _validate_items(items: list[ReceiptItemRequest]) -> list[dict]:
                 date.fromisoformat(item.warranty_date)
             except ValueError:
                 raise HTTPException(status_code=422, detail="Tanggal garansi tidak valid, gunakan format YYYY-MM-DD.")
-        validated.append(item.model_dump())
+        row = item.model_dump()
+        row["serial_no"] = (row.get("serial_no") or "").strip().upper()[:80] or None
+        validated.append(row)
     return validated
 
 
@@ -117,6 +129,7 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         quantity=row["quantity"],
         unit_price=row["unit_price"],
         warranty_date=row["warranty_date"],
+        serial_no=row.get("serial_no"),
         sku=row.get("sku"),
         unit=row.get("unit"),
         item_type=row.get("item_type") or "barang",
@@ -259,7 +272,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
             None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
             req.customer_id, transfer_sender, transfer_account, user["username"], req.work_status,
-            _clean_extra(req, False), _override_reason(req, user),
+            _clean_extra(req, False), _override_reason(req, user), req.payment_confirmed,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save.
@@ -376,8 +389,12 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
         if existing["status"] != "void":
             if len(void_reason) < 3:
                 raise HTTPException(status_code=422, detail="Alasan void wajib diisi (minimal 3 karakter).")
-            if (existing["amount_paid"] or 0) > 0 and user.get("role") != "admin":
-                raise HTTPException(status_code=403, detail="Hanya admin yang boleh membatalkan nota yang sudah ada pembayarannya.")
+            # A closed nota (Lunas + Pengerjaan Selesai) is final; an admin reopens it first, which is logged.
+            if existing["status"] == "done" and existing.get("work_status") == "selesai":
+                raise HTTPException(status_code=409, detail="Nota sudah ditutup (Lunas + Pengerjaan Selesai). Buka Kembali dulu (admin) sebelum void.")
+            # K-22: void is an admin action. Staff may only discard a Draft nota (no stock taken, no money).
+            if user.get("role") != "admin" and (existing.get("work_status") != "draft" or (existing["amount_paid"] or 0) > 0):
+                raise HTTPException(status_code=403, detail="Hanya admin yang boleh mem-void nota. Staff hanya bisa membatalkan nota Draft yang belum dibayar.")
     else:
         _refuse_if_closed(existing)
 
@@ -483,6 +500,9 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             _clean_extra(req, True),
             void_reason or None,
             _override_reason(req, user),
+            req.payment_confirmed,
+            req.refund_method,
+            req.refund_proof,
         )
     except ValueError as e:
         # The customer was deleted between the check above and the save, or the new total
@@ -496,8 +516,8 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
 
 @router.post("/receipts/{receipt_id}/settle", response_model=ReceiptDetail)
 async def settle_receipt_route(receipt_id: str, req: ReceiptSettleRequest, user: dict = Depends(get_current_user)):
-    """'Tandai Selesai': record the remaining balance of a pending receipt as paid.
-    Only the payment columns change -- never items, totals or stock."""
+    """'Lunasi' (K-07): record the remaining balance of a pending receipt as paid.
+    Only the payment columns change -- never items, totals, stock or the work status (Pengerjaan)."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
@@ -507,7 +527,7 @@ async def settle_receipt_route(receipt_id: str, req: ReceiptSettleRequest, user:
             status_code=422, detail=f"Metode pembayaran harus salah satu dari: {', '.join(sorted(VALID_PAYMENT_METHODS))}."
         )
     try:
-        updated = await loop.run_in_executor(None, settle_receipt, receipt_id, payment_method, req.amount, user["username"])
+        updated = await loop.run_in_executor(None, settle_receipt, receipt_id, payment_method, req.amount, user["username"], req.confirmed)
     except ValueError as e:
         # Deleted between the check above and the settle -> 404; wrong amount -> 422;
         # void/already done -> 409.
@@ -551,7 +571,7 @@ async def add_receipt_payment_route(
         raise HTTPException(status_code=422, detail="Rekening penerima transfer wajib dipilih.")
     try:
         updated = await loop.run_in_executor(
-            None, add_receipt_payment, receipt_id, req.amount, req.method, note, sender, account, user["username"]
+            None, add_receipt_payment, receipt_id, req.amount, req.method, note, sender, account, user["username"], req.confirmed
         )
     except ValueError as e:
         msg = str(e)
@@ -586,6 +606,46 @@ async def change_work_status_route(
                          payments=[ReceiptPaymentOut(**p) for p in payments])
 
 
+@router.post("/receipts/{receipt_id}/work-stage", response_model=ReceiptDetail)
+async def set_work_stage_route(receipt_id: str, req: ReceiptWorkStageRequest, user: dict = Depends(get_current_user)):
+    """K-06: Persiapan / Pemasangan / QC while a nota is Dalam Pengerjaan. Information only."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, set_work_stage, receipt_id, req.stage, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in msg else 422 if msg.startswith("Tahap") else 409, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
+@router.post("/receipts/{receipt_id}/handover", response_model=ReceiptDetail)
+async def hand_over_receipt_route(receipt_id: str, req: ReceiptHandoverRequest, user: dict = Depends(get_current_user)):
+    """K-08/K-09 Serah Terima Kendaraan. With a balance owed only an admin may, with a reason."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, hand_over_receipt, receipt_id, req.note, req.reason, user["username"], user.get("role") == "admin")
+    except ValueError as e:
+        msg = str(e)
+        status = 404 if "tidak ditemukan" in msg else 403 if msg.startswith("Hanya admin") else 422 if msg.startswith("Alasan") else 409
+        raise HTTPException(status_code=status, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
+@router.post("/receipts/{receipt_id}/handover/undo", response_model=ReceiptDetail, dependencies=[Depends(require_admin)])
+async def undo_handover_route(receipt_id: str, req: ReceiptReopenRequest, user: dict = Depends(get_current_user)):
+    """Admin: a handover recorded by mistake."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, undo_handover, receipt_id, req.reason, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in msg else 422 if msg.startswith("Alasan") else 409, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
 @router.get("/receipts/{receipt_id}/events", response_model=list[ReceiptEventOut])
 async def list_receipt_events(receipt_id: str):
     """Catatan & Riwayat: the nota's timeline (created, status moves, items added, void)."""
@@ -613,6 +673,38 @@ async def reverse_receipt_payment_route(
                          payments=[ReceiptPaymentOut(**p) for p in payments])
 
 
+@router.post("/receipts/{receipt_id}/payments/{payment_id}/confirm", response_model=ReceiptDetail)
+async def confirm_receipt_payment_route(receipt_id: str, payment_id: int, user: dict = Depends(get_current_user)):
+    """K-18: the transfer/QRIS money has been seen in the account. Staff and admin may confirm; who/when is kept."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, confirm_receipt_payment, receipt_id, payment_id, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in msg else 409, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
+@router.post("/receipts/{receipt_id}/payments/{payment_id}/fail", response_model=ReceiptDetail, dependencies=[Depends(require_admin)])
+async def fail_receipt_payment_route(receipt_id: str, payment_id: int, req: PaymentFailRequest, user: dict = Depends(get_current_user)):
+    """K-18 (admin): the money never arrived; the Pending payment becomes Gagal."""
+    loop = asyncio.get_event_loop()
+    try:
+        updated = await loop.run_in_executor(None, fail_receipt_payment, receipt_id, payment_id, req.reason, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in msg else 422 if msg.startswith("Alasan") else 409, detail=msg)
+    return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
+                   await loop.run_in_executor(None, get_receipt_payments, receipt_id))
+
+
+@router.get("/payments/pending")
+async def pending_payments_route():
+    """K-18: transfer/QRIS payments still waiting to be seen in the account (notas and draft Sales Orders)."""
+    return await asyncio.get_event_loop().run_in_executor(None, list_pending_payments)
+
+
 def _detail(updated: dict, items: list, payments: list) -> ReceiptDetail:
     return ReceiptDetail(**updated, item_count=len(items), items=[_row_to_item(i) for i in items],
                          payments=[ReceiptPaymentOut(**p) for p in payments])
@@ -625,10 +717,10 @@ async def refund_receipt_route(receipt_id: str, req: ReceiptRefundRequest, user:
         raise HTTPException(status_code=422, detail=f"Metode harus salah satu dari: {', '.join(sorted(VALID_PAYMENT_METHODS))}.")
     loop = asyncio.get_event_loop()
     try:
-        updated = await loop.run_in_executor(None, refund_receipt_overpay, receipt_id, req.amount, req.method, req.reason, user["username"])
+        updated = await loop.run_in_executor(None, refund_receipt_overpay, receipt_id, req.amount, req.method, req.reason, user["username"], req.proof_ref)
     except ValueError as e:
         msg = str(e)
-        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Jumlah", "Alasan")) else 409
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Jumlah", "Alasan", "Bukti")) else 409
         raise HTTPException(status_code=status, detail=msg)
     return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
                    await loop.run_in_executor(None, get_receipt_payments, receipt_id))
@@ -660,12 +752,12 @@ async def return_receipt_item_route(receipt_id: str, req: ReceiptReturnRequest, 
                 receipt_id, req.item_id, req.quantity, req.destination,
                 req.refund_amount, req.method, req.reason, user["username"],
                 kind=req.kind, reason_code=req.reason_code, restock_qty=req.restock_qty,
-                supplier_qty=req.supplier_qty, damaged_qty=req.damaged_qty,
+                supplier_qty=req.supplier_qty, damaged_qty=req.damaged_qty, proof_ref=req.proof_ref,
             ),
         )
     except ValueError as e:
         msg = str(e)
-        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Jumlah", "Alasan", "Tujuan", "Jenis")) else 409
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Jumlah", "Alasan", "Tujuan", "Jenis", "Bukti")) else 409
         raise HTTPException(status_code=status, detail=msg)
     return _detail(updated, await loop.run_in_executor(None, get_receipt_items, receipt_id),
                    await loop.run_in_executor(None, get_receipt_payments, receipt_id))
@@ -686,6 +778,17 @@ async def list_receipt_preorders(receipt_id: str):
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
     return await loop.run_in_executor(None, get_receipt_preorders, receipt_id)
+
+
+@router.post("/receipts/{receipt_id}/merge-back", dependencies=[Depends(require_admin)])
+async def merge_back_route(receipt_id: str, body: dict, user: dict = Depends(get_current_user)):
+    """K-19: folds an Invoice Lanjutan back into its Sales Order's main invoice (lines and money), then voids it."""
+    loop = asyncio.get_event_loop()
+    try:
+        po = await loop.run_in_executor(None, merge_followup_invoice, receipt_id, str(body.get("reason") or ""), user["username"])
+    except ValueError as e:
+        raise HTTPException(status_code=404 if "tidak ditemukan" in str(e) else 409, detail=str(e))
+    return {"preorder_id": po["id"], "po_number": po["po_number"]}
 
 
 @router.delete("/receipts/{receipt_id}", status_code=204, response_class=Response, dependencies=[Depends(require_admin)])

@@ -4,9 +4,10 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from backend.auth import require_admin
+from backend.auth import get_current_user, require_admin
 from backend.database import (
     compute_payment_status,
+    get_purchase_invoice_payments,
     create_purchase_invoice,
     delete_purchase_invoice,
     get_master_item,
@@ -27,6 +28,7 @@ from backend.schemas import (
     PurchaseInvoiceDetail,
     PurchaseInvoiceItemOut,
     PurchaseInvoiceOut,
+    PurchaseInvoicePaymentOut,
     PurchaseInvoicePaymentRequest,
     PurchaseInvoiceRequest,
     VoidRequest,
@@ -145,6 +147,9 @@ def _row_to_invoice(row: dict) -> PurchaseInvoiceOut:
         discount=row["discount"],
         tax_rate=row["tax_rate"],
         tax_amount=row["tax_amount"],
+        shipping_cost=row.get("shipping_cost") or 0,
+        shipping_dpp=row.get("shipping_dpp") or 0,
+        shipping_tax=row.get("shipping_tax") or 0,
         total=row["total"],
         amount_paid=row["amount_paid"],
         outstanding=outstanding,
@@ -155,6 +160,8 @@ def _row_to_invoice(row: dict) -> PurchaseInvoiceOut:
         void_reason=row["void_reason"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        supplier_po_id=row.get("supplier_po_id"),
+        supplier_po_number=row.get("supplier_po_number"),
     )
 
 
@@ -181,8 +188,10 @@ async def _detail(invoice_id: int) -> PurchaseInvoiceDetail:
     if row is None:
         raise HTTPException(status_code=404, detail=f"Faktur pembelian {invoice_id} tidak ditemukan.")
     items = await loop.run_in_executor(None, get_purchase_invoice_items, invoice_id)
+    payments = await loop.run_in_executor(None, get_purchase_invoice_payments, invoice_id)
     base = _row_to_invoice(row)
-    return PurchaseInvoiceDetail(**base.model_dump(), items=[_row_to_item(i) for i in items])
+    return PurchaseInvoiceDetail(**base.model_dump(), items=[_row_to_item(i) for i in items],
+                                 payments=[PurchaseInvoicePaymentOut(**p) for p in payments])
 
 
 # --- endpoints ---------------------------------------------------------------
@@ -212,6 +221,9 @@ async def create_invoice(req: PurchaseInvoiceRequest):
             req.discount,
             req.tax_rate,
             items,
+            req.shipping_cost,
+            req.shipping_dpp,
+            req.shipping_tax,
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -264,6 +276,9 @@ async def put_invoice(invoice_id: int, req: PurchaseInvoiceRequest):
             req.discount,
             req.tax_rate,
             items,
+            req.shipping_cost,
+            req.shipping_dpp,
+            req.shipping_tax,
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -271,10 +286,10 @@ async def put_invoice(invoice_id: int, req: PurchaseInvoiceRequest):
 
 
 @router.post("/purchase-invoices/{invoice_id}/post", response_model=PurchaseInvoiceDetail)
-async def post_invoice(invoice_id: int):
+async def post_invoice(invoice_id: int, user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     try:
-        await loop.run_in_executor(None, post_purchase_invoice, invoice_id)
+        await loop.run_in_executor(None, post_purchase_invoice, invoice_id, user["username"])
     except ValueError as e:
         _raise_from_value_error(e)
     return await _detail(invoice_id)
@@ -293,10 +308,15 @@ async def void_invoice(invoice_id: int, req: VoidRequest):
 
 
 @router.post("/purchase-invoices/{invoice_id}/payments", response_model=PurchaseInvoiceDetail)
-async def add_payment(invoice_id: int, req: PurchaseInvoicePaymentRequest):
+async def add_payment(invoice_id: int, req: PurchaseInvoicePaymentRequest, user: dict = Depends(get_current_user)):
+    if req.amount < 0 and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Hanya admin yang bisa membatalkan pembayaran.")
+    text = lambda v: (v or "").strip() or None
     loop = asyncio.get_event_loop()
     try:
-        await loop.run_in_executor(None, record_purchase_invoice_payment, invoice_id, req.amount)
+        await loop.run_in_executor(None, lambda: record_purchase_invoice_payment(
+            invoice_id, req.amount, text(req.method), text(req.paid_date), text(req.reference_no), text(req.note),
+            user["username"]))
     except ValueError as e:
         _raise_from_value_error(e)
     return await _detail(invoice_id)

@@ -3,8 +3,9 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_admin
 from backend.database import (
+    create_purchase_invoice_from_po,
     SPO_ORDER_STATUSES,
     SPO_PAYMENT_STATUSES,
     SUPPLIER_PO_STATUSES,
@@ -22,6 +23,7 @@ from backend.database import (
     issue_supplier_po,
     parse_ymd,
     receive_supplier_po,
+    release_spo_line_to_stock,
     set_supplier_po_stage,
     set_supplier_po_tracking,
     update_supplier_po_item_shipping,
@@ -32,6 +34,7 @@ from backend.schemas import (
     SupplierPoReceiveDraft,
     SupplierPoItemShippingRequest,
     SupplierPoCancelItemRequest,
+    SupplierPoReleaseRequest,
     SupplierPoResolveCancelRequest,
     SupplierPoCandidatePage,
     SupplierPoDetail,
@@ -214,7 +217,8 @@ async def receive_supplier_po_route(
         receive_supplier_po, supplier_po_id, [line.model_dump() for line in req.items], user["username"],
         received_date=_text(req.received_date), surat_jalan_no=_text(req.surat_jalan_no),
         warehouse_location=_text(req.warehouse_location), note=_text(req.note), create_inbound=req.create_inbound,
-        officer=_text(req.officer),
+        officer=_text(req.officer), accept_over=req.accept_over, over_reason=_text(req.over_reason),
+        is_admin=user.get("role") == "admin",
     )
 
 
@@ -242,6 +246,13 @@ async def add_payment_route(
     )
 
 
+@router.post("/supplier-pos/{supplier_po_id}/purchase-invoice", status_code=201)
+async def create_po_faktur_route(supplier_po_id: str, user: dict = Depends(get_current_user)):
+    """K-12: draft Faktur Pembelian from this PO; returns its id to open on the Faktur Pembelian page."""
+    row = await _run(create_purchase_invoice_from_po, supplier_po_id, user["username"])
+    return {"id": row["id"], "invoice_number": row["invoice_number"]}
+
+
 @router.put("/supplier-pos/{supplier_po_id}/items/{item_id}/shipping", response_model=SupplierPoDetail)
 async def item_shipping_route(
     supplier_po_id: str, item_id: int, req: SupplierPoItemShippingRequest, user: dict = Depends(get_current_user)
@@ -255,12 +266,21 @@ async def item_shipping_route(
 
 @router.post("/supplier-pos/{supplier_po_id}/items/{item_id}/cancel", response_model=SupplierPoDetail)
 async def cancel_item_route(
-    supplier_po_id: str, item_id: int, req: SupplierPoCancelItemRequest, user: dict = Depends(get_current_user)
+    supplier_po_id: str, item_id: int, req: SupplierPoCancelItemRequest, user: dict = Depends(require_admin)
 ):
+    """K-17 / K-22: cancelling (part of) a PO is an admin action."""
     return await _run(
         cancel_supplier_po_item, supplier_po_id, item_id, req.quantity, req.reason, req.action,
         _text(req.note), user["username"],
     )
+
+
+@router.post("/supplier-pos/{supplier_po_id}/items/{item_id}/release-to-stock", response_model=SupplierPoDetail)
+async def release_to_stock_route(
+    supplier_po_id: str, item_id: int, req: SupplierPoReleaseRequest, user: dict = Depends(require_admin)
+):
+    """K-14 (admin): the Sales Order line was cancelled after the PO went out; keep buying and let the goods become stock."""
+    return await _run(release_spo_line_to_stock, supplier_po_id, item_id, req.reason, user["username"])
 
 
 @router.post("/supplier-pos/{supplier_po_id}/cancellations/{cancellation_id}/resolve", response_model=SupplierPoDetail)
@@ -273,6 +293,14 @@ async def resolve_cancellation_route(
 
 @router.post("/supplier-pos/{supplier_po_id}/cancel", response_model=SupplierPoDetail)
 async def cancel_supplier_po_route(supplier_po_id: str, user: dict = Depends(get_current_user)):
+    """K-17 / K-22: Batal PO is an admin action once issued; staff may still discard a Draft
+    they made, since nothing has gone to the supplier yet."""
+    if user.get("role") != "admin":
+        po = await _run(get_supplier_po, supplier_po_id)
+        if po is None:
+            raise HTTPException(status_code=404, detail="Purchase Order tidak ditemukan.")
+        if po["status"] != "draft":
+            raise HTTPException(status_code=403, detail="Hanya admin yang boleh membatalkan PO yang sudah diterbitkan.")
     return await _run(cancel_supplier_po, supplier_po_id, user["username"])
 
 

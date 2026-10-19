@@ -1,0 +1,37 @@
+%% Kode: FLOW A
+%% Judul: Alur utama service: terima → kirim pabrik → hasil → serah customer
+%% Tujuan: Menelusuri unit customer dari diterima sampai diserahkan kembali, dengan bukti di setiap perpindahan dan tanpa menyentuh stok dagangan.
+%% Dimulai dari: Service / Garansi → + Terima Service Baru, atau Riwayat Invoice → Buat Service.
+%% Aturan stok: Tidak ada. Unit customer dicatat di register titipan (Lokasi Unit). Stok hanya bergerak bila tukar dari stok toko (FLOW C cara B) atau sparepart dari stok lewat Nota Jasa.
+%% Aturan keuangan: Tidak ada uang sampai ada biaya yang disetujui (FLOW B). Biaya ditagih lewat Nota Jasa Service di Kasir; nota penjualan lama tidak diubah.
+%% Warning: Service aktif lain dengan SN sama; nota void / sudah diretur; foto unit & SN belum ada; alamat supplier kosong; resi sudah dipakai; pabrik > 14 hari tanpa kabar; siap diambil > 30 hari.
+%% Catatan Programmer: Status hanya berubah lewat aksi; setiap aksi menulis service_events. Unit keluar toko = compare-and-set location 'di_toko'→'di_ekspedisi'/'dibawa_sales' dalam BEGIN IMMEDIATE + Idempotency-Key. Selesai hanya setelah serah terima ke customer.
+flowchart TB
+  S([Customer datang membawa unit]):::aksi --> A1[Langkah 1: customer + cari nota asal<br/>per baris barang]:::aksi
+  A1 --> C1{Nota ditemukan?}:::cek
+  C1 -- Ya --> G1[Garansi dihitung: tgl nota + masa<br/>dari Master Service · indikasi]:::so
+  C1 -- Tidak --> G2[Tanpa nota + alasan<br/>Garansi Belum Diverifikasi]:::tunggu
+  G1 --> A2
+  G2 --> A2[Langkah 2: identitas, SN, kondisi,<br/>keluhan, kelengkapan, foto]:::aksi
+  A2 --> A3[Langkah 3: pilih jalur penanganan<br/>Menunggu Keputusan = disimpan di toko]:::aksi
+  A3 --> A4[Simpan & Terima: nomor SVC dikunci<br/>cetak Tanda Terima + Label Unit]:::ok
+  A4 --> C2{Jalur}:::cek
+  C2 -- Pemeriksaan internal --> I1[Teknisi toko menguji<br/>tidak rusak / diperbaiki di toko<br/>perlu pabrik → pilih jalur lagi]:::aksi
+  C2 -- Kirim ekspedisi --> K1[Surat Jalan · resi · packing · foto<br/>Konfirmasi Serah Ekspedisi]:::aksi
+  C2 -- Dibawa sales --> K2[Jadwal · nama & HP sales<br/>tanda tangan / foto]:::aksi
+  K1 --> P1[Pabrik menerima<br/>Lokasi: Di Pabrik · RMA]:::so
+  K2 --> P1
+  P1 --> D1[Diagnosis tertulis pabrik]:::aksi
+  D1 --> C4{Keputusan pabrik}:::cek
+  C4 -- Diperbaiki gratis --> P2[Dikerjakan pabrik]:::so
+  C4 -- Diperbaiki dengan biaya --> FB2[/FLOW B: biaya & persetujuan/]:::sub
+  C4 -- Ganti unit baru --> FC[/FLOW C: penggantian/]:::sub
+  C4 -- Ditolak / tidak bisa --> FD[/FLOW D: ditolak & pengembalian/]:::sub
+  FB2 -- disetujui --> P2
+  P2 --> B1[Unit dikirim balik / dibawa sales<br/>Lokasi: Dalam Perjalanan Balik]:::so
+  B1 --> Q1{QC toko lulus?}:::cek
+  Q1 -- Tidak --> Q2[Klaim ulang ke pabrik<br/>diagnosis baru]:::err
+  Q1 -- Ya --> R2[Siap Diambil · hubungi customer]:::ok
+  I1 --> R2
+  R2 --> H1[Serah terima: bayar Nota Jasa,<br/>uji bersama, cek kelengkapan, ttd]:::aksi
+  H1 --> F1([Selesai · cetak Nota Hasil]):::ok

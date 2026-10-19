@@ -14,8 +14,12 @@ from backend.database import (
     get_preorder_cancel_check,
     preview_preorder_cancel,
     add_preorder_payment,
+    confirm_preorder_payment,
+    fail_preorder_payment,
     get_receipt_payments,
+    open_followup_invoice,
     po_invoice_payment,
+    split_preorder_invoice,
     split_plate,
     apply_preorder_dp,
     create_receipt,
@@ -36,6 +40,7 @@ from backend.database import (
     update_preorder,
 )
 from backend.schemas import (
+    PaymentFailRequest,
     PreorderCancelRequest,
     PreorderSpecialCancelRequest,
     PreorderAllocationOut,
@@ -48,6 +53,8 @@ from backend.schemas import (
     PreorderItemStatusRequest,
     PreorderOut,
     PreorderPaymentOut,
+    PreorderReasonRequest,
+    PreorderSplitRequest,
     PreorderPaymentRequest,
     PreorderRequest,
     PreorderStatusRequest,
@@ -93,7 +100,7 @@ def _require_invoice_plate(plate: str) -> None:
 
 def _po_error(e: ValueError) -> HTTPException:
     msg = str(e)
-    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat", "Uang muka")) else 409
+    status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Plat", "Uang muka", "Bukti")) else 409
     return HTTPException(status_code=status, detail=msg)
 
 
@@ -173,12 +180,19 @@ async def _detail(preorder_id: str) -> PreorderDetail:
     items = await loop.run_in_executor(None, get_preorder_items, preorder_id)
     history = await loop.run_in_executor(None, get_preorder_history, preorder_id)
     if row.get("receipt_id"):
-        # Money is taken on the invoice; the PO shows the invoice's payments.
-        payments = [
-            {"id": p["id"], "paid_at": p["paid_at"], "amount": p["amount"], "note": p["note"],
-             "created_by": p["created_by"], "method": p["method"]}
-            for p in await loop.run_in_executor(None, get_receipt_payments, row["receipt_id"])
-        ]
+        # Money is taken on the invoice; the PO shows the payments of all its invoices (K-19: usually one).
+        many = len([i for i in row.get("invoices", []) if i["status"] != "void"]) > 1
+        payments = []
+        for inv in row.get("invoices", []):
+            if inv["status"] == "void" and not many:
+                continue
+            for p in await loop.run_in_executor(None, get_receipt_payments, inv["id"]):
+                payments.append({"id": p["id"], "paid_at": p["paid_at"], "amount": p["amount"], "note": p["note"],
+                                 "created_by": p["created_by"], "method": p["method"], "kind": p.get("kind"),
+                                 "state": p.get("state") or "sah", "confirmed_by": p.get("confirmed_by"),
+                                 "confirmed_at": p.get("confirmed_at"), "fail_reason": p.get("fail_reason"),
+                                 "receipt_no": inv["receipt_no"] if many else None, "receipt_id": inv["id"]})
+        payments.sort(key=lambda x: (x["paid_at"], x["id"]))
     else:
         payments = await loop.run_in_executor(None, get_preorder_payments, preorder_id)
     allocations = await loop.run_in_executor(None, get_preorder_allocations, preorder_id)
@@ -236,6 +250,7 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
             None, lambda: create_preorder(
                 preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
                 plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
+                deposit_confirmed=req.deposit_confirmed,
             ),
         )
     except ValueError as e:
@@ -365,7 +380,7 @@ async def cancel_preorder_route(preorder_id: str, req: PreorderCancelRequest, us
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, lambda: cancel_preorder(
-            preorder_id, req.reason, req.refund_amount, req.refund_method, user["username"], req.item_ids))
+            preorder_id, req.reason, req.refund_amount, req.refund_method, user["username"], req.item_ids, req.refund_proof))
     except ValueError as e:
         raise _po_error(e)
     return await _detail(preorder_id)
@@ -379,7 +394,7 @@ async def cancel_preorder_items_route(
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, lambda: cancel_preorder_items(
-            preorder_id, req.item_ids, req.category, req.reason, req.refund_method, user["username"]))
+            preorder_id, req.item_ids, req.category, req.reason, req.refund_method, user["username"], req.refund_proof))
     except ValueError as e:
         raise _po_error(e)
     return await _detail(preorder_id)
@@ -395,10 +410,18 @@ async def add_payment(
     row = await loop.run_in_executor(None, get_preorder, preorder_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
-    if req.amount > row["remaining"]:
+    remaining = row["remaining"]
+    if req.receipt_id and row.get("invoice_count", 1) > 1:
+        inv = next((i for i in row.get("invoices", []) if i["id"] == req.receipt_id and i["status"] != "void"), None)
+        if inv is None:
+            raise HTTPException(status_code=422, detail="Invoice itu bukan milik Sales Order ini.")
+        remaining = max(inv["total"] - inv["amount_paid"], 0)
+    elif row.get("invoice_count", 1) > 1:
+        raise HTTPException(status_code=422, detail="Sales Order ini punya beberapa invoice. Pilih invoice yang menerima pembayaran.")
+    if req.amount > remaining:
         raise HTTPException(
             status_code=422,
-            detail=f"Pembayaran melebihi sisa tagihan (sisa Rp {row['remaining']:,}).".replace(",", "."),
+            detail=f"Pembayaran melebihi sisa tagihan (sisa Rp {remaining:,}).".replace(",", "."),
         )
     if req.method not in ("cash", "transfer", "qris", "debit"):
         raise HTTPException(status_code=422, detail="Metode pembayaran harus salah satu dari: cash, transfer, qris, debit.")
@@ -410,11 +433,32 @@ async def add_payment(
             await loop.run_in_executor(
                 None, po_invoice_payment, preorder_id, req.amount, req.method, note, user["username"],
                 (req.transfer_sender or "").strip() or None, (req.transfer_account or "").strip() or None,
+                req.receipt_id, req.confirmed,
             )
         except ValueError as e:
             raise _po_error(e)
     else:
-        await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"], req.method)
+        await loop.run_in_executor(None, add_preorder_payment, preorder_id, req.amount, note, user["username"], req.method, req.confirmed)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/payments/{payment_id}/confirm", response_model=PreorderDetail)
+async def confirm_draft_payment(preorder_id: str, payment_id: int, user: dict = Depends(get_current_user)):
+    """K-18: a draft order's transfer/QRIS DP has been seen in the account."""
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, confirm_preorder_payment, preorder_id, payment_id, user["username"])
+    except ValueError as e:
+        raise HTTPException(status_code=404 if "tidak ditemukan" in str(e) else 409, detail=str(e))
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/payments/{payment_id}/fail", response_model=PreorderDetail, dependencies=[Depends(require_admin)])
+async def fail_draft_payment(preorder_id: str, payment_id: int, req: PaymentFailRequest, user: dict = Depends(get_current_user)):
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, fail_preorder_payment, preorder_id, payment_id, req.reason, user["username"])
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in msg else 422 if msg.startswith("Alasan") else 409, detail=msg)
     return await _detail(preorder_id)
 
 
@@ -472,3 +516,27 @@ async def convert_to_receipt(
 # someone wants off the active list is archived via
 # PATCH /preorders/{preorder_id} {"is_draft": true} instead -- preorders are
 # never deleted. Do not re-add a delete route here.
+
+
+# ---- K-19: Sales Order with several invoices (admin) ----
+
+@router.post("/preorders/{preorder_id}/invoices/split", response_model=PreorderDetail)
+async def split_invoice_route(preorder_id: str, req: PreorderSplitRequest, user: dict = Depends(require_admin)):
+    """Moves lines that are not installed yet to a new Invoice Lanjutan; their DP follows."""
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, split_preorder_invoice, preorder_id, req.item_ids, req.reason, req.dp_move, user["username"])
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/invoices/followup", response_model=PreorderDetail)
+async def followup_invoice_route(preorder_id: str, req: PreorderReasonRequest, user: dict = Depends(require_admin)):
+    """An empty Invoice Lanjutan, for lines added after the older invoices were closed."""
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, open_followup_invoice, preorder_id, req.reason, user["username"])
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)

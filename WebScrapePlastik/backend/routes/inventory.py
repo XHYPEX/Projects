@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from backend import product_images
-from backend.auth import get_current_user, require_admin
+from backend.auth import get_current_user, require_admin, require_inbound_poster
 from backend.database import (
     reserved_qty_by_item,
     category_subtree_ids,
@@ -90,7 +90,9 @@ from backend.schemas import (
     MasterItemUpdateRequest,
     MasterItemArchiveRequest,
     OpenPreorderOut,
+    InboundPostRequest,
     PendingInvoiceOut,
+    ReadyHandoverOut,
     SkuPreviewOut,
     StockAdjustmentRequest,
     StockAdjustmentResponse,
@@ -1088,12 +1090,14 @@ async def review_document(document_id: int, user: dict = Depends(get_current_use
 
 
 @router.post("/inventory/inbound-documents/{document_id}/post", response_model=InboundDocumentDetail)
-async def post_document(document_id: int, user: dict = Depends(get_current_user)):
+async def post_document(document_id: int, req: InboundPostRequest | None = None, user: dict = Depends(require_inbound_poster)):
+    req = req or InboundPostRequest()
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_inbound_document, document_id) is None:
         raise HTTPException(status_code=404, detail=f"Dokumen barang masuk {document_id} tidak ditemukan.")
     try:
-        await loop.run_in_executor(None, post_inbound_document, document_id, user["username"])
+        await loop.run_in_executor(None, lambda: post_inbound_document(
+            document_id, user["username"], req.accept_over, req.over_reason, user.get("role") == "admin"))
     except ValueError as e:
         _raise_from_value_error(e)
 
@@ -1155,10 +1159,13 @@ async def inventory_overview():
         pending_invoice_count=result["pending_invoice_count"],
         pending_invoice_outstanding=result["pending_invoice_outstanding"],
         pending_invoices=[PendingInvoiceOut(**r) for r in result["pending_invoices"]],
+        ready_handover=[ReadyHandoverOut(**r) for r in result["ready_handover"]],
         latest_incoming=[IncomingItemOut(**r) for r in result["latest_incoming"]],
         top_selling=[TopSellingOut(**r) for r in result["top_selling"]],
         sales_month_revenue=result["sales_month_revenue"],
         sales_month_count=result["sales_month_count"],
+        sales_closed_month_revenue=result["sales_closed_month_revenue"],
+        sales_closed_month_count=result["sales_closed_month_count"],
         preorder_open_count=result["preorder_open_count"],
         preorder_outstanding=result["preorder_outstanding"],
         preorder_ready_count=result["preorder_ready_count"],

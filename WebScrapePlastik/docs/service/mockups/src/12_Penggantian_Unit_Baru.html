@@ -1,0 +1,46 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Penggantian Unit Baru</title>
+<link rel="stylesheet" href="app.css"></head><body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><div class="logo">SG</div><div><b>Sinar Galaksi</b><span>Variasi Mobil · Kasir &amp; stok</span></div></div>
+    <nav class="nav"><a class=""><i></i>Kasir</a><a class=""><i></i>Sales Order</a><a class=""><i></i>Purchase Order</a><a class=""><i></i>Retur Supplier</a><a class="on"><i></i>Service / Garansi<span class="new">BARU</span></a><a class=""><i></i>Riwayat Invoice</a><a class=""><i></i>Faktur Pembelian</a><a class=""><i></i>Inventori <span style="margin-left:auto">▾</span></a><a class="sub"><i></i>Barang Masuk</a><a class="sub"><i></i>Master Barang</a><a class="sub"><i></i>Master Brand</a><a class="sub"><i></i>Master Supplier</a><a class="sub"><i></i>Master Kategori</a><a class="sub"><i></i>Stock Opname</a><a class="sub"><i></i>Stok Karantina</a><a class="sub"><i></i>Master Customer</a><a class="sub"><i></i>Master Service<span class="new">BARU</span></a><a class=""><i></i>Dashboard</a><a class=""><i></i>Pengguna</a><a class=""><i></i>Log Aktivitas</a></nav>
+  </aside>
+  <main class="main">
+    <header class="top"><div class="ico">⚒</div><div><h1>Penggantian Unit Baru</h1><p>Cabang ketika pabrik memutuskan unit customer diganti baru</p></div>
+      <div class="user"><div class="avatar">SI</div><div><b>sinargalaksi88</b><div class="tiny muted">Admin</div></div>
+      <span class="btn sm">Keluar</span></div></header>
+    <div class="content"><div class="between"><div class="row" style="align-items:center;gap:8px 10px;flex-wrap:wrap">
+      <span class="btn sm">← Daftar Service</span><h2 class="serif" style="margin:0;font-size:18px;white-space:nowrap">SVC-20261016-002</h2>
+      <span class="pill p-blue">Di Supplier</span><span class="tag">Ririn Oktavia · 0813-2200-4411</span>
+      <span class="tag">SUBWOOFER AKTIF 12" · SN SW98765432</span><span class="tag">Nota PJSG/26/07/0210</span></div>
+      <div class="row" style="gap:8px;flex:none"><span class="pill p-green">Keputusan pabrik: Ganti Unit Baru</span></div></div>
+<div class="row">
+  <div class="grow" style="display:flex;flex-direction:column;gap:14px">
+  <div class="card"><h3>Persetujuan Ganti Baru dari Pabrik</h3>
+    <div class="grid g3">
+      <div class="field"><label>No. Service</label><div class="input ro">SVC-20261016-002</div></div><div class="field"><label>Customer</label><div class="input ro">Ririn Oktavia</div></div><div class="field"><label>Nota Asal</label><div class="input ro">PJSG/26/07/0210 · 21/07/2026</div></div>
+      <div class="field"><label>Barang Customer</label><div class="input ro">SUBWOOFER AKTIF 12" · SW98765432</div></div><div class="field"><label>Hasil Diagnosis</label><div class="input ro">Approved Replacement · RMA-ASTA-1102</div></div><div class="field"><label>PIC Pabrik</label><div class="input ro">ASTA JAYA · Bpk. Hendra</div></div>
+    </div></div>
+  <div class="card"><h3>Cara Penggantian</h3>
+    <div class="grid g3">
+      <div class="choice on"><b>A · Pabrik mengirim unit pengganti</b><div class="small muted" style="margin-top:3px">Default. Unit pengganti adalah titipan untuk customer; tidak masuk stok.</div></div>
+      <div class="choice"><b>B · Tukar dari stok toko sekarang</b><div class="small muted" style="margin-top:3px">Admin, hanya Garansi Aktif (K-S6). Stok OUT; unit rusak → Stok Karantina → Retur Supplier.</div></div>
+      <div class="choice"><b>C · Ganti model lain</b><div class="small muted" style="margin-top:3px">Model lama tidak ada. Selisih harga menjadi biaya di Persetujuan Biaya.</div></div>
+    </div></div>
+  <div class="card"><h3>Alur Penerimaan Unit Pengganti</h3>
+    <div class="flowrow"><div class="stat"><div class="label">1. Pabrik setuju</div><span class="pill p-green">✓ 20/10</span></div><span class="arr">→</span><div class="stat"><div class="label">2. Dikirim balik</div><span class="pill p-amber">Menunggu</span></div><span class="arr">→</span><div class="stat"><div class="label">3. Diterima toko</div><span class="pill p-grey">Belum</span></div><span class="arr">→</span><div class="stat"><div class="label">4. QC & SN baru</div><span class="pill p-grey">Belum</span></div><span class="arr">→</span><div class="stat"><div class="label">5. Serah customer</div><span class="pill p-grey">Belum</span></div></div>
+    <div class="note ok" style="margin-top:12px"><b>Penerimaan dicatat sekali.</b> Unit pengganti untuk customer dicatat sebagai titipan pengganti, bukan Barang Masuk. Barang Masuk (jenis <i>retur_pengganti</i>) hanya dipakai di cara B, saat supplier mengganti unit milik toko.</div></div>
+  </div>
+  <div style="width:400px;display:flex;flex-direction:column;gap:14px">
+    <div class="card"><h3>Detail Unit Pengganti</h3>
+      <div class="field"><label>Jenis unit pengganti</label><div class="input sel">SUBWOOFER AKTIF 12" (sama)</div></div><div style="height:8px"></div>
+      <div class="grid g2"><div class="field"><label>Serial lama</label><div class="input ro mono">SW98765432</div></div><div class="field"><label>Serial baru</label><div class="input ph">isi saat unit tiba</div><div class="hint">wajib sebelum QC</div></div></div><div style="height:8px"></div>
+      <div class="field"><label>Resi balik dari pabrik</label><div class="input ph">menunggu pengiriman</div></div><div style="height:8px"></div>
+      <div class="field"><label>Biaya tambahan</label><div class="input ro">Rp 0 · Tanpa Biaya</div></div></div>
+    <div class="note warn"><b>Barang customer tetap milik customer.</b> Unit pengganti atas klaim customer tidak masuk stok dagangan; SN baru menggantikan SN lama untuk serah terima dan garansi berikutnya.</div>
+  </div>
+</div>
+<div class="between"><span class="btn">Lihat Dokumen RMA</span><div class="row" style="gap:8px"><span class="btn">Catat Pengiriman Balik</span><span class="btn pri">Terima Unit Pengganti</span></div></div></div>
+  </main>
+</div>
+</body></html>

@@ -1,0 +1,29 @@
+%% Kode: FLOW B
+%% Judul: Biaya tambahan & persetujuan customer
+%% Tujuan: Biaya yang baru diketahui setelah pemeriksaan ditagih hanya bila customer setuju, dengan bukti, sebelum pekerjaan dimulai.
+%% Dimulai dari: Hasil Pemeriksaan Pabrik (keputusan berbayar), hasil Pemeriksaan Internal "diperbaiki di toko", atau cara C penggantian (selisih harga).
+%% Aturan stok: Tidak ada, kecuali sparepart diambil dari stok toko: baris barang di Nota Jasa Service → OUT lewat Kasir seperti penjualan biasa.
+%% Aturan keuangan: Modal pabrik (factory_cost) terpisah dari harga ke customer; staff hanya melihat harga customer. Uang masuk lewat Nota Jasa Service (receipt_payments), dihitung per tanggal bayar. Biaya = Sudah Dibayar saat nota jasa lunas.
+%% Warning: Pekerjaan berbayar tanpa persetujuan; customer belum menjawab > 7 hari; estimasi berubah setelah disetujui; serah terima dengan sisa tagihan.
+%% Catatan Programmer: service_cost_lines (kind, factory_cost, customer_price) + service_approvals (status, contacted_at, medium, proof, total_at_approval). Estimasi baru = persetujuan baru, yang lama tidak diedit. Serah terima diblok bila sisa > 0 kecuali admin "bayar nanti" (piutang di Nota Jasa).
+flowchart TB
+  S([Ada biaya > 0]):::aksi --> A1[Rincian biaya per jenis:<br/>service · sparepart · penggantian · ongkir · lainnya]:::aksi
+  A1 --> A2[Admin isi harga ke customer<br/>modal pabrik tersembunyi untuk staff]:::aksi
+  A2 --> A3[Hubungi customer: WA / telepon / datang<br/>pesan WA siap salin]:::aksi
+  A3 --> W1[[Biaya: Menunggu Persetujuan<br/>Tahap: Menunggu Keputusan Customer]]:::tunggu
+  W1 --> C1{Jawaban customer}:::cek
+  C1 -- Belum menjawab --> W2[Pengingat · Bermasalah > 7 hari]:::tunggu
+  W2 --> A3
+  C1 -- Setuju --> Y1[Catat tanggal, media, bukti<br/>Biaya: Disetujui Customer]:::ok
+  C1 -- Tolak --> N1[Alasan wajib<br/>Biaya: Ditolak Customer]:::err
+  Y1 --> Y2[Beri tahu pabrik / teknisi: kerjakan]:::so
+  Y2 --> C2{Estimasi berubah?}:::cek
+  C2 -- Ya --> A1
+  C2 -- Tidak --> Y3[Unit kembali, Siap Diambil]:::ok
+  Y3 --> P1[Nota Jasa Service di Kasir<br/>jasa + sparepart dari stok bila ada]:::aksi
+  P1 --> C3{Lunas?}:::cek
+  C3 -- Ya --> F1([Biaya: Sudah Dibayar → serah terima]):::ok
+  C3 -- Belum --> C4{Admin: serahkan, bayar nanti?}:::cek
+  C4 -- Ya + alasan --> F1
+  C4 -- Tidak --> W3[[Unit ditahan sampai lunas]]:::tunggu
+  N1 --> FD[/FLOW D: unit dikembalikan apa adanya/]:::sub

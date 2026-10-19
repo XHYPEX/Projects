@@ -12,7 +12,7 @@ from backend.auth import SESSION_COOKIE_NAME, hash_token
 from backend.database import get_session
 
 COST_KEYS = {"last_cost_price", "avg_cost_price", "cost_price", "total_inventory_value", "total_value",
-             "unit_cost", "cost_value", "writeoffs_cost_value"}
+             "unit_cost", "cost_value", "writeoffs_cost_value", "factory_cost", "factory_total"}
 
 
 def _strip(node):

@@ -1,0 +1,26 @@
+%% Kode: FLOW D
+%% Judul: Service ditolak, dibatalkan, atau tidak jadi diproses
+%% Tujuan: Setiap service yang berhenti punya alasan dan bukti, dan unitnya tetap dilacak sampai kembali ke tangan customer.
+%% Dimulai dari: Hasil Pemeriksaan (ditolak / tidak bisa diperbaiki), Persetujuan Biaya (customer tolak), atau aksi Batalkan.
+%% Aturan stok: Tidak ada (unit customer). Untuk cara B FLOW C, penolakan supplier diurus di Retur Supplier / Stok Karantina.
+%% Aturan keuangan: Biaya yang sudah timbul dan disepakati (mis. ongkir non-garansi, biaya cek pabrik) boleh ditagih lewat Nota Jasa sesuai K-S5; selain itu tanpa biaya.
+%% Warning: Alasan kosong; Batalkan Sebelum Pengiriman dipilih padahal unit sudah keluar; unit ditolak belum kembali > 14 hari; tolak klaim dianggap selesai padahal unit belum diambil.
+%% Catatan Programmer: Tahap Dibatalkan hanya bila belum ada service_shipments terkonfirmasi. Setelah unit keluar, pembatalan = minta unit kembali; dokumen berakhir Selesai dengan Hasil Ditolak / Dikembalikan Apa Adanya / Dibatalkan. Garansi Ditolak hanya dari diagnosis pabrik atau admin + alasan.
+flowchart TB
+  S1([Pabrik menolak / tidak bisa diperbaiki]):::err --> R1
+  S2([Customer menolak biaya]):::err --> R1
+  S3([Customer / toko membatalkan]):::err --> C0{Unit sudah pernah<br/>keluar toko?}:::cek
+  C0 -- Belum --> X1[Batalkan Sebelum Pengiriman<br/>alasan wajib · Tahap: Dibatalkan]:::off
+  X1 --> X2[Serah terima singkat:<br/>unit + kelengkapan kembali, ttd]:::aksi
+  X2 --> F0([Dibatalkan]):::off
+  C0 -- Sudah --> R1[Catat keputusan: asal, jenis, tanggal,<br/>alasan wajib, bukti]:::aksi
+  R1 --> C1{Tindak lanjut}:::cek
+  C1 -- Minta periksa ulang --> E1[Eskalasi ke pabrik<br/>bukti + no. eskalasi]:::tunggu
+  E1 --> E2{Hasil eskalasi}:::cek
+  E2 -- Diterima --> FA[/kembali ke FLOW A: diagnosis/]:::sub
+  E2 -- Tetap ditolak --> K1
+  C1 -- Kembalikan apa adanya --> K1[[Menunggu unit dikirim balik]]:::tunggu
+  K1 --> K2[Unit tiba di toko<br/>bukti penerimaan balik]:::so
+  K2 --> K3[Siap Diambil · hubungi customer]:::ok
+  K3 --> K4[Serah terima: kelengkapan, ttd,<br/>tagih biaya yang disepakati]:::aksi
+  K4 --> F1([Selesai · Hasil: Ditolak /<br/>Dikembalikan Apa Adanya]):::ok

@@ -1,0 +1,26 @@
+%% Kode: FLOW C
+%% Judul: Penggantian unit baru: dari pabrik, tukar stok toko, atau ganti model
+%% Tujuan: Mengganti unit customer tanpa mencampur barang titipan dengan stok dagangan, dan tanpa stok tercatat dua kali.
+%% Dimulai dari: Hasil Pemeriksaan Pabrik → keputusan Ganti Unit Baru.
+%% Aturan stok: Cara A: tidak ada stok (pengganti = titipan). Cara B: satu transaksi OUT unit pengganti dari stok + IN & QUAR unit rusak (sumber service_klaim, HPP = HPP pengganti); klaim lalu lewat Retur Supplier; pengganti dari supplier = Barang Masuk retur_pengganti. Cara C: sama dengan A atau B, selisih harga sebagai biaya.
+%% Aturan keuangan: Cara A/B garansi: tanpa biaya. Cara C: selisih harga lewat FLOW B. Cara B ditolak supplier → lot karantina dihapusbukukan (kerugian toko).
+%% Warning: Cara B hanya admin dan hanya Garansi Aktif (K-S6); SN baru wajib sebelum QC; unit pengganti belum dikirim pabrik > 14 hari.
+%% Catatan Programmer: service_replacements (mode, old_serial, new_serial, master_item_id, ledger ref, quarantine_lot_id, supplier_return_id). Cara B memanggil fungsi stok & karantina yang ada, tidak menulis stock_ledger sendiri. supplier_returns.service_order_id untuk tautan balik.
+flowchart TB
+  S([Pabrik: Ganti Unit Baru]):::ok --> C1{Cara penggantian}:::cek
+  C1 -- A · pabrik kirim pengganti --> A1[[Menunggu unit pengganti dikirim]]:::tunggu
+  A1 --> A2[Terima unit pengganti di toko<br/>titipan · bukan Barang Masuk]:::so
+  A2 --> A3[QC + catat SN baru<br/>SN lama tetap di riwayat]:::aksi
+  A3 --> Z[Siap Diambil → serah terima<br/>Hasil: Diganti Baru]:::ok
+  C1 -- B · tukar dari stok toko --> B0{Admin & Garansi Aktif?}:::cek
+  B0 -- Tidak --> C1
+  B0 -- Ya --> B1[Satu transaksi:<br/>OUT pengganti dari stok<br/>IN + QUAR unit rusak · service_klaim]:::aksi
+  B1 --> Z
+  B1 --> B2[Retur Supplier dari Stok Karantina<br/>tipe Klaim Garansi]:::so
+  B2 --> C2{Keputusan supplier}:::cek
+  C2 -- Diganti --> B3[Barang Masuk retur_pengganti<br/>stok toko pulih]:::ok
+  C2 -- Ditolak --> B4[Lot dihapusbukukan<br/>kerugian toko]:::off
+  C1 -- C · ganti model lain --> C3[Selisih harga → FLOW B]:::sub
+  C3 --> C4{Unit dari mana?}:::cek
+  C4 -- Pabrik --> A1
+  C4 -- Stok toko --> B0

@@ -1,9 +1,10 @@
 import asyncio
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from backend.database import get_sales_summary
+from backend.auth import require_admin
+from backend.database import get_sales_summary, list_cash_outs
 from backend.schemas import SalesSummaryOut
 
 router = APIRouter()
@@ -25,3 +26,18 @@ async def sales_summary(date_from: str, date_to: str):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, get_sales_summary, date_from, date_to)
     return SalesSummaryOut(**result)
+
+
+@router.get("/cash-outs", dependencies=[Depends(require_admin)])
+async def cash_outs(date_from: str, date_to: str, method: str | None = None):
+    """K-20 Kas Keluar (admin): every refund in the range, with proof, who paid it out and the nota; totals per method."""
+    for label, raw in (("awal", date_from), ("akhir", date_to)):
+        try:
+            date.fromisoformat(raw)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Tanggal {label} tidak valid, gunakan format YYYY-MM-DD.")
+    if date_from > date_to:
+        raise HTTPException(status_code=422, detail="Tanggal awal tidak boleh setelah tanggal akhir.")
+    if method and method not in ("cash", "transfer", "qris", "debit"):
+        raise HTTPException(status_code=422, detail="Metode harus salah satu dari: cash, transfer, qris, debit.")
+    return await asyncio.get_event_loop().run_in_executor(None, list_cash_outs, date_from, date_to, method or None)

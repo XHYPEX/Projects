@@ -1,0 +1,26 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Integrasi Service, Retur &amp; Inventory</title>
+<link rel="stylesheet" href="app.css"></head><body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><div class="logo">SG</div><div><b>Sinar Galaksi</b><span>Variasi Mobil · Kasir &amp; stok</span></div></div>
+    <nav class="nav"><a class=""><i></i>Kasir</a><a class=""><i></i>Sales Order</a><a class=""><i></i>Purchase Order</a><a class=""><i></i>Retur Supplier</a><a class="on"><i></i>Service / Garansi<span class="new">BARU</span></a><a class=""><i></i>Riwayat Invoice</a><a class=""><i></i>Faktur Pembelian</a><a class=""><i></i>Inventori <span style="margin-left:auto">▾</span></a><a class="sub"><i></i>Barang Masuk</a><a class="sub"><i></i>Master Barang</a><a class="sub"><i></i>Master Brand</a><a class="sub"><i></i>Master Supplier</a><a class="sub"><i></i>Master Kategori</a><a class="sub"><i></i>Stock Opname</a><a class="sub"><i></i>Stok Karantina</a><a class="sub"><i></i>Master Customer</a><a class="sub"><i></i>Master Service<span class="new">BARU</span></a><a class=""><i></i>Dashboard</a><a class=""><i></i>Pengguna</a><a class=""><i></i>Log Aktivitas</a></nav>
+  </aside>
+  <main class="main">
+    <header class="top"><div class="ico">⚒</div><div><h1>Integrasi Service, Retur &amp; Inventory</h1><p>Memisahkan kepemilikan barang customer dari persediaan barang dagangan toko</p></div>
+      <div class="user"><div class="avatar">SI</div><div><b>sinargalaksi88</b><div class="tiny muted">Admin</div></div>
+      <span class="btn sm">Keluar</span></div></header>
+    <div class="content"><div class="card"><h3>Barang Titipan Customer vs Barang Milik Toko</h3>
+  <div class="grid g2">
+    <div class="choice on"><b>Unit customer yang diservice</b><div class="small muted" style="margin-top:3px">Referensi: No. Service + nota asal. Dimiliki customer, bukan stok yang bisa dijual. Dicatat di register titipan dengan Lokasi Unit.</div></div>
+    <div class="choice"><b>Barang milik toko yang diretur ke supplier</b><div class="small muted" style="margin-top:3px">Referensi: Retur Supplier + PO + Barang Masuk. Berdampak ke stok In Hand dan Stok Karantina.</div></div>
+  </div>
+  <div class="note warn" style="margin-top:12px"><b>Jangan mencatat stok dua kali.</b> Modul service tidak menulis ke stock_ledger sendiri. Stok dagangan hanya bergerak lewat Kasir, Barang Masuk, Stok Karantina, Retur Supplier, dan Stock Opname.</div></div>
+<div class="row">
+  <div class="grow card"><h3>Jejak Unit Customer</h3><div class="chain"><div class="stat"><div class="label">Nota asal</div><b>PJSG/26/08/0125</b></div><div class="stat"><div class="label">Terima service</div><b>SVC-20261016-001</b></div><div class="stat"><div class="label">Kirim pabrik</div><b>SJS · resi 0108…5521</b></div><div class="stat"><div class="label">Diagnosis</div><b>RMA-ASTA-1088</b></div><div class="stat"><div class="label">Service / ganti</div><b>Keputusan pabrik</b></div><div class="stat"><div class="label">Serah customer</div><b>Nota Hasil</b></div></div></div>
+  <div class="grow card"><h3>Jejak Barang Dagangan Toko</h3><div class="chain"><div class="stat"><div class="label">PO Supplier</div><b>PO-SUP-20260801-002</b></div><div class="stat"><div class="label">Barang Masuk</div><b>BM-20260805-001</b></div><div class="stat"><div class="label">Stok Karantina</div><b>lot QUAR</b></div><div class="stat"><div class="label">Retur Supplier</div><b>RTS-20261020-001</b></div><div class="stat"><div class="label">Barang keluar</div><b>OUT 1×</b></div><div class="stat"><div class="label">Barang pengganti</div><b>BM retur_pengganti</b></div></div></div>
+</div>
+<div class="card soft"><b>Titik temu (cara B):</b> unit pengganti keluar dari stok toko → customer; unit rusak customer menjadi milik toko → IN + QUAR (sumber <span class="mono">service_klaim</span>) → Retur Supplier tipe Klaim Garansi → supplier mengganti → Barang Masuk <span class="mono">retur_pengganti</span>. Sparepart dari stok yang dipakai service keluar lewat Nota Jasa Service (Kasir).</div>
+<div class="tblwrap"><table class="tbl"><thead><tr><th>Dokumen / Modul</th><th>Sumber Data</th><th>Pengaruh ke Stok</th><th>Syarat Penting</th></tr></thead><tbody><tr><td><b>Service customer</b></td><td>Customer + baris nota</td><td>Tidak ada</td><td>Unit di register titipan</td></tr><tr><td><b>Pengiriman / serah sales</b></td><td>Service + kemasan + resi / sales</td><td>Tidak ada (lokasi titipan berubah)</td><td>Bukti kirim / tanda tangan</td></tr><tr><td><b>Pengganti dari pabrik (cara A)</b></td><td>Diagnosis + SN baru</td><td>Tidak ada</td><td>SN lama &amp; baru dicatat</td></tr><tr><td><b>Tukar dari stok toko (cara B)</b></td><td>Service + barang stok</td><td>OUT pengganti · IN + QUAR unit rusak</td><td>Satu transaksi; admin; Garansi Aktif</td></tr><tr><td><b>Retur Supplier (lanjutan cara B)</b></td><td>Lot karantina service_klaim</td><td>OUT saat serah ekspedisi / sales</td><td>Tidak double posting</td></tr><tr><td><b>Nota Jasa Service</b></td><td>Biaya disetujui customer</td><td>Hanya bila ada sparepart dari stok</td><td>Nota lama tidak diubah</td></tr></tbody></table></div></div>
+  </main>
+</div>
+</body></html>

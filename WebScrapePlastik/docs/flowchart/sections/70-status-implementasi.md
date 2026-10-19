@@ -17,7 +17,6 @@ Perbandingan alur target dengan kode saat ini. Detail ada di kolom Status Implem
 
 | Hal | Perilaku saat ini | Gambar |
 |---|---|---|
-| Tandai Selesai | Mengisi Lunas + Pengerjaan Selesai sekaligus | 13, 15 |
 | Invoice dari SO | Dibuat otomatis saat SO terbit, bukan tombol "Lanjutkan ke Kasir" | 11 |
 | Status pengiriman per item PO | Tidak menggerakkan baris SO ke Dalam Pengiriman | 08 |
 
@@ -27,10 +26,9 @@ Perbandingan alur target dengan kode saat ini. Detail ada di kolom Status Implem
 |---|---|
 | Sumber pemenuhan per item (Inventory / Supplier / Campuran) | 03 |
 | Notice Center (belum dipesan, pengiriman terlambat, datang sebagian, utang supplier, dll.) | 26 |
-| Serah Terima Kendaraan, Master Kendaraan | 13, 15, 22 |
-| Eksekusi otomatis "tindakan" pembatalan item PO; balik bayar PO | 07, 28 |
+| (selesai) Serah Terima Kendaraan dan Master Kendaraan sudah ada; belum ada: lampiran foto/tanda tangan saat serah terima | 13, 15, 22 |
+| Balik bayar PO ke supplier saat PO dibatalkan setelah dibayar | 07, 28 |
 | Tautan Faktur Pembelian ↔ PO / Barang Masuk; riwayat per pembayaran faktur | 17 |
-| Status pembayaran Pending (dana belum diterima) | 10 |
 | Penagihan parsial SO (beberapa invoice per SO) | 11 |
 | Paket pengiriman dengan qty (satu baris PO terbagi ke beberapa paket); master ekspedisi | 08, 20 |
 | Penjaga perubahan arti satuan (PCS → METER) | 21 |
@@ -41,5 +39,3 @@ Perbandingan alur target dengan kode saat ini. Detail ada di kolom Status Implem
 2. Posting Barang Masuk hanya dijaga cek status, belum compare-and-set / transaksi berkunci.
 3. Verifikasi Barang Masuk manual belum dipaksa server sebelum posting.
 4. Supplier yang hanya dipakai PO/SO masih bisa dihapus permanen.
-5. Void nota yang sudah dibayar tidak menulis pembayaran negatif; pengembalian uang terjadi di luar sistem.
-6. Batal PO tidak dibatasi admin.

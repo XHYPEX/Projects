@@ -47,6 +47,7 @@ class ReceiptItemRequest(BaseModel):
     id: int | None = None  # an existing line, echoed back on edit so its added-by/added-at survive
     item_type: str = "barang"  # "barang" (stock item) or "jasa" (service: never moves stock)
     line_discount: int = 0  # Rp off this line
+    serial_no: str | None = None  # K-S2: SN of a serviceable item, so a later warranty claim can find this line
 
 
 class ReceiptExtra(BaseModel):
@@ -82,6 +83,8 @@ class ReceiptRequest(ReceiptExtra):
     started_at: str | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str = "cash"  # one of VALID_PAYMENT_METHODS
+    # K-18: for transfer/QRIS, true = the cashier saw the money arrive (Sah now); otherwise it is recorded Pending.
+    payment_confirmed: bool | None = None
     transfer_sender: str | None = None  # required when payment_method is "transfer"
     transfer_account: str | None = None  # the shop's account it was paid into; required for "transfer"
     # Where the nota starts: draft (no stock taken, can't be paid), belum, pengerjaan or selesai.
@@ -109,6 +112,10 @@ class ReceiptUpdateRequest(ReceiptExtra):
     amount_paid: int | None = None
     status: str | None = None  # only "void" is accepted here — pending/done are computed from amount_paid vs total
     payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
+    payment_confirmed: bool | None = None  # K-18, see ReceiptCreateRequest
+    # K-20: voiding a paid nota is a full refund; how it was handed back and what proves it.
+    refund_method: str | None = None
+    refund_proof: str | None = None
     transfer_sender: str | None = None  # name on the sending account; kept only for "transfer"
     transfer_account: str | None = None  # the shop's receiving account; kept only for "transfer"
 
@@ -142,6 +149,7 @@ class ReceiptItemOut(BaseModel):
     quantity: int
     unit_price: int
     warranty_date: str | None
+    serial_no: str | None = None
     sku: str | None = None
     unit: str | None = None  # the linked master item's unit; None for a hand-typed line
     item_type: str = "barang"
@@ -181,9 +189,22 @@ class ReceiptOut(ReceiptExtra):
     transfer_sender: str | None = None  # for a transfer: the name on the sending account
     transfer_account: str | None = None  # for a transfer: the shop account it was paid into
     work_status: str = "belum"  # draft | menunggu | belum | pengerjaan | selesai
-    # Set on the invoice of a Sales Order.
+    # Set on the invoice of a Sales Order. K-19: invoice_seq 1 is the main invoice; invoice_count is how many
+    # live invoices the order has.
     preorder_id: str | None = None
     po_number: str | None = None
+    invoice_seq: int | None = None
+    invoice_count: int | None = None
+    pending_amount: int = 0  # K-18: transfer/QRIS recorded but not yet confirmed as received
+    work_stage: str | None = None  # K-06: persiapan | pemasangan | qc, while Dalam Pengerjaan
+    handed_over_at: str | None = None  # K-08: vehicle given back to the customer
+    handed_over_by: str | None = None
+    handover_note: str | None = None
+    handover_debt: int = 0  # K-09: balance still owed when it left (needs admin)
+    closed_at: str | None = None
+    # Set on a Nota Jasa Service (the fee of a Service / Garansi document).
+    service_order_id: int | None = None
+    service_no: str | None = None
     return_total: int = 0  # what Retur Barang took off the total
     void_reason: str | None = None
     voided_by: str | None = None
@@ -197,6 +218,15 @@ class ReceiptEventOut(BaseModel):
     by_user: str | None = None
     kind: str
     note: str | None = None
+
+
+class ReceiptWorkStageRequest(BaseModel):
+    stage: str  # persiapan | pemasangan | qc
+
+
+class ReceiptHandoverRequest(BaseModel):
+    note: str | None = None
+    reason: str | None = None  # required (admin only) when the nota still has a balance
 
 
 class ReceiptWorkStatusRequest(BaseModel):
@@ -217,12 +247,19 @@ class ReceiptPaymentOut(BaseModel):
     created_by: str | None = None
     reversed_of: int | None = None  # set on the negative row that cancels payment #reversed_of
     reversed: bool = False  # true on an original payment that has been cancelled
+    state: str = "sah"  # K-18: sah (counted) | pending (transfer/QRIS not yet seen in the account) | gagal
+    confirmed_by: str | None = None
+    confirmed_at: str | None = None
+    fail_reason: str | None = None
+    kind: str | None = None  # pindah (K-19 DP move) | refund (K-20 money handed back)
+    proof_ref: str | None = None  # K-20: transfer reference, or the name of the person who received cash
 
 
 class ReceiptRefundRequest(BaseModel):
     amount: int
     method: str = "cash"
     reason: str
+    proof_ref: str | None = None  # K-20: required; transfer reference, or who received the cash
 
 
 class ReceiptReturnRequest(BaseModel):
@@ -237,6 +274,7 @@ class ReceiptReturnRequest(BaseModel):
     restock_qty: int | None = None  # split of `quantity`; must add up to it
     supplier_qty: int | None = None
     damaged_qty: int | None = None
+    proof_ref: str | None = None  # K-20: required when money goes back to the customer
 
 
 class ReceiptReturnOut(BaseModel):
@@ -273,6 +311,7 @@ class ReceiptPaymentRequest(BaseModel):
     note: str | None = None
     transfer_sender: str | None = None  # required when method is "transfer"
     transfer_account: str | None = None  # the shop's account it was paid into; required for "transfer"
+    confirmed: bool | None = None  # K-18: transfer/QRIS only; true = money already seen in the account
 
 
 class ReceiptDetail(ReceiptOut):
@@ -285,6 +324,7 @@ class ReceiptSettleRequest(BaseModel):
     payment_method: str | None = None  # one of VALID_PAYMENT_METHODS
     # What the customer paid now. Must be exactly the remaining balance (total - amount_paid).
     amount: int
+    confirmed: bool | None = None  # K-18, see ReceiptPaymentRequest
 
 
 class CustomerRequest(BaseModel):
@@ -692,11 +732,30 @@ class PurchaseInvoiceRequest(BaseModel):
     notes: str | None = None
     discount: int = 0
     tax_rate: float = 0
+    # Shipping as on the supplier's faktur: cost, the DPP it is taxed on (0 = no PPN), PPN amount (None = DPP × rate).
+    shipping_cost: int = 0
+    shipping_dpp: int = 0
+    shipping_tax: int | None = None
     items: list[PurchaseInvoiceItemRequest]
 
 
 class PurchaseInvoicePaymentRequest(BaseModel):
     amount: int
+    method: str | None = None
+    paid_date: str | None = None
+    reference_no: str | None = None
+    note: str | None = None
+
+
+class PurchaseInvoicePaymentOut(BaseModel):
+    id: int
+    paid_at: str
+    amount: int
+    kind: str  # bayar | batal | dp | dp_batal | kredit
+    method: str | None = None
+    reference_no: str | None = None
+    note: str | None = None
+    created_by: str | None = None
 
 
 class PurchaseInvoiceOut(BaseModel):
@@ -717,6 +776,9 @@ class PurchaseInvoiceOut(BaseModel):
     discount: int
     tax_rate: float
     tax_amount: int
+    shipping_cost: int = 0
+    shipping_dpp: int = 0
+    shipping_tax: int = 0
     total: int
     amount_paid: int
     outstanding: int
@@ -727,10 +789,13 @@ class PurchaseInvoiceOut(BaseModel):
     void_reason: str | None
     created_at: str
     updated_at: str
+    supplier_po_id: str | None = None
+    supplier_po_number: str | None = None
 
 
 class PurchaseInvoiceDetail(PurchaseInvoiceOut):
     items: list[PurchaseInvoiceItemOut]
+    payments: list[PurchaseInvoicePaymentOut] = []
 
 
 class PayableSummaryOut(BaseModel):
@@ -784,6 +849,17 @@ class PendingInvoiceOut(BaseModel):
     created_at: str
 
 
+class ReadyHandoverOut(BaseModel):
+    id: str
+    receipt_no: str | None = None
+    plate_full: str
+    customer_name: str | None = None
+    total: int
+    amount_paid: int
+    outstanding: int
+    created_at: str
+
+
 class OpenPreorderOut(BaseModel):
     """Slim preorder row for the dashboard; `status` is the order-level stage
     derived from its line items."""
@@ -821,10 +897,13 @@ class InventoryOverviewOut(BaseModel):
     pending_invoice_count: int
     pending_invoice_outstanding: int
     pending_invoices: list[PendingInvoiceOut]
+    ready_handover: list[ReadyHandoverOut] = []  # K-08: Pengerjaan Selesai, not yet handed over
     latest_incoming: list[IncomingItemOut]
     top_selling: list[TopSellingOut]
-    sales_month_revenue: int
+    sales_month_revenue: int  # K-21 Penerimaan Kas: Sah payments minus refunds this month
     sales_month_count: int
+    sales_closed_month_revenue: int = 0  # K-21 Penjualan: total of notas that closed (Lunas + Selesai) this month
+    sales_closed_month_count: int = 0
     preorder_open_count: int
     preorder_outstanding: int
     preorder_ready_count: int
@@ -858,6 +937,7 @@ class UserOut(BaseModel):
     created_at: str
     # Owner: an admin who gives the final approval for losses (quarantine write-off).
     is_owner: bool = False
+    can_post_inbound: bool = False  # K-22: may post Barang Masuk
 
 
 class UserCreateRequest(BaseModel):
@@ -870,6 +950,7 @@ class UserUpdateRequest(BaseModel):
     role: str | None = None
     is_active: bool | None = None
     is_owner: bool | None = None
+    can_post_inbound: bool | None = None
 
 
 class QuarantineQtyRequest(BaseModel):
@@ -934,6 +1015,7 @@ class PreorderRequest(BaseModel):
     # payments go through POST /preorders/{id}/payments.
     deposit: int = 0
     deposit_method: str = "cash"  # cash | transfer | qris | debit
+    deposit_confirmed: bool | None = None  # K-18: transfer/QRIS DP already seen in the account
     notes: str | None = None
     # Buy every barang of this order from this supplier; null = each follows its Master Barang supplier.
     supplier_id: int | None = None
@@ -971,6 +1053,13 @@ class PreorderPaymentRequest(BaseModel):
     # A PO with an invoice takes the payment there, where a transfer needs both names.
     transfer_sender: str | None = None
     transfer_account: str | None = None
+    # K-19: which invoice takes it when the order has several.
+    receipt_id: str | None = None
+    confirmed: bool | None = None  # K-18: transfer/QRIS already seen in the account
+
+
+class PaymentFailRequest(BaseModel):
+    reason: str
 
 
 class PreorderPaymentOut(BaseModel):
@@ -980,6 +1069,37 @@ class PreorderPaymentOut(BaseModel):
     note: str | None = None
     created_by: str | None = None
     method: str = "cash"
+    state: str = "sah"
+    confirmed_by: str | None = None
+    confirmed_at: str | None = None
+    fail_reason: str | None = None
+    receipt_id: str | None = None  # set when the payment sits on an invoice (confirm/fail go through the nota)
+    proof_ref: str | None = None
+    receipt_no: str | None = None
+    kind: str | None = None
+
+
+class PreorderInvoiceOut(BaseModel):
+    id: str
+    receipt_no: str | None = None
+    invoice_seq: int = 1
+    total: int = 0
+    amount_paid: int = 0
+    status: str = "pending"
+    work_status: str = "belum"
+    split_reason: str | None = None
+    pending_amount: int = 0
+    item_ids: list[int] = []
+
+
+class PreorderSplitRequest(BaseModel):
+    item_ids: list[int]
+    reason: str
+    dp_move: int | None = None  # None = the old invoice's paid money beyond its new total follows the lines
+
+
+class PreorderReasonRequest(BaseModel):
+    reason: str
 
 
 class PreorderAllocationOut(BaseModel):
@@ -1099,6 +1219,8 @@ class PreorderOut(BaseModel):
     # 'Pesan Supplier' lines that still have no supplier, and the suppliers chosen on the lines.
     missing_supplier_count: int = 0
     line_suppliers: list[str] = []
+    invoice_count: int = 1
+    pending_amount: int = 0  # K-18: transfer/QRIS recorded but not yet confirmed
 
 
 class PreorderDetail(PreorderOut):
@@ -1110,12 +1232,15 @@ class PreorderDetail(PreorderOut):
     dp_unallocated: int = 0
     # K-13: {allowed, reasons[], deadline, special_allowed} for Batalkan Sales Order / Pembatalan Khusus.
     cancel_check: dict | None = None
+    # K-19: the order's invoices (main first); one entry in the normal flow.
+    invoices: list[PreorderInvoiceOut] = []
 
 
 class PreorderCancelRequest(BaseModel):
     reason: str
     refund_amount: int = 0
     refund_method: str = "cash"
+    refund_proof: str | None = None  # K-20: required when refund_amount > 0
     # None = every line the policy allows; else just these lines.
     item_ids: list[int] | None = None
 
@@ -1125,6 +1250,7 @@ class PreorderSpecialCancelRequest(BaseModel):
     category: str
     reason: str
     refund_method: str = "cash"
+    refund_proof: str | None = None  # K-20: required when money goes back
 
 
 # ---------------------------------------------------------------------------
@@ -1199,6 +1325,15 @@ class SupplierPoReceiveRequest(BaseModel):
     officer: str | None = None
     # Also open a draft Barang Masuk for the lines linked to a master item.
     create_inbound: bool = False
+    # K-11 (admin only): accept goods beyond what the PO still expects as general stock, with a reason.
+    accept_over: bool = False
+    over_reason: str | None = None
+
+
+class InboundPostRequest(BaseModel):
+    # K-11 (admin only): post lines that exceed the PO's remaining quantity; the excess is general stock.
+    accept_over: bool = False
+    over_reason: str | None = None
 
 
 class SupplierPoStageRequest(BaseModel):
@@ -1236,6 +1371,10 @@ class SupplierPoItemShippingRequest(BaseModel):
     transit_location: str | None = None
     note: str | None = None
     notify_customer: bool = False
+
+
+class SupplierPoReleaseRequest(BaseModel):
+    reason: str
 
 
 class SupplierPoCancelItemRequest(BaseModel):
@@ -1384,6 +1523,15 @@ class SupplierPoOut(BaseModel):
     tax_amount: int
     grand_total: int
     outstanding: int
+    # K-12: money paid on the PO before its faktur is supplier DP; the debt is the faktur's.
+    dp_paid: int = 0
+    dp_unapplied: int = 0
+    faktur_id: int | None = None
+    faktur_number: str | None = None
+    faktur_status: str | None = None
+    faktur_total: int | None = None
+    faktur_paid: int | None = None
+    faktur_outstanding: int | None = None
     # List columns: the customer POs this order serves and the names of its goods.
     customer_refs: list[dict] = []
     item_names: list[str] = []
@@ -1414,6 +1562,7 @@ class SupplierPoSummary(BaseModel):
     diterima_sebagian: int
     faktur_belum_lunas: int
     total_utang: int
+    dp_supplier: int = 0
 
 
 class SupplierPoCandidateOut(BaseModel):

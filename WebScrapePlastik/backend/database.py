@@ -5346,9 +5346,13 @@ def autocomplete_master_items(
     barcode/SKU match first, then a SKU-prefix match, then everything else
     (substring name/sku/barcode hits), alphabetically by name within each
     group -- all as a SQL sort key rather than a Python sort."""
-    like = f"%{query}%"
-    where_clauses = ["mi.is_active=1", "(mi.name LIKE ? OR mi.sku LIKE ? OR mi.barcode LIKE ?)"]
-    params: list = [like, like, like]
+    # Every word typed must hit the name, SKU or barcode, in any order, so "KIT WIPER FLUID 500 ML" still finds "KIT WIPER FLUID 500ML".
+    where_clauses = ["mi.is_active=1"]
+    params: list = []
+    for word in (query.split() or [query]):
+        like = f"%{word}%"
+        where_clauses.append("(mi.name LIKE ? OR mi.sku LIKE ? OR mi.barcode LIKE ?)")
+        params += [like, like, like]
     if supplier_id is not None:
         where_clauses.append("mi.supplier_id=?")
         params.append(supplier_id)

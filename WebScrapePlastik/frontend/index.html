@@ -650,6 +650,12 @@
         </svg>
         Faktur Pembelian
       </a>
+      <a href="#/account-payable" data-route="/account-payable" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+          <path d="M3 7h18v12H3z"/><path d="M3 11h18M8 15h3M3 7l2-3h14l2 3"/>
+        </svg>
+        Account Payable
+      </a>
       <div>
         <button type="button" onclick="toggleInventoryNavGroup()" data-route="/inventory-group"
           class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
@@ -1282,18 +1288,18 @@
         <aside class="cashier-rail cashier-inner pb-5" aria-label="Ringkasan dan riwayat nota">
 
           <section class="bg-white border border-line rounded-xl" aria-labelledby="cashier-summary-title">
-            <div class="flex items-center gap-2 px-4 pt-4 pb-3 min-h-[3.5rem]">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-4 pb-3 min-h-[3.5rem]">
               <h2 id="cashier-summary-title" class="font-serif text-base font-semibold text-ink whitespace-nowrap">Ringkasan Pesanan</h2>
-              <span id="cashier-work-badge" class="ml-auto"></span>
+              <span id="cashier-work-badge" class="ml-auto max-w-full"></span>
               <!-- Read-only payment status, derived from Jumlah Dibayar vs Total. Hidden until there is a total. -->
               <span id="cashier-status-badge" class="hidden inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-ink bg-pending/10">
                 <span id="cashier-status-dot" class="status-dot is-pending"></span>
                 <span id="cashier-status-label">Belum Lunas</span>
               </span>
             </div>
-            <div class="px-4 pb-4">
+            <div class="px-4 pb-4 min-w-0">
               <div class="text-[11px] text-muted">Nomor Nota</div>
-              <div id="cashier-summary-no" class="hidden font-serif text-2xl font-semibold text-accentDark tabular-nums leading-tight mb-2 break-all"></div>
+              <div id="cashier-summary-no" class="hidden font-serif text-xl font-semibold text-accentDark tabular-nums leading-tight mb-2 break-all max-w-full"></div>
               <div class="rounded-xl bg-accent/10 px-4 py-3.5 flex items-center gap-3">
                 <span class="w-10 h-10 rounded-full bg-white/70 text-accentDark grid place-items-center shrink-0" aria-hidden="true">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-5a2 2 0 0 1 1.9-1.3h10.2A2 2 0 0 1 19 7l2 5"/><path d="M3 12h18v5a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5Z"/><path d="M7 14.5h.01M17 14.5h.01"/></svg>
@@ -3422,6 +3428,13 @@
     </div>
   </div>
 
+  <div id="page-account-payable" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-none mx-auto">
+      <div id="ap-tabs" class="flex flex-wrap items-center gap-1.5 mb-4"></div>
+      <div id="ap-body"></div>
+    </div>
+  </div>
+
   <div id="page-kas-keluar" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
       <div class="flex flex-wrap items-end gap-2 mb-4">
@@ -5162,6 +5175,7 @@ const ROUTES = {
   "/master-service": { title: "Master Service", page: "page-master-service" },
   "/master-customer": { title: "Master Customer", page: "page-inventory", section: "inv-tab-customer", data: "customer" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
+  "/account-payable": { title: "Account Payable", page: "page-account-payable" },
   "/cash-receipt": { title: "Cash Receipt / Laporan Penerimaan", page: "page-cash-receipt" },
   "/kas-keluar": { title: "Kas Keluar", page: "page-kas-keluar" },
   "/users": { title: "Pengguna", page: "page-users" },
@@ -5177,7 +5191,7 @@ const INVENTORY_ROUTES = new Set(
 // being immediately undone by it.
 let pendingInventoryAction = null;
 
-const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar", "/cash-receipt"]);
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar", "/cash-receipt", "/account-payable"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
 // #page-scraper; it just stops being reachable.
@@ -5229,6 +5243,7 @@ function renderRoute() {
   if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); loadNotices(); }
   if (route === "/kas-keluar") koInit();
   if (route === "/cash-receipt") crInit();
+  if (route === "/account-payable") apInit();
   if (route === "/master-kategori") katInit();
   if (route === "/stock-opname") opInit();
   if (route === "/karantina") qrLoad();
@@ -5348,6 +5363,10 @@ const ROUTE_META = {
   "/dashboard": {
     subtitle: "Ringkasan persediaan, penjualan dan tagihan.",
     icon: '<path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>',
+  },
+  "/account-payable": {
+    subtitle: "Pusat kontrol utang supplier: faktur, jatuh tempo, DP, kredit, refund, dan aging.",
+    icon: '<path d="M3 7h18v12H3z"/><path d="M3 11h18M8 15h3M3 7l2-3h14l2 3"/>',
   },
   "/cash-receipt": {
     subtitle: "Laporan uang masuk dari customer: siapa membayar, untuk invoice atau SO mana, lewat apa, dan masuk ke mana.",
@@ -12143,11 +12162,309 @@ function crPrintNode(id, size = "A4 portrait") {
   root.id = "cr-print-root";
   root.innerHTML = (source.classList.contains("cr-print-target") ? source : source.querySelector(".cr-print-target") || source).outerHTML;
   root.querySelectorAll(".no-print").forEach(el => el.remove());
+  root.querySelectorAll(".ap-print-only").forEach(el => el.classList.remove("hidden"));
   document.body.appendChild(root);
   document.body.classList.add("printing-cr");
   const done = () => { document.body.classList.remove("printing-cr"); root.remove(); rule.textContent = before; window.removeEventListener("afterprint", done); };
   window.addEventListener("afterprint", done);
   window.print();
+}
+
+// ── Account Payable: pusat kontrol utang supplier (read-only) ──────────────────
+// Reads GET /api/account-payable/*. Paying, DP carry-over, credit allocation and verification stay in Faktur
+// Pembelian, Purchase Order and Retur Supplier; every document number here opens the original there.
+const AP = { tab: "dashboard", f: { q: "", supplier_id: "", pay_status: "", due: "", date_from: "", date_to: "", po: "", outstanding: false }, sort: "due_date", dir: "asc", page: 1, size: 25, month: null, seq: 0, detail: null };
+const AP_TABS = [["dashboard", "Dashboard"], ["invoices", "Faktur & Utang"], ["due", "Jatuh Tempo"], ["dp", "DP Supplier"], ["credits", "Credit Note"], ["refunds", "Refund Supplier"], ["recon", "Rekonsiliasi"], ["aging", "Aging"]];
+const AP_MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const AP_STATE_STYLE = { overdue: "bg-rose-50 text-rose-700", today: "bg-violet-50 text-violet-700", soon: "bg-amber-50 text-amber-700", ok: "bg-stone-100 text-stone-600", lunas: "bg-emerald-50 text-emerald-700" };
+const AP_PAY_STYLE = { belum: "bg-stone-100 text-stone-600", sebagian: "bg-amber-50 text-amber-700", lunas: "bg-emerald-50 text-emerald-700" };
+const AP_TH = "text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap";
+const AP_THR = AP_TH.replace("text-left", "text-right");
+const AP_TD = "px-3 py-3";
+const apBody = () => document.getElementById("ap-body");
+const apMoney = n => esc(formatIDR(n || 0));
+function apDate(ymd) {
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.slice(0, 10).split("-");
+  return `${+d} ${AP_MONTHS[+m - 1]} ${y}`;
+}
+const apDueBadge = r => crPill(AP_STATE_STYLE[r.due_state] || AP_STATE_STYLE.ok, r.due_label || "");
+const apPayBadge = r => crPill(AP_PAY_STYLE[r.pay_status] || AP_PAY_STYLE.belum, r.pay_status_label || "");
+const apGrid = (n = 5) => `grid grid-cols-2 md:grid-cols-3 ${n === 3 ? "xl:grid-cols-3" : n === 4 ? "xl:grid-cols-4" : n === 6 ? "xl:grid-cols-6" : "xl:grid-cols-5"} gap-2.5 mb-4`;
+const apNum = (label, openJs, cls = "") => `<a href="#/account-payable" onclick="${openJs}; return false;" class="font-mono text-[13px] text-accentDark hover:underline whitespace-nowrap ${cls}">${esc(label)}</a>`;
+const apInvLink = r => apNum(r.invoice_number, `openPurchaseInvoiceById(${r.id})`);
+const apPoLink = (id, no) => id ? apNum(no || "PO", `openSupplierPoFromFaktur('${esc(id)}')`) : "";
+const apRetLink = (id, no) => id ? apNum(no || "Retur", `rtsOpen(${id})`) : "";
+const apBtn = (label, js, primary) => `<button type="button" onclick="${js}" class="px-3 py-2 text-sm font-medium rounded-lg ${primary ? "bg-accent text-white hover:bg-accentDark" : "border border-line bg-white text-ink hover:bg-bg2"} transition-colors whitespace-nowrap">${label}</button>`;
+const apSmallBtn = (label, js) => `<button type="button" onclick="${js}" class="px-2.5 py-1 border border-line rounded-md bg-white text-accentDark text-xs font-semibold whitespace-nowrap hover:bg-bg2">${label}</button>`;
+const apTable = (head, rows, empty) => `<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-bg2"><tr>${head}</tr></thead><tbody>${rows || `<tr><td colspan="12" class="px-3 py-8 text-center text-sm text-muted">${empty}</td></tr>`}</tbody></table></div>`;
+const apPanel = (title, body, aside = "") => `<div class="bg-white border border-line rounded-xl overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">${crTitle(title)}${aside ? `<span class="text-xs text-muted">${aside}</span>` : ""}</div>${body}</div>`;
+const apHead = (title, sub, actions = "") => `<div class="flex flex-wrap items-start justify-between gap-3 mb-4"><div><div class="text-[11px] font-semibold uppercase tracking-wider text-accentDark">Purchase / Account Payable</div><h2 class="font-sans text-xl font-semibold text-ink">${esc(title)}</h2><p class="text-sm text-muted">${esc(sub)}</p></div><div class="flex flex-wrap gap-2">${actions}</div></div>`;
+
+function apInit() {
+  AP.detail = null;
+  apRenderTabs();
+  apGo(AP.tab);
+}
+
+function apRenderTabs() {
+  document.getElementById("ap-tabs").innerHTML = AP_TABS.map(([k, label]) =>
+    `<button type="button" onclick="apGo('${k}')" class="px-3.5 py-2 rounded-lg text-sm font-medium border transition-colors ${AP.tab === k && !AP.detail ? "bg-accent border-accent text-white" : "border-line bg-white text-muted hover:text-ink hover:bg-bg2"}">${label}</button>`).join("");
+}
+
+async function apGet(path, params) {
+  const resp = await fetch(`/api/account-payable/${path}${params ? "?" + params : ""}`);
+  if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Account Payable tidak bisa dimuat."));
+  return resp.json();
+}
+
+async function apGo(tab) {
+  AP.tab = tab; AP.detail = null;
+  apRenderTabs();
+  const seq = ++AP.seq;
+  apBody().innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  try {
+    if (tab === "dashboard") { const d = await apGet("dashboard"); if (seq === AP.seq) apRenderDashboard(d); }
+    else if (tab === "invoices") { await apLoadInvoices(seq); }
+    else if (tab === "due") { const d = await apGet("due", AP.month ? `month=${AP.month}` : ""); if (seq === AP.seq) apRenderDue(d); }
+    else if (tab === "dp") { const d = await apGet("dp"); if (seq === AP.seq) apRenderDp(d); }
+    else if (tab === "credits") { const d = await apGet("credits"); if (seq === AP.seq) apRenderCredits(d); }
+    else if (tab === "refunds") { const d = await apGet("refunds"); if (seq === AP.seq) apRenderRefunds(d); }
+    else if (tab === "recon") { const d = await apGet("reconciliation"); if (seq === AP.seq) apRenderRecon(d); }
+    else if (tab === "aging") { const d = await apGet("aging"); if (seq === AP.seq) apRenderAging(d); }
+  } catch (e) { showToast(e.message); apBody().innerHTML = `<div class="py-16 text-center text-sm text-failed">${esc(e.message)}</div>`; }
+}
+
+// ── Dashboard ──
+function apRenderDashboard(d) {
+  const b = d.buckets;
+  const tiles = `<div class="${apGrid(5)}">
+    ${crTile("Total utang aktif", apMoney(d.outstanding), `${d.open_count} faktur belum lunas`, "bg-[#FDF4EF] border-[#F3DDD2]")}
+    ${crTile("Belum jatuh tempo", apMoney(b.not_due), `${d.not_due_count} tagihan aktif`, "bg-[#F1F8F3] border-[#D9EBDE]")}
+    ${crTile("Jatuh tempo hari ini", apMoney(b.today), `${d.due_today_count} faktur${d.due_today_names.length ? " · " + esc(d.due_today_names.join(", ")) : ""}`, "bg-[#F6F2FD] border-[#E5DCF5]")}
+    ${crTile("Lewat jatuh tempo", `<span class="${d.overdue_total ? "text-failed" : ""}">${apMoney(d.overdue_total)}</span>`, `${d.overdue_count} faktur${d.overdue_names.length ? " · " + esc(d.overdue_names.join(", ")) : ""}`, "bg-[#FDF1F1] border-[#F3D9D9]")}
+    ${crTile("Faktur draft", String(d.draft_count), d.draft_count ? `${apMoney(d.draft_total)} belum diposting` : "tidak ada yang menunggu", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const banner = d.priority.length ? `<div class="flex flex-wrap items-center gap-3 border border-amber-200 bg-amber-50 text-amber-900 rounded-xl px-4 py-3 text-sm mb-4"><b>Prioritas hari ini:</b>
+    <span>${d.priority.map(p => `${esc(p.invoice_number)} ${p.state === "overdue" ? "sudah " + esc(p.label.toLowerCase()) : "jatuh tempo hari ini"}`).join("; ")}.</span>
+    <a href="#/account-payable" onclick="AP.f.due = 'overdue'; AP.f.q = ''; apGo('invoices'); return false;" class="ml-auto text-accentDark font-semibold hover:underline">Lihat tagihan yang memerlukan tindakan →</a></div>` : "";
+  const max = Math.max(1, ...d.trend.flatMap(t => [t.billed, t.paid]));
+  const chart = `<div class="px-4 py-4"><div class="flex items-end gap-4 h-44">${d.trend.map(t => `<div class="flex-1 flex flex-col items-center gap-1 h-full justify-end" title="${AP_MONTHS[+t.month.slice(5) - 1]}: tagihan ${esc(formatIDR(t.billed))}, dibayar ${esc(formatIDR(t.paid))}">
+      <div class="flex items-end gap-1 w-full justify-center h-full"><div class="w-1/3 max-w-[28px] rounded-t-md bg-accent/80" style="height:${Math.round(t.billed * 100 / max)}%"></div><div class="w-1/3 max-w-[28px] rounded-t-md bg-emerald-400/80" style="height:${Math.round(t.paid * 100 / max)}%"></div></div>
+      <div class="text-[11px] text-muted">${AP_MONTHS[+t.month.slice(5) - 1]}</div></div>`).join("")}</div>
+    <div class="flex items-center gap-4 text-xs text-muted mt-3"><span class="inline-flex items-center gap-1.5"><i class="w-2.5 h-2.5 rounded-sm bg-accent/80"></i>Tagihan faktur</span><span class="inline-flex items-center gap-1.5"><i class="w-2.5 h-2.5 rounded-sm bg-emerald-400/80"></i>Pembayaran, DP &amp; kredit</span><span class="ml-auto">5 bulan terakhir · Rupiah penuh</span></div></div>`;
+  const comp = `<div class="px-4 py-3">${[["Belum jatuh tempo", b.not_due], ["Jatuh tempo hari ini", b.today], ["Terlambat 1–30 hari", b.overdue_1_30], ["Terlambat lebih dari 30 hari", b.overdue_30_plus]].map(([l, v]) => `<div class="flex items-center justify-between py-2 text-sm border-b border-line"><span class="text-muted">${l}</span><span class="tabular-nums font-medium text-ink">${apMoney(v)}</span></div>`).join("")}
+    <div class="flex items-center justify-between mt-3 rounded-lg bg-accent/10 px-3 py-3"><span class="font-semibold text-ink text-sm">Total outstanding</span><span class="font-sans text-lg font-semibold tabular-nums text-accentDark">${apMoney(d.outstanding)}</span></div></div>`;
+  const rows = d.attention.map(r => `<tr class="border-b border-line last:border-b-0">
+    <td class="${AP_TD}">${apInvLink(r)}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}${r.po_number ? `<div class="text-xs">${apPoLink(r.supplier_po_id, r.po_number)}</div>` : ""}</td>
+    <td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.due_date)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.outstanding)}</td>
+    <td class="${AP_TD}">${apDueBadge(r)}</td><td class="${AP_TD}">${apSmallBtn("Lihat Detail", `apOpenDetail(${r.id})`)}</td></tr>`).join("");
+  const b2 = d.balances;
+  const notes = `<div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 mt-4">
+    ${apBalance("Uang muka belum dialokasikan", b2.dp_free, "DP di PO yang belum terpakai ke faktur. Tidak mengurangi utang di atas.", "dp")}
+    ${apBalance("Saldo kredit supplier", b2.credit_free, "Nota kredit retur yang belum dipotongkan ke faktur.", "credits")}
+    ${apBalance("Klaim refund menunggu", b2.refund_claims_open, "Uang muka PO batal yang belum kembali dari supplier.", "refunds")}</div>`;
+  apBody().innerHTML = apHead("Dashboard Account Payable", "Pantau utang supplier, jatuh tempo, dan prioritas pembayaran dari satu halaman.",
+    apBtn("Daftar Faktur", "apGo('invoices')") + apBtn("Unduh Ringkasan", "apExport('aging')", true))
+    + tiles + banner
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 mb-4">${apPanel("Tren tagihan dan pembayaran", chart)}${apPanel("Komposisi umur utang", comp, `Per ${apDate(d.as_of)}`)}</div>`
+    + apPanel("Tagihan yang perlu ditindaklanjuti", apTable(`<th class="${AP_TH}">Faktur</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Jatuh tempo</th><th class="${AP_THR}">Sisa tagihan</th><th class="${AP_TH}">Indikator</th><th class="${AP_TH}">Tindakan</th>`, rows, "Tidak ada utang yang terbuka."))
+    + notes;
+}
+
+function apBalance(label, value, note, tab) {
+  return `<a href="#/account-payable" onclick="apGo('${tab}'); return false;" class="block border border-line rounded-xl bg-white px-4 py-3 hover:border-accent/50 transition-colors"><div class="text-[11px] font-semibold uppercase tracking-wider text-muted">${label}</div><div class="font-sans text-lg font-semibold tabular-nums text-ink mt-1">${apMoney(value)}</div><div class="text-xs text-muted mt-1">${note}</div></a>`;
+}
+
+// ── Faktur & Utang ──
+async function apLoadInvoices(seq) {
+  const f = AP.f, q = new URLSearchParams();
+  for (const [k, v] of Object.entries(f)) if (v !== "" && v !== false && v != null) q.set(k, v);
+  q.set("sort", AP.sort); q.set("dir", AP.dir); q.set("page", AP.page); q.set("page_size", AP.size);
+  const d = await apGet("invoices", q.toString());
+  if (seq === undefined || seq === AP.seq) apRenderInvoices(d);
+}
+
+function apRenderInvoices(d) {
+  const f = AP.f;
+  const sel = (id, label, opts, cur) => `<div><label for="${id}" class="block text-[11px] font-semibold text-muted mb-1">${label}</label><select id="${id}" onchange="apFilter()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`;
+  const inp = (id, label, val, type = "search", ph = "") => `<div><label for="${id}" class="block text-[11px] font-semibold text-muted mb-1">${label}</label><input id="${id}" type="${type}" data-no-uppercase value="${esc(val)}" placeholder="${ph}" onkeydown="if(event.key==='Enter') apFilter()" ${type === "date" ? 'onchange="apFilter()"' : ""} class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>`;
+  const filters = `<div class="bg-white border border-line rounded-xl mb-4"><div class="px-4 py-3 border-b border-line">${crTitle("Cari tagihan supplier")}</div><div class="p-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3">
+      ${inp("apf-q", "Pencarian", f.q, "search", "Faktur, supplier, nomor PO")}
+      ${sel("apf-supplier", "Supplier", [["", "Semua supplier"], ...d.suppliers.map(s => [s.id, s.name])], f.supplier_id)}
+      ${sel("apf-pay", "Status pembayaran", [["", "Semua status"], ["belum", "Belum bayar"], ["sebagian", "Sebagian"], ["lunas", "Lunas"]], f.pay_status)}
+      ${sel("apf-due", "Jatuh tempo", [["", "Semua periode"], ["overdue", "Sudah lewat"], ["today", "Hari ini"], ["week", "7 hari ke depan"], ["month", "30 hari ke depan"]], f.due)}
+      ${inp("apf-from", "Tanggal faktur dari", f.date_from, "date")}${inp("apf-to", "Tanggal faktur sampai", f.date_to, "date")}${inp("apf-po", "Nomor Purchase Order", f.po, "search", "PO-…")}
+      <label class="flex items-end gap-2 pb-2 text-sm text-ink"><input id="apf-out" type="checkbox" ${f.outstanding ? "checked" : ""} onchange="apFilter()" class="accent-[#D97757]" /> Hanya yang masih outstanding</label></div>
+    <div class="flex justify-end gap-2 mt-4">${apBtn("Reset", "apFilterReset()")}${apBtn("Terapkan Filter", "apFilter()", true)}</div></div></div>`;
+  const sortTh = (k, label, right) => `<th class="${right ? AP_THR : AP_TH}"><button type="button" onclick="apSort('${k}')" class="uppercase tracking-wider hover:text-ink ${AP.sort === k ? "text-ink" : ""}">${label}${AP.sort === k ? (AP.dir === "asc" ? " ▲" : " ▼") : ""}</button></th>`;
+  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0 align-middle">
+    <td class="${AP_TD}">${apInvLink(r)}${r.supplier_invoice_no ? `<div class="text-[11px] text-muted">${esc(r.supplier_invoice_no)}</div>` : ""}</td>
+    <td class="${AP_TD}"><div class="text-ink">${esc(r.supplier_name)}</div>${r.po_number ? `<div class="text-xs">${apPoLink(r.supplier_po_id, r.po_number)}</div>` : ""}</td>
+    <td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.invoice_date)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.due_date)}</td>
+    <td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.total)}</td>
+    <td class="${AP_TD} text-right tabular-nums whitespace-nowrap text-muted">${apMoney(r.dp + r.cash)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap text-muted">${apMoney(r.credit)}</td>
+    <td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.outstanding)}</td>
+    <td class="${AP_TD}">${r.outstanding > 0 ? apDueBadge(r) : apPayBadge(r)}${r.outstanding > 0 && r.pay_status === "sebagian" ? `<div class="mt-0.5">${apPayBadge(r)}</div>` : ""}</td>
+    <td class="${AP_TD}">${apSmallBtn("Detail ↗", `apOpenDetail(${r.id})`)}</td></tr>`).join("");
+  const pages = Math.max(1, Math.ceil(d.total / d.page_size));
+  const table = apPanel("Daftar faktur dan utang", apTable(`${sortTh("invoice_number", "No. Faktur")}${sortTh("supplier", "Supplier / PO")}${sortTh("invoice_date", "Tgl. faktur")}${sortTh("due_date", "Jatuh tempo")}${sortTh("total", "Total tagihan", true)}<th class="${AP_THR}">Dibayar</th><th class="${AP_THR}">Kredit</th>${sortTh("outstanding", "Sisa", true)}<th class="${AP_TH}">Status</th><th class="${AP_TH}">Aksi</th>`, rows, "Tidak ada faktur pada filter ini.")
+    + `<div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-line text-xs text-muted"><span>Menampilkan ${d.items.length} dari ${d.total} faktur · Nominal dalam rupiah · Dibayar = pembayaran + DP dari PO</span>
+      <span class="inline-flex items-center gap-2"><span class="rounded-md bg-accent/10 text-accentDark font-semibold px-2 py-1">Total outstanding: ${apMoney(d.summary.outstanding)}</span>
+      <button type="button" ${d.page <= 1 ? "disabled" : ""} onclick="AP.page--; apGo('invoices')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">‹</button><span class="tabular-nums">Halaman ${d.page} dari ${pages}</span>
+      <button type="button" ${d.page >= pages ? "disabled" : ""} onclick="AP.page++; apGo('invoices')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">›</button></span></div>`);
+  apBody().innerHTML = apHead("Daftar Faktur & Utang Supplier", "Kelola daftar tagihan terverifikasi, pembayaran, kredit, dan saldo outstanding.", apBtn("Export Excel", "apExport('invoices')") + apBtn("Lihat Tagihan Jatuh Tempo", "apGo('due')", true)) + filters + table
+    + crNote("border-sky-200 bg-sky-50 text-sky-900 mt-4", "Nomor faktur dan nomor PO bisa diklik untuk membuka dokumen sumber. Account Payable bukan modul input kas keluar: pembayaran dicatat di Faktur Pembelian.");
+}
+
+function apFilter() {
+  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  AP.f = { q: v("apf-q"), supplier_id: v("apf-supplier"), pay_status: v("apf-pay"), due: v("apf-due"), date_from: v("apf-from"), date_to: v("apf-to"), po: v("apf-po"), outstanding: !!document.getElementById("apf-out")?.checked };
+  AP.page = 1;
+  apGo("invoices");
+}
+function apFilterReset() { AP.f = { q: "", supplier_id: "", pay_status: "", due: "", date_from: "", date_to: "", po: "", outstanding: false }; AP.page = 1; apGo("invoices"); }
+function apSort(k) { if (AP.sort === k) AP.dir = AP.dir === "asc" ? "desc" : "asc"; else { AP.sort = k; AP.dir = k === "total" || k === "outstanding" ? "desc" : "asc"; } AP.page = 1; apGo("invoices"); }
+
+function apExport(kind) {
+  const q = new URLSearchParams({ kind });
+  if (kind === "invoices") for (const [k, v] of Object.entries(AP.f)) if (v !== "" && v !== false && v != null) q.set(k, v);
+  window.location.href = `/api/account-payable/export?${q}`;
+}
+
+// ── Detail faktur ──
+async function apOpenDetail(id) {
+  AP.detail = id;
+  apRenderTabs();
+  apBody().innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  let d;
+  try { d = await apGet(`invoices/${id}`); } catch (e) { showToast(e.message); apGo(AP.tab); return; }
+  apRenderDetail(d);
+}
+
+function apRenderDetail(d) {
+  const row = (l, v) => crRow(l, v);
+  const idCard = crCard("Identitas & sumber tagihan",
+    row("Supplier", esc(d.supplier_name)) + row("No. Faktur", `${apNum(d.invoice_number, `openPurchaseInvoiceById(${d.id})`)}${d.supplier_invoice_no ? ` <span class="text-muted font-normal">· faktur supplier ${esc(d.supplier_invoice_no)}</span>` : ""}`)
+    + row("PO terkait", d.po ? apPoLink(d.po.id, d.po.po_number) : "") + row("Goods Receipt", d.grs.length ? d.grs.map(g => `${apPoLink(d.po.id, g.gr_number || "GR")} <span class="text-xs text-muted font-normal">${apDate(g.received_date)} · ${g.qty} pcs</span>`).join("<br>") : "")
+    + row("Tanggal faktur", apDate(d.invoice_date)) + row("Jatuh tempo", `${apDate(d.due_date)} ${d.outstanding > 0 ? apDueBadge(d) : ""}`)
+    + row("Status faktur", d.status === "posted" ? crPill("bg-emerald-50 text-emerald-700", "Terposting") : crPill("bg-stone-100 text-stone-600", d.status === "void" ? "Void" : "Draft"))
+    + row("Status pembayaran", apPayBadge(d)), "Nomor sumber dapat dibuka");
+  const pos = `<div class="px-4 py-3">
+    ${[["Nilai faktur", d.total, ""], ["DP supplier dialokasikan", -d.dp, ""], ["Pembayaran transfer / tunai", -d.cash, ""], ["Nota kredit disetujui", -d.credit, ""]].map(([l, v]) => `<div class="flex items-center justify-between py-2 text-sm border-b border-line"><span class="text-muted">${l}</span><span class="tabular-nums font-medium text-ink">${v < 0 ? "− " : ""}${apMoney(Math.abs(v))}</span></div>`).join("")}
+    <div class="flex items-center justify-between mt-3 rounded-lg bg-accent/10 px-3 py-3"><span class="font-semibold text-ink text-sm">Sisa utang</span><span class="font-sans text-xl font-semibold tabular-nums text-accentDark">${apMoney(d.outstanding)}</span></div>
+    ${d.can_pay ? `<button type="button" onclick="openPurchaseInvoiceById(${d.id})" class="w-full mt-3 px-3 py-2 text-sm font-semibold rounded-lg bg-accent text-white hover:bg-accentDark">Bayar Tagihan →</button><p class="text-[11px] text-muted mt-1.5">Pembayaran dicatat di Faktur Pembelian (halaman pembayaran yang sudah ada).</p>` : ""}</div>`;
+  const matchById = d.matching.reduce((m, x) => (m[x.product] = x, m), {});
+  const items = apTable(`<th class="${AP_TH}">Barang</th><th class="${AP_THR}">Qty faktur</th><th class="${AP_TH}">Satuan</th><th class="${AP_THR}">Harga beli</th><th class="${AP_THR}">Subtotal</th><th class="${AP_TH}">Penerimaan</th>`,
+    d.items.map(i => { const m = matchById[i.product_name]; return `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(i.product_name)}${i.sku ? `<div class="text-[11px] text-muted">${esc(i.sku)}</div>` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${i.qty}</td><td class="${AP_TD} text-muted">${esc(i.unit || "")}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(i.unit_price)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(i.line_total)}</td><td class="${AP_TD}">${m ? (m.qty_gr >= i.qty ? crPill("bg-emerald-50 text-emerald-700", "Diterima") : crPill("bg-amber-50 text-amber-700", `Diterima ${m.qty_gr}/${i.qty}`)) : '<span class="text-muted">—</span>'}</td></tr>`; }).join(""), "Tidak ada barang.");
+  const matching = d.matching.length ? apTable(`<th class="${AP_TH}">Produk</th><th class="${AP_THR}">Qty PO</th><th class="${AP_THR}">Qty GR</th><th class="${AP_THR}">Qty faktur</th><th class="${AP_THR}">Harga PO</th><th class="${AP_THR}">Harga faktur</th><th class="${AP_TH}">Hasil</th>`,
+    d.matching.map(m => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(m.product)}${m.note ? `<div class="text-[11px] text-amber-700">${esc(m.note)}</div>` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_po ?? "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_gr ?? "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_inv}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.price_po == null ? "—" : apMoney(m.price_po)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(m.price_inv)}</td><td class="${AP_TD}">${m.result === "sesuai" ? crPill("bg-emerald-50 text-emerald-700", "Sesuai") : crPill("bg-amber-50 text-amber-700", m.result === "tidak_di_po" ? "Di luar PO" : "Selisih")}</td></tr>`).join(""), "")
+    : '<p class="px-4 py-6 text-sm text-muted">Faktur ini tidak dibuat dari Purchase Order, jadi tidak ada yang dicocokkan.</p>';
+  const hist = `<div class="px-4 py-2">${d.payments.length ? d.payments.map(p => `<div class="flex items-start gap-3 py-2.5 border-b border-line last:border-b-0"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5 shrink-0"></span><div class="min-w-0 flex-1"><div class="text-[11px] text-muted">${apDate(p.paid_at)}</div><div class="text-sm font-semibold text-ink">${esc(p.kind_label)}</div><div class="text-xs text-muted">${[p.method ? (PAYMENT_METHOD_LABELS[p.method] || p.method) : "", p.reference_no ? "Ref " + esc(p.reference_no) : "", p.note ? esc(p.note) : "", p.created_by ? esc(p.created_by) : ""].filter(Boolean).join(" · ")}${p.credit_note?.return_id ? ` · ${apRetLink(p.credit_note.return_id, p.credit_note.return_number)}` : ""}</div></div><div class="tabular-nums font-semibold ${p.amount < 0 ? "text-failed" : "text-ink"}">${p.amount < 0 ? "− " : ""}${apMoney(Math.abs(p.amount))}</div></div>`).join("") : '<p class="py-6 text-sm text-muted">Belum ada pembayaran, DP, atau kredit pada faktur ini.</p>'}</div>`;
+  const docs = `<div class="px-4 py-3 space-y-2">${[
+    d.po ? ["Purchase Order", d.po.po_number, `openSupplierPoFromFaktur('${esc(d.po.id)}')`, d.po.status] : null,
+    ...d.grs.map(g => ["Goods Receipt", g.gr_number || "GR", `openSupplierPoFromFaktur('${esc(d.po.id)}')`, `${g.qty} pcs`]),
+    ["Faktur Pembelian", d.invoice_number, `openPurchaseInvoiceById(${d.id})`, "dokumen asli"],
+    ...d.returns.map(r => ["Retur Supplier", r.return_number, `rtsOpen(${r.id})`, "nota kredit"]),
+  ].filter(Boolean).map(([k, n, js, sub]) => `<div class="flex items-center justify-between gap-3 border border-line rounded-lg px-3 py-2"><div><div class="font-mono text-sm font-semibold text-ink">${esc(n)}</div><div class="text-[11px] text-muted">${k} · ${esc(sub)}</div></div>${apSmallBtn("Lihat dokumen", js)}</div>`).join("")}</div>`;
+  apBody().innerHTML = apHead("Detail Account Payable", `${d.invoice_number} · ${d.supplier_name} · ${d.pay_status === "lunas" ? "lunas" : "dibayar " + (d.pay_status === "sebagian" ? "sebagian" : "belum")}`,
+    apBtn("← Kembali", `apGo('${AP.tab}')`) + apBtn("Buka Faktur Pembelian", `openPurchaseInvoiceById(${d.id})`) + (d.can_pay ? apBtn("Bayar Tagihan", `openPurchaseInvoiceById(${d.id})`, true) : ""))
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${idCard}${apPanel("Posisi utang saat ini", pos)}</div>`
+    + `<div class="mb-4">${apPanel("Rincian barang dan penerimaan", items)}</div>`
+    + `<div class="mb-4">${apPanel("Pencocokan PO ↔ Goods Receipt ↔ Faktur", matching, "Hanya untuk pengecekan; tidak mengubah faktur atau stok")}</div>`
+    + `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">${apPanel("Riwayat penyelesaian", hist, "Pembayaran, DP, dan kredit berbeda sumber")}${apPanel("Dokumen terkait", docs)}</div>`;
+}
+
+// ── Jatuh tempo ──
+function apRenderDue(d) {
+  const k = d.kpi;
+  const tiles = `<div class="${apGrid(5)}">
+    ${crTile("Sudah terlambat", `<span class="${k.overdue.total ? "text-failed" : ""}">${apMoney(k.overdue.total)}</span>`, `${k.overdue.count} faktur${k.overdue.max_days ? " · lewat " + k.overdue.max_days + " hari" : ""}`, "bg-[#FDF1F1] border-[#F3D9D9]")}
+    ${crTile("Jatuh tempo hari ini", apMoney(k.today.total), `${k.today.count} faktur`, "bg-[#F6F2FD] border-[#E5DCF5]")}
+    ${crTile("7 hari ke depan", apMoney(k.week.total), `${k.week.count} faktur`, "bg-[#F1F8F3] border-[#D9EBDE]")}
+    ${crTile("8–30 hari", apMoney(k.month.total), `${k.month.count} faktur`, "bg-[#FDF4EF] border-[#F3DDD2]")}
+    ${crTile("Total outstanding", apMoney(k.all.total), `${k.all.count} faktur`, "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const rows = d.priority.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${apInvLink(r)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.due_date)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.outstanding)}</td><td class="${AP_TD}">${apDueBadge(r)}</td><td class="${AP_TD}">${apSmallBtn("Detail", `apOpenDetail(${r.id})`)}</td></tr>`).join("");
+  const [y, m] = d.month.split("-").map(Number);
+  const prev = new Date(y, m - 2, 1), next = new Date(y, m, 1);
+  const ym = dt => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}`;
+  const lead = d.weekday_first;
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push('<div></div>');
+  for (let day = 1; day <= d.days_in_month; day++) {
+    const key = `${d.month}-${pad2(day)}`, info = d.calendar[key];
+    const cls = info ? (info.overdue ? "bg-rose-100 text-rose-800 font-semibold" : key === d.as_of ? "bg-violet-100 text-violet-800 font-semibold" : "bg-orange-100 text-orange-800 font-semibold") : (key === d.as_of ? "ring-1 ring-accent/50 text-ink" : "bg-bg2 text-muted");
+    cells.push(`<div class="rounded-lg text-center text-xs py-2.5 ${cls}" ${info ? `title="${info.count} faktur · ${esc(formatIDR(info.total))}"` : ""}>${day}</div>`);
+  }
+  const cal = `<div class="px-4 py-4"><div class="flex items-center justify-between mb-3"><button type="button" onclick="AP.month='${ym(prev)}'; apGo('due')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink">‹</button><span class="text-sm font-semibold text-ink">${AP_MONTHS[m - 1]} ${y}</span><button type="button" onclick="AP.month='${ym(next)}'; apGo('due')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink">›</button></div>
+    <div class="grid grid-cols-7 gap-1.5 text-center text-[11px] text-muted mb-1.5">${["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(x => `<div>${x}</div>`).join("")}</div><div class="grid grid-cols-7 gap-1.5">${cells.join("")}</div>
+    <div class="mt-3 text-xs text-muted bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">Tanda berwarna: ada faktur jatuh tempo. Merah = sudah lewat. Tanggal berasal dari data faktur, bukan status pengerjaan barang.</div></div>`;
+  const plan = `<div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-4">${[["1. Verifikasi saldo", "Cek kredit dan DP yang belum dialokasikan sebelum membayar.", "apGo('recon')"], ["2. Jadwalkan pembayaran", "Pembayaran dicatat di Faktur Pembelian, sesuai urutan jatuh tempo.", "apGo('invoices')"], ["3. Simpan bukti", "Isi nomor referensi transfer; semua perubahan tercatat di Log Aktivitas.", "location.hash='/activity'"]].map(([t, s, js]) => `<button type="button" onclick="${js}" class="text-left border border-line rounded-lg px-3 py-3 hover:border-accent/50 bg-white"><div class="text-sm font-semibold text-ink">${t}</div><div class="text-xs text-muted mt-0.5">${s}</div></button>`).join("")}</div>`;
+  apBody().innerHTML = apHead("Tagihan Jatuh Tempo", "Prioritaskan kewajiban berdasarkan tanggal dan sisa utang aktual.", apBtn("Export Jadwal", "apExport('invoices')", true)) + tiles
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${apPanel("Daftar prioritas pembayaran", apTable(`<th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Faktur</th><th class="${AP_TH}">Jatuh tempo</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Prioritas</th><th class="${AP_TH}">Aksi</th>`, rows, "Tidak ada utang yang terbuka."), "Urut tanggal, bukan nominal")}${apPanel("Kalender jatuh tempo", cal)}</div>`
+    + apPanel("Rencana aksi", plan);
+}
+
+// ── DP supplier ──
+function apRenderDp(d) {
+  const k = d.kpi;
+  const tiles = `<div class="${apGrid(5)}">
+    ${crTile("DP supplier dibayar", apMoney(k.paid), "pada PO aktif", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah dialokasikan", apMoney(k.applied), "ke faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}
+    ${crTile("Sisa uang muka", apMoney(k.free), "dapat dipakai", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP PO dibatalkan", apMoney(k.cancelled), "menunggu refund", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Transaksi DP", String(k.count), "tercatat di PO", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD}"><div class="font-mono text-[13px] text-ink">${esc(r.reference_no || "—")}</div><div class="text-[11px] text-muted">${esc(r.bank_account || "")}</div></td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${apPoLink(r.supplier_po_id, r.po_number)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.paid_at)}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.invoices.length ? r.invoices.map(i => `${apNum(i.invoice_number, `openPurchaseInvoiceById(${i.invoice_id})`)} <span class="text-xs text-muted">${apMoney(i.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${r.status === "batal" ? "—" : apMoney(r.free)}</td><td class="${AP_TD}">${crPill({ teralokasi: "bg-emerald-50 text-emerald-700", sebagian: "bg-amber-50 text-amber-700", tersedia: "bg-violet-50 text-violet-700", batal: "bg-rose-50 text-rose-700" }[r.status], r.status_label)}</td></tr>`).join("");
+  const flow = `<div class="px-4 py-4 text-sm"><div class="flex flex-wrap items-center gap-2 text-xs">${["DP dibayar di PO", "Saldo DP", "Dialokasikan saat faktur diposting"].map((t, i) => `${i ? '<span class="text-muted">→</span>' : ""}<span class="border border-line rounded-lg bg-bg2 px-3 py-2 font-semibold text-ink">${t}</span>`).join("")}</div>
+    <p class="text-xs text-muted mt-3">Uang muka dicatat saat benar-benar dibayar di Purchase Order. Saat faktur dari PO itu diposting, DP otomatis dibawa ke faktur (bukan kas keluar baru) dan satu DP hanya terpakai sampai saldonya habis.</p></div>`;
+  apBody().innerHTML = apHead("Uang Muka / DP Supplier", "Pantau uang muka yang telah dibayarkan dan pemakaiannya ke faktur.", apBtn("Lihat Purchase Order", "location.hash='/supplier-po'", true)) + tiles + `<div class="mb-4">${apPanel("Perjalanan uang muka", flow)}</div>`
+    + apPanel("Riwayat uang muka", apTable(`<th class="${AP_TH}">Referensi</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">PO</th><th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Metode</th><th class="${AP_THR}">Nominal</th><th class="${AP_TH}">Teralokasi ke faktur</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Status</th>`, rows, "Belum ada uang muka supplier."));
+}
+
+// ── Credit note ──
+function apRenderCredits(d) {
+  const k = d.kpi;
+  const tiles = `<div class="${apGrid(3)}">${crTile("Nota kredit aktif", apMoney(k.total), `${k.count} dokumen`, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah dialokasikan", apMoney(k.allocated), "memotong faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Saldo kredit tersedia", apMoney(k.free), "belum dialokasikan", "bg-[#F6F2FD] border-[#E5DCF5]")}</div>`;
+  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(r.cn_number || "—")}${r.supplier_cn_no ? `<div class="text-[11px] text-muted font-sans">Supplier: ${esc(r.supplier_cn_no)}</div>` : ""}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.po_number ? apPoLink(r.supplier_po_id, r.po_number) : "—"}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.allocations.length ? r.allocations.map(a => `${apNum(a.invoice_number, `openPurchaseInvoiceById(${a.invoice_id})`)} <span class="text-xs text-muted">${apMoney(a.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(r.free)}</td><td class="${AP_TD}">${crPill(r.status !== "aktif" ? "bg-stone-100 text-stone-600" : r.free ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700", r.status_label)}</td></tr>`).join("");
+  apBody().innerHTML = apHead("Credit Note dari Retur Supplier", "Nota kredit resmi menjadi pengurang tagihan tanpa transaksi kas ganda.", apBtn("Lihat Retur Supplier", "location.hash='/retur-supplier'", true)) + tiles
+    + apPanel("Daftar nota kredit", apTable(`<th class="${AP_TH}">No. Credit Note</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Sumber</th><th class="${AP_TH}">Tanggal</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Dialokasikan ke faktur</th><th class="${AP_THR}">Saldo</th><th class="${AP_TH}">Status</th>`, rows, "Belum ada nota kredit."))
+    + crNote("border-amber-200 bg-amber-50 text-amber-900 mt-4", "Penggantian barang tidak otomatis menjadi nota kredit. Nota kredit baru dihitung setelah dicatat dan disetujui di Retur Supplier; alokasinya ke faktur dilakukan di sana, bukan dari halaman ini.");
+}
+
+// ── Refund supplier ──
+function apRenderRefunds(d) {
+  const k = d.kpi;
+  const tiles = `<div class="${apGrid(3)}">${crTile("Klaim refund / kredit", apMoney(k.claimed), "dari PO yang dibatalkan", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah diterima", apMoney(k.settled), "uang masuk / kredit terkonfirmasi", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Piutang refund", `<span class="${k.open ? "text-failed" : ""}">${apMoney(k.open)}</span>`, `${k.open_count} klaim menunggu`, "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`;
+  const claimRows = d.claims.map(c => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(c.claim_no)}</td><td class="${AP_TD} text-ink">${esc(c.supplier_name)}</td><td class="${AP_TD}">${apPoLink(c.supplier_po_id, c.po_number)}</td><td class="${AP_TD}">${c.kind === "refund" ? "Uang kembali" : "Kredit supplier"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(c.settled_amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.left)}</td><td class="${AP_TD}">${crPill(c.status === "menunggu" ? "bg-amber-50 text-amber-700" : c.status === "dibatalkan" ? "bg-stone-100 text-stone-600" : "bg-emerald-50 text-emerald-700", c.status === "menunggu" ? "Menunggu" : c.status === "dibatalkan" ? "Dibatalkan" : c.kind === "refund" ? "Diterima" : "Dikonfirmasi")}</td></tr>`).join("");
+  const recRows = d.received.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.claim_no ? esc(r.claim_no) + (r.po_number ? ` · ${esc(r.po_number)}` : "") : "—"}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}${r.reference_no ? ` · ${esc(r.reference_no)}` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${crPill(r.status === "aktif" ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-600", r.status === "aktif" ? "Diterima" : "Dibatalkan")}</td></tr>`).join("");
+  apBody().innerHTML = apHead("Refund Supplier & Pembatalan", "Pembatalan PO, refund, dan nota kredit diproses sesuai persetujuan supplier.", apBtn("Buka Purchase Order", "location.hash='/supplier-po'", true)) + tiles
+    + `<div class="mb-4">${apPanel("Klaim pembatalan PO", apTable(`<th class="${AP_TH}">No. Klaim</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">PO</th><th class="${AP_TH}">Jenis</th><th class="${AP_THR}">Nilai</th><th class="${AP_THR}">Diterima</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Status</th>`, claimRows, "Tidak ada klaim refund."))}</div>`
+    + apPanel("Riwayat pengembalian dana", apTable(`<th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Sumber</th><th class="${AP_TH}">Metode / referensi</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Status</th>`, recRows, "Belum ada uang refund yang diterima."))
+    + crNote("border-amber-200 bg-amber-50 text-amber-900 mt-4", "Pengembalian uang dari supplier harus dibuktikan. Pembatalan PO tidak otomatis mengembalikan saldo bank; klaim ditutup di Purchase Order setelah uang benar-benar masuk.");
+}
+
+// ── Rekonsiliasi ──
+function apRenderRecon(d) {
+  const k = d.kpi;
+  const tiles = `<div class="${apGrid(5)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih), "selisih dengan GR / PO", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP / kredit belum terpakai", String(k.alokasi), "perlu keputusan admin", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const open = (x) => x.ref_type === "invoice" ? `openPurchaseInvoiceById(${x.ref_id})` : x.ref_type === "po" ? `openSupplierPoFromFaktur('${esc(x.ref_id)}')` : "apGo('credits')";
+  const rows = d.items.map(x => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(x.number || "—")}</td><td class="${AP_TD} text-ink">${esc(x.supplier)}</td><td class="${AP_TD}">${esc(x.category)}<div class="text-[11px] text-muted">${esc(x.detail || "")}</div></td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(x.value)}</td><td class="${AP_TD}">${apSmallBtn("Buka dokumen", open(x))}</td><td class="${AP_TD}">${crPill({ selisih: "bg-amber-50 text-amber-700", duplikat: "bg-violet-50 text-violet-700", draft: "bg-stone-100 text-stone-600", dp: "bg-sky-50 text-sky-700", kredit: "bg-sky-50 text-sky-700", refund: "bg-amber-50 text-amber-700" }[x.kind], x.status)}</td></tr>`).join("");
+  apBody().innerHTML = apHead("Rekonsiliasi & Koreksi Tagihan", "Temukan selisih dengan jejak yang jelas, tanpa membuat pembayaran dua kali.", apBtn("Buka Log Aktivitas", "location.hash='/activity'")) + tiles
+    + `<div class="mb-4">${apPanel("Daftar pengecualian & koreksi", apTable(`<th class="${AP_TH}">Nomor</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Kategori selisih</th><th class="${AP_THR}">Nilai terdampak</th><th class="${AP_TH}">Tindakan</th><th class="${AP_TH}">Status</th>`, rows, "Tidak ada pengecualian. Semua faktur cocok."))}</div>`
+    + crNote("border-amber-200 bg-amber-50 text-amber-900", "<b>Halaman ini hanya menandai.</b> Koreksi dilakukan di dokumen asal (faktur, PO, retur) dengan hak akses Admin, dan perubahannya tercatat di Log Aktivitas. Jangan mengubah mutasi historis secara langsung.");
+}
+
+// ── Aging ──
+function apRenderAging(d) {
+  const t = d.totals, c = d.composition;
+  const pct = k => t.total ? `${c[k]}% dari total` : "—";
+  const tiles = `<div class="${apGrid(5)}">${crTile("Outstanding supplier", apMoney(t.total), `${d.open_count} faktur aktif`, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Belum jatuh tempo", apMoney(t.not_due), pct("not_due"), "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Jatuh tempo hari ini", apMoney(t.today), pct("today"), "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Overdue 1–30 hari", apMoney(t.overdue_1_30), pct("overdue_1_30"), "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Overdue > 30 hari", apMoney(t.overdue_30_plus), pct("overdue_30_plus"), "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const rows = d.items.map(s => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(s.supplier)}</td>${["not_due", "today", "overdue_1_30", "overdue_30_plus"].map(k => `<td class="${AP_TD} text-right tabular-nums whitespace-nowrap ${s[k] && k.startsWith("overdue") ? "text-failed" : ""}">${apMoney(s[k])}</td>`).join("")}<td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(s.total)}</td></tr>`).join("")
+    + `<tr class="bg-bg2 font-semibold"><td class="${AP_TD}">TOTAL</td>${["not_due", "today", "overdue_1_30", "overdue_30_plus", "total"].map(k => `<td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(t[k])}</td>`).join("")}</tr>`;
+  const bar = t.total ? `<div class="flex h-3 rounded-full overflow-hidden mt-3">${[["not_due", "bg-emerald-400"], ["today", "bg-violet-400"], ["overdue_1_30", "bg-orange-400"], ["overdue_30_plus", "bg-rose-500"]].map(([k, cl]) => `<div class="${cl}" style="width:${c[k]}%"></div>`).join("")}</div>` : "";
+  const legend = [["not_due", "Belum jatuh tempo", "bg-emerald-400"], ["today", "Hari ini", "bg-violet-400"], ["overdue_1_30", "Overdue 1–30 hari", "bg-orange-400"], ["overdue_30_plus", "Overdue > 30 hari", "bg-rose-500"]].map(([k, l, cl]) => `<div class="flex items-center justify-between py-1.5 text-sm"><span class="inline-flex items-center gap-2 text-muted"><i class="w-2.5 h-2.5 rounded-sm ${cl}"></i>${l}</span><span class="tabular-nums font-medium text-ink">${c[k]}%</span></div>`).join("");
+  const sheet = `<div id="ap-aging-sheet" class="cr-print-target"><div class="ap-print-only hidden flex justify-between items-end mb-3"><div><div class="text-lg font-bold">${esc((typeof SHOP_PROFILE !== "undefined" && SHOP_PROFILE.name) || "SINAR GALAKSI VARIASI MOBIL")}</div><div class="text-xs">Laporan Utang Supplier &amp; Aging</div></div><div class="text-xs">Per ${apDate(d.as_of)}</div></div>`
+    + apTable(`<th class="${AP_TH}">Supplier</th><th class="${AP_THR}">Belum jatuh tempo</th><th class="${AP_THR}">Jatuh tempo hari ini</th><th class="${AP_THR}">Overdue 1–30 hari</th><th class="${AP_THR}">Overdue &gt;30 hari</th><th class="${AP_THR}">Total outstanding</th>`, rows, "Tidak ada utang yang terbuka.") + "</div>";
+  apBody().innerHTML = apHead("Laporan Utang Supplier & Aging", "Ringkasan outstanding dan umur utang per supplier, siap diekspor.", apBtn("Print PDF", "crPrintNode('ap-aging-sheet', 'A4 landscape')") + apBtn("Export Excel", "apExport('aging')", true)) + tiles
+    + `<div class="mb-4">${apPanel("Aging report per supplier", sheet, `Snapshot per ${apDate(d.as_of)}`)}</div>`
+    + apPanel("Komposisi umur utang", `<div class="px-4 py-4"><div class="flex items-baseline justify-between"><span class="text-xs text-muted">Total saldo</span><span class="font-sans text-xl font-semibold tabular-nums text-ink">${apMoney(t.total)}</span></div>${bar}<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-3">${legend}</div><p class="text-xs text-muted mt-2">Utang dihitung dari faktur yang sudah diposting, setelah DP, pembayaran, dan kredit.</p></div>`);
 }
 
 // ── Dashboard: Ringkasan (overview) ──────────────────────────────────────────

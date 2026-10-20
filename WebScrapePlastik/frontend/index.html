@@ -513,6 +513,16 @@
     .nav-link.is-active:not([data-route="/inventory-group"]), .nav-sublink.is-active { box-shadow: inset 3px 0 0 #D97757; }
     .nav-link.is-active:not([data-route="/inventory-group"]) { font-weight: 600; }
 
+
+    /* KPI cards: an icon chip on the left, coloured to match the card tint (added by decorateKpis). */
+    body .border.rounded-xl.kpi-card { position: relative; padding-left: 3.4rem; }
+    .kpi-chip { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 2.3rem; height: 2.3rem; border-radius: 0.7rem; display: grid; place-items: center; background: #FBDCCF; color: #C4633F; }
+    .kpi-card:nth-child(6n+2) .kpi-chip { background: #DCE9FB; color: #3F6EB5; }
+    .kpi-card:nth-child(6n+3) .kpi-chip { background: #D6EDDC; color: #3F8A55; }
+    .kpi-card:nth-child(6n+4) .kpi-chip { background: #F7E7BE; color: #A87612; }
+    .kpi-card:nth-child(6n+5) .kpi-chip { background: #E6DCF7; color: #6E4FB8; }
+    .kpi-card:nth-child(6n+6) .kpi-chip { background: #F6D7DA; color: #B04654; }
+
     /* Table header cells: a quieter band. */
     thead.bg-bg2 { background: #F6F4EC; }
   </style>
@@ -3030,7 +3040,7 @@
   <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
 
-      <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-6">
+      <div class="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3 mb-6">
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
           <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">SKU Aktif</div>
           <div id="ov-active-sku-count" class="font-sans text-2xl font-semibold text-ink">0</div>
@@ -5199,6 +5209,63 @@ function renderBrandBlock() {
 }
 
 window.addEventListener("hashchange", renderPageHeader);
+
+// KPI cards get an icon chip chosen from their label, so every page's summary row reads like the mockup.
+const KPI_ICONS = {
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
+  wallet: '<rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/>',
+  cash: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v.01M18 14.5v.01"/>',
+  receipt: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6"/>',
+  box: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+  truck: '<path d="M2 5h11v11H2zM13 9h4l4 4v3h-8"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.5 6.5 0 0 1 3 6"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 0 0 5 5L21 12.6a2 2 0 0 1 0 2.8l-5.6 5.6a2 2 0 0 1-2.8 0L3 11.4a2 2 0 0 1 0-2.8L8.6 3a2 2 0 0 1 2.8 0Z"/>',
+  alert: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+  swap: '<path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"/>',
+};
+const KPI_RULES = [
+  [/masalah|lewat batas|habis|menipis|batal|selisih|terlambat|gagal/, "alert"],
+  [/retur|kembali|refund/, "swap"],
+  [/tagihan|utang|piutang|sisa|belum lunas|faktur/, "receipt"],
+  [/\bdp\b|pembayaran|bayar|kas|lunas/, "wallet"],
+  [/nilai|omzet|penjualan|pendapatan|total.*rp|harga|margin|modal/, "cash"],
+  [/service|garansi|proses/, "wrench"],
+  [/customer|pelanggan|pengguna|member/, "users"],
+  [/supplier|purchase|\bpo\b|pengadaan|pengiriman|dikirim|dalam kirim|di supplier|masuk|datang/, "truck"],
+  [/sales order|pesanan|dokumen|nota/, "doc"],
+  [/siap|selesai|aktif|diambil|tersedia|diterima/, "check"],
+  [/stok|persediaan|sku|produk|barang|brand|merek|satuan|kategori|item/, "box"],
+  [/harga jual|tanpa harga/, "tag"],
+];
+function decorateKpis() {
+  const cards = document.querySelectorAll('.grid[class*="gap-3"][class*="mb-"] > .border.rounded-xl:not(.kpi-card)');
+  cards.forEach(card => {
+    if (card.querySelector("svg")) return;                                   // already has its own icon
+    const label = card.querySelector('[class*="uppercase"]');
+    if (!label || !card.querySelector('[class*="text-xl"], [class*="text-2xl"], [class*="font-serif"]')) return;
+    const text = label.textContent.toLowerCase();
+    const hit = KPI_RULES.find(([re]) => re.test(text));
+    const idx = Array.prototype.indexOf.call(card.parentElement.children, card);
+    const icon = hit ? hit[1] : ["doc", "chart", "wallet", "box", "users", "truck"][idx % 6];
+    const chip = document.createElement("span");
+    chip.className = "kpi-chip";
+    chip.setAttribute("aria-hidden", "true");
+    chip.innerHTML = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${KPI_ICONS[icon]}</svg>`;
+    card.classList.add("kpi-card");
+    card.prepend(chip);
+  });
+}
+let kpiDecorateQueued = false;
+new MutationObserver(() => {
+  if (kpiDecorateQueued) return;
+  kpiDecorateQueued = true;
+  requestAnimationFrame(() => { kpiDecorateQueued = false; decorateKpis(); });
+}).observe(document.body, { childList: true, subtree: true });
+decorateKpis();   // the cards already in the page; later ones are caught by the observer
+
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {

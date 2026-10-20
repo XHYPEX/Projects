@@ -138,6 +138,9 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/inventory/stock-adjustments$"), "POST", "Penyesuaian stok", "stock"),
 
     (re.compile(r"^/api/purchase-invoices/\d+/post$"), "POST", "Posting faktur pembelian", "purchase_invoice"),
+    (re.compile(r"^/api/purchase-invoices/\d+/verify$"), "POST", "Verifikasi faktur pembelian (Three-Way Matching)", "purchase_invoice"),
+    (re.compile(r"^/api/purchase-invoices/\d+/hold$"), "POST", "Tahan faktur pembelian untuk klarifikasi", "purchase_invoice"),
+    (re.compile(r"^/api/purchase-invoices/\d+/exception$"), "POST", "Setujui pengecualian selisih faktur pembelian", "purchase_invoice"),
     (re.compile(r"^/api/purchase-invoices/\d+/void$"), "POST", "Batalkan faktur pembelian", "purchase_invoice"),
     (re.compile(r"^/api/purchase-invoices/\d+/payments$"), "POST", "Catat pembayaran faktur", "purchase_invoice"),
     (re.compile(r"^/api/purchase-invoices/\d+$"), "PUT", "Ubah faktur pembelian", "purchase_invoice"),

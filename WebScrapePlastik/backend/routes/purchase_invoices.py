@@ -15,6 +15,7 @@ from backend.database import (
     get_purchase_invoice_items,
     get_purchase_payable_summary,
     get_supplier,
+    list_po_received_for_faktur,
     list_purchase_invoices,
     post_purchase_invoice,
     record_purchase_invoice_payment,
@@ -31,8 +32,13 @@ from backend.schemas import (
     PurchaseInvoicePaymentOut,
     PurchaseInvoicePaymentRequest,
     PurchaseInvoiceRequest,
+    InvoiceExceptionRequest,
+    InvoiceHoldRequest,
+    InvoiceVerifyRequest,
     VoidRequest,
 )
+
+from backend import invoice_verify
 
 router = APIRouter()
 
@@ -162,6 +168,12 @@ def _row_to_invoice(row: dict) -> PurchaseInvoiceOut:
         updated_at=row["updated_at"],
         supplier_po_id=row.get("supplier_po_id"),
         supplier_po_number=row.get("supplier_po_number"),
+        verify_status=row.get("verify_status") or "belum",
+        verified_by=row.get("verified_by"),
+        verified_at=row.get("verified_at"),
+        verify_note=row.get("verify_note"),
+        exception_reason=row.get("exception_reason"),
+        hold_note=row.get("hold_note"),
     )
 
 
@@ -201,6 +213,13 @@ async def _detail(invoice_id: int) -> PurchaseInvoiceDetail:
 async def payable_summary():
     loop = asyncio.get_event_loop()
     return PayableSummaryOut(**await loop.run_in_executor(None, get_purchase_payable_summary))
+
+
+@router.get("/purchase-invoices/goods-receipt")
+async def goods_receipt_for_faktur(supplier_id: int):
+    """Received goods of a supplier that no faktur covers yet (feeds 'Ambil dari Goods Receipt')."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, list_po_received_for_faktur, supplier_id)
 
 
 @router.post("/purchase-invoices", response_model=PurchaseInvoiceDetail, status_code=201)
@@ -293,6 +312,43 @@ async def post_invoice(invoice_id: int, user: dict = Depends(get_current_user)):
     except ValueError as e:
         _raise_from_value_error(e)
     return await _detail(invoice_id)
+
+
+@router.get("/purchase-invoices/{invoice_id}/matching")
+async def invoice_matching(invoice_id: int):
+    """Three-Way Matching (PO ↔ Goods Receipt ↔ Faktur) with the verification state and its trail."""
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, invoice_verify.status, invoice_id)
+    except ValueError as e:
+        _raise_from_value_error(e)
+
+
+@router.post("/purchase-invoices/{invoice_id}/verify")
+async def verify_invoice(invoice_id: int, req: InvoiceVerifyRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, invoice_verify.verify, invoice_id, req.checklist, req.note, user["username"])
+    except ValueError as e:
+        _raise_from_value_error(e)
+
+
+@router.post("/purchase-invoices/{invoice_id}/hold")
+async def hold_invoice(invoice_id: int, req: InvoiceHoldRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, invoice_verify.hold, invoice_id, req.note, user["username"], req.ask_admin)
+    except ValueError as e:
+        _raise_from_value_error(e)
+
+
+@router.post("/purchase-invoices/{invoice_id}/exception", dependencies=[Depends(require_admin)])
+async def approve_invoice_exception(invoice_id: int, req: InvoiceExceptionRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, invoice_verify.approve_exception, invoice_id, req.reason, user["username"])
+    except ValueError as e:
+        _raise_from_value_error(e)
 
 
 @router.post("/purchase-invoices/{invoice_id}/void", response_model=PurchaseInvoiceDetail, dependencies=[Depends(require_admin)])

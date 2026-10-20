@@ -834,11 +834,31 @@ class PurchaseInvoiceOut(BaseModel):
     updated_at: str
     supplier_po_id: str | None = None
     supplier_po_number: str | None = None
+    verify_status: str = "belum"
+    verified_by: str | None = None
+    verified_at: str | None = None
+    verify_note: str | None = None
+    exception_reason: str | None = None
+    hold_note: str | None = None
 
 
 class PurchaseInvoiceDetail(PurchaseInvoiceOut):
     items: list[PurchaseInvoiceItemOut]
     payments: list[PurchaseInvoicePaymentOut] = []
+
+
+class InvoiceVerifyRequest(BaseModel):
+    checklist: dict[str, bool] = {}
+    note: str | None = None
+
+
+class InvoiceHoldRequest(BaseModel):
+    note: str
+    ask_admin: bool = False
+
+
+class InvoiceExceptionRequest(BaseModel):
+    reason: str
 
 
 class PayableSummaryOut(BaseModel):

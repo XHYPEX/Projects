@@ -648,13 +648,13 @@
           <path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/>
           <path d="M8 8h8M8 12h8M8 16h4"/>
         </svg>
-        Faktur Pembelian
+        Account Payable
       </a>
       <a href="#/account-payable" data-route="/account-payable" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
           <path d="M3 7h18v12H3z"/><path d="M3 11h18M8 15h3M3 7l2-3h14l2 3"/>
         </svg>
-        Account Payable
+        Aging Payable
       </a>
       <div>
         <button type="button" onclick="toggleInventoryNavGroup()" data-route="/inventory-group"
@@ -1742,6 +1742,8 @@
         </div>
 
         <div id="pi-readonly-banner" class="hidden mb-4 bg-bg2 border border-line rounded-lg px-3 py-2 text-xs text-muted"></div>
+        <!-- Three-Way Matching + Verifikasi Faktur (faktur dari PO): stepper, tabel PO / Goods Receipt / Faktur, pemeriksaan, aksi. -->
+        <div id="pi-verify-panel" class="hidden mb-4"></div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
@@ -1765,6 +1767,10 @@
 
         <!-- Contact block, mirrored from the supplier master so the printed invoice shows who was billed. -->
         <div id="pi-supplier-contact" class="hidden mb-3 border border-line rounded-lg bg-bg2 px-3 py-2 text-xs text-muted space-y-0.5"></div>
+
+        <!-- Goods Receipt waiting for a faktur: barang yang sudah diterima dari PO supplier ini dan belum punya faktur.
+             "Ambil" memakai alur Buat Faktur dari PO yang sudah ada, jadi nama barang, qty terima dan harga terisi otomatis. -->
+        <div id="pi-gr-panel" class="hidden mb-3 border border-accent/30 rounded-xl bg-accent/5 px-3 py-3"></div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <div>
@@ -5161,7 +5167,7 @@ const ROUTES = {
   "/sales-order": { title: "Sales Order", page: "page-preorder" },
   "/supplier-po": { title: "Purchase Order", page: "page-supplier-po" },
   "/invoices": { title: "Riwayat Invoice", page: "page-invoices" },
-  "/purchase-invoices": { title: "Faktur Pembelian", page: "page-purchase-invoices" },
+  "/purchase-invoices": { title: "Account Payable", page: "page-purchase-invoices" },
   "/inventory": { title: "Barang Masuk", page: "page-inventory", section: "inv-tab-inbound", data: "inbound" },
   "/master-barang": { title: "Master Barang", page: "page-inventory", section: "inv-tab-master", data: "master" },
   "/master-brand": { title: "Master Brand", page: "page-inventory", section: "inv-tab-brand", data: "brand" },
@@ -5175,7 +5181,7 @@ const ROUTES = {
   "/master-service": { title: "Master Service", page: "page-master-service" },
   "/master-customer": { title: "Master Customer", page: "page-inventory", section: "inv-tab-customer", data: "customer" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
-  "/account-payable": { title: "Account Payable", page: "page-account-payable" },
+  "/account-payable": { title: "Aging Payable", page: "page-account-payable" },
   "/cash-receipt": { title: "Cash Receipt / Laporan Penerimaan", page: "page-cash-receipt" },
   "/kas-keluar": { title: "Kas Keluar", page: "page-kas-keluar" },
   "/users": { title: "Pengguna", page: "page-users" },
@@ -12170,7 +12176,7 @@ function crPrintNode(id, size = "A4 portrait") {
   window.print();
 }
 
-// ── Account Payable: pusat kontrol utang supplier (read-only) ──────────────────
+// ── Aging Payable: pusat kontrol utang supplier (read-only) ──────────────────
 // Reads GET /api/account-payable/*. Paying, DP carry-over, credit allocation and verification stay in Faktur
 // Pembelian, Purchase Order and Retur Supplier; every document number here opens the original there.
 const AP = { tab: "dashboard", f: { q: "", supplier_id: "", pay_status: "", due: "", date_from: "", date_to: "", po: "", outstanding: false }, sort: "due_date", dir: "asc", page: 1, size: 25, month: null, seq: 0, detail: null };
@@ -12199,7 +12205,7 @@ const apBtn = (label, js, primary) => `<button type="button" onclick="${js}" cla
 const apSmallBtn = (label, js) => `<button type="button" onclick="${js}" class="px-2.5 py-1 border border-line rounded-md bg-white text-accentDark text-xs font-semibold whitespace-nowrap hover:bg-bg2">${label}</button>`;
 const apTable = (head, rows, empty) => `<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-bg2"><tr>${head}</tr></thead><tbody>${rows || `<tr><td colspan="12" class="px-3 py-8 text-center text-sm text-muted">${empty}</td></tr>`}</tbody></table></div>`;
 const apPanel = (title, body, aside = "") => `<div class="bg-white border border-line rounded-xl overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">${crTitle(title)}${aside ? `<span class="text-xs text-muted">${aside}</span>` : ""}</div>${body}</div>`;
-const apHead = (title, sub, actions = "") => `<div class="flex flex-wrap items-start justify-between gap-3 mb-4"><div><div class="text-[11px] font-semibold uppercase tracking-wider text-accentDark">Purchase / Account Payable</div><h2 class="font-sans text-xl font-semibold text-ink">${esc(title)}</h2><p class="text-sm text-muted">${esc(sub)}</p></div><div class="flex flex-wrap gap-2">${actions}</div></div>`;
+const apHead = (title, sub, actions = "") => `<div class="flex flex-wrap items-start justify-between gap-3 mb-4"><div><div class="text-[11px] font-semibold uppercase tracking-wider text-accentDark">Purchase / Aging Payable</div><h2 class="font-sans text-xl font-semibold text-ink">${esc(title)}</h2><p class="text-sm text-muted">${esc(sub)}</p></div><div class="flex flex-wrap gap-2">${actions}</div></div>`;
 
 function apInit() {
   AP.detail = null;
@@ -12214,7 +12220,7 @@ function apRenderTabs() {
 
 async function apGet(path, params) {
   const resp = await fetch(`/api/account-payable/${path}${params ? "?" + params : ""}`);
-  if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Account Payable tidak bisa dimuat."));
+  if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Aging Payable tidak bisa dimuat."));
   return resp.json();
 }
 
@@ -12243,7 +12249,7 @@ function apRenderDashboard(d) {
     ${crTile("Belum jatuh tempo", apMoney(b.not_due), `${d.not_due_count} tagihan aktif`, "bg-[#F1F8F3] border-[#D9EBDE]")}
     ${crTile("Jatuh tempo hari ini", apMoney(b.today), `${d.due_today_count} faktur${d.due_today_names.length ? " · " + esc(d.due_today_names.join(", ")) : ""}`, "bg-[#F6F2FD] border-[#E5DCF5]")}
     ${crTile("Lewat jatuh tempo", `<span class="${d.overdue_total ? "text-failed" : ""}">${apMoney(d.overdue_total)}</span>`, `${d.overdue_count} faktur${d.overdue_names.length ? " · " + esc(d.overdue_names.join(", ")) : ""}`, "bg-[#FDF1F1] border-[#F3D9D9]")}
-    ${crTile("Faktur draft", String(d.draft_count), d.draft_count ? `${apMoney(d.draft_total)} belum diposting` : "tidak ada yang menunggu", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+    ${crTile("Menunggu verifikasi", String((d.verify_waiting || 0) + (d.verify_held || 0)), (d.verify_waiting || d.verify_held) ? `${d.verify_waiting || 0} belum diverifikasi · ${d.verify_held || 0} ditahan${d.verify_ask_admin ? " (" + d.verify_ask_admin + " menunggu Admin)" : ""}` : "semua faktur sudah diverifikasi", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
   const banner = d.priority.length ? `<div class="flex flex-wrap items-center gap-3 border border-amber-200 bg-amber-50 text-amber-900 rounded-xl px-4 py-3 text-sm mb-4"><b>Prioritas hari ini:</b>
     <span>${d.priority.map(p => `${esc(p.invoice_number)} ${p.state === "overdue" ? "sudah " + esc(p.label.toLowerCase()) : "jatuh tempo hari ini"}`).join("; ")}.</span>
     <a href="#/account-payable" onclick="AP.f.due = 'overdue'; AP.f.q = ''; apGo('invoices'); return false;" class="ml-auto text-accentDark font-semibold hover:underline">Lihat tagihan yang memerlukan tindakan →</a></div>` : "";
@@ -12263,7 +12269,7 @@ function apRenderDashboard(d) {
     ${apBalance("Uang muka belum dialokasikan", b2.dp_free, "DP di PO yang belum terpakai ke faktur. Tidak mengurangi utang di atas.", "dp")}
     ${apBalance("Saldo kredit supplier", b2.credit_free, "Nota kredit retur yang belum dipotongkan ke faktur.", "credits")}
     ${apBalance("Klaim refund menunggu", b2.refund_claims_open, "Uang muka PO batal yang belum kembali dari supplier.", "refunds")}</div>`;
-  apBody().innerHTML = apHead("Dashboard Account Payable", "Pantau utang supplier, jatuh tempo, dan prioritas pembayaran dari satu halaman.",
+  apBody().innerHTML = apHead("Dashboard Aging Payable", "Pantau utang supplier, jatuh tempo, dan prioritas pembayaran dari satu halaman.",
     apBtn("Daftar Faktur", "apGo('invoices')") + apBtn("Unduh Ringkasan", "apExport('aging')", true))
     + tiles + banner
     + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 mb-4">${apPanel("Tren tagihan dan pembayaran", chart)}${apPanel("Komposisi umur utang", comp, `Per ${apDate(d.as_of)}`)}</div>`
@@ -12314,7 +12320,7 @@ function apRenderInvoices(d) {
       <button type="button" ${d.page <= 1 ? "disabled" : ""} onclick="AP.page--; apGo('invoices')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">‹</button><span class="tabular-nums">Halaman ${d.page} dari ${pages}</span>
       <button type="button" ${d.page >= pages ? "disabled" : ""} onclick="AP.page++; apGo('invoices')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">›</button></span></div>`);
   apBody().innerHTML = apHead("Daftar Faktur & Utang Supplier", "Kelola daftar tagihan terverifikasi, pembayaran, kredit, dan saldo outstanding.", apBtn("Export Excel", "apExport('invoices')") + apBtn("Lihat Tagihan Jatuh Tempo", "apGo('due')", true)) + filters + table
-    + crNote("border-sky-200 bg-sky-50 text-sky-900 mt-4", "Nomor faktur dan nomor PO bisa diklik untuk membuka dokumen sumber. Account Payable bukan modul input kas keluar: pembayaran dicatat di Faktur Pembelian.");
+    + crNote("border-sky-200 bg-sky-50 text-sky-900 mt-4", "Nomor faktur dan nomor PO bisa diklik untuk membuka dokumen sumber. Aging Payable bukan modul input kas keluar: pembayaran dicatat di Faktur Pembelian.");
 }
 
 function apFilter() {
@@ -12348,6 +12354,7 @@ function apRenderDetail(d) {
     row("Supplier", esc(d.supplier_name)) + row("No. Faktur", `${apNum(d.invoice_number, `openPurchaseInvoiceById(${d.id})`)}${d.supplier_invoice_no ? ` <span class="text-muted font-normal">· faktur supplier ${esc(d.supplier_invoice_no)}</span>` : ""}`)
     + row("PO terkait", d.po ? apPoLink(d.po.id, d.po.po_number) : "") + row("Goods Receipt", d.grs.length ? d.grs.map(g => `${apPoLink(d.po.id, g.gr_number || "GR")} <span class="text-xs text-muted font-normal">${apDate(g.received_date)} · ${g.qty} pcs</span>`).join("<br>") : "")
     + row("Tanggal faktur", apDate(d.invoice_date)) + row("Jatuh tempo", `${apDate(d.due_date)} ${d.outstanding > 0 ? apDueBadge(d) : ""}`)
+    + (d.po ? row("Verifikasi faktur", crPill(({ terverifikasi: "bg-emerald-50 text-emerald-700", pengecualian: "bg-orange-50 text-orange-700", ditahan: "bg-amber-50 text-amber-700", diajukan: "bg-amber-50 text-amber-700" })[d.verify_status] || "bg-stone-100 text-stone-600", d.verify_label || "Belum diverifikasi")) + (d.verified_by ? ` <span class="text-xs text-muted font-normal">oleh ${esc(d.verified_by)}</span>` : "") + (d.exception_reason ? `<div class="text-[11px] text-muted font-normal mt-0.5">Pengecualian: ${esc(d.exception_reason)}</div>` : "") : "")
     + row("Status faktur", d.status === "posted" ? crPill("bg-emerald-50 text-emerald-700", "Terposting") : crPill("bg-stone-100 text-stone-600", d.status === "void" ? "Void" : "Draft"))
     + row("Status pembayaran", apPayBadge(d)), "Nomor sumber dapat dibuka");
   const pos = `<div class="px-4 py-3">
@@ -12367,7 +12374,7 @@ function apRenderDetail(d) {
     ["Faktur Pembelian", d.invoice_number, `openPurchaseInvoiceById(${d.id})`, "dokumen asli"],
     ...d.returns.map(r => ["Retur Supplier", r.return_number, `rtsOpen(${r.id})`, "nota kredit"]),
   ].filter(Boolean).map(([k, n, js, sub]) => `<div class="flex items-center justify-between gap-3 border border-line rounded-lg px-3 py-2"><div><div class="font-mono text-sm font-semibold text-ink">${esc(n)}</div><div class="text-[11px] text-muted">${k} · ${esc(sub)}</div></div>${apSmallBtn("Lihat dokumen", js)}</div>`).join("")}</div>`;
-  apBody().innerHTML = apHead("Detail Account Payable", `${d.invoice_number} · ${d.supplier_name} · ${d.pay_status === "lunas" ? "lunas" : "dibayar " + (d.pay_status === "sebagian" ? "sebagian" : "belum")}`,
+  apBody().innerHTML = apHead("Detail Aging Payable", `${d.invoice_number} · ${d.supplier_name} · ${d.pay_status === "lunas" ? "lunas" : "dibayar " + (d.pay_status === "sebagian" ? "sebagian" : "belum")}`,
     apBtn("← Kembali", `apGo('${AP.tab}')`) + apBtn("Buka Faktur Pembelian", `openPurchaseInvoiceById(${d.id})`) + (d.can_pay ? apBtn("Bayar Tagihan", `openPurchaseInvoiceById(${d.id})`, true) : ""))
     + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${idCard}${apPanel("Posisi utang saat ini", pos)}</div>`
     + `<div class="mb-4">${apPanel("Rincian barang dan penerimaan", items)}</div>`
@@ -12443,9 +12450,9 @@ function apRenderRefunds(d) {
 // ── Rekonsiliasi ──
 function apRenderRecon(d) {
   const k = d.kpi;
-  const tiles = `<div class="${apGrid(5)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih), "selisih dengan GR / PO", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP / kredit belum terpakai", String(k.alokasi), "perlu keputusan admin", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const tiles = `<div class="${apGrid(6)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih), "selisih dengan GR / PO", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Faktur ditahan", String(k.tahan || 0), "menunggu klarifikasi / Admin", "bg-[#FFF8E8] border-[#F2E3B8]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP / kredit belum terpakai", String(k.alokasi), "perlu keputusan admin", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
   const open = (x) => x.ref_type === "invoice" ? `openPurchaseInvoiceById(${x.ref_id})` : x.ref_type === "po" ? `openSupplierPoFromFaktur('${esc(x.ref_id)}')` : "apGo('credits')";
-  const rows = d.items.map(x => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(x.number || "—")}</td><td class="${AP_TD} text-ink">${esc(x.supplier)}</td><td class="${AP_TD}">${esc(x.category)}<div class="text-[11px] text-muted">${esc(x.detail || "")}</div></td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(x.value)}</td><td class="${AP_TD}">${apSmallBtn("Buka dokumen", open(x))}</td><td class="${AP_TD}">${crPill({ selisih: "bg-amber-50 text-amber-700", duplikat: "bg-violet-50 text-violet-700", draft: "bg-stone-100 text-stone-600", dp: "bg-sky-50 text-sky-700", kredit: "bg-sky-50 text-sky-700", refund: "bg-amber-50 text-amber-700" }[x.kind], x.status)}</td></tr>`).join("");
+  const rows = d.items.map(x => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(x.number || "—")}</td><td class="${AP_TD} text-ink">${esc(x.supplier)}</td><td class="${AP_TD}">${esc(x.category)}<div class="text-[11px] text-muted">${esc(x.detail || "")}</div></td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(x.value)}</td><td class="${AP_TD}">${apSmallBtn("Buka dokumen", open(x))}</td><td class="${AP_TD}">${crPill({ tahan: "bg-amber-50 text-amber-700", selisih: "bg-amber-50 text-amber-700", duplikat: "bg-violet-50 text-violet-700", draft: "bg-stone-100 text-stone-600", dp: "bg-sky-50 text-sky-700", kredit: "bg-sky-50 text-sky-700", refund: "bg-amber-50 text-amber-700" }[x.kind], x.status)}</td></tr>`).join("");
   apBody().innerHTML = apHead("Rekonsiliasi & Koreksi Tagihan", "Temukan selisih dengan jejak yang jelas, tanpa membuat pembayaran dua kali.", apBtn("Buka Log Aktivitas", "location.hash='/activity'")) + tiles
     + `<div class="mb-4">${apPanel("Daftar pengecualian & koreksi", apTable(`<th class="${AP_TH}">Nomor</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Kategori selisih</th><th class="${AP_THR}">Nilai terdampak</th><th class="${AP_TH}">Tindakan</th><th class="${AP_TH}">Status</th>`, rows, "Tidak ada pengecualian. Semua faktur cocok."))}</div>`
     + crNote("border-amber-200 bg-amber-50 text-amber-900", "<b>Halaman ini hanya menandai.</b> Koreksi dilakukan di dokumen asal (faktur, PO, retur) dengan hak akses Admin, dan perubahannya tercatat di Log Aktivitas. Jangan mengubah mutasi historis secara langsung.");
@@ -16372,6 +16379,7 @@ function newPurchaseInvoiceForm() {
   document.getElementById("pi-form-number").classList.add("hidden");
   comboboxSetValue(document.getElementById("pi-supplier-select"), "", "");
   document.getElementById("pi-supplier-contact").classList.add("hidden");
+  document.getElementById("pi-gr-panel").classList.add("hidden");
   document.getElementById("pi-supplier-invoice-no").value = "";
   document.getElementById("pi-invoice-date").value = toDateInputValue(new Date());
   document.getElementById("pi-payment-terms").value = "NET 30";
@@ -16393,6 +16401,7 @@ async function openPurchaseInvoice(invoiceId) {
   if (!resp.ok) { showToast("Faktur tidak ditemukan."); return; }
   const inv = await resp.json();
   currentPurchaseInvoice = inv;
+  document.getElementById("pi-gr-panel").classList.add("hidden");
 
   document.getElementById("pi-form-title").textContent = inv.supplier_name_snapshot;
   const numberEl = document.getElementById("pi-form-number");
@@ -16478,6 +16487,7 @@ function applyPurchaseInvoiceMode(inv) {
   document.getElementById("pi-delete-btn").classList.toggle("hidden", !(inv !== null && inv.status === "draft"));
   document.getElementById("pi-print-btn").classList.toggle("hidden", inv === null);
   resetPiArmButtons();
+  renderPiVerifyPanel(inv);
 
   const paymentSection = document.getElementById("pi-payment-section");
   const pays = inv?.payments || [];
@@ -16543,6 +16553,39 @@ async function onPurchaseInvoiceSupplierChange(inputEl) {
     } catch (_) {}
   }
   renderPurchaseInvoiceContact(supplier);
+  loadPurchaseInvoiceGoodsReceipt(supplierId);
+}
+
+// "Ambil dari Goods Receipt": received goods of the chosen supplier that no faktur covers yet. Only on a new faktur.
+async function loadPurchaseInvoiceGoodsReceipt(supplierId) {
+  const panel = document.getElementById("pi-gr-panel");
+  panel.classList.add("hidden"); panel.innerHTML = "";
+  if (currentPurchaseInvoice || !supplierId) return;
+  let rows = [];
+  try {
+    const resp = await fetch(`/api/purchase-invoices/goods-receipt?supplier_id=${encodeURIComponent(supplierId)}`);
+    if (resp.ok) rows = await resp.json();
+  } catch (_) {}
+  if (currentPurchaseInvoice || comboboxValue(document.getElementById("pi-supplier-select")) !== String(supplierId) || !rows.length) return;
+  panel.innerHTML = `<div class="text-sm font-semibold text-ink mb-0.5">Ambil dari Goods Receipt</div>
+    <div class="text-xs text-muted mb-2">Barang ini sudah diterima dan belum difakturkan. Pilih PO-nya, nama barang, qty terima dan harga terisi otomatis.</div>
+    <div class="space-y-2">${rows.map(r => `<div class="bg-white border border-line rounded-lg px-3 py-2.5">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-mono text-[13px] text-ink">${esc(r.po_number)}</span>
+        <span class="text-xs text-muted">${r.lines.length} barang · ${formatIDR(r.goods_total)}</span>
+        <button type="button" onclick="takePurchaseInvoiceFromReceipt('${esc(r.po_id)}')" class="ml-auto px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accentDark transition-colors">Ambil barang</button>
+      </div>
+      <ul class="mt-1.5 text-xs text-muted space-y-0.5">${r.lines.map(l => `<li class="flex gap-2"><span class="text-ink truncate">${esc(l.product_name)}</span><span class="ml-auto shrink-0 tabular-nums">${l.qty} ${esc(l.unit)} × ${formatIDR(l.unit_price)}</span></li>`).join("")}</ul>
+    </div>`).join("")}</div>`;
+  panel.classList.remove("hidden");
+}
+
+async function takePurchaseInvoiceFromReceipt(poId) {
+  const resp = await fetch(`/api/supplier-pos/${encodeURIComponent(poId)}/purchase-invoice`, { method: "POST" });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${body.detail || resp.status}`); return; }
+  showToast(`Draft ${body.invoice_number} dibuat dari Goods Receipt. Cocokkan dengan faktur supplier lalu Posting.`, "success");
+  openPurchaseInvoiceById(body.id);
 }
 
 function onPurchaseInvoiceTermsChange() {
@@ -16836,6 +16879,141 @@ function handleVoidPurchaseInvoiceClick(btnEl) {
 
 function handleDeletePurchaseInvoiceClick(btnEl) {
   armPiButton(btnEl, ["bg-failed", "text-bg"], "text-failed", "Hapus", deletePurchaseInvoice);
+}
+
+// ── Three-Way Matching & Verifikasi Faktur ───────────────────────────────────
+let piMatch = null;
+
+const PI_VERIFY_TONE = {
+  belum: ["bg-bg2 text-muted border-line", "Belum diverifikasi"],
+  terverifikasi: ["bg-done/10 text-done border-done/30", "Terverifikasi"],
+  ditahan: ["bg-pending/10 text-ink border-pending/40", "Ditahan (klarifikasi)"],
+  diajukan: ["bg-pending/10 text-ink border-pending/40", "Menunggu persetujuan Admin"],
+  pengecualian: ["bg-accent/10 text-accentDark border-accent/40", "Disetujui sebagai pengecualian"],
+  perlu_ulang: ["bg-failed/10 text-failed border-failed/30", "Perlu verifikasi ulang"],
+};
+
+async function renderPiVerifyPanel(inv) {
+  const panel = document.getElementById("pi-verify-panel");
+  piMatch = null;
+  panel.classList.add("hidden"); panel.innerHTML = "";
+  const gateBtn = document.getElementById("pi-post-btn");
+  gateBtn.disabled = false; gateBtn.title = ""; gateBtn.classList.remove("opacity-40", "cursor-not-allowed");
+  if (!inv || !inv.supplier_po_id) return;
+  let m = null;
+  try {
+    const resp = await fetch(`/api/purchase-invoices/${inv.id}/matching`);
+    if (resp.ok) m = await resp.json();
+  } catch (_) {}
+  if (!m || !currentPurchaseInvoice || currentPurchaseInvoice.id !== inv.id) return;
+  piMatch = m;
+  const draft = inv.status === "draft";
+  const state = m.effective_status || m.verify_status;
+  const [tone, label] = PI_VERIFY_TONE[state] || PI_VERIFY_TONE.belum;
+  const pill = `<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${tone}">${esc(label)}</span>`;
+  const rp = v => v == null ? "—" : formatIDR(v);
+  const n = v => v == null ? "—" : v;
+  const resultCell = l => l.result === "sesuai" ? `<span class="text-done font-semibold">Sesuai</span>`
+    : `<span class="text-failed font-semibold">${l.result === "tidak_di_po" ? "Tidak di PO" : "Selisih"}</span>`;
+  const step = (i, text, on) => `<div class="flex items-center gap-1.5"><span class="grid place-items-center w-5 h-5 rounded-full text-[10px] font-bold ${on ? "bg-accent text-white" : "bg-bg2 text-muted border border-line"}">${i}</span><span class="text-[11px] ${on ? "text-ink font-semibold" : "text-muted"}">${text}</span></div>`;
+  const done = state === "terverifikasi" || state === "pengecualian";
+  const stepper = `<div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3">${step(1, "Referensi PO", true)}${step(2, "Pencocokan", true)}${step(3, "Verifikasi", done || !draft)}${step(4, "Pembayaran", !draft)}</div>`;
+
+  let body = `<div class="flex flex-wrap items-center gap-2 mb-1">
+      <div class="text-sm font-semibold text-ink">Three-Way Matching</div>${pill}
+      <span class="text-xs text-muted ml-auto">PO ${esc(m.summary.po_number || "")} ↔ Goods Receipt ↔ Faktur</span></div>${stepper}`;
+  body += `<div class="overflow-x-auto border border-line rounded-lg bg-white"><table class="w-full text-xs"><thead class="bg-bg2"><tr class="text-left text-muted">
+      <th class="px-2.5 py-1.5 font-medium">Barang</th><th class="px-2 py-1.5 font-medium text-right">Qty PO</th><th class="px-2 py-1.5 font-medium text-right">Qty Terima</th><th class="px-2 py-1.5 font-medium text-right">Qty Faktur</th>
+      <th class="px-2 py-1.5 font-medium text-right">Harga PO</th><th class="px-2 py-1.5 font-medium text-right">Harga Faktur</th><th class="px-2.5 py-1.5 font-medium">Hasil</th></tr></thead><tbody class="divide-y divide-line">
+      ${m.lines.map(l => `<tr><td class="px-2.5 py-1.5 text-ink">${esc(l.product)}${l.note ? `<div class="text-[11px] text-failed">${esc(l.note)}</div>` : ""}</td>
+        <td class="px-2 py-1.5 text-right tabular-nums">${n(l.qty_po)}</td><td class="px-2 py-1.5 text-right tabular-nums">${n(l.qty_gr)}</td><td class="px-2 py-1.5 text-right tabular-nums">${n(l.qty_inv)}</td>
+        <td class="px-2 py-1.5 text-right tabular-nums">${rp(l.price_po)}</td><td class="px-2 py-1.5 text-right tabular-nums">${rp(l.price_inv)}</td><td class="px-2.5 py-1.5">${resultCell(l)}</td></tr>`).join("") || `<tr><td colspan="7" class="px-3 py-3 text-muted">Belum ada baris faktur.</td></tr>`}
+      </tbody></table></div>`;
+  body += `<ul class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-xs">${m.checks.map(c => `<li class="flex items-start gap-1.5 ${c.ok ? "text-ink" : "text-failed"}"><span class="font-bold">${c.ok ? "✓" : "✗"}</span><span>${esc(c.label)}</span></li>`).join("")}</ul>`;
+  if (m.outstanding_po.length) body += `<div class="mt-2 text-xs text-muted">Belum diterima dari PO: ${m.outstanding_po.map(o => `${esc(o.product)} (${o.qty})`).join(", ")} — tidak ikut ditagih di faktur ini.</div>`;
+  if (m.hold_note && (state === "ditahan" || state === "diajukan")) body += `<div class="mt-2 text-xs rounded-lg bg-pending/10 border border-pending/30 px-3 py-2 text-ink"><b>Catatan klarifikasi:</b> ${esc(m.hold_note)}</div>`;
+  if (state === "pengecualian") body += `<div class="mt-2 text-xs rounded-lg bg-accent/10 border border-accent/30 px-3 py-2 text-ink"><b>Pengecualian disetujui ${esc(m.verified_by || "Admin")}:</b> ${esc(m.exception_reason || "")}</div>`;
+  if (state === "terverifikasi") body += `<div class="mt-2 text-xs text-muted">Diverifikasi ${esc(m.verified_by || "")} · ${esc(formatReceiptWhen(m.verified_at, true))}${m.verify_note ? " · " + esc(m.verify_note) : ""}</div>`;
+  if (state === "perlu_ulang") body += `<div class="mt-2 text-xs text-failed">Hasil pencocokan berubah sejak diverifikasi (barang diterima atau PO berubah). Verifikasi ulang sebelum posting.</div>`;
+
+  if (draft) {
+    const matched = m.result === "cocok";
+    const btn = (cls, onclick, text) => `<button type="button" onclick="${onclick}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${cls}">${text}</button>`;
+    const actions = [];
+    if (matched && state !== "terverifikasi") actions.push(btn("bg-accent text-white hover:bg-accentDark", "openPiVerifyModal()", "Verifikasi Faktur"));
+    if (!matched) {
+      if (state !== "ditahan" && state !== "diajukan" && state !== "pengecualian") actions.push(btn("border border-line bg-white text-ink hover:bg-bg2", "openPiMismatchModal()", "Tahan &amp; Minta Klarifikasi"));
+      if (isAdmin() && state !== "pengecualian") actions.push(btn("bg-accent text-white hover:bg-accentDark", "openPiExceptionModal()", "Setujui Pengecualian"));
+    }
+    if (actions.length) body += `<div class="flex flex-wrap gap-2 mt-3">${actions.join("")}</div>`;
+    if (!matched && !isAdmin()) body += `<div class="mt-2 text-xs text-muted">Ada selisih: hanya Admin yang dapat menyetujui sebagai pengecualian.</div>`;
+  }
+  panel.innerHTML = `<div class="border border-line rounded-xl bg-bg2/60 px-3.5 py-3">${body}</div>`;
+  panel.classList.remove("hidden");
+  const postBtn = document.getElementById("pi-post-btn");
+  const ready = !draft || state === "terverifikasi" || state === "pengecualian";
+  postBtn.disabled = !ready;
+  postBtn.title = ready ? "" : "Verifikasi faktur dulu (Three-Way Matching) sebelum posting.";
+  postBtn.classList.toggle("opacity-40", !ready);
+  postBtn.classList.toggle("cursor-not-allowed", !ready);
+}
+
+function openPiVerifyModal() {
+  if (!piMatch) return;
+  openModal("Verifikasi Faktur", `<div class="space-y-3">
+    <p class="text-sm text-muted">PO, Goods Receipt, dan faktur sudah cocok. Centang semua butir pemeriksaan untuk memverifikasi.</p>
+    <div class="space-y-1.5">${piMatch.checklist.map(c => `<label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input type="checkbox" class="pi-vf-check mt-0.5 accent-accent" data-key="${esc(c.key)}" /><span>${esc(c.label)}</span></label>`).join("")}</div>
+    <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan (opsional)</label>
+      <input id="pi-vf-note" type="text" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+      <button type="button" onclick="submitPiVerify()" class="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accentDark">Verifikasi</button></div></div>`);
+}
+
+async function piVerifyPost(path, payload, okMsg) {
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/${path}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${body.detail || resp.status}`); return false; }
+  closeModal();
+  showToast(okMsg, "success");
+  await openPurchaseInvoice(currentPurchaseInvoice.id);
+  return true;
+}
+
+function submitPiVerify() {
+  const checklist = {};
+  document.querySelectorAll(".pi-vf-check").forEach(el => { checklist[el.dataset.key] = el.checked; });
+  piVerifyPost("verify", { checklist, note: document.getElementById("pi-vf-note").value.trim() || null }, "Faktur terverifikasi. Sekarang bisa diposting.");
+}
+
+function openPiMismatchModal() {
+  if (!piMatch) return;
+  const diffs = piMatch.lines.filter(l => l.note).map(l => `<li><b>${esc(l.product)}</b> — ${esc(l.note)}</li>`).join("");
+  openModal("Faktur belum dapat diverifikasi", `<div class="space-y-3">
+    <p class="text-sm text-muted">Ada selisih antara PO, Goods Receipt, dan faktur:</p>
+    <ul class="text-xs text-ink space-y-1 list-disc pl-4">${diffs || "<li>Pemeriksaan lain tidak terpenuhi (lihat daftar pemeriksaan).</li>"}</ul>
+    <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan klarifikasi</label>
+      <input id="pi-hold-note" type="text" placeholder="mis. minta supplier kirim faktur revisi" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+    <label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input id="pi-hold-ask" type="checkbox" class="mt-0.5 accent-accent" /><span>Ajukan pengecualian ke Admin</span></label>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+      <button type="button" onclick="submitPiHold()" class="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accentDark">Tahan Faktur</button></div></div>`);
+}
+
+function submitPiHold() {
+  piVerifyPost("hold", { note: document.getElementById("pi-hold-note").value.trim(), ask_admin: document.getElementById("pi-hold-ask").checked }, "Faktur ditahan untuk klarifikasi.");
+}
+
+function openPiExceptionModal() {
+  openModal("Setujui Pengecualian", `<div class="space-y-3">
+    <p class="text-sm text-muted">Selisih diterima dengan sadar dan faktur boleh diposting. Alasan wajib diisi dan tercatat di log.</p>
+    <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan pengecualian</label>
+      <input id="pi-exc-reason" type="text" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+      <button type="button" onclick="submitPiException()" class="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accentDark">Setujui</button></div></div>`);
+}
+
+function submitPiException() {
+  piVerifyPost("exception", { reason: document.getElementById("pi-exc-reason").value.trim() }, "Pengecualian disetujui. Faktur bisa diposting.");
 }
 
 async function postPurchaseInvoice() {

@@ -18,6 +18,7 @@ import sqlite3
 from datetime import date, timedelta
 
 from backend import database as db
+from backend import invoice_verify
 
 PAY_KIND_LABELS = {"bayar": "Pembayaran", "batal": "Pembatalan pembayaran", "dp": "Uang muka (DP) dari PO",
                    "dp_batal": "DP dikembalikan ke PO", "kredit": "Nota kredit retur"}
@@ -117,6 +118,11 @@ def dashboard() -> dict:
     with _conn() as con:
         rows = _rows(con, today)
         drafts = con.execute("SELECT COUNT(*) AS n, COALESCE(SUM(total), 0) AS t FROM purchase_invoices WHERE status='draft'").fetchone()
+        verify = con.execute(
+            """SELECT SUM(CASE WHEN verify_status IN ('belum') THEN 1 ELSE 0 END) AS waiting,
+                      SUM(CASE WHEN verify_status IN ('ditahan','diajukan') THEN 1 ELSE 0 END) AS held,
+                      SUM(CASE WHEN verify_status = 'diajukan' THEN 1 ELSE 0 END) AS ask_admin
+               FROM purchase_invoices WHERE status='draft' AND supplier_po_id IS NOT NULL""").fetchone()
         balances = _balances(con)
         months = [_month_back(today, i) for i in range(4, -1, -1)]
         billed = {m: 0 for m in months}
@@ -143,6 +149,7 @@ def dashboard() -> dict:
         "overdue_count": len(overdue), "overdue_total": b["overdue_1_30"] + b["overdue_30_plus"],
         "overdue_names": sorted({r["supplier_name"] for r in overdue}),
         "draft_count": drafts["n"], "draft_total": drafts["t"],
+        "verify_waiting": verify["waiting"] or 0, "verify_held": verify["held"] or 0, "verify_ask_admin": verify["ask_admin"] or 0,
         "priority": [{"invoice_number": r["invoice_number"], "id": r["id"], "state": r["due_state"], "label": r["due_label"]}
                      for r in open_rows if r["due_state"] in ("overdue", "today")][:6],
         "trend": [{"month": m, "billed": billed[m], "paid": paid[m]} for m in months],
@@ -239,37 +246,15 @@ def invoice_detail(invoice_id: int) -> dict | None:
             "dp": row.get("dp", 0), "cash": row.get("cash", 0), "credit": row.get("credit", 0),
             "pay_status": row.get("pay_status"), "pay_status_label": row.get("pay_status_label"),
             "due_state": row.get("due_state"), "due_label": row.get("due_label"),
+            "verify_status": inv["verify_status"], "verify_label": invoice_verify.STATUS_LABELS.get(inv["verify_status"], inv["verify_status"]),
+            "verified_by": inv["verified_by"], "verified_at": inv["verified_at"], "hold_note": inv["hold_note"], "exception_reason": inv["exception_reason"],
             "po": po, "grs": grs or [], "items": items, "payments": pays, "matching": matching,
             "returns": [{"id": k, "return_number": v} for k, v in returns.items()],
             "can_pay": inv["status"] == "posted" and inv["total"] - inv["amount_paid"] > 0}
 
 
 def _matching(con: sqlite3.Connection, po_id: str, items: list[dict]) -> list[dict]:
-    """PO ↔ Goods Receipt ↔ Faktur, per product. For checking only: it never changes stock or the faktur."""
-    po_items = [dict(r) for r in con.execute("SELECT * FROM supplier_po_items WHERE supplier_po_id=?", (po_id,)).fetchall()]
-    used: set[int] = set()
-    out = []
-    for it in items:
-        hit = next((p for p in po_items if p["id"] not in used and (
-            (it.get("master_item_id") and p.get("master_item_id") == it["master_item_id"])
-            or (p["product_name"] or "").strip().lower() == (it["product_name"] or "").strip().lower())), None)
-        if hit is None:
-            out.append({"product": it["product_name"], "qty_po": None, "qty_gr": None, "qty_inv": it["qty"], "price_po": None,
-                        "price_inv": it["unit_price"], "result": "tidak_di_po", "note": "Barang ini tidak ada di PO"})
-            continue
-        used.add(hit["id"])
-        qty_po = hit["quantity"] - (hit.get("qty_cancelled") or 0)
-        price_po = hit["est_unit_price"] - round(hit["est_unit_price"] * (hit.get("discount_pct") or 0) / 100)
-        notes = []
-        if it["qty"] > hit["qty_received"]:
-            notes.append(f"Qty faktur melebihi barang diterima ({it['qty']} > {hit['qty_received']})")
-        if it["qty"] > qty_po:
-            notes.append("Qty faktur melebihi PO")
-        if it["unit_price"] != price_po:
-            notes.append("Harga faktur beda dari PO")
-        out.append({"product": it["product_name"], "qty_po": qty_po, "qty_gr": hit["qty_received"], "qty_inv": it["qty"],
-                    "price_po": price_po, "price_inv": it["unit_price"], "result": "selisih" if notes else "sesuai", "note": "; ".join(notes)})
-    return out
+    return invoice_verify.match_lines(con, po_id, items)
 
 
 def due_view(month: str | None = None) -> dict:
@@ -409,6 +394,12 @@ def reconciliation() -> dict:
                 out.append({"kind": "draft", "category": "Faktur draft belum diposting", "ref_type": "invoice", "ref_id": r["id"], "number": r["invoice_number"],
                             "supplier": r["supplier_name"], "value": r["total"], "detail": f"Draft sudah {age} hari; belum masuk saldo utang", "status": "Ditahan"})
         for r in con.execute(
+                """SELECT pi.id, pi.invoice_number, pi.total, pi.verify_status, pi.hold_note, s.name AS supplier_name FROM purchase_invoices pi
+                   JOIN suppliers s ON s.id = pi.supplier_id WHERE pi.status='draft' AND pi.verify_status IN ('ditahan','diajukan') ORDER BY pi.id""").fetchall():
+            out.append({"kind": "tahan", "category": "Faktur ditahan untuk klarifikasi" if r["verify_status"] == "ditahan" else "Menunggu persetujuan pengecualian Admin",
+                        "ref_type": "invoice", "ref_id": r["id"], "number": r["invoice_number"], "supplier": r["supplier_name"], "value": r["total"],
+                        "detail": (r["hold_note"] or "")[:200], "status": "Ditahan" if r["verify_status"] == "ditahan" else "Perlu Admin"})
+        for r in con.execute(
                 """SELECT o.id, o.po_number, s.name AS supplier_name, SUM(p.amount - p.applied_amount) AS free FROM spo_payments p
                    JOIN supplier_pos o ON o.id = p.supplier_po_id JOIN suppliers s ON s.id = o.supplier_id
                    WHERE o.status IN ('sebagian_diterima','diterima') AND p.amount - p.applied_amount > 0 GROUP BY o.id""").fetchall():
@@ -428,7 +419,7 @@ def reconciliation() -> dict:
         matched = sum(1 for r in rows if r["supplier_po_id"] and r["id"] not in flagged)
     count = lambda k: sum(1 for x in out if x["kind"] == k)
     return {"as_of": today.isoformat(), "items": out,
-            "kpi": {"cocok": matched, "selisih": count("selisih"), "duplikat": count("duplikat"), "draft": count("draft"),
+            "kpi": {"cocok": matched, "selisih": count("selisih"), "duplikat": count("duplikat"), "draft": count("draft"), "tahan": count("tahan"),
                     "alokasi": count("dp") + count("kredit"), "refund": count("refund")}}
 
 

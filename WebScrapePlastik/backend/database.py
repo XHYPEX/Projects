@@ -1109,12 +1109,22 @@ def init_db() -> None:
                 created_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_pi_payments_invoice ON purchase_invoice_payments(invoice_id);
+            -- Who verified, held or approved a faktur, and why (Three-Way Matching trail).
+            CREATE TABLE IF NOT EXISTS purchase_invoice_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL REFERENCES purchase_invoices(id),
+                at TEXT NOT NULL, by_user TEXT, kind TEXT NOT NULL, note TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_pi_events_invoice ON purchase_invoice_events(invoice_id);
         """)
         for table, cols in (
             # Shipping on the supplier's faktur, kept apart from the goods: the cost, the DPP it is taxed on
             # (0 = no PPN) and the PPN amount as printed on the faktur.
             ("purchase_invoices", (("supplier_po_id", "TEXT"), ("shipping_cost", "INTEGER NOT NULL DEFAULT 0"),
-                                   ("shipping_dpp", "INTEGER NOT NULL DEFAULT 0"), ("shipping_tax", "INTEGER NOT NULL DEFAULT 0"))),
+                                   ("shipping_dpp", "INTEGER NOT NULL DEFAULT 0"), ("shipping_tax", "INTEGER NOT NULL DEFAULT 0"),
+                                   # Three-Way Matching: belum | terverifikasi | ditahan | diajukan | pengecualian (Admin approved a mismatch).
+                                   ("verify_status", "TEXT NOT NULL DEFAULT 'belum'"), ("verify_note", "TEXT"), ("verified_by", "TEXT"),
+                                   ("verified_at", "TEXT"), ("exception_reason", "TEXT"), ("hold_note", "TEXT"))),
             # Supplier DP paid on a PO before its faktur: how much of it has been carried onto the faktur.
             ("spo_payments", (("applied_amount", "INTEGER NOT NULL DEFAULT 0"), ("applied_invoice_id", "INTEGER"))),
             # BEKAS (Retur Supplier #9): a second-hand variant is its own master item pointing at the new one.
@@ -6573,6 +6583,12 @@ def update_purchase_invoice(
         )
         con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
         _insert_purchase_invoice_items(con, invoice_id, items)
+        if row["supplier_po_id"] and row["verify_status"] != "belum":
+            # The faktur changed after it was checked: the checking (or the Admin's exception) no longer covers it.
+            con.execute("UPDATE purchase_invoices SET verify_status='belum', verify_note=NULL, verified_by=NULL, verified_at=NULL, "
+                        "exception_reason=NULL, hold_note=NULL WHERE id=?", (invoice_id,))
+            con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, NULL, 'reset', ?)",
+                        (invoice_id, _now(), "Faktur diubah setelah diverifikasi/ditahan, verifikasi diulang dari awal."))
         updated = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         return dict(updated)
 
@@ -6649,6 +6665,8 @@ def post_purchase_invoice(invoice_id: int, by: str | None = None) -> dict:
         ).fetchone()["n"]
         if item_count == 0:
             raise ValueError(f"Faktur pembelian {invoice_id} tidak bisa diposting: tidak ada baris barang")
+        from backend import invoice_verify
+        invoice_verify.require_verified(con, dict(row))
         con.execute(
             "UPDATE purchase_invoices SET status='posted', updated_at=? WHERE id=?", (_now(), invoice_id)
         )
@@ -6825,14 +6843,16 @@ def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) 
         items = _spo_items(con, supplier_po_id)
         lines = []
         for i in items:
-            qty = i["quantity"] - i["qty_cancelled"]
+            # Three-Way Matching: the faktur bills what has been received (Goods Receipt), not what was ordered.
+            qty = min(i["quantity"] - i["qty_cancelled"], i["qty_received"])
             if qty <= 0:
                 continue
             price = i["est_unit_price"] - round(i["est_unit_price"] * (i["discount_pct"] or 0) / 100)
             lines.append({"master_item_id": i["master_item_id"], "product_name": i["product_name"], "sku": i.get("sku"),
                           "unit": i.get("unit") or "", "qty": qty, "unit_price": price})
         if not lines:
-            raise ValueError("Tidak ada barang yang bisa ditagihkan di PO ini.")
+            raise ValueError("Belum ada barang yang diterima dari PO ini. Faktur dibuat dari barang yang sudah diterima (Goods Receipt); "
+                             "catat penerimaan barang dulu.")
         goods = sum(l["qty"] * l["unit_price"] for l in lines)
         discount = round(goods * (po["discount_pct"] or 0) / 100)
         # The PO keeps shipping outside PPN, so the draft does too (no PPN counted twice). If the supplier's
@@ -6862,6 +6882,33 @@ def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) 
         _insert_purchase_invoice_items(con, cur.lastrowid, lines)
         _spo_event(con, supplier_po_id, "invoice", "Draft Faktur Pembelian dibuat dari PO ini", by)
         return dict(con.execute("SELECT * FROM purchase_invoices WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def list_po_received_for_faktur(supplier_id: int) -> list[dict]:
+    """Goods Receipt waiting for a faktur: this supplier's issued POs that have received goods and no active faktur
+    yet, with each received line at its PO price. Read-only; 'Ambil' on the Faktur Pembelian page then uses the
+    existing create-from-PO flow, so the faktur stays linked to its PO and goes through the same matching."""
+    out = []
+    with _conn() as con:
+        pos = con.execute(
+            "SELECT * FROM supplier_pos WHERE supplier_id=? AND status NOT IN ('draft','batal') ORDER BY created_at DESC, id DESC",
+            (supplier_id,)).fetchall()
+        for po in pos:
+            po = dict(po)
+            if _active_po_faktur(con, po["id"]):
+                continue
+            lines = []
+            for i in _spo_items(con, po["id"]):
+                qty = min(i["quantity"] - i["qty_cancelled"], i["qty_received"])
+                if qty <= 0:
+                    continue
+                price = i["est_unit_price"] - round(i["est_unit_price"] * (i["discount_pct"] or 0) / 100)
+                lines.append({"product_name": i["product_name"], "unit": i.get("unit") or "", "qty": qty, "unit_price": price,
+                              "line_total": qty * price})
+            if lines:
+                out.append({"po_id": po["id"], "po_number": po["po_number"], "status": po["status"],
+                            "created_at": po.get("created_at"), "lines": lines, "goods_total": sum(l["line_total"] for l in lines)})
+    return out
 
 
 def get_purchase_payable_summary() -> dict:

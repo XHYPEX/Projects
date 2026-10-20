@@ -182,6 +182,7 @@ def _row_to_invoice(row: dict) -> PurchaseInvoiceOut:
         verify_note=row.get("verify_note"),
         exception_reason=row.get("exception_reason"),
         hold_note=row.get("hold_note"),
+        gr_docs=row.get("gr_docs") or [],
     )
 
 
@@ -224,7 +225,7 @@ async def payable_summary():
 
 
 @router.get("/purchase-invoices/goods-receipt")
-async def goods_receipt_for_faktur(supplier_id: int):
+async def goods_receipt_for_faktur(supplier_id: int | None = None):
     """Received goods of a supplier that no faktur covers yet (feeds 'Ambil dari Goods Receipt')."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, list_po_received_for_faktur, supplier_id)

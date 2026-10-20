@@ -1436,6 +1436,11 @@ def init_db() -> None:
                     COALESCE((SELECT MAX(e.at) FROM receipt_events e WHERE e.receipt_id = receipts.id), ''))
                 WHERE status='done' AND work_status='selesai' AND closed_at IS NULL""")
             con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('k21_closed_at', ?)", (_now(),))
+        # 'Stok Tersedia' lines used to stay at Pesanan dibuat even when the shelf held all of them (the publish
+        # check only looked at items that also had a supplier line). Move the ones the shelf covers now, once.
+        if not con.execute("SELECT 1 FROM app_migrations WHERE name='stok_lines_ready'").fetchone():
+            _promote_shelf_ready_lines(con, "sistem")
+            con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('stok_lines_ready', ?)", (_now(),))
 
 
 def _now() -> str:
@@ -5887,6 +5892,8 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
         if header["supplier_po_id"]:
             # K-10: the goods are stock now, so the Sales Order lines they were bought for can move on.
             _spo_sync_all(con, header["supplier_po_id"], by, _now())
+        # ...and a 'Stok Tersedia' line still waiting for shelf stock of these items may be covered now.
+        _promote_shelf_ready_lines(con, by, master_item_ids=touched_ids)
         if over_notes:
             _spo_event(con, header["supplier_po_id"], "over",
                        f"Kelebihan barang diterima sebagai stok umum lewat {header['doc_number']}: " + ", ".join(over_notes)
@@ -6206,6 +6213,7 @@ def release_quarantine(lot_id: int, qty: int, reason: str, by: str | None) -> di
                VALUES (?, 'LEPAS_KARANTINA', ?, ?, 'quarantine', ?, ?, ?, ?)""",
             (lot["master_item_id"], qty, new_qty, lot_id, f"Lepas karantina: {reason}", _now(), by),
         )
+        _promote_shelf_ready_lines(con, by, master_item_ids=[lot["master_item_id"]])
     return get_quarantine_lot(lot_id)
 
 
@@ -6368,6 +6376,8 @@ def create_stock_adjustment(master_item_id: int, qty_delta: int, reason: str, cr
             (master_item_id, qty_delta, new_stock_qty, reason, _now(), created_by),
         )
         con.execute("UPDATE master_items SET updated_at=?, updated_by=? WHERE id=?", (_now(), created_by, master_item_id))
+        if qty_delta > 0:
+            _promote_shelf_ready_lines(con, created_by, master_item_ids=[master_item_id])
         return {"master_item_id": master_item_id, "qty_delta": qty_delta, "stock_qty": new_stock_qty}
 
 
@@ -6673,6 +6683,20 @@ def list_purchase_invoices(
             params.extend([f"%{search}%"] * 3)
         query += " ORDER BY pi.invoice_date DESC, pi.id DESC"
         rows = [dict(r) for r in con.execute(query, params).fetchall()]
+        # Goods Receipts behind a faktur made from a PO: the PO's Barang Masuk documents and what each brought in.
+        po_ids = sorted({r["supplier_po_id"] for r in rows if r.get("supplier_po_id")})
+        gr_by_po: dict[str, list[dict]] = {}
+        if po_ids:
+            for g in con.execute(
+                    f"""SELECT sr.supplier_po_id, d.id, d.doc_number, d.status, sr.received_date, SUM(srl.quantity) AS qty
+                        FROM spo_receipts sr JOIN inbound_documents d ON d.id = sr.inbound_document_id
+                        LEFT JOIN spo_receipt_lines srl ON srl.receipt_id = sr.id
+                        WHERE sr.supplier_po_id IN ({_placeholders(po_ids)}) AND d.status <> 'void'
+                        GROUP BY sr.id ORDER BY sr.received_date, sr.id""", po_ids):
+                gr_by_po.setdefault(g["supplier_po_id"], []).append(
+                    {"id": g["id"], "doc_number": g["doc_number"], "status": g["status"], "received_date": g["received_date"], "qty": g["qty"] or 0})
+        for r in rows:
+            r["gr_docs"] = gr_by_po.get(r.get("supplier_po_id"), [])
 
     # payment_status is derived, so it can't be pushed into the SQL WHERE above.
     if payment_status:
@@ -7064,15 +7088,17 @@ def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) 
         return dict(con.execute("SELECT * FROM purchase_invoices WHERE id=?", (cur.lastrowid,)).fetchone())
 
 
-def list_po_received_for_faktur(supplier_id: int) -> list[dict]:
+def list_po_received_for_faktur(supplier_id: int | None) -> list[dict]:
     """Goods Receipt waiting for a faktur: this supplier's issued POs that have received goods and no active faktur
     yet, with each received line at its PO price. Read-only; 'Ambil' on the Faktur Pembelian page then uses the
-    existing create-from-PO flow, so the faktur stays linked to its PO and goes through the same matching."""
+    existing create-from-PO flow, so the faktur stays linked to its PO and goes through the same matching.
+    With no supplier, every supplier's (the 'Buat dari Goods Receipt' picker on the faktur list)."""
     out = []
     with _conn() as con:
+        where, params = ("supplier_id=? AND ", (supplier_id,)) if supplier_id is not None else ("", ())
         pos = con.execute(
-            "SELECT * FROM supplier_pos WHERE supplier_id=? AND status NOT IN ('draft','batal') ORDER BY created_at DESC, id DESC",
-            (supplier_id,)).fetchall()
+            f"SELECT * FROM supplier_pos WHERE {where}status NOT IN ('draft','batal') ORDER BY created_at DESC, id DESC",
+            params).fetchall()
         for po in pos:
             po = dict(po)
             if _active_po_faktur(con, po["id"]):
@@ -7087,6 +7113,7 @@ def list_po_received_for_faktur(supplier_id: int) -> list[dict]:
                               "line_total": qty * price})
             if lines:
                 out.append({"po_id": po["id"], "po_number": po["po_number"], "status": po["status"],
+                            "supplier_name": po["supplier_name_snapshot"],
                             "created_at": po.get("created_at"), "lines": lines, "goods_total": sum(l["line_total"] for l in lines)})
     return out
 
@@ -7656,21 +7683,44 @@ def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, b
         _spo_replace_items(con, spo_id, items)
         _spo_event(con, spo_id, "created", f"Draft dibuat otomatis dari Sales Order {po['po_number']}", by)
         created.append(spo_id)
-    # A line the shelf covers completely is already at the shop: it waits for installation like a
-    # delivered one (and lets the invoice leave Menunggu Barang).
-    ready = [ln for ln in res_lines if ln["preorder_id"] == preorder_id and ln["status"] == "pesanan_dibuat"
-             and ln["coming"] == 0 and ln["reserved"] >= ln["quantity"]]
     # A service (jasa) needs no goods: it is ready to be done as soon as the order is published.
-    ready += [dict(r) for r in con.execute(
+    jasa = [dict(r) for r in con.execute(
         "SELECT * FROM preorder_items WHERE preorder_id=? AND source='jasa' AND status='pesanan_dibuat'", (preorder_id,))]
-    if ready:
-        now = _now()
-        for ln in ready:
-            con.execute("UPDATE preorder_items SET status='sampai_di_toko' WHERE id=?", (ln["id"],))
-            _log_preorder_status(con, preorder_id, ln["id"], ln["product_name"], "sampai_di_toko", now, by,
-                                 "pesanan_dibuat")
+    now = _now()
+    for ln in jasa:
+        con.execute("UPDATE preorder_items SET status='sampai_di_toko' WHERE id=?", (ln["id"],))
+        _log_preorder_status(con, preorder_id, ln["id"], ln["product_name"], "sampai_di_toko", now, by, "pesanan_dibuat")
+    moved = _promote_shelf_ready_lines(con, by, preorder_id=preorder_id, sync=False)
+    if jasa or moved:
         _po_invoice_sync(con, preorder_id, by)
     return created
+
+
+def _promote_shelf_ready_lines(con: sqlite3.Connection, by: str | None, preorder_id: str | None = None,
+                               master_item_ids: list[int] | None = None, sync: bool = True) -> list[str]:
+    """A published Sales Order line the shelf now holds completely (K-02 reservation, nothing still to come
+    from a supplier) is already at the shop: it moves to sampai_di_toko and waits for installation like a
+    delivered one, which also lets its invoice leave Menunggu Barang. Run when an order is published or
+    changed (`preorder_id`) and whenever stock is added (`master_item_ids`): a 'Stok Tersedia' line that was
+    short at publish becomes ready once the goods are on the shelf. Never moves a line backwards.
+    Returns the ids of the orders that changed (their invoices are synced unless sync=False)."""
+    if preorder_id is not None:
+        master_item_ids = [r[0] for r in con.execute(
+            "SELECT DISTINCT master_item_id FROM preorder_items WHERE preorder_id=? AND master_item_id IS NOT NULL", (preorder_id,))]
+    if master_item_ids is not None and not master_item_ids:
+        return []
+    ready = [ln for ln in _reservation_lines(con, master_item_ids)
+             if ln["status"] == "pesanan_dibuat" and ln["coming"] == 0 and ln["reserved"] >= ln["quantity"]
+             and (preorder_id is None or ln["preorder_id"] == preorder_id)]
+    now = _now()
+    for ln in ready:
+        con.execute("UPDATE preorder_items SET status='sampai_di_toko' WHERE id=? AND status='pesanan_dibuat'", (ln["id"],))
+        _log_preorder_status(con, ln["preorder_id"], ln["id"], ln["product_name"], "sampai_di_toko", now, by, "pesanan_dibuat")
+    changed = sorted({ln["preorder_id"] for ln in ready})
+    if sync:
+        for pid in changed:
+            _po_invoice_sync(con, pid, by)
+    return changed
 
 
 def create_preorder(
@@ -11655,6 +11705,7 @@ def approve_supplier_return(return_id: int, shortage_ack: bool, note: str | None
 
 def _sr_unhold_stock_items(con: sqlite3.Connection, ret: dict, keep_in_quarantine: bool, by: str | None, why: str) -> None:
     """Undo what approval did to stock items: back to the shelf, or left in quarantine as a candidate."""
+    back: list[int] = []
     for i in _sr_items(con, ret["id"]):
         if i["source"] != "stok" or not i["quarantine_lot_id"]:
             continue
@@ -11672,7 +11723,9 @@ def _sr_unhold_stock_items(con: sqlite3.Connection, ret: dict, keep_in_quarantin
                 """INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at, created_by)
                    VALUES (?, 'LEPAS_KARANTINA', ?, ?, 'supplier_return', ?, ?, ?, ?)""",
                 (lot["master_item_id"], q, new_qty, ret["id"], f"{why} {ret['return_number']}", _now(), by))
+            back.append(lot["master_item_id"])
         con.execute("UPDATE supplier_return_items SET quarantine_lot_id=NULL WHERE id=?", (i["id"],))
+    _promote_shelf_ready_lines(con, by, master_item_ids=back)
 
 
 def return_supplier_return_to_draft(return_id: int, note: str, user: dict) -> dict:

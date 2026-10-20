@@ -231,7 +231,9 @@
     .nav-link.is-active > svg:first-child { color: #D97757; }
     /* The Inventori group header lights up on every child route; the child link carries the tint. */
     .nav-link[data-route="/inventory-group"].is-active,
-    .nav-link[data-route="/inventory-group"].is-active:hover {
+    .nav-link[data-route="/inventory-group"].is-active:hover,
+    .nav-link[data-route="/dashboard-group"].is-active,
+    .nav-link[data-route="/dashboard-group"].is-active:hover {
       background: transparent;
     }
 
@@ -262,11 +264,6 @@
       color: #FAF9F5;
     }
 
-    /* Faktur Pembelian has two independent filter strips (document status and
-       payment status), so each gets its own class — one shared class would let
-       a click in one strip clear the highlight in the other. */
-    .pi-status-btn.is-active,
-    .pi-payment-btn.is-active,
     .po-status-btn.is-active,
     .history-range-btn.is-active {
       background: #D97757;
@@ -692,12 +689,23 @@
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Service</a>
         </div>
       </div>
-      <a href="#/dashboard" data-route="/dashboard" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>
-        </svg>
-        Dashboard
-      </a>
+      <div>
+        <button type="button" onclick="toggleDashboardNavGroup()" data-route="/dashboard-group"
+          class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+            <path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>
+          </svg>
+          <span class="flex-1 text-left">Dashboard</span>
+          <svg id="nav-dashboard-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted shrink-0 transition-transform duration-200 motion-reduce:transition-none">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
+        <div id="nav-dashboard-submenu" class="hidden ml-[21px] pl-3 mt-0.5 py-0.5 border-l border-line space-y-0.5">
+          <a href="#/dashboard" data-route="/dashboard" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ringkasan</a>
+          <a href="#/dashboard-so" data-route="/dashboard-so" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Dashboard SO</a>
+          <a href="#/dashboard-po" data-route="/dashboard-po" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Dashboard PO</a>
+        </div>
+      </div>
       <a href="#/cash-receipt" data-route="/cash-receipt" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
           <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9v6M9.5 11.5 12 9l2.5 2.5"/>
@@ -1655,78 +1663,64 @@
   <div id="page-purchase-invoices" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
 
-      <!-- LIST PANEL -->
+      <!-- LIST PANEL: Daftar Faktur Pembelian. Tiles, filters and table are drawn from one fetch of all
+           faktur (renderPurchaseInvoiceList); filtering happens in the browser so the tiles stay whole-book. -->
       <div id="pi-list-panel">
-        <div class="flex items-center justify-end mb-4">
-          <button onclick="newPurchaseInvoiceForm()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Faktur Baru</button>
-        </div>
+        <section class="bg-white border border-line rounded-xl px-5 py-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-accentDark">Purchase / Faktur Pembelian</div>
+            <h2 class="font-serif text-2xl font-semibold text-ink leading-tight mt-0.5">Daftar Faktur Pembelian</h2>
+            <p class="text-sm text-muted mt-1">Faktur pembelian dibuat dari Goods Receipt yang sudah diterima. Item, qty dan nilai dasar diambil otomatis dari GR.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="newPurchaseInvoiceForm()" title="Faktur tanpa Purchase Order (diketik manual)" class="px-3.5 py-2.5 rounded-lg text-[13px] font-medium text-muted hover:text-ink hover:bg-bg2 transition-colors">Faktur Manual</button>
+            <button type="button" onclick="exportPurchaseInvoiceList()" class="px-4 py-2.5 rounded-lg border border-line bg-white text-[13px] font-semibold text-ink hover:bg-bg2 transition-colors">Export Laporan</button>
+            <button type="button" onclick="openGoodsReceiptPicker()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-[13px] font-semibold hover:bg-accentDark transition-colors">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Buat dari Goods Receipt</button>
+          </div>
+        </section>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Total Utang</div>
-            <div id="pi-sum-outstanding" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
-          </div>
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Faktur Belum Lunas</div>
-            <div id="pi-sum-unpaid" class="font-sans text-2xl font-semibold text-ink">0</div>
-          </div>
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Lewat Jatuh Tempo</div>
-            <div id="pi-sum-overdue-count" class="font-sans text-2xl font-semibold text-failed">0</div>
-            <div id="pi-sum-overdue-total" class="text-xs text-muted mt-0.5">Rp 0</div>
-          </div>
-          <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-            <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Diposting</div>
-            <div id="pi-sum-posted" class="font-sans text-2xl font-semibold text-ink">0</div>
-          </div>
-        </div>
+        <div id="pi-kpis" class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-2.5 sm:gap-3 mb-4"></div>
 
-        <div class="flex flex-wrap items-center gap-2 mb-4">
-          <input id="pi-search-input" type="text" placeholder="Cari no. faktur / no. supplier / nama supplier…" autocomplete="off"
-            oninput="onPurchaseInvoiceSearchInput()"
-            class="flex-1 min-w-[240px] border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-          <div class="flex flex-wrap gap-1.5">
-            <button type="button" data-pi-status="" onclick="setPurchaseInvoiceStatusFilter('')"
-              class="pi-status-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Semua</button>
-            <button type="button" data-pi-status="draft" onclick="setPurchaseInvoiceStatusFilter('draft')"
-              class="pi-status-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Draft</button>
-            <button type="button" data-pi-status="posted" onclick="setPurchaseInvoiceStatusFilter('posted')"
-              class="pi-status-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Diposting</button>
-            <button type="button" data-pi-status="void" onclick="setPurchaseInvoiceStatusFilter('void')"
-              class="pi-status-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Void</button>
+        <section class="bg-white border border-line rounded-xl mb-4">
+          <div class="px-5 py-3.5 border-b border-line"><h3 class="text-[15px] font-semibold text-ink">Pencarian &amp; Filter</h3></div>
+          <div class="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3.5">
+            <div><label for="pi-f-q" class="block text-[12px] font-semibold text-ink mb-1.5">Cari No. Faktur / No. GR / No. Invoice</label>
+              <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+                <input id="pi-f-q" type="search" data-no-uppercase autocomplete="off" placeholder="FP / BM / No. Invoice Supplier…" onkeydown="if(event.key==='Enter') applyPurchaseInvoiceFilters()" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent pl-9" /></div></div>
+            <div><label for="pi-f-supplier" class="block text-[12px] font-semibold text-ink mb-1.5">Supplier</label><select id="pi-f-supplier" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"><option value="">Semua Supplier</option></select></div>
+            <div><label for="pi-f-status" class="block text-[12px] font-semibold text-ink mb-1.5">Status Faktur</label><select id="pi-f-status" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+              <option value="">Semua Status Faktur</option><option value="draft">Draft</option><option value="siap">Siap ke AP</option><option value="ditahan">Ditahan / menunggu Admin</option><option value="posted">Diposting</option><option value="void">Void</option></select></div>
+            <div><label for="pi-f-ap" class="block text-[12px] font-semibold text-ink mb-1.5">Status AP</label><select id="pi-f-ap" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+              <option value="">Semua Status AP</option><option value="belum_posting">Belum Diposting</option><option value="belum_bayar">Belum Dibayar</option><option value="sebagian">Sebagian Dibayar</option><option value="lewat">Lewat Jatuh Tempo</option><option value="lunas">Lunas</option></select></div>
+            <div class="sm:col-span-2 xl:col-span-1"><span class="block text-[12px] font-semibold text-ink mb-1.5">Rentang Tanggal</span>
+              <div class="flex items-center gap-2"><input id="pi-f-from" type="date" aria-label="Tanggal faktur dari" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /><span class="text-muted">—</span><input id="pi-f-to" type="date" aria-label="Tanggal faktur sampai" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div></div>
+            <div><label for="pi-f-due" class="block text-[12px] font-semibold text-ink mb-1.5">Jatuh Tempo</label><select id="pi-f-due" class="w-full border border-line rounded-lg px-3 py-2.5 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+              <option value="">Semua Jatuh Tempo</option><option value="lewat">Sudah lewat</option><option value="minggu">Minggu ini</option><option value="30">30 hari ke depan</option></select></div>
+            <div class="sm:col-span-2 flex items-end justify-end gap-2">
+              <button type="button" onclick="resetPurchaseInvoiceFilters()" class="px-4 py-2.5 rounded-lg border border-line bg-white text-[13px] font-medium text-ink hover:bg-bg2 transition-colors">Reset</button>
+              <button type="button" onclick="applyPurchaseInvoiceFilters()" class="px-4 py-2.5 rounded-lg bg-accent text-white text-[13px] font-semibold hover:bg-accentDark transition-colors">Terapkan Filter</button></div>
           </div>
-          <span class="w-px h-5 bg-line mx-0.5"></span>
-          <div class="flex flex-wrap gap-1.5">
-            <button type="button" data-pi-payment="" onclick="setPurchaseInvoicePaymentFilter('')"
-              class="pi-payment-btn is-active px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Semua Bayar</button>
-            <button type="button" data-pi-payment="belum" onclick="setPurchaseInvoicePaymentFilter('belum')"
-              class="pi-payment-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Belum</button>
-            <button type="button" data-pi-payment="sebagian" onclick="setPurchaseInvoicePaymentFilter('sebagian')"
-              class="pi-payment-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Sebagian</button>
-            <button type="button" data-pi-payment="lunas" onclick="setPurchaseInvoicePaymentFilter('lunas')"
-              class="pi-payment-btn px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Lunas</button>
-          </div>
-        </div>
+        </section>
 
-        <div class="bg-white border border-line rounded-xl overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-bg2">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Faktur</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jatuh Tempo</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
-              </tr>
-            </thead>
-            <tbody id="pi-list-tbody"></tbody>
-          </table>
-          <div id="pi-list-empty" class="hidden text-center py-12">
-            <p class="font-serif text-base text-ink mb-1">Belum ada faktur pembelian.</p>
-            <p class="text-sm text-muted">Catat tagihan dari supplier lewat tombol “+ Faktur Baru”.</p>
+        <section class="bg-white border border-line rounded-xl overflow-hidden mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 border-b border-line"><h3 class="text-[15px] font-semibold text-ink">Daftar Tagihan Supplier</h3><span id="pi-list-count" class="text-xs text-muted"></span></div>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[1150px] text-sm">
+              <thead class="bg-bg2"><tr id="pi-list-head"></tr></thead>
+              <tbody id="pi-list-tbody"></tbody>
+            </table>
+            <div id="pi-list-empty" class="hidden text-center py-12">
+              <p class="font-serif text-base text-ink mb-1">Belum ada faktur pembelian.</p>
+              <p class="text-sm text-muted">Buat faktur lewat tombol “Buat dari Goods Receipt”.</p>
+            </div>
           </div>
+          <div id="pi-list-pager"></div>
+        </section>
+
+        <div class="flex items-start gap-3 rounded-xl border border-[#CFE0F6] bg-[#F3F8FE] px-4 py-3 text-[13px] text-[#2F4E7A]">
+          <span class="w-5 h-5 rounded-full bg-[#3F6EB5] text-white grid place-items-center shrink-0 mt-px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 11v6M12 7h.01"/></svg></span>
+          <p>Faktur pembelian dibuat dari Goods Receipt. Item, qty dan nilai dasar ditarik otomatis dari GR; user hanya melengkapi informasi tagihan supplier seperti nomor invoice, termin, PPN, ongkir dan catatan. Faktur dari PO harus lolos <b>Verifikasi (Three-Way Matching)</b> sebelum bisa diposting ke Account Payable.</p>
         </div>
       </div>
 
@@ -3443,6 +3437,10 @@
       <div id="cr-view-print" class="hidden"></div>
     </div>
   </div>
+
+  <!-- PAGE: DASHBOARD SALES ORDER / PURCHASE ORDER (read-only monitoring; filled by odSoRender / odPoRender) -->
+  <div id="page-dashboard-so" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="od-so-body" class="max-w-none mx-auto"></div></div>
+  <div id="page-dashboard-po" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="od-po-body" class="max-w-none mx-auto"></div></div>
 
   <div id="page-account-payable" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
@@ -5194,6 +5192,8 @@ const ROUTES = {
   "/master-service": { title: "Master Service", page: "page-master-service" },
   "/master-customer": { title: "Master Customer", page: "page-inventory", section: "inv-tab-customer", data: "customer" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
+  "/dashboard-so": { title: "Dashboard Sales Order", page: "page-dashboard-so" },
+  "/dashboard-po": { title: "Dashboard Purchase Order", page: "page-dashboard-po" },
   "/account-payable": { title: "Aging Payable", page: "page-account-payable" },
   "/cash-receipt": { title: "Cash Receipt / Laporan Penerimaan", page: "page-cash-receipt" },
   "/kas-keluar": { title: "Kas Keluar", page: "page-kas-keluar" },
@@ -5258,6 +5258,13 @@ function renderRoute() {
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
     document.getElementById("nav-inventory-chevron").classList.add("rotate-180");
   }
+  if (DASHBOARD_ROUTES.has(route)) {
+    document.querySelector('.nav-link[data-route="/dashboard-group"]')?.classList.add("is-active");
+    document.getElementById("nav-dashboard-submenu").classList.remove("hidden");
+    document.getElementById("nav-dashboard-chevron").classList.add("rotate-180");
+  }
+  if (route === "/dashboard-so") odSoInit();
+  if (route === "/dashboard-po") odPoInit();
   if (route === "/cashier") { itemEntryInput()?.focus(); svcLoadSerialSkus(); }
   if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); loadNotices(); }
   if (route === "/kas-keluar") koInit();
@@ -5289,6 +5296,12 @@ function renderRoute() {
 function toggleInventoryNavGroup() {
   document.getElementById("nav-inventory-submenu").classList.toggle("hidden");
   document.getElementById("nav-inventory-chevron").classList.toggle("rotate-180");
+}
+
+const DASHBOARD_ROUTES = new Set(["/dashboard", "/dashboard-so", "/dashboard-po"]);
+function toggleDashboardNavGroup() {
+  document.getElementById("nav-dashboard-submenu").classList.toggle("hidden");
+  document.getElementById("nav-dashboard-chevron").classList.toggle("rotate-180");
 }
 
 function updateInventoryNavHighlight() {
@@ -5382,6 +5395,14 @@ const ROUTE_META = {
   "/dashboard": {
     subtitle: "Ringkasan persediaan, penjualan dan tagihan.",
     icon: '<path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>',
+  },
+  "/dashboard-so": {
+    subtitle: "Pantau pesanan customer, supplier per item, barang tiba, stok alokasi, dan pembayaran.",
+    icon: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 13 2 2 4-4"/>',
+  },
+  "/dashboard-po": {
+    subtitle: "Pantau pesanan ke supplier, pengiriman barang, dan penerimaan di toko.",
+    icon: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
   },
   "/account-payable": {
     subtitle: "Pusat kontrol utang supplier: faktur, jatuh tempo, DP, kredit, refund, dan aging.",
@@ -12571,6 +12592,532 @@ function apRenderAging(d) {
     + apPanel("Komposisi umur utang", `<div class="px-4 py-4"><div class="flex items-baseline justify-between"><span class="text-xs text-muted">Total saldo</span><span class="font-sans text-xl font-semibold tabular-nums text-ink">${apMoney(t.total)}</span></div>${bar}<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-3">${legend}</div><p class="text-xs text-muted mt-2">Utang dihitung dari faktur yang sudah diposting, setelah DP, pembayaran, dan kredit.</p></div>`);
 }
 
+// ── Dashboard Sales Order & Dashboard Purchase Order ─────────────────────────
+// Read-only monitoring. The server gives one row per order with its stage, flags and follow-up actions
+// (backend/order_dashboards.py); tiles, the value card, the donut and the table are all counted here from
+// those same rows, so they always agree. Every button opens the document where the work is actually done.
+const OD_ICONS = {
+  clipboard: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 12h6M9 16h4"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.6L22 7H6"/>',
+  truck: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
+  box: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+  alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+  alertc: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16h.01"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  hourglass: '<path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4"/>',
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+  printer: '<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/>',
+  external: '<path d="M14 3h7v7M10 14 21 3M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z"/>',
+  coins: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+  pie: '<path d="M21 12A9 9 0 1 1 12 3v9Z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15Z"/>',
+  wallet: '<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+};
+const odIcon = (name, size = 16, sw = 1.7) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${OD_ICONS[name] || ""}</svg>`;
+// Tone → [card title, chip background, chip ink, card tint, card border]; the six colours of the KPI row.
+// The tint is an inline style so the app-wide nth-child card tints don't recolour the row out of order.
+const OD_TONES = {
+  coral: ["text-[#C4633F]", "bg-[#FBE6DD]", "text-[#C4633F]", "#FFF8F5", "#F4DDD3"],
+  amber: ["text-[#A87612]", "bg-[#FBEFD3]", "text-[#C08A1C]", "#FFFAF0", "#F2E3BF"],
+  blue: ["text-[#3F6EB5]", "bg-[#E1ECFA]", "text-[#3F6EB5]", "#F6F9FE", "#D8E5F6"],
+  violet: ["text-[#6E4FB8]", "bg-[#ECE5FA]", "text-[#6E4FB8]", "#F9F7FE", "#E3DAF4"],
+  red: ["text-[#B04646]", "bg-[#FBE3E3]", "text-[#C04848]", "#FFF6F6", "#F2D4D4"],
+  green: ["text-[#2F7A4B]", "bg-[#E0F2E6]", "text-[#3F8F5A]", "#F5FBF7", "#D3EADB"],
+};
+const OD_BADGE = {
+  amber: "bg-[#FCF1DA] text-[#94650F] border-[#F3DFB2]", orange: "bg-[#FDEBDF] text-[#B4562A] border-[#F6D2BC]",
+  blue: "bg-[#E6F0FC] text-[#2F5C9E] border-[#CFE0F6]", sky: "bg-[#E5F4FA] text-[#22708F] border-[#C9E6F2]",
+  violet: "bg-[#EFE9FB] text-[#5E43A8] border-[#DDD2F5]", green: "bg-[#E4F4E9] text-[#2F6B43] border-[#C9E6D2]",
+  red: "bg-[#FBE7E7] text-[#A83B3B] border-[#F3CDCD]", stone: "bg-[#F0EEE6] text-[#5E5A52] border-[#E2DED3]",
+};
+const odBadge = (tone, label, extra = "") => `<span class="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap ${OD_BADGE[tone] || OD_BADGE.stone} ${extra}">${esc(label)}</span>`;
+const odMoney = n => esc(formatIDR(n || 0));
+const odDate = ymd => ymd ? apDate(ymd) : "—";
+const odPct = (a, b) => b > 0 ? Math.round(a * 100 / b) : 0;
+const OD_PAGE_SIZE = 10;
+const OD_TH = "text-left px-3 py-2.5 font-semibold text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap";
+const OD_TD = "px-3 py-3 align-middle";
+const OD_INPUT = "w-full border border-line rounded-lg px-3 py-2 text-[13px] bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent";
+
+function odHead(crumb, title, sub, actions) {
+  return `<div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+    <div class="min-w-0"><nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb"><a href="#/dashboard" class="hover:text-ink">Dashboard</a><span aria-hidden="true">›</span><span class="text-accentDark font-medium">${esc(crumb)}</span></nav>
+      <h2 class="font-serif text-2xl sm:text-[28px] font-semibold text-ink leading-tight">${esc(title)}</h2>
+      <p class="text-sm text-muted mt-1">${esc(sub)}</p></div>
+    <div class="flex flex-wrap items-center gap-2">${actions}</div></div>`;
+}
+const odBtn = (icon, label, js, extra = "") => `<button type="button" onclick="${js}" class="inline-flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium rounded-lg border border-line bg-white text-ink hover:bg-bg2 transition-colors whitespace-nowrap ${extra}">${odIcon(icon, 15)}${label}</button>`;
+const odMonitorChip = `<span title="Halaman ini hanya untuk memantau. Perubahan dilakukan di dokumennya masing-masing." class="inline-flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium rounded-lg border border-[#C9E6D2] bg-[#EEF7F1] text-[#2F6B43] whitespace-nowrap">${odIcon("eye", 15)}Monitoring saja</span>`;
+
+function odKpi(tone, icon, label, value, sub, js) {
+  const [title, chipBg, chipInk, tint, edge] = OD_TONES[tone];
+  return `<button type="button" onclick="${js}" style="background:${tint};border-color:${edge}" class="text-left bg-white border border-line rounded-xl px-3 sm:px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row items-start gap-2 sm:gap-3.5 hover:border-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+    <span class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl grid place-items-center shrink-0 ${chipBg} ${chipInk}">${odIcon(icon, 22, 1.6)}</span>
+    <span class="min-w-0"><span class="block text-[12.5px] font-semibold ${title}">${label}</span>
+      <span class="block font-sans text-[26px] leading-tight font-semibold text-ink tabular-nums mt-0.5">${value}</span>
+      <span class="block text-[11.5px] text-muted mt-1 leading-snug">${sub}</span></span></button>`;
+}
+
+function odCard(title, icon, body, aside = "", extra = "") {
+  return `<section class="bg-white border border-line rounded-xl overflow-hidden flex flex-col ${extra}">
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-line"><div class="flex items-center gap-2.5 min-w-0"><span class="w-8 h-8 rounded-lg grid place-items-center bg-[#FBEBE4] text-accentDark shrink-0">${odIcon(icon, 16)}</span><h3 class="text-[15px] font-semibold text-ink truncate">${title}</h3></div>${aside}</div>
+    <div class="flex-1">${body}</div></section>`;
+}
+
+// Donut from [{label, value, color}]; the gaps between slices are left by the white stroke.
+function odDonut(parts, center, centerSub) {
+  const total = parts.reduce((s, p) => s + p.value, 0);
+  const r = 15.9155;
+  let offset = 25;
+  const arcs = total ? parts.filter(p => p.value > 0).map(p => {
+    const len = p.value * 100 / total;
+    const arc = `<circle cx="21" cy="21" r="${r}" fill="none" stroke="${p.color}" stroke-width="6" stroke-dasharray="${len} ${100 - len}" stroke-dashoffset="${offset}"><title>${esc(p.label)}: ${p.value}</title></circle>`;
+    offset -= len;
+    return arc;
+  }).join("") : "";
+  return `<div class="relative w-[150px] h-[150px] shrink-0"><svg viewBox="0 0 42 42" class="w-full h-full" role="img" aria-label="${esc(centerSub)}: ${total}">
+      <circle cx="21" cy="21" r="${r}" fill="none" stroke="#F0EEE6" stroke-width="6"/>${arcs}</svg>
+    <div class="absolute inset-0 grid place-items-center text-center"><div><div class="font-sans text-[28px] font-semibold text-ink leading-none tabular-nums">${center}</div><div class="text-[11px] text-muted mt-1 leading-tight max-w-[80px]">${esc(centerSub)}</div></div></div></div>`;
+}
+const odLegend = (parts, total, js) => `<ul class="flex-1 min-w-0 space-y-2.5">${parts.map(p => `<li><button type="button" ${p.tab ? `onclick="${js}('${p.tab}')"` : "disabled"} class="w-full flex items-center gap-2.5 text-[13px] text-left ${p.tab ? "hover:text-ink" : "cursor-default"}">
+    <i class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${p.color}"></i><span class="flex-1 text-ink truncate">${esc(p.label)}</span>
+    <span class="tabular-nums font-semibold text-ink">${p.value}</span><span class="tabular-nums text-[11px] text-muted w-9 text-right">${odPct(p.value, total)}%</span></button></li>`).join("")}</ul>`;
+
+function odTabs(tabs, current, counts, js) {
+  return `<div class="flex flex-wrap items-center gap-1.5">${tabs.map(([k, label]) => {
+    const on = current === k;
+    return `<button type="button" onclick="${js}('${k}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors ${on ? "bg-accent border-accent text-white" : "border-line bg-white text-muted hover:text-ink hover:bg-bg2"}">${label}<span class="tabular-nums text-[11px] px-1.5 rounded-full ${on ? "bg-white/25" : "bg-bg2 text-muted"}">${counts[k] ?? 0}</span></button>`;
+  }).join("")}</div>`;
+}
+
+function odPager(page, pages, shown, total, js) {
+  const btn = (p, label, dis) => `<button type="button" ${dis ? "disabled" : `onclick="${js}(${p})"`} class="px-2.5 py-1 rounded-md border border-line bg-white text-xs ${dis ? "text-muted/50" : "text-ink hover:bg-bg2"}">${label}</button>`;
+  return `<div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-line text-xs text-muted">
+    <span>${total ? `Menampilkan ${shown} dari ${total} data` : ""}</span>
+    <div class="flex items-center gap-1.5">${btn(page - 1, "‹ Sebelumnya", page <= 1)}<span class="px-2">Halaman ${page} dari ${pages}</span>${btn(page + 1, "Berikutnya ›", page >= pages)}</div></div>`;
+}
+
+function odProgress(done, total, unit, tone) {
+  const pct = odPct(done, total);
+  const color = tone || (pct >= 100 ? "#3FAE6A" : pct > 0 ? "#3B8BD9" : "#D8D4C9");
+  return `<div class="min-w-[130px]"><div class="flex items-center justify-between gap-2 text-[12px]"><span class="tabular-nums text-ink">${done}/${total} ${esc(unit)}</span><span class="tabular-nums text-[11px] text-muted">${pct}%</span></div>
+    <div class="h-1.5 rounded-full bg-[#EFEDE6] mt-1 overflow-hidden"><div class="h-full rounded-full" style="width:${Math.min(pct, 100)}%;background:${color}"></div></div></div>`;
+}
+
+function odWa(phone, text) {
+  const digits = String(phone || "").replace(/\D/g, "").replace(/^0/, "62");
+  if (digits.length < 10) { showToast("Nomor WhatsApp tidak tersedia atau tidak valid."); return false; }
+  window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  return true;
+}
+
+function odPrint(title, head, rows) {
+  const w = window.open("", "_blank");
+  if (!w) { showToast("Pop-up diblokir browser. Izinkan pop-up untuk mencetak."); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+    body{font-family:Arial,sans-serif;font-size:11px;margin:18px;color:#111}h1{font-size:16px;margin:0 0 2px}.meta{color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 5px;text-align:left;vertical-align:top}th{background:#eee}</style></head><body>
+    <h1>${esc(title)}</h1><div class="meta">Dicetak ${esc(new Date().toLocaleString("id-ID"))} · ${rows.length} baris</div>
+    <table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`);
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+}
+
+async function odFetch(kind) {
+  const resp = await fetch(`/api/dashboards/${kind}`);
+  if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Dashboard tidak bisa dimuat."));
+  return resp.json();
+}
+
+// ── Sales Order ──
+const OD_SO = { data: null, tab: "semua", page: 1, scope: "aktif", f: { q: "", supplier: "", status: "", line: "", po: "", from: "", eta: "" } };
+const OD_SO_TABS = [["semua", "Semua"], ["tindakan", "Perlu Tindakan"], ["menunggu_po", "Menunggu PO"], ["dalam_pengiriman", "Dalam Pengiriman"],
+  ["tiba_sebagian", "Tiba Sebagian"], ["siap", "Barang Siap"], ["terlambat", "Terlambat"], ["selesai", "Selesai"]];
+const OD_SO_STATUS = {
+  menunggu_supplier: ["orange", "Menunggu supplier"], menunggu_po: ["amber", "Menunggu PO"], dalam_pengiriman: ["blue", "Dalam pengiriman"],
+  tiba_sebagian: ["sky", "Tiba sebagian"], dialokasikan: ["violet", "Dialokasikan"], siap: ["green", "Barang siap"],
+  menunggu_lunas: ["stone", "Menunggu pelunasan"], menunggu_selesai: ["stone", "Menunggu selesai"], selesai: ["green", "Selesai"],
+};
+const OD_SO_STAGE_COLORS = { menunggu_po: "#F2A541", dalam_pengiriman: "#3B8BD9", tiba_sebagian: "#8A6FD1", siap: "#3FAE6A", lain: "#BDB9AE" };
+// Order of the follow-ups (the first one is what the "Perlu Tindakan" card shows for an order).
+const OD_SO_ACTION_RANK = { lengkapi_supplier: 0, terlambat: 1, po_draft: 2, harga_khusus: 3, dana_pending: 4, hubungi_customer: 5 };
+const OD_SO_ACTION_ICON = { lengkapi_supplier: ["alertc", "red"], terlambat: ["clock", "red"], po_draft: ["truck", "amber"],
+  harga_khusus: ["tag", "violet"], dana_pending: ["wallet", "blue"], hubungi_customer: ["check", "green"] };
+
+async function odSoInit() {
+  const body = document.getElementById("od-so-body");
+  if (!OD_SO.data) body.innerHTML = '<div class="py-24 text-center text-sm text-muted">Memuat dashboard…</div>';
+  try { OD_SO.data = await odFetch("sales-orders"); }
+  catch (e) { showToast(e.message); body.innerHTML = `<div class="py-24 text-center text-sm text-failed">${esc(e.message)}</div>`; return; }
+  odSoRender();
+}
+
+const odSoActive = () => OD_SO.data.rows.filter(r => r.stage !== "selesai");
+function odSoInTab(r, tab) {
+  if (tab === "semua") return r.stage !== "selesai";
+  if (tab === "tindakan") return r.actions.length > 0;
+  if (tab === "terlambat") return r.late && r.stage !== "selesai";
+  return r.stage === tab;
+}
+
+function odSoFiltered() {
+  const f = OD_SO.f, q = f.q.trim().toLowerCase(), po = f.po.trim().toLowerCase();
+  return OD_SO.data.rows.filter(r => odSoInTab(r, OD_SO.tab)
+    && (!q || [r.so_number, r.customer_name, r.plate, r.customer_phone, r.receipt_no, ...r.item_names, ...r.pos.map(p => p.po_number)].some(v => String(v || "").toLowerCase().includes(q)))
+    && (!f.supplier || r.suppliers.includes(f.supplier))
+    && (!f.status || r.status_key === f.status)
+    && (!f.line || r.line_statuses.includes(f.line))
+    && (!po || r.pos.some(p => p.po_number.toLowerCase().includes(po)))
+    && (!f.from || r.so_date >= f.from)
+    && (!f.eta || (r.eta && r.eta <= f.eta)));
+}
+
+function odSoRender() {
+  const d = OD_SO.data, rows = d.rows, active = odSoActive();
+  const cnt = st => active.filter(r => r.stage === st).length;
+  const actionRows = rows.filter(r => r.actions.length);
+  const late = active.filter(r => r.late).length;
+  const kpis = `<div class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5 sm:gap-3 mb-4">
+    ${odKpi("coral", "clipboard", "SO Aktif", active.length, "Pesanan masih berjalan", "odSoTab('semua')")}
+    ${odKpi("amber", "cart", "Menunggu PO", cnt("menunggu_po"), "Perlu supplier / PO", "odSoTab('menunggu_po')")}
+    ${odKpi("blue", "truck", "Dalam Pengiriman", cnt("dalam_pengiriman"), "Barang sedang dipesan / dikirim", "odSoTab('dalam_pengiriman')")}
+    ${odKpi("violet", "box", "Barang Siap", cnt("siap"), "Siap dipasang / diambil", "odSoTab('siap')")}
+    ${odKpi("red", "alert", "Perlu Tindakan", actionRows.length, "Butuh tindak lanjut hari ini", "odSoTab('tindakan')")}
+    ${odKpi("green", "clock", "Terlambat", late, "Melewati ETA terkonfirmasi", "odSoTab('terlambat')")}</div>`;
+
+  // Perlu Tindakan Hari Ini: each order once, by its most urgent follow-up.
+  const todo = actionRows.map(r => ({ r, a: [...r.actions].sort((x, y) => OD_SO_ACTION_RANK[x.kind] - OD_SO_ACTION_RANK[y.kind])[0] }))
+    .sort((x, y) => OD_SO_ACTION_RANK[x.a.kind] - OD_SO_ACTION_RANK[y.a.kind] || (x.r.so_date < y.r.so_date ? -1 : 1));
+  const todoList = todo.length ? `<ul class="divide-y divide-line">${todo.slice(0, 4).map(({ r, a }) => {
+    const [ic, tone] = OD_SO_ACTION_ICON[a.kind] || ["alertc", "red"];
+    const [, chipBg, chipInk] = OD_TONES[tone === "violet" ? "violet" : tone];
+    const text = a.kind === "terlambat" && a.eta ? `${a.text} (ETA ${odDate(a.eta)})` : a.kind === "dana_pending" ? `${a.text}: ${formatIDR(a.amount)}` : a.text;
+    return `<li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg grid place-items-center shrink-0 ${chipBg} ${chipInk}">${odIcon(ic, 16)}</span>
+      <div class="min-w-0 flex-1"><div class="text-[13px] font-semibold text-ink truncate">${esc(r.so_number)} · ${esc(r.customer_name)}</div><div class="text-[12px] text-muted truncate" title="${esc(text)}">${esc(text)}</div></div>
+      <button type="button" onclick="odSoAction('${esc(r.id)}', '${a.kind}')" class="shrink-0 px-3 py-1.5 rounded-lg border border-[#F1CDBE] bg-white text-accentDark text-xs font-semibold hover:bg-accent/10 whitespace-nowrap">${esc(a.button)}</button></li>`;
+  }).join("")}</ul>` : `<div class="px-4 py-10 text-center text-sm text-muted">${odIcon("check", 22)}<div class="mt-2">Tidak ada SO yang perlu ditindaklanjuti.</div></div>`;
+  const todoCard = `<section class="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#F3DCD2] bg-[#FDF3EE]"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-lg grid place-items-center bg-[#FBDCCF] text-[#C04848]">${odIcon("alertc", 17)}</span><h3 class="text-[15px] font-semibold text-[#B4452A]">Perlu Tindakan Hari Ini</h3></div>
+      ${todo.length ? `<button type="button" onclick="odSoTab('tindakan')" class="text-xs font-semibold text-accentDark hover:underline whitespace-nowrap">Lihat Semua (${todo.length}) →</button>` : ""}</div>${todoList}</section>`;
+
+  // Nilai Sales Order Aktif
+  const month = d.today.slice(0, 7);
+  const scoped = OD_SO.scope === "bulan" ? active.filter(r => (r.so_date || "").startsWith(month)) : active;
+  const total = scoped.reduce((s, r) => s + r.total, 0);
+  const paid = scoped.reduce((s, r) => s + Math.min(r.paid, r.total), 0);
+  const rest = scoped.reduce((s, r) => s + r.remaining, 0);
+  const valueCard = odCard("Nilai Sales Order Aktif", "coins", `<div class="px-4 py-4">
+      <div class="font-sans text-[28px] font-semibold text-ink tabular-nums leading-tight">${odMoney(total)}</div>
+      <div class="text-xs text-muted mt-0.5">${scoped.length} SO ${OD_SO.scope === "bulan" ? "aktif dibuat bulan ini" : "aktif"}</div>
+      <div class="flex h-2.5 rounded-full overflow-hidden bg-[#EFEDE6] mt-4" role="img" aria-label="DP ${odPct(paid, total)}%">
+        <div style="width:${odPct(paid, total)}%" class="bg-[#F2A541]"></div><div style="width:${odPct(rest, total)}%" class="bg-[#3B8BD9]"></div></div>
+      <dl class="mt-4 space-y-2.5 text-[13px]">
+        <div class="flex items-center gap-2.5"><i class="w-2.5 h-2.5 rounded-full bg-[#F2A541]"></i><dt class="flex-1 text-muted">DP sudah diterima</dt><dd class="tabular-nums font-semibold text-ink">${odMoney(paid)}</dd><span class="w-9 text-right text-[11px] text-muted tabular-nums">${odPct(paid, total)}%</span></div>
+        <div class="flex items-center gap-2.5"><i class="w-2.5 h-2.5 rounded-full bg-[#3B8BD9]"></i><dt class="flex-1 text-muted">Sisa tagihan</dt><dd class="tabular-nums font-semibold text-ink">${odMoney(rest)}</dd><span class="w-9 text-right text-[11px] text-muted tabular-nums">${odPct(rest, total)}%</span></div></dl>
+      <p class="mt-4 rounded-lg bg-bg px-3 py-2 text-[11.5px] text-muted text-center">DP yang sudah pindah ke invoice dihitung sekali. Transfer/QRIS yang belum dikonfirmasi belum dihitung.</p></div>`,
+    `<select onchange="OD_SO.scope = this.value; odSoRender()" aria-label="Cakupan nilai" class="border border-line rounded-lg px-2.5 py-1.5 text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30">
+      <option value="aktif" ${OD_SO.scope === "aktif" ? "selected" : ""}>Seluruh SO aktif</option><option value="bulan" ${OD_SO.scope === "bulan" ? "selected" : ""}>SO bulan ini</option></select>`);
+
+  // Status Pemenuhan SO: one category per order.
+  const parts = [["menunggu_po", "Menunggu PO"], ["dalam_pengiriman", "Dalam Pengiriman"], ["tiba_sebagian", "Diterima Sebagian"], ["siap", "Barang Siap"], ["lain", "Status Lain"]]
+    .map(([k, label]) => ({ label, value: cnt(k), color: OD_SO_STAGE_COLORS[k], tab: k === "lain" ? "" : k }));
+  const donutCard = odCard("Status Pemenuhan SO", "pie", `<div class="px-4 py-4"><div class="flex flex-col sm:flex-row items-center gap-5">${odDonut(parts, active.length, "SO Aktif")}${odLegend(parts, active.length, "odSoTab")}</div>
+      <p class="mt-4 rounded-lg bg-[#FDF3EA] px-3 py-2 text-[11.5px] text-[#9A5A1F] text-center">Satu SO dihitung pada satu kategori utama saja. Status Lain = semua barang terpasang, invoice belum ditutup.</p></div>`,
+    `<span class="text-xs text-muted border border-line rounded-lg px-2.5 py-1.5 whitespace-nowrap">${active.length} SO Aktif</span>`);
+
+  document.getElementById("od-so-body").innerHTML =
+    odHead("Dashboard Sales Order", "Dashboard Sales Order", "Pantau pesanan customer, supplier per item, barang tiba, stok alokasi, dan pembayaran.",
+      odBtn("external", "Daftar SO", "location.hash='/sales-order'") + odBtn("download", "Ekspor", "odSoExport()") + odMonitorChip)
+    + kpis
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 mb-4">${todoCard}${valueCard}${donutCard}</div>`
+    + `<section id="od-so-table" class="bg-white border border-line rounded-xl overflow-hidden"></section>`;
+  odSoRenderTable();
+}
+
+function odSoRenderTable() {
+  const d = OD_SO.data, f = OD_SO.f;
+  const counts = Object.fromEntries(OD_SO_TABS.map(([k]) => [k, d.rows.filter(r => odSoInTab(r, k)).length]));
+  const list = odSoFiltered();
+  const pages = Math.max(1, Math.ceil(list.length / OD_PAGE_SIZE));
+  OD_SO.page = Math.min(OD_SO.page, pages);
+  const shown = list.slice((OD_SO.page - 1) * OD_PAGE_SIZE, OD_SO.page * OD_PAGE_SIZE);
+  const suppliers = [...new Set(d.rows.flatMap(r => r.suppliers))].sort();
+  const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label)}</option>`;
+  const sel = (key, ph, opts) => `<select onchange="OD_SO.f.${key} = this.value; OD_SO.page = 1; odSoRenderTable()" aria-label="${ph}" class="${OD_INPUT}">${opt("", ph, f[key])}${opts.map(([v, l]) => opt(v, l, f[key])).join("")}</select>`;
+  const dateIn = (key, label) => `<label class="relative block"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted pointer-events-none ${f[key] ? "hidden" : ""}">${label}</span><input type="date" value="${esc(f[key])}" aria-label="${label}" onchange="OD_SO.f.${key} = this.value; OD_SO.page = 1; odSoRenderTable()" class="${OD_INPUT} ${f[key] ? "" : "text-transparent focus:text-ink"}" /></label>`;
+  const filters = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2 px-4 py-3 border-b border-line">
+    <label class="relative block"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">${odIcon("search", 14)}</span><input id="od-so-q" type="search" data-no-uppercase value="${esc(f.q)}" placeholder="Cari customer / SO / plat / barang" onkeydown="if(event.key==='Enter') odSoSearch()" class="${OD_INPUT} pl-8" /></label>
+    ${sel("supplier", "Semua Supplier", suppliers.map(s => [s, s]))}
+    ${sel("status", "Status SO", Object.entries(OD_SO_STATUS).map(([k, [, l]]) => [k, l]))}
+    ${sel("line", "Status Barang", Object.entries(d.line_status_labels).filter(([k]) => k !== "dibatalkan"))}
+    <input id="od-so-po" type="search" data-no-uppercase value="${esc(f.po)}" placeholder="Nomor PO" onkeydown="if(event.key==='Enter') odSoSearch()" class="${OD_INPUT}" />
+    ${dateIn("from", "Tanggal SO dari")}${dateIn("eta", "ETA sampai")}
+    <div class="flex gap-2"><button type="button" onclick="odSoSearch()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-accent text-white text-[13px] font-semibold hover:bg-accentDark">${odIcon("search", 14)}Cari</button>
+      <button type="button" onclick="odSoReset()" class="px-3.5 py-2 rounded-lg border border-line bg-white text-[13px] text-ink hover:bg-bg2">Reset</button></div></div>`;
+  const rows = shown.map(r => {
+    const [tone, label] = OD_SO_STATUS[r.status_key] || ["stone", r.status_label];
+    const pos = r.pos.length ? `<div class="flex flex-wrap gap-1">${r.pos.map(p => `<button type="button" onclick="openSupplierPoFromFaktur('${esc(p.id)}')" class="px-1.5 py-0.5 rounded-md bg-[#E6F0FC] text-[#2F5C9E] text-[11px] font-semibold hover:underline whitespace-nowrap ${p.status === "draft" ? "border border-dashed border-[#9DBBE6]" : ""}" title="${p.status === "draft" ? "Masih draft" : ""}">${esc(p.po_number.replace(/^PO-SUP-\d{8}-/, "PO-"))}</button>`).join("")}</div>`
+      : r.missing_supplier ? `<span class="text-[12px] font-medium text-accentDark">Belum dipilih</span>` : `<span class="text-muted">—</span>`;
+    const eta = r.eta ? `<span class="whitespace-nowrap ${r.late ? "text-failed font-semibold" : "text-ink"}">${odDate(r.eta)}</span>${r.late ? `<div class="text-[10.5px] font-semibold text-failed uppercase tracking-wide">Terlambat</div>` : ""}`
+      : `<span class="text-[12px] ${r.eta_text === "Belum ada" ? "text-muted" : "text-[#2F6B43] font-medium"}">${esc(r.eta_text || "—")}</span>`;
+    return `<tr class="border-b border-line last:border-b-0 hover:bg-bg/60">
+      <td class="${OD_TD}"><a href="#/sales-order" onclick="openPreorderFromDashboard('${esc(r.id)}'); return false;" class="font-mono text-[12.5px] font-semibold text-accentDark underline decoration-dotted underline-offset-2 whitespace-nowrap">${esc(r.so_number)}</a></td>
+      <td class="${OD_TD} text-[13px] text-ink whitespace-nowrap">${odDate(r.so_date)}</td>
+      <td class="${OD_TD}"><div class="text-[13px] font-semibold text-ink uppercase">${esc(r.customer_name)}</div><div class="text-[11px] text-muted">${esc(r.plate || "—")}</div></td>
+      <td class="${OD_TD} text-[13px] text-ink max-w-[220px]"><div class="truncate" title="${esc(r.item_names.join(", "))}">${esc(r.summary)}</div></td>
+      <td class="${OD_TD} text-[13px] text-ink">${esc(r.source_label)}</td>
+      <td class="${OD_TD}">${pos}</td>
+      <td class="${OD_TD}">${odProgress(r.progress.done, r.progress.total, r.progress.unit)}</td>
+      <td class="${OD_TD} text-[13px]">${eta}</td>
+      <td class="${OD_TD} whitespace-nowrap"><div class="text-[13px] font-semibold text-ink tabular-nums">${odMoney(r.paid)}</div><div class="text-[11px] text-muted tabular-nums">Sisa ${odMoney(r.remaining)}</div></td>
+      <td class="${OD_TD}">${odBadge(tone, label)}</td>
+      <td class="${OD_TD}"><button type="button" onclick="openPreorderFromDashboard('${esc(r.id)}')" class="px-3 py-1.5 rounded-lg border border-line bg-white text-xs font-semibold text-ink hover:bg-bg2">Lihat</button></td></tr>`;
+  }).join("");
+  const th = ["No. SO", "Tanggal", "Customer / Plat", "Ringkasan Barang", "Sumber", "PO Terkait", "Progress Barang", "ETA / Siap", "DP / Sisa", "Status SO", "Aksi"].map(h => `<th class="${OD_TH}">${h}</th>`).join("");
+  document.getElementById("od-so-table").innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">${odTabs(OD_SO_TABS, OD_SO.tab, counts, "odSoTab")}
+      <div class="flex gap-2">${odBtn("download", "Ekspor", "odSoExport()", "!py-1.5")}${odBtn("printer", "Cetak", "odSoPrint()", "!py-1.5")}</div></div>
+    ${filters}
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-2"><span class="text-[11px] font-semibold uppercase tracking-wider text-accentDark">Monitoring pesanan customer</span>
+      <span class="text-[11px] text-muted">Menampilkan ${list.length} dari ${counts.semua} SO aktif</span></div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[1180px] text-sm"><thead class="bg-bg2"><tr>${th}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="11" class="px-3 py-12 text-center text-sm text-muted">Tidak ada Sales Order pada tab / filter ini.</td></tr>`}</tbody></table></div>
+    ${odPager(OD_SO.page, pages, shown.length, list.length, "odSoPage")}`;
+}
+
+function odSoTab(tab) {
+  OD_SO.tab = tab; OD_SO.page = 1;
+  odSoRenderTable();
+  document.getElementById("od-so-table")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function odSoPage(p) { OD_SO.page = p; odSoRenderTable(); }
+function odSoSearch() {
+  OD_SO.f.q = document.getElementById("od-so-q").value;
+  OD_SO.f.po = document.getElementById("od-so-po").value;
+  OD_SO.page = 1; odSoRenderTable();
+}
+function odSoReset() {
+  OD_SO.f = { q: "", supplier: "", status: "", line: "", po: "", from: "", eta: "" };
+  OD_SO.page = 1; odSoRenderTable();
+}
+
+function odSoAction(id, kind) {
+  const r = OD_SO.data.rows.find(x => x.id === id);
+  if (!r) return;
+  const a = r.actions.find(x => x.kind === kind);
+  if (kind === "po_draft" && a?.po_id) { openSupplierPoFromFaktur(a.po_id); return; }
+  if (kind === "hubungi_customer") {
+    const shop = document.getElementById("brand-name")?.textContent.trim() || "kami";
+    if (odWa(r.customer_phone, `Halo ${r.customer_name}, barang pesanan Anda (${r.so_number}${r.plate ? ", " + r.plate : ""}) sudah siap di toko. Silakan atur jadwal pemasangan / pengambilan. Terima kasih — ${shop}`)) return;
+  }
+  openPreorderFromDashboard(id);
+}
+
+function odSoTableRows() {
+  return odSoFiltered().map(r => [r.so_number, r.so_date, r.customer_name, r.plate || "", r.summary, r.source_label, r.pos.map(p => p.po_number).join(" "),
+    `${r.progress.done}/${r.progress.total} ${r.progress.unit}`, r.eta || r.eta_text || "", r.late ? "Ya" : "", r.total, r.paid, r.remaining, (OD_SO_STATUS[r.status_key] || [, r.status_label])[1]]);
+}
+const OD_SO_COLS = ["No. SO", "Tanggal", "Customer", "Plat", "Ringkasan Barang", "Sumber", "PO Terkait", "Progress", "ETA / Siap", "Terlambat", "Total", "DP", "Sisa", "Status SO"];
+function odSoExport() { downloadCsvText(`dashboard-sales-order-${OD_SO.data.today}.csv`, [OD_SO_COLS, ...odSoTableRows()]); }
+function odSoPrint() { odPrint("Dashboard Sales Order — " + (OD_SO_TABS.find(t => t[0] === OD_SO.tab) || [, ""])[1], OD_SO_COLS, odSoTableRows().map(r => r.map((c, i) => i >= 10 && i <= 12 ? formatIDR(c) : c))); }
+
+// ── Purchase Order ──
+const OD_PO = { data: null, tab: "semua", page: 1, scope: "bulan", fwd: "", f: { q: "", supplier: "", status: "", ship: "", receipt: "", from: "", eta: "" } };
+const OD_PO_TABS = [["semua", "Semua"], ["tindakan", "Perlu Tindakan"], ["menunggu_konfirmasi", "Menunggu Konfirmasi"], ["dalam_pengiriman", "Dalam Pengiriman"],
+  ["diterima_sebagian", "Diterima Sebagian"], ["terlambat", "Terlambat"], ["diterima_lengkap", "Diterima Lengkap"], ["draft", "Draft"]];
+const OD_PO_STATUS_TONE = { draft: "stone", menunggu_konfirmasi: "amber", dikonfirmasi: "green", diproses: "violet", dalam_pengiriman: "blue",
+  diterima_sebagian: "sky", diterima_lengkap: "green", dibatalkan: "red" };
+const OD_PO_SHIP = { belum_dikirim: ["amber", "#E7A33C"], diproses: ["violet", "#8A6FD1"], dalam_pengiriman: ["blue", "#3B8BD9"], tiba: ["green", "#3FAE6A"], terlambat: ["red", "#D9534F"] };
+const OD_PO_ACTION_RANK = { terlambat: 0, gr_draft: 1, tiba_hub: 2, tanpa_resi: 3, konfirmasi: 4, draft: 5 };
+const OD_PO_ACTION_ICON = { terlambat: ["clock", "red"], gr_draft: ["box", "coral"], tiba_hub: ["box", "violet"], tanpa_resi: ["truck", "coral"],
+  konfirmasi: ["hourglass", "amber"], draft: ["doc", "blue"] };
+
+async function odPoInit() {
+  const body = document.getElementById("od-po-body");
+  if (!OD_PO.data) body.innerHTML = '<div class="py-24 text-center text-sm text-muted">Memuat dashboard…</div>';
+  try { OD_PO.data = await odFetch("purchase-orders"); }
+  catch (e) { showToast(e.message); body.innerHTML = `<div class="py-24 text-center text-sm text-failed">${esc(e.message)}</div>`; return; }
+  odPoRender();
+}
+
+function odPoInTab(r, tab) {
+  if (tab === "draft") return r.order_status === "draft";
+  if (r.order_status === "draft" && tab !== "tindakan") return false;
+  if (tab === "semua") return true;
+  if (tab === "tindakan") return r.actions.length > 0;
+  if (tab === "terlambat") return r.late;
+  if (tab === "dalam_pengiriman") return r.active && r.ship_key === "dalam_pengiriman";
+  return r.order_status === tab;
+}
+
+function odPoFiltered() {
+  const f = OD_PO.f, q = f.q.trim().toLowerCase();
+  return OD_PO.data.rows.filter(r => odPoInTab(r, OD_PO.tab)
+    && (!q || [r.po_number, r.supplier_name, ...r.item_names, ...r.so_refs.flatMap(s => [s.so_number, s.customer_name])].some(v => String(v || "").toLowerCase().includes(q)))
+    && (!f.supplier || r.supplier_name === f.supplier)
+    && (!f.status || r.order_status === f.status)
+    && (!f.ship || r.ship_key === f.ship)
+    && (!f.receipt || r.receipt_status === f.receipt)
+    && (!f.from || r.po_date >= f.from)
+    && (!f.eta || (r.eta && r.eta <= f.eta)));
+}
+
+function odPoRender() {
+  const d = OD_PO.data, rows = d.rows, active = rows.filter(r => r.active);
+  const doneMonth = rows.filter(r => r.completed_at && r.completed_at.startsWith(d.month)).length;
+  const actionRows = rows.filter(r => r.actions.length);
+  const kpis = `<div class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5 sm:gap-3 mb-4">
+    ${odKpi("coral", "doc", "PO Aktif", active.length, "Sudah dikirim ke supplier, belum lengkap", "odPoTab('semua')")}
+    ${odKpi("amber", "hourglass", "Menunggu Konfirmasi", active.filter(r => r.order_status === "menunggu_konfirmasi").length, "Perlu follow up supplier", "odPoTab('menunggu_konfirmasi')")}
+    ${odKpi("blue", "truck", "Dalam Pengiriman", active.filter(r => r.ship_key === "dalam_pengiriman").length, "Sedang dikirim", "odPoTab('dalam_pengiriman')")}
+    ${odKpi("violet", "box", "Diterima Sebagian", active.filter(r => r.order_status === "diterima_sebagian").length, "Sisa barang belum tiba", "odPoTab('diterima_sebagian')")}
+    ${odKpi("red", "clock", "Terlambat (Overdue)", rows.filter(r => r.late).length, "Melewati ETA", "odPoTab('terlambat')")}
+    ${odKpi("green", "check", "Diterima Lengkap", doneMonth, "Selesai bulan ini", "odPoTab('diterima_lengkap')")}</div>`;
+
+  const todo = actionRows.map(r => ({ r, a: [...r.actions].sort((x, y) => OD_PO_ACTION_RANK[x.kind] - OD_PO_ACTION_RANK[y.kind])[0] }))
+    .sort((x, y) => OD_PO_ACTION_RANK[x.a.kind] - OD_PO_ACTION_RANK[y.a.kind] || (x.r.po_date < y.r.po_date ? -1 : 1));
+  const todoList = todo.length ? `<ul class="divide-y divide-line">${todo.slice(0, 5).map(({ r, a }) => {
+    const [ic, tone] = OD_PO_ACTION_ICON[a.kind] || ["alertc", "red"];
+    const [, chipBg, chipInk] = OD_TONES[tone];
+    const text = a.kind === "terlambat" && a.eta ? `${a.text} (estimasi ${odDate(a.eta)})` : a.text;
+    return `<li class="flex items-center gap-3 px-4 py-3"><span class="w-8 h-8 rounded-lg grid place-items-center shrink-0 ${chipBg} ${chipInk}">${odIcon(ic, 16)}</span>
+      <div class="min-w-0 flex-1"><div class="text-[13px] font-semibold text-ink truncate">${esc(r.po_number)} · ${esc(r.supplier_name)}</div><div class="text-[12px] text-muted truncate" title="${esc(text)}">${esc(text)}</div></div>
+      <button type="button" onclick="odPoAction('${esc(r.id)}', '${a.kind}')" class="shrink-0 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accentDark whitespace-nowrap">${esc(a.button)}</button></li>`;
+  }).join("")}</ul>` : `<div class="px-4 py-10 text-center text-sm text-muted">${odIcon("check", 22)}<div class="mt-2">Tidak ada PO yang perlu ditindaklanjuti.</div></div>`;
+  const todoCard = `<section class="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#F3DCD2] bg-[#FDF3EE]"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-full grid place-items-center bg-[#D9534F] text-white">${odIcon("alertc", 17, 2)}</span><h3 class="text-[15px] font-semibold text-[#B4452A]">Perlu Tindakan Hari Ini</h3></div>
+      ${todo.length ? `<button type="button" onclick="odPoTab('tindakan')" class="text-xs font-semibold text-accentDark hover:underline whitespace-nowrap">Lihat Semua (${todo.length}) →</button>` : ""}</div>${todoList}</section>`;
+
+  // Nilai Pembelian PO (goods value after line discounts, before PPN / ongkir).
+  const scoped = OD_PO.scope === "bulan" ? rows.filter(r => r.order_status !== "draft" && (r.po_date || "").startsWith(d.month)) : active;
+  const total = scoped.reduce((s, r) => s + r.value, 0);
+  const got = scoped.reduce((s, r) => s + r.value_received, 0);
+  const moving = scoped.reduce((s, r) => s + r.value_moving, 0);
+  const notYet = Math.max(total - got - moving, 0);
+  const vrow = (color, label, v) => `<div class="flex items-center gap-2.5"><i class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${color}"></i><dt class="flex-1 text-muted">${label}</dt><dd class="tabular-nums font-semibold text-ink">${odMoney(v)}</dd><span class="w-9 text-right text-[11px] text-muted tabular-nums">${odPct(v, total)}%</span></div>`;
+  const valueCard = odCard("Nilai Pembelian PO", "coins", `<div class="px-4 py-4">
+      <div class="font-sans text-[28px] font-semibold text-ink tabular-nums leading-tight">${odMoney(total)}</div>
+      <div class="text-xs text-muted mt-0.5">${scoped.length} PO · nilai barang sebelum PPN &amp; ongkir</div>
+      <div class="flex h-2.5 rounded-full overflow-hidden bg-[#EFEDE6] mt-4"><div style="width:${odPct(got, total)}%" class="bg-[#F2A541]"></div><div style="width:${odPct(moving, total)}%" class="bg-[#3B8BD9]"></div><div style="width:${odPct(notYet, total)}%" class="bg-[#C9C5BA]"></div></div>
+      <dl class="mt-4 space-y-2.5 text-[13px]">${vrow("#F2A541", "Sudah Diterima", got)}${vrow("#3B8BD9", "Dalam Pengiriman", moving)}${vrow("#C9C5BA", "Belum Diterima", notYet)}</dl></div>`,
+    `<select onchange="OD_PO.scope = this.value; odPoRender()" aria-label="Cakupan nilai" class="border border-line rounded-lg px-2.5 py-1.5 text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30">
+      <option value="bulan" ${OD_PO.scope === "bulan" ? "selected" : ""}>Bulan Ini</option><option value="aktif" ${OD_PO.scope === "aktif" ? "selected" : ""}>Semua PO aktif</option></select>`);
+
+  // Status Pengiriman: the packages of active POs and of POs completed this month.
+  const scopePos = rows.filter(r => r.active || (r.completed_at && r.completed_at.startsWith(d.month)));
+  const forwarders = [...new Set(scopePos.flatMap(r => r.packages.map(p => p.forwarder)).filter(Boolean))].sort();
+  if (OD_PO.fwd && !forwarders.includes(OD_PO.fwd)) OD_PO.fwd = "";
+  const pkgs = scopePos.flatMap(r => r.packages).filter(p => !OD_PO.fwd || p.forwarder === OD_PO.fwd);
+  const pk = {
+    tiba: pkgs.filter(p => !p.open).length,
+    jalan: pkgs.filter(p => p.open && !p.late && ["dalam_pengiriman", "tiba_di_hub"].includes(p.status)).length,
+    tunggu: pkgs.filter(p => p.open && !p.late && !["dalam_pengiriman", "tiba_di_hub"].includes(p.status)).length,
+    telat: pkgs.filter(p => p.open && p.late).length,
+  };
+  const parts = [{ label: "Tiba di Toko", value: pk.tiba, color: "#3FAE6A" }, { label: "Dalam Perjalanan", value: pk.jalan, color: "#3B8BD9", tab: "dalam_pengiriman" },
+    { label: "Menunggu Kirim", value: pk.tunggu, color: "#F2A541" }, { label: "Terlambat", value: pk.telat, color: "#D9534F", tab: "terlambat" }];
+  const donutCard = odCard("Status Pengiriman", "truck", pkgs.length
+      ? `<div class="px-4 py-4"><div class="flex flex-col sm:flex-row items-center gap-5">${odDonut(parts, pkgs.length, "Paket Pengiriman")}${odLegend(parts, pkgs.length, "odPoTab")}</div></div>`
+      : `<div class="px-4 py-12 text-center text-sm text-muted">Belum ada paket pengiriman${OD_PO.fwd ? " untuk ekspedisi ini" : ""}.<div class="text-xs mt-1">Paket dicatat di detail Purchase Order.</div></div>`,
+    `<select onchange="OD_PO.fwd = this.value; odPoRender()" aria-label="Ekspedisi" class="border border-line rounded-lg px-2.5 py-1.5 text-xs bg-white text-ink max-w-[150px] focus:outline-none focus:ring-2 focus:ring-accent/30">
+      <option value="">Semua Ekspedisi</option>${forwarders.map(f => `<option value="${esc(f)}" ${f === OD_PO.fwd ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>`);
+
+  document.getElementById("od-po-body").innerHTML =
+    odHead("Dashboard Purchase Order", "Dashboard Purchase Order", "Pantau seluruh pesanan ke supplier, pengiriman barang, dan penerimaan di toko.",
+      odBtn("external", "Daftar PO", "location.hash='/supplier-po'") + odBtn("download", "Ekspor", "odPoExport()") + odMonitorChip)
+    + kpis
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 mb-4">${todoCard}${valueCard}${donutCard}</div>`
+    + `<section id="od-po-table" class="bg-white border border-line rounded-xl overflow-hidden"></section>`;
+  odPoRenderTable();
+}
+
+function odPoRenderTable() {
+  const d = OD_PO.data, f = OD_PO.f;
+  const counts = Object.fromEntries(OD_PO_TABS.map(([k]) => [k, d.rows.filter(r => odPoInTab(r, k)).length]));
+  const list = odPoFiltered();
+  const pages = Math.max(1, Math.ceil(list.length / OD_PAGE_SIZE));
+  OD_PO.page = Math.min(OD_PO.page, pages);
+  const shown = list.slice((OD_PO.page - 1) * OD_PAGE_SIZE, OD_PO.page * OD_PAGE_SIZE);
+  const suppliers = [...new Set(d.rows.map(r => r.supplier_name))].sort();
+  const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label)}</option>`;
+  const sel = (key, ph, opts) => `<select onchange="OD_PO.f.${key} = this.value; OD_PO.page = 1; odPoRenderTable()" aria-label="${ph}" class="${OD_INPUT}">${opt("", ph, f[key])}${opts.map(([v, l]) => opt(v, l, f[key])).join("")}</select>`;
+  const dateIn = (key, label) => `<label class="relative block"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted pointer-events-none ${f[key] ? "hidden" : ""}">${label}</span><input type="date" value="${esc(f[key])}" aria-label="${label}" onchange="OD_PO.f.${key} = this.value; OD_PO.page = 1; odPoRenderTable()" class="${OD_INPUT} ${f[key] ? "" : "text-transparent focus:text-ink"}" /></label>`;
+  const filters = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2 px-4 py-3 border-b border-line">
+    <label class="relative block"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">${odIcon("search", 14)}</span><input id="od-po-q" type="search" data-no-uppercase value="${esc(f.q)}" placeholder="Cari PO / supplier / barang / SO" onkeydown="if(event.key==='Enter') odPoSearch()" class="${OD_INPUT} pl-8" /></label>
+    ${sel("supplier", "Pilih Supplier", suppliers.map(s => [s, s]))}
+    ${sel("status", "Status PO", Object.entries(d.order_labels).filter(([k]) => k !== "dibatalkan"))}
+    ${sel("ship", "Status Pengiriman", [...Object.entries(d.ship_labels), ["terlambat", "Terlambat"]])}
+    ${sel("receipt", "Status Penerimaan", Object.entries(d.receipt_labels))}
+    ${dateIn("from", "Tanggal PO dari")}${dateIn("eta", "ETA sampai")}
+    <div class="flex gap-2"><button type="button" onclick="odPoSearch()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-accent text-white text-[13px] font-semibold hover:bg-accentDark">${odIcon("search", 14)}Cari</button>
+      <button type="button" onclick="odPoReset()" class="px-3.5 py-2 rounded-lg border border-line bg-white text-[13px] text-ink hover:bg-bg2">Reset</button></div></div>`;
+  const rows = shown.map(r => {
+    const refs = r.so_refs.length ? `<div class="flex flex-wrap gap-1">${r.so_refs.slice(0, 2).map(s => `<button type="button" onclick="openPreorderFromDashboard('${esc(s.id)}')" title="${esc(s.customer_name)}" class="px-1.5 py-0.5 rounded-md bg-[#E6F0FC] text-[#2F5C9E] text-[11px] font-semibold hover:underline whitespace-nowrap">${esc(s.so_number.replace(/^SO-\d{8}-0*/, "SO-"))}</button>`).join("")}${r.so_refs.length > 2 ? `<span class="px-1.5 py-0.5 rounded-md bg-bg2 text-muted text-[11px]" title="${esc(r.so_refs.slice(2).map(s => s.so_number).join(", "))}">+${r.so_refs.length - 2}</span>` : ""}</div>` : `<span class="text-muted">—</span>`;
+    const [stone, dot] = OD_PO_SHIP[r.ship_key] || ["stone", "#BDB9AE"];
+    const ship = r.ship_key ? `<div class="inline-flex items-start gap-1.5 px-2 py-1 rounded-lg border ${OD_BADGE[stone]}"><i class="w-2 h-2 rounded-full mt-1 shrink-0" style="background:${dot}"></i><span><span class="block text-[11.5px] font-semibold leading-tight whitespace-nowrap">${esc(r.ship_label)}</span>${r.packages.length ? `<span class="block text-[10.5px] opacity-80">${r.packages.length} paket</span>` : ""}</span></div>` : `<span class="text-muted text-[12px]">${r.order_status === "draft" ? "Belum dikirim ke supplier" : "—"}</span>`;
+    const recvColor = r.qty_received >= r.qty_total && r.qty_total ? "#3FAE6A" : r.late ? "#D9534F" : "#3B8BD9";
+    return `<tr class="border-b border-line last:border-b-0 hover:bg-bg/60">
+      <td class="${OD_TD}"><a href="#/supplier-po" onclick="openSupplierPoFromFaktur('${esc(r.id)}'); return false;" class="font-mono text-[12.5px] font-semibold text-accentDark underline decoration-dotted underline-offset-2 whitespace-nowrap">${esc(r.po_number)}</a></td>
+      <td class="${OD_TD} text-[13px] text-ink whitespace-nowrap">${odDate(r.po_date)}</td>
+      <td class="${OD_TD} text-[13px] font-semibold text-ink uppercase">${esc(r.supplier_name)}</td>
+      <td class="${OD_TD}">${refs}</td>
+      <td class="${OD_TD} text-[13px] text-ink"><div title="${esc(r.item_names.join(", "))}">${r.item_count} jenis barang</div><div class="text-[11px] text-muted">(${r.qty_total} item)</div></td>
+      <td class="${OD_TD} text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">${odMoney(r.grand_total)}</td>
+      <td class="${OD_TD}">${ship}</td>
+      <td class="${OD_TD}">${r.order_status === "draft" ? `<span class="text-muted">—</span>` : odProgress(r.qty_received, r.qty_total, "", recvColor)}</td>
+      <td class="${OD_TD} text-[13px] whitespace-nowrap ${r.late ? "text-failed font-semibold" : "text-ink"}">${odDate(r.eta)}</td>
+      <td class="${OD_TD}">${odBadge(OD_PO_STATUS_TONE[r.order_status] || "stone", r.order_label)}</td>
+      <td class="${OD_TD}"><button type="button" onclick="openSupplierPoFromFaktur('${esc(r.id)}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-white text-xs font-semibold text-ink hover:bg-bg2 whitespace-nowrap">${odIcon("doc", 13)}Lihat Detail</button></td></tr>`;
+  }).join("");
+  const th = ["No. PO", "Tanggal PO", "Supplier", "Referensi SO", "Ringkasan Barang", "Nilai PO", "Pengiriman", "Penerimaan", "ETA", "Status PO", "Aksi"].map(h => `<th class="${OD_TH}">${h}</th>`).join("");
+  document.getElementById("od-po-table").innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">${odTabs(OD_PO_TABS, OD_PO.tab, counts, "odPoTab")}
+      <div class="flex gap-2">${odBtn("download", "Ekspor", "odPoExport()", "!py-1.5")}${odBtn("printer", "Cetak", "odPoPrint()", "!py-1.5")}</div></div>
+    ${filters}
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-2"><span class="text-[11px] font-semibold uppercase tracking-wider text-accentDark">Monitoring pesanan ke supplier</span>
+      <span class="text-[11px] text-muted">Menampilkan ${list.length} PO · Nilai PO termasuk PPN &amp; ongkir</span></div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[1180px] text-sm"><thead class="bg-bg2"><tr>${th}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="11" class="px-3 py-12 text-center text-sm text-muted">Tidak ada Purchase Order pada tab / filter ini.</td></tr>`}</tbody></table></div>
+    ${odPager(OD_PO.page, pages, shown.length, list.length, "odPoPage")}`;
+}
+
+function odPoTab(tab) {
+  OD_PO.tab = tab; OD_PO.page = 1;
+  odPoRenderTable();
+  document.getElementById("od-po-table")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function odPoPage(p) { OD_PO.page = p; odPoRenderTable(); }
+function odPoSearch() { OD_PO.f.q = document.getElementById("od-po-q").value; OD_PO.page = 1; odPoRenderTable(); }
+function odPoReset() { OD_PO.f = { q: "", supplier: "", status: "", ship: "", receipt: "", from: "", eta: "" }; OD_PO.page = 1; odPoRenderTable(); }
+
+function odPoAction(id, kind) {
+  const r = OD_PO.data.rows.find(x => x.id === id);
+  if (!r) return;
+  const a = r.actions.find(x => x.kind === kind);
+  if (kind === "gr_draft" && a?.inbound_id) { jumpToInboundDocument(a.inbound_id); return; }
+  if (kind === "tanpa_resi" || kind === "konfirmasi") {
+    const ask = kind === "konfirmasi" ? "konfirmasi pesanan" : "nomor resi pengiriman";
+    if (odWa(r.supplier_phone, `Halo ${r.supplier_name}, mohon info ${ask} untuk ${r.po_number}. Terima kasih.`)) return;
+  }
+  openSupplierPoFromFaktur(id);
+}
+
+function odPoTableRows() {
+  return odPoFiltered().map(r => [r.po_number, r.po_date, r.supplier_name, r.so_refs.map(s => s.so_number).join(" "), `${r.item_count} jenis / ${r.qty_total} item`,
+    r.grand_total, r.ship_label, `${r.qty_received}/${r.qty_total}`, r.eta || "", r.late ? "Ya" : "", r.order_label]);
+}
+const OD_PO_COLS = ["No. PO", "Tanggal PO", "Supplier", "Referensi SO", "Ringkasan Barang", "Nilai PO", "Pengiriman", "Penerimaan", "ETA", "Terlambat", "Status PO"];
+function odPoExport() { downloadCsvText(`dashboard-purchase-order-${OD_PO.data.today}.csv`, [OD_PO_COLS, ...odPoTableRows()]); }
+function odPoPrint() { odPrint("Dashboard Purchase Order — " + (OD_PO_TABS.find(t => t[0] === OD_PO.tab) || [, ""])[1], OD_PO_COLS, odPoTableRows().map(r => r.map((c, i) => i === 5 ? formatIDR(c) : c))); }
+
 // ── Dashboard: Ringkasan (overview) ──────────────────────────────────────────
 // K-18 dashboard card: transfer/QRIS payments still waiting for confirmation (notas and draft Sales Orders).
 async function loadPendingPayments() {
@@ -16383,96 +16930,220 @@ const PI_PAYMENT_LABELS = { belum: "Belum dibayar", sebagian: "Dibayar sebagian"
 let purchaseInvoiceCache = [];
 let currentPurchaseInvoice = null; // full detail of the open invoice; null while composing a new one
 let piRowSeq = 0;
-let piStatusFilter = "";
-let piPaymentFilter = "";
-let piSearchQuery = "";
 let piProductSearchState = new WeakMap(); // row product input -> { results, timer }
 
 // --- list ------------------------------------------------------------------
+// Daftar Faktur Pembelian: one fetch of every faktur, then tiles, filters, sort and paging in the browser.
+// Status Faktur is the document (Draft → Siap ke AP after Verifikasi → Diposting); Status AP is the debt it
+// became (Belum Diposting until posted, then Belum Dibayar / Sebagian / Lunas / Lewat Jatuh Tempo).
+const PI_LIST = { f: { q: "", supplier: "", status: "", ap: "", from: "", to: "", due: "" }, sort: "date", dir: "desc", page: 1 };
+const PI_PAGE_SIZE = 10;
 
-const debouncedPurchaseInvoiceSearch = debounce(() => {
-  piSearchQuery = document.getElementById("pi-search-input").value.trim();
-  loadPurchaseInvoices();
-}, 250);
-
-function onPurchaseInvoiceSearchInput() {
-  debouncedPurchaseInvoiceSearch();
+function piFakturState(inv) {
+  if (inv.status === "void") return ["void", "Void", "stone"];
+  if (inv.status === "posted") return ["posted", "Diposting", "green"];
+  if (!inv.supplier_po_id) return ["draft", "Draft", "stone"];
+  const v = inv.verify_status;
+  if (v === "terverifikasi" || v === "pengecualian") return ["siap", "Siap ke AP", "blue"];
+  if (v === "ditahan") return ["ditahan", "Ditahan", "red"];
+  if (v === "diajukan") return ["ditahan", "Menunggu Admin", "violet"];
+  return ["draft", "Draft", "stone"];
 }
 
-function setPurchaseInvoiceStatusFilter(status) {
-  piStatusFilter = status;
-  document.querySelectorAll(".pi-status-btn").forEach(btn => {
-    btn.classList.toggle("is-active", btn.dataset.piStatus === status);
-  });
-  loadPurchaseInvoices();
+function piApState(inv) {
+  if (inv.status === "void") return ["", "—", ""];
+  if (inv.status !== "posted") return ["belum_posting", "Belum Diposting", "amber"];
+  if (inv.outstanding <= 0) return ["lunas", "Lunas", "green"];
+  if (inv.is_overdue) return ["lewat", "Lewat Jatuh Tempo", "red"];
+  return inv.amount_paid > 0 ? ["sebagian", "Sebagian Dibayar", "blue"] : ["belum_bayar", "Belum Dibayar", "orange"];
 }
 
-function setPurchaseInvoicePaymentFilter(payment) {
-  piPaymentFilter = payment;
-  document.querySelectorAll(".pi-payment-btn").forEach(btn => {
-    btn.classList.toggle("is-active", btn.dataset.piPayment === payment);
+// Monday-start week, as the shop's calendar reads it: the Sunday that ends this week.
+function piWeekEnd() {
+  const d = new Date();
+  d.setDate(d.getDate() + (7 - (d.getDay() || 7)));
+  return toDateInputValue(d);
+}
+
+function piDueMatches(inv, due) {
+  if (!due) return true;
+  if (inv.status !== "posted" || inv.outstanding <= 0) return false;
+  const today = toDateInputValue(new Date());
+  if (due === "lewat") return inv.due_date < today;
+  if (due === "minggu") return inv.due_date >= today && inv.due_date <= piWeekEnd();
+  const in30 = new Date(); in30.setDate(in30.getDate() + 30);
+  return inv.due_date >= today && inv.due_date <= toDateInputValue(in30);
+}
+
+function piFiltered() {
+  const f = PI_LIST.f, q = f.q.trim().toLowerCase();
+  const rows = purchaseInvoiceCache.filter(inv => {
+    if (q && ![inv.invoice_number, inv.supplier_invoice_no, inv.supplier_name || inv.supplier_name_snapshot, inv.supplier_po_number,
+      ...(inv.gr_docs || []).map(g => g.doc_number)].some(v => String(v || "").toLowerCase().includes(q))) return false;
+    if (f.supplier && String(inv.supplier_id) !== f.supplier) return false;
+    if (f.status && piFakturState(inv)[0] !== f.status) return false;
+    if (f.ap && piApState(inv)[0] !== f.ap) return false;
+    if (f.from && inv.invoice_date < f.from) return false;
+    if (f.to && inv.invoice_date > f.to) return false;
+    return piDueMatches(inv, f.due);
   });
-  loadPurchaseInvoices();
+  const key = PI_LIST.sort === "due" ? (r => r.due_date || "") : (r => `${r.invoice_date} ${r.created_at}`);
+  const sign = PI_LIST.dir === "asc" ? 1 : -1;
+  return rows.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0) * sign);
 }
 
 async function loadPurchaseInvoices() {
-  const params = new URLSearchParams();
-  if (piStatusFilter) params.set("status", piStatusFilter);
-  if (piPaymentFilter) params.set("payment_status", piPaymentFilter);
-  if (piSearchQuery) params.set("search", piSearchQuery);
-  const resp = await fetch(`/api/purchase-invoices?${params.toString()}`);
+  const resp = await fetch("/api/purchase-invoices");
   if (!resp.ok) { showToast("Gagal memuat faktur pembelian."); return; }
   purchaseInvoiceCache = await resp.json();
-  renderPurchaseInvoiceList(purchaseInvoiceCache);
-  loadPayableSummary();
+  const sel = document.getElementById("pi-f-supplier");
+  const suppliers = [...new Map(purchaseInvoiceCache.map(r => [String(r.supplier_id), r.supplier_name || r.supplier_name_snapshot])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  sel.innerHTML = `<option value="">Semua Supplier</option>${suppliers.map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join("")}`;
+  sel.value = PI_LIST.f.supplier;
+  renderPurchaseInvoiceList();
 }
 
-async function loadPayableSummary() {
-  const resp = await fetch("/api/purchase-invoices/summary");
-  if (!resp.ok) return;
-  const s = await resp.json();
-  document.getElementById("pi-sum-outstanding").textContent = formatIDR(s.outstanding_total);
-  document.getElementById("pi-sum-unpaid").textContent = s.unpaid_count;
-  document.getElementById("pi-sum-overdue-count").textContent = s.overdue_count;
-  document.getElementById("pi-sum-overdue-total").textContent = formatIDR(s.overdue_total);
-  document.getElementById("pi-sum-posted").textContent = s.posted_count;
+function piKpi(label, value, sub, icon, tint, edge, ink, extra = "") {
+  return `<div class="rounded-xl border px-4 py-3.5 relative overflow-hidden ${extra}" style="background:${tint};border-color:${edge}">
+    <span class="absolute right-3 top-3 w-10 h-10 rounded-full grid place-items-center bg-white/70" style="color:${ink}">${odIcon(icon, 20, 1.6)}</span>
+    <div class="text-[10.5px] font-semibold uppercase tracking-wider pr-12" style="color:${ink}">${label}</div>
+    <div class="font-sans text-2xl font-semibold text-ink tabular-nums mt-1.5 whitespace-nowrap">${value}</div>
+    <div class="text-[11.5px] text-muted mt-1">${sub}</div></div>`;
 }
 
-function purchaseInvoiceStatusBadge(inv) {
-  const dot = `<span class="status-dot is-${esc(inv.status)}"></span>`;
-  const label = PI_STATUS_LABELS[inv.status] || inv.status;
-  if (inv.status !== "posted") {
-    return `<span class="inline-flex items-center gap-1.5 text-xs text-muted">${dot}${esc(label)}</span>`;
-  }
-  const payment = PI_PAYMENT_LABELS[inv.payment_status] || inv.payment_status;
-  const overdue = inv.is_overdue ? `<span class="text-failed font-medium"> · telat</span>` : "";
-  return `<span class="inline-flex items-center gap-1.5 text-xs text-muted">${dot}${esc(label)} · ${esc(payment)}${overdue}</span>`;
+function renderPurchaseInvoiceKpis(filtered) {
+  const all = purchaseInvoiceCache;
+  const drafts = all.filter(r => r.status === "draft");
+  const ready = drafts.filter(r => piFakturState(r)[0] === "siap" || !r.supplier_po_id).length;
+  const open = all.filter(r => r.status === "posted" && r.outstanding > 0);
+  const week = open.filter(r => piDueMatches(r, "minggu"));
+  const sum = (rows, k) => rows.reduce((s, r) => s + (r[k] || 0), 0);
+  const live = filtered.filter(r => r.status !== "void");
+  document.getElementById("pi-kpis").innerHTML =
+    piKpi("Draft", drafts.length - ready, "Perlu dilengkapi / diverifikasi", "doc", "#F3F7FD", "#D8E5F6", "#3F6EB5")
+    + piKpi("Belum diposting ke AP", drafts.length, `${ready} siap diposting ke Account Payable`, "clock", "#FFFAF0", "#F2E3BF", "#A87612")
+    + piKpi("Jatuh tempo minggu ini", week.length, `Total ${esc(formatIDR(sum(week, "outstanding")))}`, "calendar", "#FFF6F4", "#F4D9D2", "#C4633F")
+    + piKpi("Belum lunas", open.length, `Total ${esc(formatIDR(sum(open, "outstanding")))}`, "card", "#F5FBF7", "#D3EADB", "#2F7A4B")
+    + piKpi("Nilai tagihan", esc(formatIDR(sum(live, "total"))), `Dari ${live.length} faktur pembelian`, "chart", "#F9F7FE", "#E3DAF4", "#6E4FB8", "col-span-2 lg:col-span-1");
 }
 
-function renderPurchaseInvoiceList(rows) {
+function renderPurchaseInvoiceList() {
+  const list = piFiltered();
+  renderPurchaseInvoiceKpis(list);
+  const sortTh = (k, label) => `<th class="${OD_TH}"><button type="button" onclick="sortPurchaseInvoices('${k}')" class="inline-flex items-center gap-1 uppercase tracking-wider hover:text-ink ${PI_LIST.sort === k ? "text-ink" : ""}">${label}<span aria-hidden="true">${PI_LIST.sort === k ? (PI_LIST.dir === "asc" ? "↑" : "↓") : "↕"}</span></button></th>`;
+  document.getElementById("pi-list-head").innerHTML = sortTh("date", "Tanggal")
+    + ["No. Faktur Pembelian", "Supplier", "Referensi Goods Receipt", "No. Invoice Supplier"].map(h => `<th class="${OD_TH}">${h}</th>`).join("")
+    + `<th class="${OD_TH} !text-right">Nilai Tagihan</th><th class="${OD_TH}">Status Faktur</th><th class="${OD_TH}">Status AP</th>`
+    + sortTh("due", "Jatuh Tempo") + `<th class="${OD_TH} text-center">Aksi</th>`;
   const tbody = document.getElementById("pi-list-tbody");
   const emptyEl = document.getElementById("pi-list-empty");
-  tbody.innerHTML = "";
-  if (rows.length === 0) { emptyEl.classList.remove("hidden"); return; }
-  emptyEl.classList.add("hidden");
-  for (const inv of rows) {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
-    tr.innerHTML = `
-      <td class="px-3 py-2">
-        <div class="font-mono text-xs text-ink">${esc(inv.invoice_number)}</div>
-        ${inv.supplier_invoice_no ? `<div class="text-[11px] text-muted">${esc(inv.supplier_invoice_no)}</div>` : ""}
-      </td>
-      <td class="px-3 py-2 font-serif font-medium text-ink">${esc(inv.supplier_name || inv.supplier_name_snapshot)}</td>
-      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(inv.invoice_date)}</td>
-      <td class="px-3 py-2 whitespace-nowrap ${inv.is_overdue ? "text-failed font-medium" : "text-muted"}">${esc(inv.due_date)}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatIDR(inv.total)}</td>
-      <td class="px-3 py-2 text-right tabular-nums ${inv.outstanding > 0 ? "text-failed font-medium" : "text-muted"}">${formatIDR(inv.outstanding)}</td>
-      <td class="px-3 py-2">${purchaseInvoiceStatusBadge(inv)}</td>
-    `;
-    tr.onclick = () => openPurchaseInvoice(inv.id);
-    tbody.appendChild(tr);
-  }
+  const pages = Math.max(1, Math.ceil(list.length / PI_PAGE_SIZE));
+  PI_LIST.page = Math.min(PI_LIST.page, pages);
+  const shown = list.slice((PI_LIST.page - 1) * PI_PAGE_SIZE, PI_LIST.page * PI_PAGE_SIZE);
+  document.getElementById("pi-list-count").textContent = purchaseInvoiceCache.length ? `${list.length} dari ${purchaseInvoiceCache.length} faktur` : "";
+  emptyEl.classList.toggle("hidden", list.length > 0);
+  emptyEl.querySelector("p").textContent = purchaseInvoiceCache.length ? "Tidak ada faktur pada filter ini." : "Belum ada faktur pembelian.";
+  const ymd = v => { if (!v) return "—"; const [y, m, d] = v.slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
+  const hm = iso => { const d = new Date(iso); return isNaN(d) ? "" : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+  tbody.innerHTML = shown.map(inv => {
+    const [, fLabel, fTone] = piFakturState(inv);
+    const [, apLabel, apTone] = piApState(inv);
+    const grs = inv.gr_docs || [];
+    const qty = grs.reduce((s, g) => s + g.qty, 0);
+    const gr = grs.length
+      ? `<button type="button" onclick="event.stopPropagation(); jumpToInboundDocument(${grs[0].id})" class="font-mono text-[12.5px] font-semibold text-accentDark underline decoration-dotted underline-offset-2 whitespace-nowrap">${esc(grs[0].doc_number)}</button>
+         <div class="text-[11px] text-muted whitespace-nowrap">${grs.length} dokumen • ${qty} PCS${grs.some(g => g.status !== "posted") ? ` · <span class="text-[#A87612]">ada draft</span>` : ""}</div>`
+      : inv.supplier_po_id ? `<span class="text-[12px] text-muted">${esc(inv.supplier_po_number || "PO")} · belum ada GR</span>` : `<span class="text-[12px] text-muted">Tanpa PO (manual)</span>`;
+    const dueCls = inv.is_overdue ? "text-failed font-semibold underline decoration-dotted underline-offset-2" : inv.status === "posted" && inv.outstanding > 0 ? "text-ink" : "text-muted";
+    return `<tr class="border-b border-line last:border-b-0 hover:bg-bg/60 cursor-pointer" onclick="openPurchaseInvoice(${inv.id})">
+      <td class="${OD_TD} whitespace-nowrap"><div class="text-[13px] text-ink">${ymd(inv.invoice_date)}</div><div class="text-[11px] text-muted">${hm(inv.created_at)}</div></td>
+      <td class="${OD_TD}"><a href="#/purchase-invoices" onclick="event.stopPropagation(); openPurchaseInvoice(${inv.id}); return false;" class="font-mono text-[12.5px] font-semibold text-accentDark underline decoration-dotted underline-offset-2 whitespace-nowrap">${esc(inv.invoice_number)}</a></td>
+      <td class="${OD_TD} text-[13px] font-medium text-ink uppercase">${esc(inv.supplier_name || inv.supplier_name_snapshot)}</td>
+      <td class="${OD_TD}">${gr}</td>
+      <td class="${OD_TD} text-[13px] text-ink">${esc(inv.supplier_invoice_no || "—")}</td>
+      <td class="${OD_TD} text-right text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">${esc(formatIDR(inv.total))}${inv.status === "posted" && inv.outstanding > 0 && inv.amount_paid > 0 ? `<div class="text-[11px] font-normal text-muted">Sisa ${esc(formatIDR(inv.outstanding))}</div>` : ""}</td>
+      <td class="${OD_TD}">${odBadge(fTone, fLabel)}</td>
+      <td class="${OD_TD}">${apTone ? odBadge(apTone, apLabel) : `<span class="text-muted">—</span>`}</td>
+      <td class="${OD_TD} text-[13px] whitespace-nowrap ${dueCls}">${ymd(inv.due_date)}</td>
+      <td class="${OD_TD} text-center"><button type="button" onclick="openPurchaseInvoiceRowMenu(event, ${inv.id})" aria-label="Aksi ${esc(inv.invoice_number)}" class="w-9 h-9 inline-grid place-items-center rounded-lg border border-line bg-white text-ink hover:bg-bg2">⋯</button></td></tr>`;
+  }).join("");
+  document.getElementById("pi-list-pager").innerHTML = list.length > PI_PAGE_SIZE ? odPager(PI_LIST.page, pages, shown.length, list.length, "pagePurchaseInvoices") : "";
+}
+
+function sortPurchaseInvoices(key) {
+  if (PI_LIST.sort === key) PI_LIST.dir = PI_LIST.dir === "asc" ? "desc" : "asc";
+  else { PI_LIST.sort = key; PI_LIST.dir = key === "due" ? "asc" : "desc"; }
+  renderPurchaseInvoiceList();
+}
+function pagePurchaseInvoices(p) { PI_LIST.page = p; renderPurchaseInvoiceList(); }
+
+function applyPurchaseInvoiceFilters() {
+  const v = id => document.getElementById(id).value;
+  PI_LIST.f = { q: v("pi-f-q"), supplier: v("pi-f-supplier"), status: v("pi-f-status"), ap: v("pi-f-ap"), from: v("pi-f-from"), to: v("pi-f-to"), due: v("pi-f-due") };
+  PI_LIST.page = 1;
+  renderPurchaseInvoiceList();
+}
+
+function resetPurchaseInvoiceFilters() {
+  for (const id of ["pi-f-q", "pi-f-supplier", "pi-f-status", "pi-f-ap", "pi-f-from", "pi-f-to", "pi-f-due"]) document.getElementById(id).value = "";
+  applyPurchaseInvoiceFilters();
+}
+
+function openPurchaseInvoiceRowMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
+  const inv = purchaseInvoiceCache.find(r => r.id === id);
+  if (!inv) return;
+  const open = !menu.classList.contains("hidden") && menu.dataset.itemId === `pi-${id}`;
+  closeMasterRowMenu();
+  if (open) return;
+  const mi = (icon, label, onclick) => `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}"
+    class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm text-ink hover:bg-bg2 transition-colors">${odIcon(icon, 15)}${esc(label)}</button>`;
+  const grs = inv.gr_docs || [];
+  menu.innerHTML = [
+    mi("doc", inv.status === "draft" ? "Buka / lengkapi faktur" : inv.status === "posted" && inv.outstanding > 0 ? "Buka & catat pembayaran" : "Buka faktur", `openPurchaseInvoice(${id})`),
+    inv.supplier_po_id ? mi("truck", `Buka ${inv.supplier_po_number || "Purchase Order"}`, `openSupplierPoFromFaktur('${esc(inv.supplier_po_id)}')`) : "",
+    ...grs.map(g => mi("box", `Buka Goods Receipt ${g.doc_number}`, `jumpToInboundDocument(${g.id})`)),
+  ].join("");
+  menu.dataset.itemId = `pi-${id}`;
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect();
+  const height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
+}
+
+function exportPurchaseInvoiceList() {
+  const rows = piFiltered();
+  if (!rows.length) { showToast("Tidak ada faktur untuk diekspor."); return; }
+  downloadCsvText(`faktur-pembelian-${toDateInputValue(new Date())}.csv`, [
+    ["Tanggal", "No. Faktur", "Supplier", "Purchase Order", "Goods Receipt", "No. Invoice Supplier", "Nilai Tagihan", "Dibayar", "Sisa", "Status Faktur", "Status AP", "Jatuh Tempo"],
+    ...rows.map(r => [r.invoice_date, r.invoice_number, r.supplier_name || r.supplier_name_snapshot, r.supplier_po_number || "", (r.gr_docs || []).map(g => g.doc_number).join(" "),
+      r.supplier_invoice_no || "", r.total, r.amount_paid, r.outstanding, piFakturState(r)[1], piApState(r)[1], r.due_date]),
+  ]);
+}
+
+// "Buat dari Goods Receipt": every supplier's received goods that no faktur covers yet; "Ambil" uses the
+// same create-from-PO flow as the panel on a new faktur, so the faktur stays linked and gets matched.
+async function openGoodsReceiptPicker() {
+  openModal("Buat dari Goods Receipt", '<div class="py-10 text-center text-sm text-muted">Memuat Goods Receipt…</div>', { lg: true });
+  let rows = [];
+  try {
+    const resp = await fetch("/api/purchase-invoices/goods-receipt");
+    if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Goods Receipt tidak bisa dimuat."));
+    rows = await resp.json();
+  } catch (e) { closeModal(); showToast(e.message); return; }
+  document.getElementById("modal-body").innerHTML = rows.length
+    ? `<p class="text-xs text-muted mb-3">Barang ini sudah diterima dan belum difakturkan. Pilih PO-nya: nama barang, qty terima dan harga terisi otomatis sebagai draft faktur.</p>
+       <div class="space-y-2 max-h-[60vh] overflow-y-auto">${rows.map(r => `<div class="border border-line rounded-lg px-3 py-2.5 bg-white">
+         <div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[13px] font-semibold text-ink">${esc(r.po_number)}</span><span class="text-[12px] font-medium text-ink uppercase">${esc(r.supplier_name || "")}</span>
+           <span class="text-xs text-muted">${r.lines.length} barang · ${esc(formatIDR(r.goods_total))}</span>
+           <button type="button" onclick="closeModal(); takePurchaseInvoiceFromReceipt('${esc(r.po_id)}')" class="ml-auto px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accentDark">Buat Faktur</button></div>
+         <ul class="mt-1.5 text-xs text-muted space-y-0.5">${r.lines.map(l => `<li class="flex gap-2"><span class="text-ink truncate">${esc(l.product_name)}</span><span class="ml-auto shrink-0 tabular-nums">${l.qty} ${esc(l.unit)} × ${esc(formatIDR(l.unit_price))}</span></li>`).join("")}</ul></div>`).join("")}</div>`
+    : `<div class="py-8 text-center"><p class="text-sm text-ink">Tidak ada Goods Receipt yang menunggu faktur.</p>
+       <p class="text-xs text-muted mt-1">Terima barang di Purchase Order dulu, atau buat faktur tanpa PO.</p>
+       <button type="button" onclick="closeModal(); newPurchaseInvoiceForm()" class="mt-4 px-4 py-2 rounded-lg border border-line bg-white text-sm text-ink hover:bg-bg2">Faktur Manual</button></div>`;
 }
 
 // --- panels ----------------------------------------------------------------

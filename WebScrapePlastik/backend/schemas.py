@@ -854,6 +854,8 @@ class PurchaseInvoiceOut(BaseModel):
     verify_note: str | None = None
     exception_reason: str | None = None
     hold_note: str | None = None
+    # Goods Receipt (Barang Masuk) documents of the faktur's PO; empty for a faktur without PO.
+    gr_docs: list[dict] = []
 
 
 class PurchaseInvoiceDetail(PurchaseInvoiceOut):

@@ -3,7 +3,7 @@ admin approves it, and then through the stock ledger like every other movement."
 import sqlite3
 from datetime import datetime
 
-from backend.database import _conn, _now, _reserved_by_item, get_master_item_usage
+from backend.database import _conn, _now, _promote_shelf_ready_lines, _reserved_by_item, get_master_item_usage
 
 REASONS = ("Susut / Hilang", "Rusak", "Salah catat / input", "Ditemukan lebih", "Retur belum tercatat", "Lainnya")
 STATUSES = ("draft", "menunggu_verifikasi", "disetujui", "ditolak", "dibatalkan")
@@ -272,6 +272,8 @@ def approve_opname(opname_id: int, by: str | None, note: str | None, accept_move
                  f"Stock opname: {i['reason'] or 'sesuai hitung'}", now, by),
             )
             con.execute("UPDATE stock_opname_items SET applied_delta=? WHERE id=?", (delta, i["id"]))
+        # Found stock may now cover a 'Stok Tersedia' Sales Order line that was waiting for it.
+        _promote_shelf_ready_lines(con, by, master_item_ids=[i["master_item_id"] for i in items if i["counted_qty"] > i["current_qty"]])
         con.execute(
             "UPDATE stock_opnames SET status='disetujui', resolved_by=?, resolved_at=?, resolution_note=?, updated_at=? WHERE id=?",
             (by, now, (note or "").strip() or None, now, opname_id),

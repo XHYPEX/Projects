@@ -524,7 +524,7 @@ def init_db() -> None:
         # A purchase invoice prints the supplier's contact block, so those details
         # live on the supplier master rather than being retyped per invoice. Live
         # rows predate these columns and stay NULL until someone fills them in.
-        for supplier_col in ("address", "contact_person", "npwp"):
+        for supplier_col in ("address", "contact_person", "npwp", "email"):
             if supplier_col not in supplier_cols:
                 con.execute(f"ALTER TABLE suppliers ADD COLUMN {supplier_col} TEXT")
 
@@ -663,7 +663,8 @@ def init_db() -> None:
         poi_cols = {row["name"] for row in con.execute("PRAGMA table_info(preorder_items)").fetchall()}
         if "receipt_id" not in poi_cols:
             con.execute("ALTER TABLE preorder_items ADD COLUMN receipt_id TEXT")
-        for col, ddl in (("ship_route", "TEXT"), ("priority", "TEXT NOT NULL DEFAULT 'normal'"), ("eta_date", "TEXT")):
+        for col, ddl in (("ship_route", "TEXT"), ("priority", "TEXT NOT NULL DEFAULT 'normal'"), ("eta_date", "TEXT"),
+                         ("cost_hint", "INTEGER NOT NULL DEFAULT 0")):
             if col not in poi_cols:
                 con.execute(f"ALTER TABLE preorder_items ADD COLUMN {col} {ddl}")
         history_cols = {row["name"] for row in con.execute("PRAGMA table_info(preorder_status_history)").fetchall()}
@@ -4233,6 +4234,7 @@ def _create_quick_add_entity(
     address: str | None = None,
     contact_person: str | None = None,
     npwp: str | None = None,
+    email: str | None = None,
 ) -> dict:
     """Shared insert path for create_supplier/create_brand — same validation and
     insert shape for both tables, only the table name differs. `phone`/`address`/
@@ -4262,8 +4264,8 @@ def _create_quick_add_entity(
             cur = con.execute(
                 """INSERT INTO suppliers
                    (code, name, is_active, created_at, name_normalized, is_system, source,
-                    phone, address, contact_person, npwp)
-                   VALUES (?, ?, 1, ?, ?, 0, ?, ?, ?, ?, ?)""",
+                    phone, address, contact_person, npwp, email)
+                   VALUES (?, ?, 1, ?, ?, 0, ?, ?, ?, ?, ?, ?)""",
                 (
                     code,
                     name,
@@ -4274,6 +4276,7 @@ def _create_quick_add_entity(
                     (address or "").strip() or None,
                     (contact_person or "").strip() or None,
                     (npwp or "").strip() or None,
+                    (email or "").strip() or None,
                 ),
             )
         else:
@@ -4295,9 +4298,10 @@ def _update_quick_add_entity(
     address: str | None = None,
     contact_person: str | None = None,
     npwp: str | None = None,
+    email: str | None = None,
 ) -> dict:
     entity_label = "Supplier" if table == "suppliers" else "Merek"
-    supplier_details = (phone, address, contact_person, npwp)
+    supplier_details = (phone, address, contact_person, npwp, email)
     with _conn() as con:
         row = con.execute(f"SELECT * FROM {table} WHERE id=?", (entity_id,)).fetchone()
         if row is None:
@@ -4321,7 +4325,7 @@ def _update_quick_add_entity(
 
             con.execute(
                 """UPDATE suppliers
-                   SET name=?, name_normalized=?, is_active=?, phone=?, address=?, contact_person=?, npwp=?
+                   SET name=?, name_normalized=?, is_active=?, phone=?, address=?, contact_person=?, npwp=?, email=?
                    WHERE id=?""",
                 (
                     new_name,
@@ -4331,6 +4335,7 @@ def _update_quick_add_entity(
                     _merged(address, "address"),
                     _merged(contact_person, "contact_person"),
                     _merged(npwp, "npwp"),
+                    _merged(email, "email"),
                     entity_id,
                 ),
             )
@@ -4416,8 +4421,9 @@ def create_supplier(
     address: str | None = None,
     contact_person: str | None = None,
     npwp: str | None = None,
+    email: str | None = None,
 ) -> dict:
-    return _create_quick_add_entity("suppliers", name, code, source, phone, address, contact_person, npwp)
+    return _create_quick_add_entity("suppliers", name, code, source, phone, address, contact_person, npwp, email)
 
 
 def update_supplier(
@@ -4428,9 +4434,10 @@ def update_supplier(
     address: str | None = None,
     contact_person: str | None = None,
     npwp: str | None = None,
+    email: str | None = None,
 ) -> dict:
     return _update_quick_add_entity(
-        "suppliers", supplier_id, name, is_active, phone, address, contact_person, npwp
+        "suppliers", supplier_id, name, is_active, phone, address, contact_person, npwp, email
     )
 
 
@@ -8994,7 +9001,8 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
         f"""SELECT pi.id AS preorder_item_id, pi.preorder_id, p.po_number AS customer_po_number,
                    p.customer_name, p.plate_full, pi.product_name, pi.unit, pi.quantity AS qty_ordered_by_customer,
                    pi.master_item_id, COALESCE(o.ordered, 0) AS qty_bought,
-                   pi.ship_route, pi.priority, pi.eta_date, pi.source, s.id AS supplier_id, s.name AS supplier_name, COALESCE(m.last_cost_price, 0) AS est_unit_price
+                   pi.ship_route, pi.priority, pi.eta_date, pi.source, s.id AS supplier_id, s.name AS supplier_name,
+                   CASE WHEN COALESCE(pi.cost_hint, 0) > 0 THEN pi.cost_hint ELSE COALESCE(m.last_cost_price, 0) END AS est_unit_price
             FROM preorder_items pi
             JOIN preorders p ON p.id = pi.preorder_id
             LEFT JOIN (
@@ -9580,6 +9588,12 @@ def update_supplier_po(
         )
         if items is not None:
             _spo_replace_items(con, supplier_po_id, items)
+            # The price typed on a draft is remembered on the Sales Order line, so a line that is
+            # rebuilt later (supplier changed, SO edited) does not fall back to a missing cost.
+            for it in items:
+                if it.get("preorder_item_id") and (it.get("est_unit_price") or 0) > 0:
+                    con.execute("UPDATE preorder_items SET cost_hint=? WHERE id=?",
+                                (it["est_unit_price"], it["preorder_item_id"]))
     return get_supplier_po(supplier_po_id)
 
 

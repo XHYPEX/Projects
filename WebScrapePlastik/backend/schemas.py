@@ -443,6 +443,7 @@ class SupplierRequest(BaseModel):
     address: str | None = None
     contact_person: str | None = None
     npwp: str | None = None
+    email: str | None = None
 
 
 class SupplierUpdateRequest(BaseModel):
@@ -452,6 +453,7 @@ class SupplierUpdateRequest(BaseModel):
     address: str | None = None
     contact_person: str | None = None
     npwp: str | None = None
+    email: str | None = None
 
 
 class SupplierOut(BaseModel):
@@ -466,6 +468,7 @@ class SupplierOut(BaseModel):
     address: str | None = None
     contact_person: str | None = None
     npwp: str | None = None
+    email: str | None = None
     score: float | None = None
 
 

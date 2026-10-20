@@ -233,6 +233,7 @@ def _row_to_supplier(row: dict) -> SupplierOut:
         address=row["address"],
         contact_person=row["contact_person"],
         npwp=row["npwp"],
+        email=row.get("email"),
         score=row.get("score"),
     )
 
@@ -417,6 +418,7 @@ async def create_new_supplier(req: SupplierRequest):
             req.address,
             req.contact_person,
             req.npwp,
+            req.email,
         )
     except ValueError as e:
         _raise_from_value_error(e)
@@ -462,6 +464,7 @@ async def patch_supplier(supplier_id: int, req: SupplierUpdateRequest):
             req.address,
             req.contact_person,
             req.npwp,
+            req.email,
         )
     except ValueError as e:
         _raise_from_value_error(e)

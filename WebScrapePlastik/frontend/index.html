@@ -109,7 +109,12 @@
       body.printing-spo-inv #spo-inv-panel, body.printing-spo-inv #spo-inv-panel * { visibility: visible !important; }
       body.printing-spo-inv #spo-inv-panel { position: absolute; left: 0; top: 0; width: 100%; }
       body.printing-spo-inv .no-print { display: none !important; }
+      body.printing-cr > *:not(#cr-print-root) { display: none !important; }
+      body.printing-cr #cr-print-root { display: block !important; }
+      body.printing-cr * { visibility: visible !important; }
     }
+
+    #cr-print-root { display: none; }
 
     #map { min-height: 320px; }
 
@@ -523,6 +528,40 @@
     .kpi-card:nth-child(6n+5) .kpi-chip { background: #E6DCF7; color: #6E4FB8; }
     .kpi-card:nth-child(6n+6) .kpi-chip { background: #F6D7DA; color: #B04654; }
 
+
+    /* Sales Order form: label-left rows, a one-line-per-item table, source and procurement pills. */
+    .po-frow { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.75rem; align-items: center; }
+    .po-frow > label { font-size: 13px; color: #4a4a46; font-weight: 500; }
+    @media (max-width: 640px) { .po-frow { grid-template-columns: 1fr; gap: 0.25rem; } }
+    .po-table { min-width: 1120px; }
+    .po-grid { display: grid; grid-template-columns: minmax(170px, 1.8fr) 62px 54px 108px 100px 142px minmax(140px, 1.3fr) 138px 112px 32px; gap: 0.5rem; align-items: center; }
+    .po-head { padding: 0.45rem 0.25rem; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B6B66; border-bottom: 1px solid #E5E3DC; }
+    .po-item-row { padding: 0.45rem 0.25rem; border-bottom: 1px solid #EFECE4; }
+    .po-item-row:last-child { border-bottom: 0; }
+    .po-item-row.is-warn { background: #FFF6E3; border-radius: 10px; }
+    select.po-src.po-src { -webkit-appearance: none; appearance: none; border-radius: 9999px; padding: 0.3rem 1.5rem 0.3rem 1.6rem; font-size: 12px; font-weight: 500; border: 1px solid #E0DDD4; background-color: #fff; position: relative; }
+    .po-src[data-src="supplier"] { background-color: #FDF0E6; border-color: #F4D3B8; color: #9A5A1F; }
+    .po-src[data-src="stok"] { background-color: #E9F5EC; border-color: #C9E4D0; color: #2F6B43; }
+    .po-src[data-src="jasa"] { background-color: #E8F0FB; border-color: #C9DAF3; color: #2F5C9E; }
+    .po-src-wrap { position: relative; }
+    .po-src-wrap::before { content: ""; position: absolute; left: 0.65rem; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 9999px; background: #9A938A; pointer-events: none; z-index: 1; }
+    .po-src-wrap[data-src="supplier"]::before { background: #E08A3C; }
+    .po-src-wrap[data-src="stok"]::before { background: #3F9A5A; }
+    .po-src-wrap[data-src="jasa"]::before { background: #3F6EB5; }
+    .po-na { display: block; padding: 0.4rem 0.7rem; border-radius: 8px; background: #F3F1EA; color: #8A8780; font-size: 13px; }
+    .po-pill.is-proc_po { color: #9A5A1F; background: #FDF0E6; }
+    .po-pill.is-proc_stok { color: #2F6B43; background: #E9F5EC; }
+    .po-pill.is-proc_none { color: #5E5A52; background: #EFEDE6; }
+    .po-pill.is-pay_ok { color: #2F6B43; background: #E9F5EC; }
+    .po-pill.is-pay_part { color: #8A6218; background: #FCF3DC; }
+    .po-pill.is-pay_none { color: #A83B3B; background: #FBEBEB; }
+    .po-tile { border: 1px solid #E5E3DC; border-radius: 12px; padding: 0.6rem 0.75rem; display: flex; gap: 0.6rem; align-items: flex-start; background: #fff; }
+    .po-tile .tile-ic { width: 2.1rem; height: 2.1rem; border-radius: 0.6rem; display: grid; place-items: center; flex: none; }
+    .po-tile[data-tone="a"] { background: #FDF3EA; border-color: #F4D9C2; } .po-tile[data-tone="a"] .tile-ic { background: #FADFC8; color: #B4642A; }
+    .po-tile[data-tone="b"] { background: #EEF4FC; border-color: #D3E2F6; } .po-tile[data-tone="b"] .tile-ic { background: #D9E8FA; color: #3F6EB5; }
+    .po-tile[data-tone="red"] { background: #FDEEEE; border-color: #F3CFCF; } .po-tile[data-tone="red"] .tile-ic { background: #F8D4D4; color: #B04646; }
+    .po-tile[data-tone="plain"] .tile-ic { background: #F0EEE6; color: #6B6B66; }
+
     /* Table header cells: a quieter band. */
     thead.bg-bg2 { background: #F6F4EC; }
   </style>
@@ -652,6 +691,12 @@
           <path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>
         </svg>
         Dashboard
+      </a>
+      <a href="#/cash-receipt" data-route="/cash-receipt" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+          <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9v6M9.5 11.5 12 9l2.5 2.5"/>
+        </svg>
+        Cash Receipt
       </a>
       <a href="#/kas-keluar" data-route="/kas-keluar" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
@@ -1938,100 +1983,104 @@
 
       <!-- FORM PANEL (Sales Order Baru / Edit Sales Order) -->
       <div id="po-form-panel" class="hidden">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 id="po-form-title" class="font-serif text-lg font-semibold text-ink">Sales Order Baru</h2>
-            <p id="po-form-meta" class="hidden text-xs text-muted mt-0.5"></p>
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div class="flex items-start gap-3 min-w-0">
+            <span class="w-10 h-10 rounded-xl bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span>
+            <div class="min-w-0">
+              <h2 id="po-form-title" class="font-serif text-2xl font-semibold text-ink leading-tight">Sales Order Baru</h2>
+              <p class="text-sm text-muted mt-0.5">Tentukan barang pesanan customer, pilih sumber pemenuhan, dan supplier per item.</p>
+              <p id="po-form-meta" class="hidden text-xs text-muted mt-0.5"></p>
+            </div>
           </div>
-          <button id="po-form-back" onclick="poFormBack()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali ke daftar</button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="po-form-back" onclick="poFormBack()" class="px-4 py-2 border border-failed/40 rounded-lg text-sm font-medium text-failed bg-white hover:bg-failed/5 transition-colors">&larr; Kembali ke daftar</button>
+            <button id="po-draft-btn" onclick="savePreorder(true)"
+              class="px-4 py-2 border border-accent/60 rounded-lg text-sm font-medium text-accentDark bg-white hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Draft</button>
+            <button id="po-save-btn" onclick="savePreorder(false)"
+              class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan &amp; Buat Draft PO</button>
+          </div>
         </div>
 
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Informasi Customer &amp; Kendaraan</h3></div>
-          <div class="mb-3 sm:w-64">
-            <label for="po-number" class="block text-xs text-muted mb-1.5">Nomor Sales Order <span class="text-muted/70">(otomatis)</span></label>
-            <input id="po-number" type="text" readonly tabindex="-1" aria-readonly="true" data-no-uppercase
-              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-ink font-semibold cursor-default focus:outline-none" />
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-            <div>
-              <label for="po-customer-name" class="block text-xs text-muted mb-1.5">Nama Customer <span class="text-failed">*</span></label>
-              <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input id="po-customer-name" type="text" placeholder="Nama pemesan" autocomplete="off"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
-            </div>
-            <div>
-              <label for="po-plate-region" class="block text-xs text-muted mb-1.5">Nomor Plat Mobil <span class="text-failed">*</span></label>
-              <div class="flex items-center gap-2">
-                <input id="po-plate-region" type="text" maxlength="2" placeholder="B" autocomplete="off" aria-label="Kode wilayah plat"
-                  class="w-14 uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-                  oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,''); validatePoPlateRegion();" />
-                <span class="text-muted" aria-hidden="true">·</span>
-                <input id="po-plate-number" type="text" maxlength="4" inputmode="numeric" placeholder="1234" autocomplete="off" aria-label="Nomor plat"
-                  class="w-[4.5rem] border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-                  oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
-                <span class="text-muted" aria-hidden="true">·</span>
-                <input id="po-plate-suffix" type="text" maxlength="3" placeholder="ABC" autocomplete="off" aria-label="Huruf belakang plat"
-                  class="w-16 uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-                  oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'');" />
+          <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Informasi Customer</h3></div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+            <div class="space-y-3">
+              <div class="po-frow">
+                <label for="po-customer-name">Nama Customer <span class="text-failed">*</span></label>
+                <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input id="po-customer-name" type="text" placeholder="Nama pemesan" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
               </div>
-              <p id="po-plate-feedback" class="text-xs text-muted mt-1.5 min-h-[1rem]"></p>
+              <div class="po-frow">
+                <label for="po-plate-region">No. Plat <span class="text-failed">*</span></label>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-muted shrink-0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l2-5a2 2 0 0 1 1.9-1.3h10.2A2 2 0 0 1 19 7l2 5"/><path d="M3 12h18v5a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5Z"/><path d="M7 14.5h.01M17 14.5h.01"/></svg></span>
+                    <input id="po-plate-region" type="text" maxlength="2" placeholder="B" autocomplete="off" aria-label="Kode wilayah plat"
+                      class="w-14 uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,''); validatePoPlateRegion();" />
+                    <span class="text-muted" aria-hidden="true">·</span>
+                    <input id="po-plate-number" type="text" maxlength="4" inputmode="numeric" placeholder="1234" autocomplete="off" aria-label="Nomor plat"
+                      class="w-[4.5rem] border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                      oninput="this.value=this.value.replace(/[^0-9]/g,'');" />
+                    <span class="text-muted" aria-hidden="true">·</span>
+                    <input id="po-plate-suffix" type="text" maxlength="3" placeholder="ABC" autocomplete="off" aria-label="Huruf belakang plat"
+                      class="w-16 uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+                      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'');" />
+                  </div>
+                  <p id="po-plate-feedback" class="text-xs text-muted mt-1 min-h-[1rem]"></p>
+                </div>
+              </div>
+              <div class="po-frow">
+                <label for="po-customer-phone">No. HP <span class="text-failed">*</span></label>
+                <div>
+                  <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg><input id="po-customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off" oninput="poPhoneVehicleLookup()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
+                  <div id="po-vehicle-chips" class="flex flex-wrap items-center gap-2 mt-2"></div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label for="po-customer-phone" class="block text-xs text-muted mb-1.5">Nomor Telepon <span class="text-failed">*</span></label>
-              <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg><input id="po-customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off" oninput="poPhoneVehicleLookup()"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
-              <div id="po-vehicle-chips" class="flex flex-wrap items-center gap-2 mt-2"></div>
+            <div class="space-y-3">
+              <div class="po-frow">
+                <label for="po-number">No. Sales Order <span class="text-muted/70 font-normal">(otomatis)</span></label>
+                <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg><input id="po-number" type="text" readonly tabindex="-1" aria-readonly="true" data-no-uppercase
+                  class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-ink font-semibold cursor-default focus:outline-none" /></div>
+              </div>
+              <div class="po-frow">
+                <label for="po-date">Tanggal SO <span class="text-failed">*</span></label>
+                <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><input id="po-date" type="date" data-no-uppercase onchange="refreshPoNumberPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
+              </div>
+              <div class="po-frow items-start">
+                <label for="po-notes" class="pt-2">Catatan Pesanan</label>
+                <textarea id="po-notes" rows="3" placeholder="opsional, mis. warna, ukuran, janji pemasangan" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea>
+              </div>
             </div>
-            <div>
-              <label for="po-date" class="block text-xs text-muted mb-1.5">Tanggal Sales Order</label>
-              <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><input id="po-date" type="date" data-no-uppercase onchange="refreshPoNumberPreview()"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
-            </div>
-          </div>
-          <div>
-            <label for="po-notes" class="block text-xs text-muted mb-1.5">Catatan Pesanan</label>
-            <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><input id="po-notes" type="text" placeholder="opsional — mis. warna, ukuran, janji pemasangan"
-              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
           </div>
         </div>
 
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
-            <div>
-              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2 3h3l2.4 12.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6"/></svg></span><h3>Daftar Barang Pesanan</h3></div>
-              <p class="text-xs text-muted mt-2">Tentukan sumber tiap barang: <b class="text-ink font-medium">Pesan Supplier</b> (dibuatkan draft Purchase Order ke supplier tujuan), <b class="text-ink font-medium">Stok Tersedia</b> (dicadangkan dari stok toko), atau <b class="text-ink font-medium">Manual / Jasa</b>.</p>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2 3h3l2.4 12.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6"/></svg></span><h3>Detail Barang Pesanan</h3></div>
+            <button type="button" onclick="addPreorderRow()" class="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 border border-accent/60 rounded-lg text-sm font-medium text-accentDark bg-white hover:bg-accent/10 transition-colors"><span aria-hidden="true">+</span> Tambah Baris</button>
+          </div>
+          <div class="overflow-x-auto -mx-1 px-1 pb-1">
+            <div class="po-table">
+              <div class="po-grid po-head"><div class="">Barang</div><div class="">Satuan</div><div class="text-right">Qty</div><div class="text-right">Harga Jual</div><div class="text-right">Subtotal</div><div class="">Sumber</div><div class="">Supplier Tujuan</div><div class="">Estimasi Datang</div><div class="">Status Pengadaan</div><div class=""></div></div>
+              <div id="po-item-rows"></div>
             </div>
-            <button type="button" onclick="addPreorderRow()" class="shrink-0 px-3 py-1.5 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors">+ Tambah Barang</button>
           </div>
-          <div class="hidden md:flex items-center gap-2 px-3 pb-1 text-[11px] font-medium text-muted uppercase tracking-wider">
-            <div class="flex-1 min-w-[180px]">Nama Barang</div>
-            <div class="w-24">Satuan</div>
-            <div class="w-20 text-right">Qty</div>
-            <div class="w-32 text-right">Harga Jual</div>
-            <div class="w-28 text-right">Subtotal</div>
-            <div class="w-10"></div>
+          <div id="po-missing-supplier" class="hidden mt-3 flex items-center gap-2 rounded-lg border border-failed/30 bg-failed/5 px-3 py-2 text-sm text-failed">
+            <span class="shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span id="po-missing-supplier-text"></span>
           </div>
-          <div id="po-item-rows" class="space-y-2"></div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 mb-4 items-start">
-          <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
-            <div class="flex items-center justify-between gap-2 mb-1">
-              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><h3>Preview Draft Purchase Order</h3></div>
-              <span id="po-preview-count" class="text-xs text-muted"></span>
-            </div>
-            <p class="text-xs text-muted mb-3">Saat Sales Order disimpan &amp; diterbitkan, barang “Pesan Supplier” dikelompokkan menjadi draft Purchase Order per supplier. Draft bisa direview sebelum dikirim ke supplier.</p>
-            <div id="po-preview-body" class="space-y-2"></div>
-          </div>
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,0.85fr)_1.15fr] gap-4 mb-4 items-start">
           <div class="bg-white border border-line rounded-xl p-4 sm:p-5 text-sm">
-            <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg></span><h3>Ringkasan Pembayaran</h3></div>
+            <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg></span><h3>Ringkasan Pembayaran Customer</h3></div>
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-muted">Total Pesanan</span>
+                <span class="text-muted">Total Sales Order</span>
                 <span id="po-total-display" class="font-serif text-base font-semibold text-ink tabular-nums">Rp 0</span>
               </div>
               <div class="flex items-center justify-between gap-3">
-                <label for="po-deposit" class="text-muted shrink-0">DP Dibayar</label>
+                <label for="po-deposit" class="text-muted shrink-0">DP Customer</label>
                 <div id="po-deposit-wrap" class="relative w-40">
                   <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
                   <input id="po-deposit" type="text" inputmode="numeric" value="0" oninput="updatePreorderTotals()"
@@ -2064,17 +2113,26 @@
                 <span class="text-muted">Sisa Tagihan</span>
                 <span id="po-remaining-display" class="font-serif text-base font-semibold text-failed tabular-nums">Rp 0</span>
               </div>
+              <div class="flex items-center justify-between">
+                <span class="text-muted">Status Pembayaran</span>
+                <span id="po-pay-status" class="po-pill is-pesanan_dibuat">-</span>
+              </div>
+            </div>
+            <div class="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">
+              <span class="shrink-0 mt-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span>Harga beli supplier tidak memengaruhi total tagihan customer.</span>
             </div>
           </div>
-        </div>
-
-        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-          <button type="button" onclick="poFormBack()"
-            class="mr-auto px-4 py-2 text-sm font-medium text-muted hover:text-ink transition-colors">Batal</button>
-          <button id="po-draft-btn" onclick="savePreorder(true)"
-            class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Draft</button>
-          <button id="po-save-btn" onclick="savePreorder(false)"
-            class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan &amp; Buat Draft PO</button>
+          <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><h3>Preview Otomatis Draft PO</h3></div>
+              <span id="po-preview-count" class="text-xs text-muted"></span>
+            </div>
+            <p class="text-xs text-muted mb-3">Draft PO dibuat berdasarkan item yang memilih sumber Pesan Supplier, satu draft per supplier.</p>
+            <div id="po-preview-body" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+            <div class="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">
+              <span class="shrink-0 mt-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span>Barang dari stok tersedia tidak dibuatkan PO Supplier.</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3284,6 +3342,86 @@
 
   <!-- PAGE: AKTIVITAS (admin-only audit trail) -->
   <!-- K-20 Kas Keluar (admin): every refund, with the proof and the nota it belongs to. -->
+  <div id="page-cash-receipt" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-none mx-auto">
+
+      <!-- Daftar -->
+      <div id="cr-view-list">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted bg-bg2 border border-line rounded-full px-2.5 py-1" title="Laporan dibaca dari pembayaran yang sudah dicatat di Kasir dan Sales Order. Tidak ada yang bisa diubah dari sini.">Read only</span>
+          <span class="text-sm text-muted">Tidak dapat diedit. Koreksi pembayaran dilakukan di Kasir / Sales Order.</span>
+          <div class="ml-auto flex flex-wrap gap-2">
+            <button type="button" onclick="crExport()" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2 transition-colors">Ekspor Excel</button>
+            <button type="button" onclick="crOpenPrint()" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2 transition-colors">Ekspor PDF</button>
+          </div>
+        </div>
+
+        <div id="cr-kpis" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-4"></div>
+        <div id="cr-pending" class="hidden mb-4"></div>
+
+        <div class="bg-white border border-line rounded-xl mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">
+            <div class="card-title"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><h3>Pencarian &amp; Filter</h3></div>
+            <span id="cr-period" class="text-xs text-muted"></span>
+          </div>
+          <div class="p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3">
+              <div><label for="cr-q" class="block text-[11px] font-semibold text-muted mb-1">Nama customer</label>
+                <input id="cr-q" type="search" data-no-uppercase placeholder="Cari nama, HP, atau plat…" onkeydown="if(event.key==='Enter') crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+              <div><label for="cr-doc" class="block text-[11px] font-semibold text-muted mb-1">No. Invoice / SO</label>
+                <input id="cr-doc" type="search" data-no-uppercase placeholder="Cari nomor…" onkeydown="if(event.key==='Enter') crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+              <div><label for="cr-method" class="block text-[11px] font-semibold text-muted mb-1">Metode pembayaran</label>
+                <select id="cr-method" onchange="crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+                  <option value="">Semua metode</option><option value="cash">Tunai</option><option value="transfer">Transfer Bank</option><option value="qris">QRIS</option><option value="debit">Kartu Debit</option></select></div>
+              <div><label for="cr-account" class="block text-[11px] font-semibold text-muted mb-1">Rekening / Kas</label>
+                <select id="cr-account" onchange="crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"><option value="">Semua rekening</option></select></div>
+              <div><label for="cr-status" class="block text-[11px] font-semibold text-muted mb-1">Status transaksi</label>
+                <select id="cr-status" onchange="crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+                  <option value="">Semua status</option><option value="berhasil">Berhasil</option><option value="pending">Pending</option><option value="dibatalkan">Dibatalkan</option><option value="refund">Refund</option><option value="pembalikan">Pembalikan</option><option value="gagal">Gagal</option></select></div>
+              <div><label for="cr-cashier" class="block text-[11px] font-semibold text-muted mb-1">Petugas</label>
+                <select id="cr-cashier" onchange="crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"><option value="">Semua petugas</option></select></div>
+              <div><label for="cr-from" class="block text-[11px] font-semibold text-muted mb-1">Tanggal awal</label>
+                <input id="cr-from" type="date" data-no-uppercase onchange="crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+              <div><label for="cr-to" class="block text-[11px] font-semibold text-muted mb-1">Tanggal akhir</label>
+                <input id="cr-to" type="date" data-no-uppercase onchange="crFilterChanged()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></div>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-3 mt-4">
+              <div id="cr-quick" class="flex flex-wrap gap-2"></div>
+              <div class="flex gap-2">
+                <button type="button" onclick="crReset()" class="px-4 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2 transition-colors">Reset</button>
+                <button type="button" onclick="crFilterChanged()" class="px-4 py-2 text-sm font-semibold rounded-lg bg-accent text-white hover:bg-accentDark transition-colors">Terapkan Filter</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-line rounded-xl overflow-hidden mb-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">
+            <div class="card-title"><span class="chip"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><h3>Daftar Transaksi Penerimaan</h3></div>
+            <span id="cr-counts" class="text-xs text-muted"></span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-bg2"><tr id="cr-thead"></tr></thead>
+              <tbody id="cr-tbody"></tbody>
+            </table>
+          </div>
+          <div id="cr-empty" class="hidden text-center py-10 text-sm text-muted">Belum ada penerimaan pembayaran pada filter ini.</div>
+          <div id="cr-pager" class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-line text-xs text-muted"></div>
+        </div>
+
+        <div id="cr-breakdown" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+      </div>
+
+      <!-- Detail satu penerimaan -->
+      <div id="cr-view-detail" class="hidden"></div>
+      <!-- Riwayat penerimaan satu invoice / SO -->
+      <div id="cr-view-group" class="hidden"></div>
+      <!-- Preview cetak -->
+      <div id="cr-view-print" class="hidden"></div>
+    </div>
+  </div>
+
   <div id="page-kas-keluar" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
       <div class="flex flex-wrap items-end gap-2 mb-4">
@@ -4350,6 +4488,7 @@
 
       <!-- TAB: MASTER SUPPLIER -->
       <section id="inv-tab-supplier" class="hidden">
+        <div id="supplier-list-view">
         <div id="supplier-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" aria-live="polite"></div>
         <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4">
           <div class="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -4363,7 +4502,7 @@
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
               <button onclick="confirmDeleteAllEntities('supplier')" class="admin-only flex-1 sm:flex-none px-4 py-2 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-failed/30">Hapus Semua</button>
-              <button onclick="openStandaloneQuickAdd('supplier')" class="flex-1 sm:flex-none justify-center inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
+              <button onclick="openSupplierForm()" class="flex-1 sm:flex-none justify-center inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                 Tambah Supplier
               </button>
@@ -4392,6 +4531,46 @@
           </div>
           <div id="supplier-list-empty" class="hidden text-center py-12">
             <p class="text-sm text-muted">Tidak ada supplier yang cocok.</p>
+          </div>
+        </div>
+        </div>
+
+        <!-- Tambah Supplier Baru (page, not a modal) -->
+        <div id="supplier-form-panel" class="hidden">
+          <nav class="text-xs text-muted mb-2" aria-label="Breadcrumb">Inventori &rsaquo; <button type="button" onclick="closeSupplierForm()" class="hover:text-ink underline-offset-2 hover:underline">Master Supplier</button> &rsaquo; <span class="text-ink">Tambah Supplier</span></nav>
+          <div class="flex items-start gap-3 mb-4">
+            <span class="w-10 h-10 rounded-xl bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.5 6.5 0 0 1 3 6"/></svg></span>
+            <div>
+              <h2 class="font-serif text-2xl font-semibold text-ink leading-tight">Tambah Supplier Baru</h2>
+              <p class="text-sm text-muted mt-0.5">Data supplier untuk kebutuhan pembelian, faktur, dan relasi produk.</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+            <div class="space-y-4">
+              <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
+                <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><div><h3>Informasi Utama Supplier</h3><p>Data dasar supplier yang dipakai pada transaksi pembelian.</p></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3"><div><label class="block text-[13px] font-medium text-ink mb-1.5">Nama Supplier <span class="text-failed">*</span></label><div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14a6.5 6.5 0 0 1 3 6"/></svg><input id="sf-name" type="text" maxlength="120" autocomplete="off" placeholder="mis. ASTA JAYA" oninput="onSupplierFormName()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div><p id="sf-name-error" class="hidden text-xs text-failed mt-1"></p></div><div><label class="block text-[13px] font-medium text-ink mb-1.5">Kode Supplier</label><div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14M5 15h14M9 4 7 20M17 4l-2 16"/></svg><input id="sf-code" type="text" readonly tabindex="-1" data-no-uppercase placeholder="Dibuat otomatis" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-ink font-medium cursor-default focus:outline-none" /></div><p class="text-[11px] text-muted mt-1">Kode supplier otomatis dibuat oleh sistem.</p></div><div><label class="block text-[13px] font-medium text-ink mb-1.5">Nama PIC / Kontak</label><div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input id="sf-contact" type="text" maxlength="120" autocomplete="off" placeholder="mis. Budi Santoso" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div></div><div><label class="block text-[13px] font-medium text-ink mb-1.5">Nomor Telepon / WhatsApp</label><div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg><input id="sf-phone" type="tel" inputmode="tel" maxlength="40" autocomplete="off" placeholder="0812xxxxxxxx" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div></div><div><label class="block text-[13px] font-medium text-ink mb-1.5">Email</label><div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3 7 9 6 9-6"/></svg><input id="sf-email" type="email" maxlength="120" autocomplete="off" data-no-uppercase placeholder="nama@perusahaan.co.id" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div></div><div><label class="block text-[13px] font-medium text-ink mb-1.5">Status Supplier</label><select id="sf-status" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="1">Aktif</option><option value="0">Nonaktif</option></select></div></div>
+              </div>
+              <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
+                <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span><div><h3>Informasi Alamat &amp; Pajak</h3><p>Alamat dan NPWP dicetak di Purchase Order dan Faktur Pembelian.</p></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3"><div class="md:col-span-2"><div><label class="block text-[13px] font-medium text-ink mb-1.5">Alamat Lengkap</label><textarea id="sf-address" rows="3" maxlength="400" placeholder="mis. Jl. Raya DKI No. 12, Ruko Sentra Otomotif Blok A3, Jakarta Barat" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea></div></div><div><label class="block text-[13px] font-medium text-ink mb-1.5">NPWP</label><div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg><input id="sf-npwp" type="text" maxlength="40" autocomplete="off" placeholder="opsional" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div></div></div>
+              </div>
+            </div>
+            <aside class="space-y-4">
+              <div class="bg-white border border-line rounded-xl p-4">
+                <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/></svg></span><h3>Panduan Pengisian</h3></div>
+                <ul class="space-y-2.5 text-[13px] text-ink"><li class="flex items-start gap-2"><span class="mt-0.5 text-done shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><span>Nama supplier wajib diisi dan harus unik.</span></li><li class="flex items-start gap-2"><span class="mt-0.5 text-done shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><span>Kode supplier dibuat otomatis oleh sistem.</span></li><li class="flex items-start gap-2"><span class="mt-0.5 text-done shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><span>Lengkapi alamat untuk memudahkan pengiriman barang dan cetak dokumen.</span></li><li class="flex items-start gap-2"><span class="mt-0.5 text-done shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><span>Nomor telepon dan PIC membantu saat menghubungi supplier soal pesanan.</span></li><li class="flex items-start gap-2"><span class="mt-0.5 text-done shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><span>Pastikan semua data sudah benar sebelum disimpan.</span></li></ul>
+              </div>
+              <div class="rounded-xl border border-failed/25 bg-failed/5 p-4">
+                <div class="flex items-center gap-2 text-failed font-semibold text-sm mb-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>Nama Supplier Harus Unik</div>
+                <p class="text-[13px] text-ink">Pastikan nama supplier belum pernah terdaftar di sistem dan gunakan nama yang konsisten untuk menghindari data ganda.</p>
+              </div>
+            </aside>
+          </div>
+          <div class="sticky bottom-0 z-10 mt-4 -mx-1 px-1 py-3 bg-bg/95 backdrop-blur border-t border-line flex flex-wrap items-center justify-end gap-2">
+            <button type="button" onclick="closeSupplierForm()" class="px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors">Batal</button>
+            <button id="sf-save-more" type="button" onclick="submitSupplierForm(true)" class="px-4 py-2 border border-accent/60 rounded-lg text-sm font-medium text-accentDark bg-white hover:bg-accent/10 disabled:opacity-40 transition-colors">Simpan &amp; Tambah Lagi</button>
+            <button id="sf-save" type="button" onclick="submitSupplierForm(false)" class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 transition-colors">Simpan Supplier</button>
           </div>
         </div>
       </section>
@@ -4983,6 +5162,7 @@ const ROUTES = {
   "/master-service": { title: "Master Service", page: "page-master-service" },
   "/master-customer": { title: "Master Customer", page: "page-inventory", section: "inv-tab-customer", data: "customer" },
   "/dashboard": { title: "Dashboard", page: "page-dashboard" },
+  "/cash-receipt": { title: "Cash Receipt / Laporan Penerimaan", page: "page-cash-receipt" },
   "/kas-keluar": { title: "Kas Keluar", page: "page-kas-keluar" },
   "/users": { title: "Pengguna", page: "page-users" },
   "/activity": { title: "Log Aktivitas", page: "page-activity" },
@@ -4997,7 +5177,7 @@ const INVENTORY_ROUTES = new Set(
 // being immediately undone by it.
 let pendingInventoryAction = null;
 
-const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar"]);
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar", "/cash-receipt"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
 // #page-scraper; it just stops being reachable.
@@ -5048,6 +5228,7 @@ function renderRoute() {
   if (route === "/cashier") { itemEntryInput()?.focus(); svcLoadSerialSkus(); }
   if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); loadNotices(); }
   if (route === "/kas-keluar") koInit();
+  if (route === "/cash-receipt") crInit();
   if (route === "/master-kategori") katInit();
   if (route === "/stock-opname") opInit();
   if (route === "/karantina") qrLoad();
@@ -5167,6 +5348,10 @@ const ROUTE_META = {
   "/dashboard": {
     subtitle: "Ringkasan persediaan, penjualan dan tagihan.",
     icon: '<path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>',
+  },
+  "/cash-receipt": {
+    subtitle: "Laporan uang masuk dari customer: siapa membayar, untuk invoice atau SO mana, lewat apa, dan masuk ke mana.",
+    icon: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9v6M9.5 11.5 12 9l2.5 2.5"/>',
   },
   "/kas-keluar": {
     subtitle: "Semua uang yang dikembalikan ke pelanggan, lengkap dengan bukti dan nota asalnya.",
@@ -9942,7 +10127,7 @@ function refreshInventoryTab(tab) {
   if (tab === "inbound") { showInboundListPanel(); loadInboundDocuments(); }
   else if (tab === "master") { showMasterListPanel(); loadMasterItems(); }
   else if (tab === "brand") loadBrands();
-  else if (tab === "supplier") loadSuppliers();
+  else if (tab === "supplier") { closeSupplierForm(); loadSuppliers(); }
   else if (tab === "unit") loadUnits();
   else if (tab === "customer") { showCustomerListPanel(); loadCustomers(); }
 }
@@ -9958,6 +10143,63 @@ async function loadSuppliers() {
   suppliersCache = resp.ok ? await resp.json() : [];
   refreshSupplierDropdowns();
   renderSupplierTable();
+}
+
+// ── Master Supplier: "Tambah Supplier Baru" page ─────────────────────────────
+const SUPPLIER_FORM_FIELDS = ["sf-name", "sf-code", "sf-contact", "sf-phone", "sf-email", "sf-address", "sf-npwp"];
+function openSupplierForm() {
+  SUPPLIER_FORM_FIELDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  document.getElementById("sf-status").value = "1";
+  document.getElementById("sf-name-error").classList.add("hidden");
+  document.getElementById("supplier-list-view").classList.add("hidden");
+  document.getElementById("supplier-form-panel").classList.remove("hidden");
+  window.scrollTo({ top: 0 });
+  document.getElementById("sf-name").focus();
+}
+function closeSupplierForm() {
+  document.getElementById("supplier-form-panel")?.classList.add("hidden");
+  document.getElementById("supplier-list-view")?.classList.remove("hidden");
+}
+const debouncedSupplierFormCode = debounce(async () => {
+  const name = document.getElementById("sf-name").value.trim();
+  const codeEl = document.getElementById("sf-code");
+  if (!name) { codeEl.value = ""; return; }
+  try {
+    const resp = await fetch(`/api/suppliers/code-preview?name=${encodeURIComponent(name)}`);
+    if (resp.ok && name === document.getElementById("sf-name").value.trim()) codeEl.value = (await resp.json()).code;
+  } catch (_) {}
+}, 250);
+function onSupplierFormName() {
+  document.getElementById("sf-name-error").classList.add("hidden");
+  debouncedSupplierFormCode();
+}
+async function submitSupplierForm(addAnother) {
+  const g = id => document.getElementById(id).value.trim();
+  const errEl = document.getElementById("sf-name-error");
+  const name = g("sf-name");
+  if (!name) { errEl.textContent = "Nama supplier wajib diisi."; errEl.classList.remove("hidden"); document.getElementById("sf-name").focus(); return; }
+  const buttons = [document.getElementById("sf-save"), document.getElementById("sf-save-more")];
+  buttons.forEach(b => { b.disabled = true; });
+  const body = { name, contact_person: g("sf-contact") || null, phone: g("sf-phone") || null, email: g("sf-email") || null,
+    address: g("sf-address") || null, npwp: g("sf-npwp") || null };
+  try {
+    const resp = await fetch("/api/suppliers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!resp.ok) {
+      let message = "Gagal menambahkan supplier.";
+      try { const err = await resp.json(); if (err.detail) message = err.detail; } catch (_) {}
+      errEl.textContent = message; errEl.classList.remove("hidden");
+      return;
+    }
+    const created = await resp.json();
+    if (document.getElementById("sf-status").value === "0") {
+      await fetch(`/api/suppliers/${created.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: false }) });
+    }
+    await loadSuppliers();
+    showToast(`Supplier ${created.name} (${created.code}) ditambahkan.`, "success");
+    if (addAnother) openSupplierForm(); else closeSupplierForm();
+  } finally {
+    buttons.forEach(b => { b.disabled = false; });
+  }
 }
 
 async function loadBrands() {
@@ -11496,6 +11738,416 @@ async function submitQuickAdd() {
   quickAddContext = null;
   closeModal();
   showToast(`${ctx.type === "supplier" ? "Supplier" : "Merek"} "${created.name}" ditambahkan.`, "success");
+}
+
+// ── Cash Receipt: laporan penerimaan pembayaran customer (read-only) ───────────
+// Everything here only reads GET /api/cash-receipts*. Payments are recorded in Kasir / Sales Order and
+// corrected there; this page never writes.
+const CR = { f: {}, quick: "today", sort: "paid_at", dir: "desc", page: 1, size: 25, data: null, seq: 0, timer: null, ready: false, last: null };
+const CR_METHOD_STYLE = { cash: "bg-emerald-50 text-emerald-700", transfer: "bg-sky-50 text-sky-700", qris: "bg-violet-50 text-violet-700", debit: "bg-amber-50 text-amber-700" };
+const CR_STATUS_STYLE = { berhasil: "bg-emerald-50 text-emerald-700", pending: "bg-amber-50 text-amber-700", gagal: "bg-rose-50 text-rose-700", dibatalkan: "bg-stone-100 text-stone-600", refund: "bg-rose-50 text-rose-700", pembalikan: "bg-stone-100 text-stone-600" };
+const CR_QUICK = [["today", "Hari Ini"], ["yesterday", "Kemarin"], ["week", "7 Hari"], ["month", "Bulan Ini"], ["all", "Semua"]];
+const CR_COLS = [
+  ["no", "No. Receipt"], ["paid_at", "Tanggal / Jam"], ["customer", "Customer"], [null, "Invoice / SO"],
+  ["method", "Metode"], [null, "Kas / Rekening"], ["amount", "Nominal", "right"], ["status", "Status"], [null, "Aksi"],
+];
+
+const crPill = (cls, label) => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${cls}">${esc(label)}</span>`;
+const crMethodPill = e => crPill(CR_METHOD_STYLE[e.method] || "bg-stone-100 text-stone-600", e.method_label);
+const crStatusPill = e => crPill(CR_STATUS_STYLE[e.status] || "bg-stone-100 text-stone-600", e.status_label);
+function crWhen(local, dateOnly) {
+  if (!local) return "—";
+  const [d, t] = local.split(" ");
+  const [y, m, dd] = d.split("-");
+  return `${dd}/${m}/${y}${dateOnly ? "" : " " + t}`;
+}
+function crLongDate(local) {
+  if (!local) return "";
+  const d = new Date(local.replace(" ", "T"));
+  return `${d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}, ${local.split(" ")[1]} WIB`;
+}
+const crSigned = e => (e.kind === "masuk" ? "" : "− ") + formatIDR(e.amount);
+const crAmountCls = e => (e.kind === "masuk" ? (e.status === "pending" ? "text-amber-700" : e.status === "gagal" || e.status === "dibatalkan" ? "text-muted line-through" : "text-ink") : "text-failed");
+const crYmd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const crInvLink = e => e.invoice_id ? `<a href="#/invoices" onclick="event.stopPropagation(); openReceiptFromHistory('${esc(e.invoice_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(e.invoice_no || "Invoice")}</a>` : "";
+const crSoLink = e => e.so_id ? `<a href="#/sales-order" onclick="event.stopPropagation(); openPreorderFromDashboard('${esc(e.so_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(e.so_no || "SO")}</a>` : "";
+
+function crView(name) {
+  for (const v of ["list", "detail", "group", "print"]) document.getElementById(`cr-view-${v}`).classList.toggle("hidden", v !== name);
+  document.getElementById("page-cash-receipt").scrollTop = 0;
+}
+
+function crInit() {
+  if (!CR.ready) { CR.ready = true; crApplyQuick("today", false); }
+  crRenderQuick();
+  crView("list");
+  crLoad();
+}
+
+function crRenderQuick() {
+  document.getElementById("cr-quick").innerHTML = CR_QUICK.map(([k, label]) =>
+    `<button type="button" onclick="crApplyQuick('${k}')" class="px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${CR.quick === k ? "bg-accent border-accent text-white" : "border-line bg-white text-muted hover:text-ink hover:bg-bg2"}">${label}</button>`).join("");
+}
+
+function crApplyQuick(k, load = true) {
+  const now = new Date(), from = document.getElementById("cr-from"), to = document.getElementById("cr-to");
+  const day = (off) => { const d = new Date(now); d.setDate(d.getDate() + off); return crYmd(d); };
+  if (k === "today") { from.value = to.value = crYmd(now); }
+  else if (k === "yesterday") { from.value = to.value = day(-1); }
+  else if (k === "week") { from.value = day(-6); to.value = crYmd(now); }
+  else if (k === "month") { from.value = crYmd(new Date(now.getFullYear(), now.getMonth(), 1)); to.value = crYmd(now); }
+  else { from.value = to.value = ""; }
+  CR.quick = k; CR.page = 1;
+  crRenderQuick();
+  if (load) crLoad();
+}
+
+function crFilterChanged() {
+  const active = document.activeElement && ["cr-from", "cr-to"].includes(document.activeElement.id);
+  if (active) { CR.quick = "custom"; crRenderQuick(); }
+  CR.page = 1;
+  crLoad();
+}
+
+function crReset() {
+  for (const id of ["cr-q", "cr-doc", "cr-method", "cr-account", "cr-status", "cr-cashier"]) document.getElementById(id).value = "";
+  crApplyQuick("today");
+}
+
+function crFilters() {
+  const v = id => document.getElementById(id).value.trim();
+  return { date_from: v("cr-from"), date_to: v("cr-to"), q: v("cr-q"), doc: v("cr-doc"),
+    method: v("cr-method"), account: document.getElementById("cr-account").value, status: v("cr-status"), cashier: document.getElementById("cr-cashier").value };
+}
+
+function crQuery(f, extra = {}) {
+  const q = new URLSearchParams();
+  for (const [k, val] of Object.entries({ ...f, ...extra })) if (val !== "" && val != null) q.set(k, val);
+  return q;
+}
+
+async function crFetch(f, extra) {
+  const resp = await fetch(`/api/cash-receipts?${crQuery(f, extra)}`);
+  if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Cash Receipt tidak bisa dimuat."));
+  return resp.json();
+}
+
+async function crLoad() {
+  const seq = ++CR.seq;
+  CR.f = crFilters();
+  let data;
+  try { data = await crFetch(CR.f, { sort: CR.sort, dir: CR.dir, page: CR.page, page_size: CR.size }); }
+  catch (e) { showToast(e.message || "Cash Receipt tidak bisa dimuat."); return; }
+  if (seq !== CR.seq) return;
+  CR.data = data;
+  crFillOptions("cr-account", data.options.accounts, "Semua rekening");
+  crFillOptions("cr-cashier", data.options.cashiers, "Semua petugas");
+  crRenderList();
+}
+
+function crFillOptions(id, values, allLabel) {
+  const el = document.getElementById(id), cur = el.value;
+  const list = values.includes(cur) || !cur ? values : [...values, cur];
+  el.innerHTML = `<option value="">${allLabel}</option>` + list.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  el.value = cur;
+}
+
+// Summary tile: its own tint (no icon chip), so the six sit in one row like the mockup.
+function crTile(label, value, sub, tint) {
+  return `<div class="border rounded-xl px-4 py-3 ${tint || "bg-[#FFFFFE] border-line"}"><div class="text-[10.5px] font-semibold text-muted uppercase tracking-wider mb-1.5">${label}</div><div class="font-sans text-xl font-semibold text-ink tabular-nums whitespace-nowrap">${value}</div>${sub ? `<div class="text-[11px] text-muted mt-1">${sub}</div>` : ""}</div>`;
+}
+
+function crRenderList() {
+  const d = CR.data, s = d.summary, m = s.by_method;
+  const f = CR.f;
+  document.getElementById("cr-period").textContent = f.date_from || f.date_to
+    ? `Periode: ${f.date_from === f.date_to ? crLongDay(f.date_from) : `${f.date_from ? crWhen(f.date_from + " 0", true) : "…"} — ${f.date_to ? crWhen(f.date_to + " 0", true) : "…"}`}` : "Periode: semua tanggal";
+  const money = n => esc(formatIDR(n));
+  document.getElementById("cr-kpis").innerHTML =
+    crTile("Penerimaan Bruto", money(s.gross), `${s.gross_count} pembayaran sah`, "bg-[#FDF4EF] border-[#F3DDD2]")
+    + crTile("Refund", `<span class="${s.refund ? "text-failed" : ""}">${money(s.refund)}</span>`, `${s.refund_count} refund / pembalikan`, "bg-[#FDF1F1] border-[#F3D9D9]")
+    + crTile("Penerimaan Bersih", money(s.net), "Bruto dikurangi refund", "bg-[#F1F8F3] border-[#D9EBDE]")
+    + crTile("Tunai", money(m.cash.gross), `${m.cash.count} penerimaan`)
+    + crTile("Transfer", money(m.transfer.gross), `${m.transfer.count} penerimaan`, "bg-[#F2F6FD] border-[#DCE6F6]")
+    + crTile("QRIS", money(m.qris.gross), `${m.qris.count} penerimaan${m.debit.count ? ` · Debit ${money(m.debit.gross)}` : ""}`, "bg-[#F6F2FD] border-[#E5DCF5]");
+
+  const pend = document.getElementById("cr-pending");
+  pend.classList.toggle("hidden", !s.pending_count);
+  pend.innerHTML = s.pending_count ? `<div class="flex flex-wrap items-center gap-3 border border-amber-200 bg-amber-50 text-amber-800 rounded-xl px-4 py-3 text-sm">
+    <span><b>${s.pending_count} pembayaran Pending</b> (${money(s.pending_total)}) belum masuk rekening dan <b>tidak dihitung</b> di angka di atas.</span>
+    <button type="button" onclick="document.getElementById('cr-status').value='pending'; crFilterChanged()" class="ml-auto px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-amber-800 text-xs font-semibold hover:bg-amber-100">Lihat yang Pending</button></div>` : "";
+
+  const list = (title, rows, valKey) => `<div class="bg-white border border-line rounded-xl p-4"><div class="mb-2">${crTitle(title)}</div>
+    ${rows.length ? rows.map(r => `<div class="flex items-center justify-between py-1.5 text-sm border-b border-line last:border-b-0"><span class="text-ink">${esc(r.name)}</span><span class="tabular-nums font-medium text-ink">${money(r[valKey])}</span></div>`).join("") : '<p class="text-xs text-muted">Belum ada data.</p>'}</div>`;
+  document.getElementById("cr-breakdown").innerHTML = list("Penerimaan per Rekening / Kas (bersih)", s.by_account, "net") + list("Penerimaan per Petugas (bruto)", s.by_cashier, "gross");
+
+  document.getElementById("cr-thead").innerHTML = CR_COLS.map(([k, label, al]) => {
+    const active = k && CR.sort === k;
+    const arrow = active ? (CR.dir === "asc" ? " ▲" : " ▼") : "";
+    return `<th class="${al === "right" ? "text-right" : "text-left"} px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap">${k ? `<button type="button" onclick="crSort('${k}')" class="uppercase tracking-wider hover:text-ink ${active ? "text-ink" : ""}">${label}${arrow}</button>` : label}</th>`;
+  }).join("");
+
+  const ok = d.items.filter(e => e.kind === "masuk" && e.status === "berhasil").length;
+  document.getElementById("cr-counts").textContent = `${d.total} catatan • ${s.gross_count} berhasil • ${s.pending_count} pending`;
+  document.getElementById("cr-empty").classList.toggle("hidden", d.items.length > 0);
+  document.getElementById("cr-tbody").innerHTML = d.items.map(e => `<tr class="border-b border-line last:border-b-0 align-middle cursor-pointer hover:bg-bg2/60" onclick="crOpen('${e.key}')">
+    <td class="px-3 py-3 font-mono text-[13px] text-accentDark underline whitespace-nowrap">${esc(e.no)}${e.kind === "masuk" && e.is_dp ? ' <span class="no-underline text-[10px] font-sans font-semibold uppercase tracking-wider text-muted">DP</span>' : ""}</td>
+    <td class="px-3 py-3 text-muted tabular-nums whitespace-nowrap">${esc(crWhen(e.paid_local))}</td>
+    <td class="px-3 py-3"><div class="font-semibold text-ink">${esc(e.customer_name || "—")}</div>${e.plate ? `<div class="text-xs text-muted">${esc(e.plate)}</div>` : ""}</td>
+    <td class="px-3 py-3 text-[13px]">${crInvLink(e) || crSoLink(e) || "—"}${e.invoice_id && e.so_id ? `<div class="text-xs">${crSoLink(e)}</div>` : ""}</td>
+    <td class="px-3 py-3">${crMethodPill(e)}</td>
+    <td class="px-3 py-3 text-ink">${esc(e.dest)}</td>
+    <td class="px-3 py-3 text-right tabular-nums font-semibold whitespace-nowrap ${crAmountCls(e)}">${esc(crSigned(e))}</td>
+    <td class="px-3 py-3">${crStatusPill(e)}</td>
+    <td class="px-3 py-3"><button type="button" onclick="event.stopPropagation(); crOpen('${e.key}')" class="px-2.5 py-1 border border-line rounded-md bg-white text-accentDark text-xs font-semibold whitespace-nowrap hover:bg-bg2">Lihat Detail</button></td></tr>`).join("");
+
+  const pages = Math.max(1, Math.ceil(d.total / d.page_size));
+  document.getElementById("cr-pager").innerHTML = `<span>Pending tidak masuk total penerimaan • Refund ditampilkan tanpa menghapus pembayaran asal</span>
+    <span class="inline-flex items-center gap-2">
+      <select onchange="CR.size=+this.value; CR.page=1; crLoad()" class="border border-line rounded-lg px-2 py-1 text-xs bg-white text-ink">${[25, 50, 100].map(n => `<option value="${n}" ${n === CR.size ? "selected" : ""}>${n} / halaman</option>`).join("")}</select>
+      <button type="button" ${d.page <= 1 ? "disabled" : ""} onclick="CR.page--; crLoad()" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">‹</button>
+      <span class="tabular-nums">Halaman ${d.page} dari ${pages}</span>
+      <button type="button" ${d.page >= pages ? "disabled" : ""} onclick="CR.page++; crLoad()" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">›</button></span>`;
+}
+
+function crLongDay(ymd) {
+  if (!ymd) return "";
+  return new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function crSort(col) {
+  if (CR.sort === col) CR.dir = CR.dir === "asc" ? "desc" : "asc";
+  else { CR.sort = col; CR.dir = col === "paid_at" || col === "amount" ? "desc" : "asc"; }
+  CR.page = 1;
+  crLoad();
+}
+
+function crExport() {
+  window.location.href = `/api/cash-receipts/export?${crQuery(crFilters(), { sort: CR.sort, dir: CR.dir })}`;
+}
+
+const crBack = () => { crView("list"); };
+const crRow = (label, value) => `<div class="flex items-start gap-3 py-2 border-b border-line last:border-b-0 text-sm"><div class="w-40 shrink-0 text-muted">${label}</div><div class="min-w-0 font-medium text-ink break-words">${value || '<span class="text-muted font-normal">—</span>'}</div></div>`;
+const crTitle = text => `<div class="card-title">${cardChip(iconByRules(CARD_ICON_RULES, text, "doc"))}<h3>${esc(text)}</h3></div>`;
+const crCard = (title, body, aside = "") => `<div class="bg-white border border-line rounded-xl"><div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-line">${crTitle(title)}${aside ? `<span class="text-xs text-muted">${aside}</span>` : ""}</div><div class="px-4 py-2">${body}</div></div>`;
+const crNote = (cls, html) => `<div class="border rounded-xl px-4 py-3 text-sm ${cls}">${html}</div>`;
+
+async function crOpen(key) {
+  crView("detail");
+  const root = document.getElementById("cr-view-detail");
+  root.innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  let data;
+  try {
+    const resp = await fetch(`/api/cash-receipts/${encodeURIComponent(key)}`);
+    if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Detail Cash Receipt tidak bisa dimuat."));
+    data = await resp.json();
+  } catch (e) { showToast(e.message); crBack(); return; }
+  crRenderDetail(data);
+}
+
+function crPayStatusLabel(inv) {
+  if (!inv) return "";
+  if (inv.status === "void") return crPill("bg-stone-100 text-stone-600", "Void");
+  if (inv.status === "done") return crPill("bg-emerald-50 text-emerald-700", "Lunas");
+  return crPill("bg-amber-50 text-amber-700", inv.amount_paid > 0 ? "Sebagian" : "Belum Dibayar");
+}
+
+function crRenderDetail(data) {
+  const e = data.item, inv = data.invoice, doc = data.document;
+  const isIn = e.kind === "masuk";
+  const origin = e.doc_type === "so" ? "DP Sales Order (belum ada invoice)" : e.is_dp ? "DP Sales Order, dibawa ke invoice" : "pembayaran di Kasir";
+  const steps = [];
+  steps.push([e.paid_local, e.cashier, isIn ? "Pembayaran dicatat" : e.kind === "refund" ? "Refund dicatat" : "Pembayaran dibatalkan", e.note || ""]);
+  if (e.status === "pending") steps.push([null, null, "Menunggu konfirmasi dana masuk", "Belum dihitung sebagai uang diterima."]);
+  if (e.confirmed_at) steps.push([e.confirmed_local, e.confirmed_by, isIn ? "Diverifikasi" : "Dikonfirmasi", e.method === "transfer" ? "Dana terlihat masuk di rekening." : ""]);
+  if (e.status === "gagal") steps.push([null, e.confirmed_by, "Ditandai gagal", e.fail_reason || ""]);
+  for (const r of data.reversals) steps.push([r.paid_local, r.cashier, `Dibatalkan melalui ${r.no}`, r.note || ""]);
+  if (data.reversal_of) steps.push([null, null, `Membalik pembayaran ${data.reversal_of.no}`, ""]);
+  const others = data.siblings;
+  const sib = others.length ? others.map(s => `<div class="flex flex-wrap items-center gap-2 bg-bg2 rounded-lg px-3 py-2 text-sm mb-2"><a href="#/cash-receipt" onclick="crOpen('${s.key}'); return false;" class="font-mono font-semibold text-accentDark hover:underline">${esc(s.no)}</a><span class="text-muted">${esc(s.kind === "masuk" ? s.method_label : s.kind_label)}</span>${crStatusPill(s)}<span class="ml-auto tabular-nums font-semibold ${crAmountCls(s)}">${esc(crSigned(s))}</span></div>`).join("") : '<p class="text-sm text-muted py-2">Tidak ada penerimaan lain pada dokumen ini.</p>';
+  const groupType = e.invoice_id ? "invoice" : "so", groupId = e.invoice_id || e.so_id;
+  document.getElementById("cr-view-detail").innerHTML = `<div class="cr-print-target space-y-4">
+    <div class="flex flex-wrap items-center gap-2 no-print">
+      <button type="button" onclick="crBack()" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">← Kembali ke Daftar</button>
+      <button type="button" onclick="crOpenGroup('${groupType}', '${esc(groupId)}')" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">Semua penerimaan dokumen ini</button>
+      <button type="button" onclick="crPrintNode('cr-view-detail')" class="ml-auto px-3 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accentDark">Cetak Bukti</button></div>
+    <div class="rounded-xl border border-accent/25 bg-accent/10 px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div><div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Nomor Cash Receipt</div>
+        <div class="font-sans text-2xl font-semibold text-ink">${esc(e.no)}</div>
+        <div class="text-xs text-muted mt-0.5">Berasal dari ${esc(origin)} · ${esc(crLongDate(e.paid_local))}</div></div>
+      <div class="text-right">${crStatusPill(e)}<div class="font-sans text-3xl font-semibold tabular-nums mt-1 ${crAmountCls(e)}">${esc(crSigned(e))}</div></div></div>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+      ${crCard("Informasi Customer & Invoice",
+        crRow("ID Customer", esc(e.customer_code || "")) + crRow("Nama Customer", esc(e.customer_name)) + crRow("Nomor HP", esc(e.customer_phone || ""))
+        + crRow("Nomor Plat", esc(e.plate || "")) + crRow("No. Invoice", crInvLink(e)) + crRow("No. Sales Order", crSoLink(e))
+        + crRow("Nilai Tagihan Invoice", inv ? esc(formatIDR(inv.total)) : "")
+        + crRow("Status Pengerjaan", inv ? crPill("bg-amber-50 text-amber-700", WORK_STATUS_LABELS[inv.work_status] || inv.work_status || "") : "")
+        + crRow("Status Pembayaran Invoice", crPayStatusLabel(inv)), "Sumber: " + (e.invoice_id ? "Kasir / Invoice" : "Sales Order"))}
+      ${crCard("Informasi Pembayaran",
+        crRow("Jenis", esc(e.kind_label)) + crRow("Metode Bayar", crMethodPill(e)) + crRow(e.method === "transfer" ? "Rekening Tujuan" : "Kas / Tujuan", esc(e.dest))
+        + crRow(isIn ? "Jumlah Diterima" : "Jumlah Keluar", esc(formatIDR(e.amount)))
+        + (e.method === "transfer" ? crRow("Nama Pengirim", esc(e.sender || "")) : "") + (e.proof_ref ? crRow("Bukti / Referensi", esc(e.proof_ref)) : "")
+        + crRow("Status", crStatusPill(e)) + crRow("Petugas Pencatat", esc(e.cashier || ""))
+        + crRow("Waktu Pencatatan", esc(crLongDate(e.paid_local))) + (e.confirmed_at ? crRow("Waktu Verifikasi", esc(crLongDate(e.confirmed_local)) + (e.confirmed_by ? ` · ${esc(e.confirmed_by)}` : "")) : "")
+        + crRow("Catatan", esc(e.note || "")), "Tidak ada tombol Edit / Hapus")}
+    </div>
+    ${crNote("border-sky-200 bg-sky-50 text-sky-900", "<b>Read-only.</b> Bila data pembayaran salah, koreksi hanya lewat modul pembayaran asal (Kasir / Sales Order) dengan hak akses Admin; perubahannya tercatat di Audit Log dan tetap muncul di sini.")}
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+      ${crCard("Riwayat Status", `<div class="py-2 space-y-2">${steps.map(([at, by, title, note], i) => `<div class="flex gap-3"><div class="flex flex-col items-center"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5"></span>${i < steps.length - 1 ? '<span class="flex-1 w-px bg-line my-1"></span>' : ""}</div><div class="pb-2"><div class="text-xs text-muted">${at ? esc(crWhen(at)) : ""}${at && by ? " · " : ""}${esc(by || "")}</div><div class="text-sm font-semibold text-ink">${esc(title)}</div>${note ? `<div class="text-xs text-muted">${esc(note)}</div>` : ""}</div></div>`).join("")}</div>`, "Diperlihatkan, tidak bisa diubah")}
+      ${crCard("Penerimaan Lain pada Dokumen Ini", `<div class="py-2">${sib}${others.length || isIn ? `<div class="flex flex-wrap items-center gap-3 mt-3 text-sm"><span class="text-muted">Bruto Rp ${esc(String(doc.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))} · Refund Rp ${esc(String(doc.refund).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}</span><span class="ml-auto font-semibold text-ink">Bersih ${esc(formatIDR(doc.net))}</span></div>` : ""}</div>`)}
+    </div>
+    ${data.events.length ? crCard("Audit Log Invoice", `<div class="py-1">${data.events.map(ev => `<div class="flex gap-3 py-1.5 text-sm border-b border-line last:border-b-0"><span class="w-32 shrink-0 text-xs text-muted tabular-nums">${esc(crWhen(ev.at_local))}</span><span class="w-24 shrink-0 text-xs text-muted">${esc(ev.by_user || "sistem")}</span><span class="text-ink">${esc(ev.note || ev.kind)}</span></div>`).join("")}</div>`) : ""}
+  </div>`;
+}
+
+async function crOpenGroup(type, id) {
+  crView("group");
+  const root = document.getElementById("cr-view-group");
+  root.innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  let data;
+  try {
+    const resp = await fetch(`/api/cash-receipts/group?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`);
+    if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Riwayat penerimaan tidak bisa dimuat."));
+    data = await resp.json();
+  } catch (e) { showToast(e.message); crBack(); return; }
+  crRenderGroup(data);
+}
+
+function crRenderGroup(g) {
+  const inv = g.invoice, so = g.so, s = g.summary, items = g.items;
+  const first = items[0] || {};
+  const total = inv ? inv.total : (so ? so.total : 0);
+  const hasDp = items.some(e => e.is_dp), hasRefund = items.some(e => e.kind !== "masuk");
+  const docNo = inv ? inv.receipt_no : (so ? so.po_number : "");
+  const status = inv ? crPayStatusLabel({ status: inv.status, amount_paid: s.net }) : crPill("bg-amber-50 text-amber-700", s.net > 0 ? "DP diterima" : "Belum ada DP");
+  const cards = items.filter(e => e.status !== "gagal").map((e, i) => `${i ? '<div class="hidden lg:flex items-center text-muted text-xl px-1">→</div>' : ""}
+    <a href="#/cash-receipt" onclick="crOpen('${e.key}'); return false;" class="block flex-1 min-w-[220px] border border-line rounded-xl bg-white p-4 hover:border-accent/50 transition-colors">
+      <div class="text-[11px] text-muted">${esc(crWhen(e.paid_local))}${e.cashier ? " · " + esc(e.cashier) : ""}</div>
+      <div class="font-mono text-sm font-semibold text-ink mt-0.5">${esc(e.no)}</div>
+      <div class="font-sans text-2xl font-semibold tabular-nums mt-1 ${crAmountCls(e)}">${e.kind === "masuk" ? "+ " : ""}${esc(crSigned(e))}</div>
+      <div class="flex flex-wrap items-center gap-1.5 mt-2">${crMethodPill(e)}${crStatusPill(e)}${e.is_dp ? crPill("bg-accent/10 text-accentDark", "DP") : ""}</div>
+      <div class="text-xs text-muted mt-2">${esc(e.dest)}${e.note ? " · " + esc(e.note) : ""}</div></a>`).join("");
+  const rows = items.map(e => `<tr class="border-b border-line last:border-b-0 align-top">
+    <td class="px-3 py-2"><a href="#/cash-receipt" onclick="crOpen('${e.key}'); return false;" class="font-mono text-accentDark hover:underline">${esc(e.no)}</a></td>
+    <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(crWhen(e.paid_local))}</td>
+    <td class="px-3 py-2">${esc(e.kind_label)}</td>
+    <td class="px-3 py-2 font-mono text-xs">${esc(e.invoice_no || e.so_no || "—")}</td>
+    <td class="px-3 py-2">${esc(e.method_label)} <span class="text-muted">· ${esc(e.dest)}</span></td>
+    <td class="px-3 py-2 text-right tabular-nums font-semibold ${e.kind === "masuk" ? "" : "text-muted"}">${e.kind === "masuk" ? esc(formatIDR(e.amount)) : "—"}</td>
+    <td class="px-3 py-2 text-right tabular-nums font-semibold ${e.kind === "masuk" ? "text-muted" : "text-failed"}">${e.kind === "masuk" ? "—" : esc(formatIDR(e.amount))}</td>
+    <td class="px-3 py-2">${crStatusPill(e)}</td></tr>`).join("");
+  const notes = [];
+  if (hasDp && inv && so) notes.push(crNote("border-sky-200 bg-sky-50 text-sky-900", `<b>Anti-duplikasi:</b> DP dari ${esc(so.po_number)} dibawa ke invoice ${esc(inv.receipt_no)} sebagai referensi saja. Nomor receipt DP tetap sama dan uang tidak dihitung dua kali; receipt baru hanya muncul bila customer benar-benar membayar lagi.`));
+  else if (hasDp && !inv) notes.push(crNote("border-sky-200 bg-sky-50 text-sky-900", "DP ini masih di Sales Order. Saat SO diterbitkan menjadi invoice, DP tetap satu receipt dengan nomor yang sama."));
+  if (hasRefund) notes.push(crNote("border-amber-200 bg-amber-50 text-amber-900", "<b>Catatan:</b> penerimaan bruto tetap mencatat uang yang pernah masuk. Refund dan pembatalan adalah catatan terpisah (RF-…) yang mengurangi penerimaan bersih; riwayat tidak pernah dihapus."));
+  if (!hasRefund && items.length > 1) notes.push(crNote("border-emerald-200 bg-emerald-50 text-emerald-900", "<b>Aturan sistem:</b> setiap pembayaran bertahap punya nomor, metode, tanggal, dan referensi sendiri. Membuka atau mencetak ulang invoice tidak membuat Cash Receipt baru."));
+  const outstanding = Math.max(total - s.net, 0);
+  document.getElementById("cr-view-group").innerHTML = `<div class="cr-print-target space-y-4">
+    <div class="flex flex-wrap items-center gap-2 no-print">
+      <button type="button" onclick="crBack()" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">← Kembali ke Daftar</button>
+      ${inv ? `<a href="#/invoices" onclick="openReceiptFromHistory('${esc(inv.id)}'); return false;" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">Buka Invoice</a>` : ""}
+      ${so ? `<a href="#/sales-order" onclick="openPreorderFromDashboard('${esc(so.id)}'); return false;" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">Buka Sales Order</a>` : ""}
+      <button type="button" onclick="crPrintNode('cr-view-group')" class="ml-auto px-3 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accentDark">Cetak</button></div>
+    <div class="rounded-xl border border-accent/25 bg-accent/10 px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div><div class="text-[11px] font-semibold uppercase tracking-wider text-muted">${inv ? "Invoice" : "Sales Order"} · ${esc(first.customer_name || "")}${first.plate ? " · " + esc(first.plate) : ""}</div>
+        <div class="font-sans text-2xl font-semibold text-ink">${esc(docNo || "—")}</div>
+        <div class="text-xs text-muted mt-0.5">${so && inv ? `Berasal dari ${esc(so.po_number)} · ` : ""}${inv && inv.items.length ? esc(inv.items.map(i => i.product_name).join(" + ")) : so ? `${so.item_count} barang pesanan` : ""}</div></div>
+      <div class="flex flex-wrap items-center gap-6">
+        <div><div class="text-[11px] uppercase tracking-wider text-muted">Total ${inv ? "Invoice" : "Pesanan"}</div><div class="font-sans text-xl font-semibold tabular-nums">${esc(formatIDR(total))}</div></div>
+        <div><div class="text-[11px] uppercase tracking-wider text-muted">Diterima (bersih)</div><div class="font-sans text-xl font-semibold tabular-nums">${esc(formatIDR(s.net))}</div></div>
+        <div><div class="text-[11px] uppercase tracking-wider text-muted">Status</div><div class="mt-1">${status}</div></div></div></div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-1">
+      ${crTile("Uang Masuk", esc(formatIDR(s.gross)), `${items.filter(e => e.kind === "masuk" && e.status !== "gagal").length} penerimaan`)}
+      ${crTile("Refund / Pembalikan", `<span class="${s.refund ? "text-failed" : ""}">${esc(formatIDR(s.refund))}</span>`, "uang keluar ke customer")}
+      ${crTile("Sisa Tagihan", `<span class="${outstanding ? "text-accentDark" : ""}">${esc(formatIDR(outstanding))}</span>`, "total dikurangi penerimaan bersih")}</div>
+    ${s.pending ? crNote("border-amber-200 bg-amber-50 text-amber-800", `Ada pembayaran Pending ${esc(formatIDR(s.pending))} yang belum dihitung sebagai uang diterima.`) : ""}
+    <div class="flex flex-wrap items-stretch gap-3">${cards || '<p class="text-sm text-muted">Belum ada pembayaran.</p>'}</div>
+    <div class="bg-white border border-line rounded-xl overflow-hidden"><div class="flex items-center justify-between px-4 py-3 border-b border-line">${crTitle("Riwayat Transaksi · Tidak Bisa Dihapus")}<span class="text-xs text-muted">Satu baris = satu kejadian uang</span></div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-bg2"><tr>${["No. Dokumen", "Tanggal", "Jenis", "Referensi", "Metode / Tujuan"].map(h => `<th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap">${h}</th>`).join("")}${["Uang Masuk", "Uang Keluar"].map(h => `<th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap">${h}</th>`).join("")}<th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    ${notes.join("")}
+  </div>`;
+}
+
+// ── Preview cetak / ekspor ───────────────────────────────────────────────────
+async function crOpenPrint() {
+  crView("print");
+  const root = document.getElementById("cr-view-print");
+  root.innerHTML = '<div class="py-16 text-center text-sm text-muted">Menyiapkan laporan…</div>';
+  await crRenderPrint();
+}
+
+async function crRenderPrint(keepForm) {
+  const f = keepForm ? crPrintFilters() : { ...CR.f, status: CR.f.status || "" };
+  let data;
+  try { data = await crFetch(f, { sort: "paid_at", dir: "asc", page_size: 0 }); }
+  catch (e) { showToast(e.message); crBack(); return; }
+  CR.last = { f, data };
+  const mode = (keepForm ? (document.getElementById("crp-status") || {}).value : "") || "sah";
+  let rows = data.items;
+  if (mode === "sah") rows = rows.filter(e => !["pending", "gagal"].includes(e.status));
+  const s = data.summary, m = s.by_method;
+  const printed = new Date();
+  const when = `${pad2(printed.getDate())}/${pad2(printed.getMonth() + 1)}/${printed.getFullYear()} ${pad2(printed.getHours())}:${pad2(printed.getMinutes())} WIB`;
+  const period = f.date_from || f.date_to ? `${f.date_from ? crWhen(f.date_from + " 0", true) : "…"} — ${f.date_to ? crWhen(f.date_to + " 0", true) : "…"}` : "Semua periode";
+  const sel = (id, label, opts, cur) => `<div class="mb-3"><label for="${id}" class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">${label}</label><select id="${id}" onchange="crRenderPrint(true)" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`;
+  const refunds = rows.filter(e => e.kind === "refund");
+  document.getElementById("cr-view-print").innerHTML = `
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <button type="button" onclick="crBack()" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">← Kembali</button>
+      <div class="ml-auto flex gap-2"><button type="button" onclick="crExport()" class="px-3 py-2 text-sm font-medium border border-line rounded-lg bg-white text-ink hover:bg-bg2">Excel</button>
+        <button type="button" onclick="crPrintPaper()" class="px-3 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accentDark">Unduh PDF</button></div></div>
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+      <div class="bg-stone-200/60 border border-line rounded-xl p-4 sm:p-6 overflow-auto">
+        <div id="cr-paper" class="cr-print-target mx-auto bg-white text-black shadow-sm px-8 py-7" style="max-width:1000px; font-family:Arial,Helvetica,sans-serif">
+          <div class="flex justify-between gap-6 pb-4 border-b-2 border-black">
+            <div><div class="text-xl font-bold tracking-wide">${esc((typeof SHOP_PROFILE !== "undefined" && SHOP_PROFILE.name) || "SINAR GALAKSI VARIASI MOBIL")}</div><div class="text-xs mt-0.5">LAPORAN PENERIMAAN PEMBAYARAN CUSTOMER</div></div>
+            <div class="text-xs text-right leading-5">Periode: ${esc(period)}<br>Dicetak: ${esc(when)}<br>Dokumen: READ ONLY</div></div>
+          <div class="grid grid-cols-3 gap-3 my-4">
+            ${[["Penerimaan Bruto", s.gross], ["Refund / Pembalikan", s.refund], ["Penerimaan Bersih", s.net]].map(([l, v]) => `<div class="border border-black/70 px-3 py-2"><div class="text-[11px]">${l}</div><div class="text-lg font-bold tabular-nums">${esc(formatIDR(v))}</div></div>`).join("")}</div>
+          <table class="w-full text-[11px] border-collapse"><thead><tr class="bg-stone-100">${["Tgl / Jam", "No. Receipt", "Customer", "No. Invoice / SO", "Metode", "Rekening / Kas", "Nominal"].map((h, i) => `<th class="${i === 6 ? "text-right" : "text-left"} px-2 py-1.5 uppercase tracking-wide">${h}</th>`).join("")}</tr></thead>
+            <tbody>${rows.map(e => `<tr class="border-b border-stone-300"><td class="px-2 py-1.5 whitespace-nowrap">${esc(crWhen(e.paid_local))}</td><td class="px-2 py-1.5 font-mono">${esc(e.no)}</td><td class="px-2 py-1.5">${esc(e.customer_name)}</td><td class="px-2 py-1.5">${esc(e.invoice_no || e.so_no || "—")}${e.is_dp ? " (DP)" : ""}</td><td class="px-2 py-1.5">${esc(e.method_label)}</td><td class="px-2 py-1.5">${esc(e.dest)}</td><td class="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">${e.kind === "masuk" ? "" : "−"}${esc(String(e.amount).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}${e.status === "pending" ? " (pending)" : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="px-2 py-6 text-center">Tidak ada transaksi pada filter ini.</td></tr>'}</tbody></table>
+          <div class="flex flex-wrap justify-between gap-2 border-t border-black mt-3 pt-3 text-[11px]">
+            <div><b>Total metode:</b> Tunai ${esc(String(m.cash.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))} • Transfer ${esc(String(m.transfer.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))} • QRIS ${esc(String(m.qris.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}${m.debit.gross ? ` • Debit ${esc(String(m.debit.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}` : ""}</div>
+            <div><b>Total Bruto ${esc(formatIDR(s.gross))}</b></div></div>
+          ${s.by_account.length ? `<div class="text-[11px] mt-2"><b>Per rekening / kas (bersih):</b> ${s.by_account.map(a => `${esc(a.name)} ${esc(formatIDR(a.net))}`).join(" • ")}</div>` : ""}
+          ${refunds.length ? `<div class="text-[11px] mt-2"><b>Refund direalisasi:</b> ${refunds.map(r => `${esc(r.no)} • ${esc(formatIDR(r.amount))}`).join(" ; ")}</div>` : ""}
+          <div class="text-[11px] mt-2">Catatan: pembayaran pending${s.pending_count ? ` (${s.pending_count} transaksi, ${esc(formatIDR(s.pending_total))})` : ""} tidak masuk total. Setiap DP dicatat satu kali.</div>
+          <div class="text-[10px] text-stone-500 border-t border-stone-300 mt-5 pt-2">Laporan sistem • Hanya untuk pemeriksaan penerimaan</div></div></div>
+      <div class="bg-white border border-line rounded-xl p-4">
+        <div class="mb-3">${crTitle("Pengaturan Laporan")}</div>
+        <div class="mb-3"><div class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Periode</div>
+          <div class="flex items-center gap-2"><input id="crp-from" type="date" data-no-uppercase value="${esc(f.date_from || "")}" onchange="crRenderPrint(true)" class="w-full border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink" /><input id="crp-to" type="date" data-no-uppercase value="${esc(f.date_to || "")}" onchange="crRenderPrint(true)" class="w-full border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink" /></div></div>
+        ${sel("crp-method", "Metode pembayaran", [["", "Semua metode"], ["cash", "Tunai"], ["transfer", "Transfer Bank"], ["qris", "QRIS"], ["debit", "Kartu Debit"]], f.method || "")}
+        ${sel("crp-account", "Rekening tujuan", [["", "Semua rekening"], ...(data.options.accounts.map(a => [a, a]))], f.account || "")}
+        ${sel("crp-status", "Status", [["sah", "Berhasil + Refund"], ["semua", "Semua termasuk Pending"]], mode)}
+        <div class="border-t border-line pt-3 mt-1 text-xs text-muted space-y-0.5"><div>Format: A4 Landscape</div><div>Transaksi tercetak: ${rows.length}</div><div>Pending: tidak masuk total</div></div>
+        <button type="button" onclick="crPrintPaper()" class="w-full mt-4 px-3 py-2 text-sm font-semibold rounded-lg bg-accent text-white hover:bg-accentDark">Cetak / Simpan PDF</button>
+        <button type="button" onclick="crExport()" class="w-full mt-2 px-3 py-2 text-sm font-medium rounded-lg border border-line bg-white text-ink hover:bg-bg2">Ekspor Excel (.csv)</button></div></div>`;
+}
+
+function crPrintFilters() {
+  const v = id => (document.getElementById(id) || {}).value || "";
+  return { ...CR.f, date_from: v("crp-from"), date_to: v("crp-to"), method: v("crp-method"), account: v("crp-account") };
+}
+
+function crPrintPaper() { crPrintNode("cr-paper", "A4 landscape"); }
+
+// Prints one element of this page: it is copied into its own root (everything else is hidden while printing),
+// and the sheet size is rewritten like the other print helpers do, then restored.
+function crPrintNode(id, size = "A4 portrait") {
+  const source = document.getElementById(id);
+  if (!source) return;
+  const rule = document.getElementById("print-page-rule"), before = rule.textContent;
+  rule.textContent = `@page { size: ${size}; margin: 10mm; }`;
+  const root = document.createElement("div");
+  root.id = "cr-print-root";
+  root.innerHTML = (source.classList.contains("cr-print-target") ? source : source.querySelector(".cr-print-target") || source).outerHTML;
+  root.querySelectorAll(".no-print").forEach(el => el.remove());
+  document.body.appendChild(root);
+  document.body.classList.add("printing-cr");
+  const done = () => { document.body.classList.remove("printing-cr"); root.remove(); rule.textContent = before; window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  window.print();
 }
 
 // ── Dashboard: Ringkasan (overview) ──────────────────────────────────────────
@@ -16680,40 +17332,44 @@ async function renderPreorderForm(detail) {
 const SO_SOURCE_LABELS = { supplier: "Pesan Supplier", stok: "Stok Tersedia", jasa: "Manual / Jasa" };
 const SO_ROW_SELECT = "border border-line rounded-md px-1.5 py-1 text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent";
 
+const PO_CELL = "w-full border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
 function preorderRowTemplate() {
   const statusOptions = PREORDER_STATUSES
     .map(s => `<option value="${esc(s.key)}">${esc(s.label)}</option>`).join("");
   return `
-    <div class="flex flex-wrap md:flex-nowrap items-start gap-2">
-      <div class="relative flex-1 min-w-[180px]">
+    <div class="po-grid">
+      <div class="relative min-w-0">
         <input type="text" autocomplete="off" placeholder="Nama barang (cari master / ketik bebas)"
-          class="po-row-product w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
+          class="po-row-product ${PO_CELL}"
           oninput="onPoProductInput(this)" onfocus="onPoProductInput(this)" onblur="onPoProductBlur(this)" />
         <div class="po-row-dropdown hidden absolute z-20 left-0 right-0 mt-1 bg-bg border border-line rounded-lg shadow-sm max-h-64 overflow-y-auto"></div>
       </div>
-      <input type="text" placeholder="Satuan"
-        class="po-row-unit w-24 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-      <input type="number" min="1" step="1" placeholder="Qty" value="1"
-        class="po-row-qty w-20 border border-line rounded-lg px-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-        oninput="updatePreorderTotals()" />
-      <div class="relative w-32">
-        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
+      <input type="text" placeholder="Satuan" class="po-row-unit ${PO_CELL}" />
+      <input type="number" min="1" step="1" placeholder="Qty" value="1" class="po-row-qty ${PO_CELL} text-right tabular-nums" oninput="updatePreorderTotals()" />
+      <div class="relative">
+        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
         <input type="text" inputmode="numeric" placeholder="Harga" value="0"
-          class="po-row-price price-input w-full border border-line rounded-lg pl-8 pr-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
-          oninput="updatePreorderTotals()" />
+          class="po-row-price price-input ${PO_CELL} pl-7 text-right tabular-nums" oninput="updatePreorderTotals()" />
       </div>
-      <div class="po-row-total w-28 px-2 py-2 text-sm text-right tabular-nums text-muted">Rp 0</div>
+      <div class="po-row-total px-1 text-sm text-right tabular-nums text-ink">Rp 0</div>
+      <div class="po-src-wrap" data-src="supplier">
+        <select class="po-row-source po-src w-full" data-src="supplier" onchange="onPoRowSourceChange(this)">
+          ${Object.entries(SO_SOURCE_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+      </div>
+      <div class="po-row-supplier-wrap min-w-0">
+        <select class="po-row-supplier ${PO_CELL}" onchange="updatePreorderTotals()"></select>
+        <span class="po-row-supplier-na po-na hidden">Tidak perlu</span>
+      </div>
+      <div class="po-row-eta-wrap min-w-0">
+        <input type="date" data-no-uppercase class="po-row-eta ${PO_CELL}" />
+        <span class="po-row-eta-na po-na hidden"></span>
+      </div>
+      <div><span class="po-row-proc po-pill is-proc_po">Akan dibuat PO</span></div>
       <button type="button" onclick="removePreorderRow(this)" title="Hapus baris" aria-label="Hapus baris"
-        class="po-row-remove w-10 px-2.5 py-2 border border-line rounded-lg text-sm text-muted hover:text-failed hover:border-failed transition-colors">&times;</button>
+        class="po-row-remove w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-failed hover:bg-failed/10 transition-colors">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
     </div>
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-[11px] text-muted">
-      <label class="flex items-center gap-1">Sumber
-        <select class="po-row-source ${SO_ROW_SELECT}" onchange="onPoRowSourceChange(this)">
-          ${Object.entries(SO_SOURCE_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
-      <label class="po-row-supplier-wrap flex items-center gap-1">Supplier Tujuan
-        <select class="po-row-supplier ${SO_ROW_SELECT} max-w-[12rem]" onchange="updatePreorderTotals()"></select></label>
-      <label class="po-row-eta-wrap flex items-center gap-1">Estimasi Tiba
-        <input type="date" data-no-uppercase class="po-row-eta ${SO_ROW_SELECT}" /></label>
+    <div class="po-row-extra flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1.5 pl-1 text-[11px] text-muted">
       <label class="po-row-route-wrap flex items-center gap-1">Jalur Kirim
         <select class="po-row-route ${SO_ROW_SELECT}">
           <option value="">—</option>${Object.entries(SPO_SHIP_LABELS_PO).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
@@ -16733,7 +17389,7 @@ function preorderRowTemplate() {
 function poRowSupplierOptions(selectEl, chosen, chosenName) {
   const opts = !chosen || spoSupplierOptions.some(o => o.id === chosen) ? spoSupplierOptions
     : [...spoSupplierOptions, { id: chosen, name: chosenName || `Supplier #${chosen}` }];
-  selectEl.innerHTML = `<option value="">— Pilih supplier —</option>`
+  selectEl.innerHTML = `<option value="">Pilih supplier…</option>`
     + opts.map(o => `<option value="${o.id}" ${o.id === chosen ? "selected" : ""}>${esc(o.name)}</option>`).join("");
 }
 
@@ -16742,13 +17398,55 @@ function onPoRowSourceChange(selectEl) {
   updatePreorderTotals();
 }
 
-// Shows only the fields that matter for the line's source.
+// Shows only the fields that matter for the line's source, and keeps the source / procurement pills and the
+// "supplier missing" warning in step with it.
 function applyPoRowSource(rowEl) {
-  const source = rowEl.querySelector(".po-row-source").value;
+  const sourceEl = rowEl.querySelector(".po-row-source");
+  const source = sourceEl.value;
   const buys = source === "supplier" || source === "";
-  rowEl.querySelector(".po-row-supplier-wrap").classList.toggle("hidden", source !== "supplier");
-  rowEl.querySelector(".po-row-eta-wrap").classList.toggle("hidden", !buys);
+  const supSel = rowEl.querySelector(".po-row-supplier");
+  supSel.classList.toggle("hidden", source !== "supplier");
+  rowEl.querySelector(".po-row-supplier-na").classList.toggle("hidden", source === "supplier");
+  const eta = rowEl.querySelector(".po-row-eta");
+  eta.classList.toggle("hidden", !buys);
+  const etaNa = rowEl.querySelector(".po-row-eta-na");
+  etaNa.classList.toggle("hidden", buys);
+  etaNa.textContent = source === "stok" ? "Siap hari ini" : "Saat pemasangan";
   rowEl.querySelector(".po-row-route-wrap").classList.toggle("hidden", !buys);
+  const tone = source === "" ? "" : source;
+  sourceEl.dataset.src = tone;
+  sourceEl.parentElement.dataset.src = tone;
+  const issued = rowEl.dataset.issued === "1";
+  const proc = rowEl.querySelector(".po-row-proc");
+  const [label, cls] = issued ? ["PO terbit", "is-proc_po"] : source === "supplier" ? ["Akan dibuat PO", "is-proc_po"]
+    : source === "stok" ? ["Ambil dari stok", "is-proc_stok"] : source === "jasa" ? ["Tanpa PO", "is-proc_none"] : ["Otomatis", "is-proc_none"];
+  proc.textContent = label;
+  proc.className = `po-row-proc po-pill ${cls}`;
+  const missing = source === "supplier" && !issued && !supSel.disabled && !supSel.value && rowEl.querySelector(".po-row-product").value.trim() !== "";
+  rowEl.classList.toggle("is-warn", missing);
+  supSel.classList.toggle("border-failed", missing);
+  supSel.classList.toggle("text-failed", missing);
+  supSel.classList.toggle("font-medium", missing);
+}
+
+// Whole-form checks that depend on every line: the warning under the table and the payment status pill.
+function refreshPoFormStates(total, deposit, need, published) {
+  const rows = [...document.querySelectorAll("#po-item-rows .po-item-row")];
+  rows.forEach(applyPoRowSource);
+  const missing = rows.filter(r => r.classList.contains("is-warn")).length;
+  const banner = document.getElementById("po-missing-supplier");
+  banner.classList.toggle("hidden", missing === 0);
+  document.getElementById("po-missing-supplier-text").textContent = `${missing} barang wajib memilih supplier sebelum draft PO dapat dibuat`;
+  const pill = document.getElementById("po-pay-status");
+  let label = "Belum ada total", cls = "is-pesanan_dibuat";
+  if (total > 0) {
+    if (deposit >= total) { label = "Lunas"; cls = "is-pay_ok"; }
+    else if (deposit > 0 && (published || deposit >= need)) { label = "DP diterima"; cls = "is-pay_ok"; }
+    else if (deposit > 0) { label = "DP kurang"; cls = "is-pay_part"; }
+    else { label = "Belum ada DP"; cls = "is-pay_none"; }
+  }
+  pill.textContent = label;
+  pill.className = `po-pill ${cls}`;
 }
 
 async function refreshPoNumberPreview() {
@@ -16764,7 +17462,7 @@ async function refreshPoNumberPreview() {
 function addPreorderRow(prefill) {
   const rowId = ++poRowSeq;
   const div = document.createElement("div");
-  div.className = "po-item-row border border-line rounded-lg p-2";
+  div.className = "po-item-row";
   div.dataset.rowId = rowId;
   div.dataset.masterItemId = "";
   div.dataset.itemId = "";
@@ -16777,6 +17475,7 @@ function addPreorderRow(prefill) {
   poRowSupplierOptions(div.querySelector(".po-row-supplier"), prefill?.supplier_id ?? null, prefill?.supplier_name);
   // Once the line is on a Purchase Order sent to the supplier, where it comes from is settled.
   const issued = (prefill?.supplier_pos || []).some(sp => sp.po_status && sp.po_status !== "draft");
+  if (issued) div.dataset.issued = "1";
   if (issued || prefill?.status === "dibatalkan") {
     sourceEl.disabled = true;
     div.querySelector(".po-row-supplier").disabled = true;
@@ -16833,6 +17532,7 @@ function poRowDropdown(inputEl) {
 
 function onPoProductInput(inputEl) {
   const rowEl = inputEl.closest(".po-item-row");
+  applyPoRowSource(rowEl);
   rowEl.dataset.masterItemId = ""; // typing detaches any previous master link
   rowEl.dataset.available = "";
   setPoRowMeta(rowEl, null);
@@ -17053,6 +17753,7 @@ function updatePreorderTotals() {
   minEl.classList.toggle("text-failed", short);
   minEl.classList.toggle("text-muted", !short);
   renderPoDraftPreview();
+  refreshPoFormStates(total, deposit, need, published);
   const remainingEl = document.getElementById("po-remaining-display");
   remainingEl.textContent = formatIDR(remaining);
   remainingEl.classList.toggle("text-failed", remaining > 0);
@@ -17205,23 +17906,28 @@ function renderPoDraftPreview() {
     else if (r.source === "jasa") jasa.push(r);
     else auto.push(r);
   }
-  const line = r => `<li class="flex justify-between gap-3"><span class="truncate text-ink">${esc(r.product_name)}</span><span class="shrink-0 tabular-nums text-muted">${r.quantity} ${esc(r.unit || "")}</span></li>`;
-  const card = (title, sub, items, tone = "") => `
-    <div class="border ${tone || "border-line"} rounded-lg px-3 py-2.5">
-      <div class="flex items-center justify-between gap-2 text-sm"><span class="font-medium text-ink">${title}</span><span class="text-[11px] text-muted">${sub}</span></div>
-      <ul class="mt-1.5 space-y-0.5 text-xs">${items.map(line).join("")}</ul>
+  const ic = { box: '<path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>', alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>' };
+  const tile = (title, sub, items, tone, icon = "box") => `
+    <div class="po-tile" data-tone="${tone}">
+      <span class="tile-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic[icon]}</svg></span>
+      <div class="min-w-0 flex-1">
+        <div class="text-sm font-semibold text-ink truncate">${title}</div>
+        <div class="text-[11px] text-muted">${sub}</div>
+        <ul class="mt-1 space-y-0.5 text-xs">${items.map(r => `<li class="flex justify-between gap-2"><span class="truncate text-ink">${esc(r.product_name)}</span><span class="shrink-0 tabular-nums text-muted">${r.quantity}</span></li>`).join("")}</ul>
+      </div>
     </div>`;
   const parts = [];
-  for (const [sid, items] of groups) parts.push(card(`Draft PO · ${esc(supName(sid))}`, `${items.length} barang`, items));
-  if (missing.length) parts.push(card('<span class="text-failed">Supplier belum dipilih</span>', "tidak dibuatkan PO sampai supplier dipilih", missing, "border-failed/40 bg-failed/5"));
+  let n = 0;
+  for (const [sid, items] of groups) parts.push(tile(esc(supName(sid)), `${items.length} item`, items, n++ % 2 ? "b" : "a"));
+  if (missing.length) parts.push(tile("Supplier belum dipilih", `${missing.length} item`, missing, "red", "alert"));
   if (stock.length) {
     const lowStock = stock.filter(r => r.rowEl.dataset.available !== "" && Number(r.rowEl.dataset.available) < r.quantity);
-    parts.push(card("Dari stok toko", lowStock.length ? `<span class="text-failed">${lowStock.length} barang stoknya kurang</span>` : "dicadangkan, tanpa PO", stock));
+    parts.push(tile("Dari stok toko", lowStock.length ? `<span class="text-failed">${lowStock.length} barang stoknya kurang</span>` : "dicadangkan, tanpa PO", stock, "plain"));
   }
-  if (jasa.length) parts.push(card("Manual / Jasa", "tanpa PO", jasa));
-  if (auto.length) parts.push(card("Otomatis (stok dulu)", "kekurangan stok dibuatkan PO", auto));
-  if (issued.length) parts.push(`<div class="border border-line rounded-lg px-3 py-2.5 text-xs text-muted">Sudah di Purchase Order terbit: ${issued.map(x => `${esc(x.r.product_name)} (${x.pos.map(sp => esc(sp.po_number)).join(", ")})`).join("; ")}</div>`);
-  body.innerHTML = parts.join("") || '<p class="text-sm text-muted">Belum ada barang.</p>';
+  if (jasa.length) parts.push(tile("Manual / Jasa", "tanpa PO", jasa, "plain"));
+  if (auto.length) parts.push(tile("Otomatis (stok dulu)", "kekurangan stok dibuatkan PO", auto, "plain"));
+  if (issued.length) parts.push(`<div class="sm:col-span-2 xl:col-span-3 border border-line rounded-lg px-3 py-2.5 text-xs text-muted">Sudah di Purchase Order terbit: ${issued.map(x => `${esc(x.r.product_name)} (${x.pos.map(sp => esc(sp.po_number)).join(", ")})`).join("; ")}</div>`);
+  body.innerHTML = parts.join("") || '<p class="text-sm text-muted sm:col-span-2 xl:col-span-3">Belum ada barang.</p>';
   document.getElementById("po-preview-count").textContent = groups.size ? `${groups.size} draft PO` : "";
 }
 
@@ -21065,7 +21771,8 @@ function renderSpoFormItems() {
           <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
           <input type="text" inputmode="numeric" value="${groupDigits(item.est_unit_price) || "0"}" aria-label="Harga ${esc(item.product_name)}"
             oninput="onSpoItemPrice(${idx}, this)"
-            class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
+            title="${item.est_unit_price ? "" : "Harga beli belum diisi"}"
+            class="price-input w-full border ${item.est_unit_price ? "border-line bg-white" : "border-red-400 bg-red-50"} rounded-lg pl-8 pr-2 py-1.5 text-sm text-right text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
         </div>
       </td>
       <td class="px-3 py-2 text-right">
@@ -21165,6 +21872,12 @@ function onSpoItemQty(idx, el) {
 
 function onSpoItemPrice(idx, el) {
   spoItems[idx].est_unit_price = priceValue(el);
+  const missing = !spoItems[idx].est_unit_price;
+  el.classList.toggle("border-red-400", missing);
+  el.classList.toggle("bg-red-50", missing);
+  el.classList.toggle("bg-white", !missing);
+  el.classList.toggle("border-line", !missing);
+  el.title = missing ? "Harga beli belum diisi" : "";
   updateSpoFormTotals();
 }
 

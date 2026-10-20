@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Maps Scraper — Direktori Plastik Jabodetabek</title>
+  <title>Sinar Galaksi Variasi Mobil</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -459,6 +459,63 @@
       body.print-nota #nota-print-area tr { page-break-inside: avoid; }
     }
   </style>
+  <style id="theme-v2">
+    /* ── Theme v2: the Claude look, after the Sales Order mockup ─────────────────────────────
+       One layer on top of the app: softer cards, tinted icon chips, level form controls, sans card
+       titles (page titles and big numbers stay serif), a bar on the active menu item. Compact
+       density above is kept. Delete this block to go back to the previous look. */
+    body .rounded-xl { border-radius: 14px; }
+    body .bg-white.border.rounded-xl, body section.bg-white.border { border-color: #E9E6DE; box-shadow: 0 1px 2px rgba(20, 20, 19, 0.04); }
+
+    /* Card titles in sans; h1 and the big page titles keep the serif. */
+    main h2.font-serif:not(.text-2xl):not(.text-3xl), main h3.font-serif:not(.text-2xl):not(.text-3xl), main h4.font-serif,
+    #modal-title { font-family: Inter, system-ui, sans-serif; letter-spacing: -0.005em; }
+
+    /* Icon chips (the little square beside a card or page title) turn coral-tinted. */
+    body span[class*="bg-bg2"][class*="rounded-lg"][class*="place-items-center"] { background: #FBEBE4; color: #C4633F; }
+
+    .card-title { display: flex; align-items: center; gap: 0.6rem; }
+    .card-title .chip { width: 2rem; height: 2rem; flex: none; display: grid; place-items: center; border-radius: 0.6rem; background: #FBEBE4; color: #C4633F; }
+    .card-title h3 { font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.2; font-weight: 600; color: #141413; }
+    .card-title p { font-size: 12px; color: #6B6B66; margin-top: 1px; }
+
+    /* Input with a leading icon. */
+    .fi { position: relative; }
+    .fi > svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9A958B; pointer-events: none; }
+    .fi > input { padding-left: 2.3rem; }
+    .fi:focus-within > svg { color: #C4633F; }
+
+    /* Controls without their own border classes (filter selects and search boxes) match the rest. */
+    select:not([class*="border"]) {
+      -webkit-appearance: none; appearance: none; background-color: #fff; border: 1px solid #E0DDD4; border-radius: 10px;
+      padding: 0.4rem 2.1rem 0.4rem 0.7rem; font-size: 14px; color: #141413;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B6B66' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1rem;
+    }
+    select:not([class*="border"]):focus { outline: none; border-color: #D97757; box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18); }
+    input[type="date"]:not([class*="border"]), input[type="datetime-local"]:not([class*="border"]) {
+      background-color: #fff; border: 1px solid #E0DDD4; border-radius: 10px; padding: 0.4rem 0.7rem; font-size: 14px; color: #141413;
+    }
+    input[type="date"]:not([class*="border"]):focus, input[type="datetime-local"]:not([class*="border"]):focus { outline: none; border-color: #D97757; box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18); }
+
+    /* Every other native select gets the same chevron, so none shows the OS arrow. */
+    select:not(.select-chevron) {
+      -webkit-appearance: none; appearance: none; padding-right: 1.9rem;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B6B66' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 1rem;
+    }
+    select:not(.select-chevron):not([class*="text-"]) { font-size: 14px; }
+
+    /* Outlined buttons warm up on hover instead of going grey. */
+    button.border.border-line:not(:disabled):hover { border-color: rgba(217, 119, 87, 0.55); }
+
+    /* Active menu item: tint plus a coral bar on the left edge. */
+    .nav-link.is-active:not([data-route="/inventory-group"]), .nav-sublink.is-active { box-shadow: inset 3px 0 0 #D97757; }
+    .nav-link.is-active:not([data-route="/inventory-group"]) { font-weight: 600; }
+
+    /* Table header cells: a quieter band. */
+    thead.bg-bg2 { background: #F6F4EC; }
+  </style>
   <style id="print-page-rule">@page { size: 58mm 40mm; margin: 0; }</style>
 </head>
 <body class="bg-bg text-ink font-sans h-screen flex flex-col overflow-hidden">
@@ -480,7 +537,7 @@
         </svg>
       </span>
       <div class="min-w-0 flex-1">
-        <div id="brand-name" class="font-serif font-semibold text-ink leading-tight truncate">Toko Plastik</div>
+        <div id="brand-name" class="text-[13px] font-bold tracking-wide text-ink leading-[1.15] uppercase">Sinar Galaksi Variasi Mobil</div>
         <div class="text-[11px] text-muted leading-tight mt-0.5">Kasir &amp; stok</div>
       </div>
       <button onclick="closeDrawer()" aria-label="Tutup menu" class="xl:hidden p-1.5 -mr-1 rounded-lg hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
@@ -1880,7 +1937,7 @@
         </div>
 
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Informasi Customer &amp; Kendaraan</div>
+          <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Informasi Customer &amp; Kendaraan</h3></div>
           <div class="mb-3 sm:w-64">
             <label for="po-number" class="block text-xs text-muted mb-1.5">Nomor Sales Order <span class="text-muted/70">(otomatis)</span></label>
             <input id="po-number" type="text" readonly tabindex="-1" aria-readonly="true" data-no-uppercase
@@ -1889,8 +1946,8 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
             <div>
               <label for="po-customer-name" class="block text-xs text-muted mb-1.5">Nama Customer <span class="text-failed">*</span></label>
-              <input id="po-customer-name" type="text" placeholder="Nama pemesan" autocomplete="off"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input id="po-customer-name" type="text" placeholder="Nama pemesan" autocomplete="off"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             </div>
             <div>
               <label for="po-plate-region" class="block text-xs text-muted mb-1.5">Nomor Plat Mobil <span class="text-failed">*</span></label>
@@ -1911,28 +1968,28 @@
             </div>
             <div>
               <label for="po-customer-phone" class="block text-xs text-muted mb-1.5">Nomor Telepon <span class="text-failed">*</span></label>
-              <input id="po-customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off" oninput="poPhoneVehicleLookup()"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg><input id="po-customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off" oninput="poPhoneVehicleLookup()"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
               <div id="po-vehicle-chips" class="flex flex-wrap items-center gap-2 mt-2"></div>
             </div>
             <div>
               <label for="po-date" class="block text-xs text-muted mb-1.5">Tanggal Sales Order</label>
-              <input id="po-date" type="date" data-no-uppercase onchange="refreshPoNumberPreview()"
-                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+              <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><input id="po-date" type="date" data-no-uppercase onchange="refreshPoNumberPreview()"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             </div>
           </div>
           <div>
             <label for="po-notes" class="block text-xs text-muted mb-1.5">Catatan Pesanan</label>
-            <input id="po-notes" type="text" placeholder="opsional — mis. warna, ukuran, janji pemasangan"
-              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+            <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><input id="po-notes" type="text" placeholder="opsional — mis. warna, ukuran, janji pemasangan"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
           </div>
         </div>
 
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
           <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
             <div>
-              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Daftar Barang Pesanan</div>
-              <p class="text-xs text-muted mt-1">Tentukan sumber tiap barang: <b class="text-ink font-medium">Pesan Supplier</b> (dibuatkan draft Purchase Order ke supplier tujuan), <b class="text-ink font-medium">Stok Tersedia</b> (dicadangkan dari stok toko), atau <b class="text-ink font-medium">Manual / Jasa</b>.</p>
+              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2 3h3l2.4 12.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6"/></svg></span><h3>Daftar Barang Pesanan</h3></div>
+              <p class="text-xs text-muted mt-2">Tentukan sumber tiap barang: <b class="text-ink font-medium">Pesan Supplier</b> (dibuatkan draft Purchase Order ke supplier tujuan), <b class="text-ink font-medium">Stok Tersedia</b> (dicadangkan dari stok toko), atau <b class="text-ink font-medium">Manual / Jasa</b>.</p>
             </div>
             <button type="button" onclick="addPreorderRow()" class="shrink-0 px-3 py-1.5 border border-line rounded-lg text-xs text-ink hover:bg-bg2 transition-colors">+ Tambah Barang</button>
           </div>
@@ -1950,14 +2007,14 @@
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 mb-4 items-start">
           <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
             <div class="flex items-center justify-between gap-2 mb-1">
-              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Preview Draft Purchase Order</div>
+              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><h3>Preview Draft Purchase Order</h3></div>
               <span id="po-preview-count" class="text-xs text-muted"></span>
             </div>
             <p class="text-xs text-muted mb-3">Saat Sales Order disimpan &amp; diterbitkan, barang “Pesan Supplier” dikelompokkan menjadi draft Purchase Order per supplier. Draft bisa direview sebelum dikirim ke supplier.</p>
             <div id="po-preview-body" class="space-y-2"></div>
           </div>
           <div class="bg-white border border-line rounded-xl p-4 sm:p-5 text-sm">
-            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Ringkasan Pembayaran</div>
+            <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg></span><h3>Ringkasan Pembayaran</h3></div>
             <div class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-muted">Total Pesanan</span>
@@ -5134,11 +5191,11 @@ function renderSidebarDate() {
 
 // The brand block follows SHOP_PROFILE.name (the same constant the printed invoice uses), so
 // renaming the shop in one place renames it here too. It is stored in capitals for print,
-// so it is title-cased for the sidebar.
+// so the sidebar shows it as is.
 function renderBrandBlock() {
   const el = document.getElementById("brand-name");
   const name = (typeof SHOP_PROFILE !== "undefined" && SHOP_PROFILE.name) || "";
-  if (el && name) el.textContent = name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  if (el && name) el.textContent = name;   // the brand block is set in capitals (CSS uppercase), same as the printed name
 }
 
 window.addEventListener("hashchange", renderPageHeader);
@@ -15099,7 +15156,7 @@ function printWithPageRule(pageRule, bodyClass) {
 
 // Printed on the invoice as the billed party. Edit to match the real shop.
 const SHOP_PROFILE = {
-  name: "TOKO PLASTIK",
+  name: "SINAR GALAKSI VARIASI MOBIL",
   address: "",
   phone: "",
   // Customer nota (Nota Penjualan) only. Empty values are simply left off the printout.
@@ -21343,7 +21400,7 @@ const RTS_TINT = {
 };
 function rtsCard(title, body, right = "") {
   return `<section class="bg-white border border-line rounded-xl min-w-0"><div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-line">
-    <div class="font-serif font-semibold text-ink">${title}</div>${right}</div><div class="p-4">${body}</div></section>`;
+    <div class="font-semibold text-ink text-[15px]">${title}</div>${right}</div><div class="p-4">${body}</div></section>`;
 }
 function rtsNote(kind, title, text) {
   const cls = kind === "amber" ? "bg-amber-50 border-amber-200 text-amber-900" : kind === "red" ? "bg-red-50 border-red-200 text-red-800" : kind === "green" ? "bg-green-50 border-green-200 text-green-900" : "bg-blue-50 border-blue-200 text-blue-900";

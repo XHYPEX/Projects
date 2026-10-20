@@ -2,10 +2,16 @@ import asyncio
 import re
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    allocate_spo_dp,
+    get_payment_row,
+    set_payment_proof,
+    verify_payment_proof,
+    reverse_dp_allocation,
     compute_payment_status,
     get_purchase_invoice_payments,
     create_purchase_invoice,
@@ -32,13 +38,15 @@ from backend.schemas import (
     PurchaseInvoicePaymentOut,
     PurchaseInvoicePaymentRequest,
     PurchaseInvoiceRequest,
+    DpAllocateRequest,
+    DpReverseRequest,
     InvoiceExceptionRequest,
     InvoiceHoldRequest,
     InvoiceVerifyRequest,
     VoidRequest,
 )
 
-from backend import invoice_verify
+from backend import invoice_verify, payment_proofs
 
 router = APIRouter()
 
@@ -203,7 +211,7 @@ async def _detail(invoice_id: int) -> PurchaseInvoiceDetail:
     payments = await loop.run_in_executor(None, get_purchase_invoice_payments, invoice_id)
     base = _row_to_invoice(row)
     return PurchaseInvoiceDetail(**base.model_dump(), items=[_row_to_item(i) for i in items],
-                                 payments=[PurchaseInvoicePaymentOut(**p) for p in payments])
+                                 payments=[PurchaseInvoicePaymentOut(**{**p, "has_proof": bool(p.get("proof_file"))}) for p in payments])
 
 
 # --- endpoints ---------------------------------------------------------------
@@ -351,6 +359,31 @@ async def approve_invoice_exception(invoice_id: int, req: InvoiceExceptionReques
         _raise_from_value_error(e)
 
 
+@router.post("/purchase-invoices/{invoice_id}/dp-allocation", response_model=PurchaseInvoiceDetail, dependencies=[Depends(require_admin)])
+async def allocate_dp(invoice_id: int, req: DpAllocateRequest, user: dict = Depends(get_current_user)):
+    """Alokasi DP Supplier (Admin): carries an unused supplier DP onto this faktur. No new cash is recorded."""
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, allocate_spo_dp, req.spo_payment_id, invoice_id, req.amount, user["username"])
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return await _detail(invoice_id)
+
+
+@router.post("/purchase-invoices/{invoice_id}/dp-allocation/{row_id}/reverse", response_model=PurchaseInvoiceDetail, dependencies=[Depends(require_admin)])
+async def reverse_dp(invoice_id: int, row_id: int, req: DpReverseRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, reverse_dp_allocation, row_id, req.reason, user["username"])
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return await _detail(invoice_id)
+
+
 @router.post("/purchase-invoices/{invoice_id}/void", response_model=PurchaseInvoiceDetail, dependencies=[Depends(require_admin)])
 async def void_invoice(invoice_id: int, req: VoidRequest):
     if not req.reason.strip():
@@ -372,7 +405,71 @@ async def add_payment(invoice_id: int, req: PurchaseInvoicePaymentRequest, user:
     try:
         await loop.run_in_executor(None, lambda: record_purchase_invoice_payment(
             invoice_id, req.amount, text(req.method), text(req.paid_date), text(req.reference_no), text(req.note),
-            user["username"]))
+            user["username"], text(req.source_account), text(req.dest_account)))
+    except ValueError as e:
+        _raise_from_value_error(e)
+    return await _detail(invoice_id)
+
+
+async def _read_proof_body(request: Request) -> bytes:
+    too_big = HTTPException(status_code=413, detail="Ukuran bukti maksimal 5 MB.")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > payment_proofs.MAX_PROOF_BYTES:
+        raise too_big
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > payment_proofs.MAX_PROOF_BYTES:
+            raise too_big
+    return bytes(data)
+
+
+def _payment_of_invoice(row: dict | None, invoice_id: int) -> dict:
+    if row is None or row["invoice_id"] != invoice_id:
+        raise HTTPException(status_code=404, detail="Pembayaran tidak ditemukan.")
+    return row
+
+
+@router.put("/purchase-invoices/{invoice_id}/payments/{payment_id}/proof", response_model=PurchaseInvoiceDetail)
+async def put_payment_proof(invoice_id: int, payment_id: int, request: Request, name: str | None = None, user: dict = Depends(get_current_user)):
+    """Raw-body upload of the proof (JPEG / PNG / WebP / PDF, 5 MB). Any logged-in user may attach it; only Admin verifies."""
+    loop = asyncio.get_event_loop()
+    _payment_of_invoice(await loop.run_in_executor(None, get_payment_row, payment_id), invoice_id)
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type not in payment_proofs.PROOF_EXTENSIONS:
+        raise HTTPException(status_code=422, detail="Format bukti harus JPEG, PNG, WebP, atau PDF.")
+    data = await _read_proof_body(request)
+    if not data:
+        raise HTTPException(status_code=422, detail="File bukti kosong.")
+    if not payment_proofs.matches_content_type(content_type, data):
+        raise HTTPException(status_code=422, detail="Isi file tidak cocok dengan format yang dipilih.")
+    filename = await loop.run_in_executor(None, payment_proofs.save_proof, data, content_type)
+    try:
+        _row, previous = await loop.run_in_executor(None, set_payment_proof, payment_id, filename, name, user["username"])
+    except ValueError as e:
+        await loop.run_in_executor(None, payment_proofs.delete_proof_file, filename)
+        _raise_from_value_error(e)
+    await loop.run_in_executor(None, payment_proofs.delete_proof_file, previous)
+    return await _detail(invoice_id)
+
+
+@router.get("/purchase-invoices/{invoice_id}/payments/{payment_id}/proof")
+async def get_payment_proof(invoice_id: int, payment_id: int):
+    loop = asyncio.get_event_loop()
+    row = _payment_of_invoice(await loop.run_in_executor(None, get_payment_row, payment_id), invoice_id)
+    path = await loop.run_in_executor(None, payment_proofs.proof_file, row.get("proof_file"))
+    if path is None:
+        raise HTTPException(status_code=404, detail="Pembayaran ini belum punya bukti.")
+    return FileResponse(path, media_type=payment_proofs.media_type_for(row["proof_file"]),
+                        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
+
+
+@router.post("/purchase-invoices/{invoice_id}/payments/{payment_id}/proof/verify", response_model=PurchaseInvoiceDetail, dependencies=[Depends(require_admin)])
+async def verify_payment_proof_route(invoice_id: int, payment_id: int, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    _payment_of_invoice(await loop.run_in_executor(None, get_payment_row, payment_id), invoice_id)
+    try:
+        await loop.run_in_executor(None, verify_payment_proof, payment_id, user["username"])
     except ValueError as e:
         _raise_from_value_error(e)
     return await _detail(invoice_id)

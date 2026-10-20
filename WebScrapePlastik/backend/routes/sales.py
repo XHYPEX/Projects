@@ -29,7 +29,7 @@ async def sales_summary(date_from: str, date_to: str):
 
 
 @router.get("/cash-outs", dependencies=[Depends(require_admin)])
-async def cash_outs(date_from: str, date_to: str, method: str | None = None):
+async def cash_outs(date_from: str, date_to: str, method: str | None = None, kind: str = "semua"):
     """K-20 Kas Keluar (admin): every refund in the range, with proof, who paid it out and the nota; totals per method."""
     for label, raw in (("awal", date_from), ("akhir", date_to)):
         try:
@@ -38,9 +38,11 @@ async def cash_outs(date_from: str, date_to: str, method: str | None = None):
             raise HTTPException(status_code=422, detail=f"Tanggal {label} tidak valid, gunakan format YYYY-MM-DD.")
     if date_from > date_to:
         raise HTTPException(status_code=422, detail="Tanggal awal tidak boleh setelah tanggal akhir.")
-    if method and method not in ("cash", "transfer", "qris", "debit"):
-        raise HTTPException(status_code=422, detail="Metode harus salah satu dari: cash, transfer, qris, debit.")
-    return await asyncio.get_event_loop().run_in_executor(None, list_cash_outs, date_from, date_to, method or None)
+    if method and method not in ("cash", "transfer", "qris", "debit", "giro", "lainnya"):
+        raise HTTPException(status_code=422, detail="Metode harus salah satu dari: cash, transfer, qris, debit, giro, lainnya.")
+    if kind not in ("semua", "refund", "supplier"):
+        raise HTTPException(status_code=422, detail="Jenis harus salah satu dari: semua, refund, supplier.")
+    return await asyncio.get_event_loop().run_in_executor(None, list_cash_outs, date_from, date_to, method or None, kind)
 
 
 @router.get("/price-requests/pending", dependencies=[Depends(require_admin)])

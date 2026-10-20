@@ -60,9 +60,41 @@ async def dp_route():
     return await _run(ap.dp_view)
 
 
+@router.get("/dp/{spo_payment_id}/targets")
+async def dp_targets_route(spo_payment_id: int):
+    data = await _run(ap.dp_targets, spo_payment_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="DP supplier tidak ditemukan.")
+    return data
+
+
+@router.get("/invoices/{invoice_id}/dp-options")
+async def dp_options_route(invoice_id: int):
+    data = await _run(ap.dp_options, invoice_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Faktur tidak ditemukan.")
+    return data
+
+
 @router.get("/credits")
 async def credits_route():
     return await _run(ap.credit_view)
+
+
+@router.get("/credits/{cn_id}")
+async def credit_detail_route(cn_id: int):
+    data = await _run(ap.credit_detail, cn_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Nota kredit tidak ditemukan.")
+    return data
+
+
+@router.get("/refunds/{claim_id}")
+async def refund_detail_route(claim_id: int):
+    data = await _run(ap.refund_detail, claim_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Klaim refund tidak ditemukan.")
+    return data
 
 
 @router.get("/refunds")
@@ -85,9 +117,13 @@ async def export_route(
     kind: str = Query("invoices", pattern="^(invoices|aging)$"), supplier_id: int | None = None,
     pay_status: str | None = Query(None, pattern="^(belum|sebagian|lunas)$"), due: str | None = Query(None, pattern="^(overdue|today|week|month)$"),
     date_from: str | None = None, date_to: str | None = None, q: str | None = None, invoice: str | None = None, po: str | None = None,
-    outstanding: bool = False,
+    outstanding: bool = False, format: str = Query("csv", pattern="^(csv|xlsx)$"),
 ):
     f = _filters(supplier_id, pay_status, due, date_from, date_to, q, invoice, po, outstanding)
+    if format == "xlsx":
+        data = await _run(ap.export_xlsx, kind, f)
+        return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f'attachment; filename="aging-payable-{kind}.xlsx"'})
     body = await _run(ap.export_csv, kind, f)
     return Response("﻿" + body, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="account-payable-{kind}.csv"'})

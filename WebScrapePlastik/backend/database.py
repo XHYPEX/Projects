@@ -1127,6 +1127,14 @@ def init_db() -> None:
                                    ("verified_at", "TEXT"), ("exception_reason", "TEXT"), ("hold_note", "TEXT"))),
             # Supplier DP paid on a PO before its faktur: how much of it has been carried onto the faktur.
             ("spo_payments", (("applied_amount", "INTEGER NOT NULL DEFAULT 0"), ("applied_invoice_id", "INTEGER"))),
+            # Alokasi DP manual: a reversal row points at the allocation row it undoes.
+            ("purchase_invoice_payments", (("reverses_id", "INTEGER"),)),
+            # Pembayaran Supplier: which shop account paid, which supplier account received, the proof file and its check,
+            # and the Kas Keluar number (KK-YYYYMMDD-NNN, assigned when the payment is recorded or lazily for older rows).
+            ("purchase_invoice_payments", (("source_account", "TEXT"), ("dest_account", "TEXT"), ("proof_file", "TEXT"), ("proof_name", "TEXT"),
+                                           ("proof_status", "TEXT"), ("proof_by", "TEXT"), ("proof_at", "TEXT"),
+                                           ("verified_by", "TEXT"), ("verified_at", "TEXT"), ("kk_number", "TEXT"))),
+            ("spo_payments", (("kk_number", "TEXT"),)),
             # BEKAS (Retur Supplier #9): a second-hand variant is its own master item pointing at the new one.
             ("master_items", (("quarantine_qty", "INTEGER NOT NULL DEFAULT 0"), ("item_condition", "TEXT NOT NULL DEFAULT 'baru'"),
                               ("origin_item_id", "INTEGER"))),
@@ -3936,26 +3944,49 @@ def delete_receipt(receipt_id: str) -> None:
         con.execute("DELETE FROM receipts WHERE id=?", (receipt_id,))
 
 
-def list_cash_outs(date_from: str, date_to: str, method: str | None = None) -> dict:
-    """K-20 Kas Keluar: every refund (money handed back to a customer) in the date range, by the shop's
-    calendar day, with who paid it out, the proof, and the nota it belongs to. Totals per method."""
+def list_cash_outs(date_from: str, date_to: str, method: str | None = None, kind: str = "semua") -> dict:
+    """K-20 Kas Keluar: money that left the shop in the date range, by the shop's calendar day. Customer refunds
+    (money handed back, with proof and the nota) and, since Account Payable, supplier payments: faktur payments
+    and PO DP, each with its Kas Keluar number. A DP carried onto a faktur is not new cash and is not listed.
+    Totals per method. kind: semua | refund | supplier."""
     shift = f"{SHOP_UTC_OFFSET_MINUTES:+d} minutes"
-    sql = """SELECT p.id, p.paid_at, -p.amount AS amount, p.method, p.note, p.created_by, p.proof_ref,
-                    r.id AS receipt_id, r.receipt_no, r.plate_full, r.customer_name, r.preorder_id,
-                    (SELECT o.po_number FROM preorders o WHERE o.id = r.preorder_id) AS po_number
-             FROM receipt_payments p JOIN receipts r ON r.id = p.receipt_id
-             WHERE p.kind = 'refund' AND p.amount < 0 AND date(p.paid_at, ?) BETWEEN ? AND ?"""
-    params: list = [shift, date_from, date_to]
-    if method:
-        sql += " AND p.method = ?"
-        params.append(method)
-    sql += " ORDER BY p.paid_at DESC, p.id DESC"
+    items: list[dict] = []
     with _conn() as con:
-        items = [dict(r) for r in con.execute(sql, params).fetchall()]
+        if kind in ("semua", "refund"):
+            sql = """SELECT p.id, p.paid_at, -p.amount AS amount, p.method, p.note, p.created_by, p.proof_ref,
+                            r.id AS receipt_id, r.receipt_no, r.plate_full, r.customer_name, r.preorder_id,
+                            (SELECT o.po_number FROM preorders o WHERE o.id = r.preorder_id) AS po_number
+                     FROM receipt_payments p JOIN receipts r ON r.id = p.receipt_id
+                     WHERE p.kind = 'refund' AND p.amount < 0 AND date(p.paid_at, ?) BETWEEN ? AND ?"""
+            params: list = [shift, date_from, date_to]
+            if method:
+                sql += " AND p.method = ?"
+                params.append(method)
+            for r in con.execute(sql, params).fetchall():
+                items.append({**dict(r), "source": "refund", "source_label": "Refund pelanggan"})
+        if kind in ("semua", "supplier"):
+            _kk_assign(con)
+            msql = " AND p.method = ?" if method else ""
+            mp = [method] if method else []
+            for r in con.execute(
+                    f"""SELECT p.id, p.paid_at, p.amount, p.method, p.note, p.created_by, p.reference_no AS proof_ref, p.kk_number, p.proof_status,
+                               p.source_account, p.dest_account, i.id AS invoice_id, i.invoice_number, s.name AS supplier_name, o.po_number
+                        FROM purchase_invoice_payments p JOIN purchase_invoices i ON i.id = p.invoice_id JOIN suppliers s ON s.id = i.supplier_id
+                        LEFT JOIN supplier_pos o ON o.id = i.supplier_po_id
+                        WHERE p.kind IN ('bayar','batal') AND date(p.paid_at, ?) BETWEEN ? AND ?{msql}""", [shift, date_from, date_to] + mp).fetchall():
+                items.append({**dict(r), "source": "supplier", "source_label": "Pembayaran faktur supplier"})
+            for r in con.execute(
+                    f"""SELECT p.id, p.paid_at, p.amount, p.method, p.note, p.created_by, p.reference_no AS proof_ref, p.kk_number, p.bank_account AS source_account,
+                               o.id AS po_id, o.po_number, s.name AS supplier_name
+                        FROM spo_payments p JOIN supplier_pos o ON o.id = p.supplier_po_id JOIN suppliers s ON s.id = o.supplier_id
+                        WHERE date(p.paid_at, ?) BETWEEN ? AND ?{msql}""", [shift, date_from, date_to] + mp).fetchall():
+                items.append({**dict(r), "source": "dp", "source_label": "DP supplier (uang muka PO)"})
+    items.sort(key=lambda i: (i["paid_at"], i["id"]), reverse=True)
     by_method: dict[str, int] = {}
     for i in items:
         by_method[i["method"]] = by_method.get(i["method"], 0) + i["amount"]
-    return {"items": items, "total": sum(i["amount"] for i in items), "count": len(items), "by_method": by_method}
+    by_source = {k: sum(i["amount"] for i in items if i["source"] == k) for k in ("refund", "supplier", "dp")}
+    return {"items": items, "total": sum(i["amount"] for i in items), "count": len(items), "by_method": by_method, "by_source": by_source}
 
 
 def get_sales_summary(date_from: str, date_to: str) -> dict:
@@ -6691,10 +6722,14 @@ def void_purchase_invoice(invoice_id: int, reason: str) -> dict:
                 f"Faktur pembelian {invoice_id} tidak bisa dibatalkan: sudah tercatat pembayaran {row['amount_paid'] - dp_net}. "
                 "Batalkan pembayarannya terlebih dahulu."
             )
+        # Net per DP: an allocation already reversed by hand (dp_batal row with the same spo_payment_id) must not be returned twice.
+        net_by_dp: dict[int, int] = {}
         for r in dp_rows:
-            if r["kind"] == "dp" and r["spo_payment_id"]:
-                con.execute("UPDATE spo_payments SET applied_amount = MAX(applied_amount - ?, 0), applied_invoice_id=NULL WHERE id=?",
-                            (r["amount"], r["spo_payment_id"]))
+            if r["spo_payment_id"]:
+                net_by_dp[r["spo_payment_id"]] = net_by_dp.get(r["spo_payment_id"], 0) + r["amount"]
+        for dp_id, net in net_by_dp.items():
+            if net > 0:
+                con.execute("UPDATE spo_payments SET applied_amount = MAX(applied_amount - ?, 0), applied_invoice_id=NULL WHERE id=?", (net, dp_id))
         if dp_net:
             _pi_payment_row(con, invoice_id, -dp_net, "dp_batal", None, note="Faktur dibatalkan, DP kembali ke PO")
             con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid - ? WHERE id=?", (dp_net, invoice_id))
@@ -6732,18 +6767,39 @@ PURCHASE_PAYMENT_KINDS = {"bayar": "Pembayaran", "batal": "Pembatalan pembayaran
 
 def _pi_payment_row(con: sqlite3.Connection, invoice_id: int, amount: int, kind: str, by: str | None, *,
                     paid_at: str | None = None, method: str | None = None, reference_no: str | None = None,
-                    note: str | None = None, spo_payment_id: int | None = None) -> None:
+                    note: str | None = None, spo_payment_id: int | None = None, reverses_id: int | None = None) -> None:
     now = _now()
     con.execute(
         """INSERT INTO purchase_invoice_payments (invoice_id, paid_at, amount, kind, method, reference_no, note,
-               spo_payment_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (invoice_id, paid_at or now, amount, kind, method, reference_no, note, spo_payment_id, by, now),
+               spo_payment_id, created_by, created_at, reverses_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (invoice_id, paid_at or now, amount, kind, method, reference_no, note, spo_payment_id, by, now, reverses_id),
     )
+
+
+def _kk_assign(con: sqlite3.Connection) -> None:
+    """Kas Keluar numbers (KK-YYYYMMDD-NNN, per payment day) for supplier money out: faktur payments (bayar / batal)
+    and PO DP. Older rows get theirs here, in payment order, so the numbers never change once given."""
+    todo = [("purchase_invoice_payments", r["id"], r["paid_at"]) for r in con.execute(
+        "SELECT id, paid_at FROM purchase_invoice_payments WHERE kind IN ('bayar','batal') AND kk_number IS NULL").fetchall()]
+    todo += [("spo_payments", r["id"], r["paid_at"]) for r in con.execute("SELECT id, paid_at FROM spo_payments WHERE kk_number IS NULL").fetchall()]
+    if not todo:
+        return
+    todo.sort(key=lambda t: (t[2], t[0], t[1]))
+    counters: dict[str, int] = {}
+    for tbl in ("purchase_invoice_payments", "spo_payments"):
+        for r in con.execute(f"SELECT kk_number FROM {tbl} WHERE kk_number IS NOT NULL").fetchall():
+            day = r["kk_number"][3:11]
+            counters[day] = max(counters.get(day, 0), int(r["kk_number"][12:] or 0))
+    for tbl, rid, paid_at in todo:
+        day = (paid_at or _now())[:10].replace("-", "")
+        counters[day] = counters.get(day, 0) + 1
+        con.execute(f"UPDATE {tbl} SET kk_number=? WHERE id=?", (f"KK-{day}-{counters[day]:03d}", rid))
 
 
 def record_purchase_invoice_payment(
     invoice_id: int, amount: int, method: str | None = None, paid_date: str | None = None,
     reference_no: str | None = None, note: str | None = None, by: str | None = None,
+    source_account: str | None = None, dest_account: str | None = None,
 ) -> dict:
     """Adds to amount_paid (a row per payment). A negative amount reverses an over-recorded payment;
     the running total stays within [0, total] either way."""
@@ -6779,14 +6835,64 @@ def record_purchase_invoice_payment(
         )
         _pi_payment_row(con, invoice_id, amount, "bayar" if amount > 0 else "batal", by, paid_at=paid_at,
                         method=method, reference_no=reference_no, note=note)
+        rid = con.execute("SELECT MAX(id) AS i FROM purchase_invoice_payments WHERE invoice_id=?", (invoice_id,)).fetchone()["i"]
+        src = " ".join((source_account or "").split()) or None
+        dst = " ".join((dest_account or "").split()) or None
+        con.execute("UPDATE purchase_invoice_payments SET source_account=?, dest_account=? WHERE id=?", (src, dst, rid))
+        if src:
+            _remember_transfer_name(con, "account", src)
+        _kk_assign(con)
         updated = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         return dict(updated)
 
 
 def get_purchase_invoice_payments(invoice_id: int) -> list[dict]:
     with _conn() as con:
+        _kk_assign(con)
         return [dict(r) for r in con.execute(
             "SELECT * FROM purchase_invoice_payments WHERE invoice_id=? ORDER BY paid_at ASC, id ASC", (invoice_id,))]
+
+
+def set_payment_proof(payment_id: int, filename: str, original_name: str | None, by: str | None) -> tuple[dict, str | None]:
+    """Attach (or replace) the proof of a supplier payment. A verified proof is locked. Returns (row, previous filename)."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        r = con.execute("SELECT * FROM purchase_invoice_payments WHERE id=?", (payment_id,)).fetchone()
+        if r is None:
+            raise ValueError("Pembayaran tidak ditemukan.")
+        if r["kind"] != "bayar":
+            raise ValueError("Bukti hanya untuk pembayaran supplier (bukan DP otomatis, kredit, atau pembatalan).")
+        if r["proof_status"] == "terverifikasi":
+            raise ValueError("Bukti sudah diverifikasi Admin dan terkunci.")
+        con.execute("UPDATE purchase_invoice_payments SET proof_file=?, proof_name=?, proof_status='tersimpan', proof_by=?, proof_at=?, "
+                    "verified_by=NULL, verified_at=NULL WHERE id=?", (filename, (original_name or "")[:120] or None, by, _now(), payment_id))
+        inv = con.execute("SELECT invoice_number, supplier_po_id FROM purchase_invoices WHERE id=?", (r["invoice_id"],)).fetchone()
+        if inv and inv["supplier_po_id"]:
+            _spo_event(con, inv["supplier_po_id"], "payment", f"Bukti pembayaran faktur {inv['invoice_number']} diunggah", by)
+        return dict(con.execute("SELECT * FROM purchase_invoice_payments WHERE id=?", (payment_id,)).fetchone()), r["proof_file"]
+
+
+def verify_payment_proof(payment_id: int, by: str | None) -> dict:
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        r = con.execute("SELECT * FROM purchase_invoice_payments WHERE id=?", (payment_id,)).fetchone()
+        if r is None:
+            raise ValueError("Pembayaran tidak ditemukan.")
+        if not r["proof_file"]:
+            raise ValueError("Belum ada bukti yang diunggah untuk pembayaran ini.")
+        if r["proof_status"] == "terverifikasi":
+            raise ValueError("Bukti ini sudah diverifikasi.")
+        con.execute("UPDATE purchase_invoice_payments SET proof_status='terverifikasi', verified_by=?, verified_at=? WHERE id=?", (by, _now(), payment_id))
+        inv = con.execute("SELECT invoice_number, supplier_po_id FROM purchase_invoices WHERE id=?", (r["invoice_id"],)).fetchone()
+        if inv and inv["supplier_po_id"]:
+            _spo_event(con, inv["supplier_po_id"], "payment", f"Bukti pembayaran faktur {inv['invoice_number']} diverifikasi", by)
+        return dict(con.execute("SELECT * FROM purchase_invoice_payments WHERE id=?", (payment_id,)).fetchone())
+
+
+def get_payment_row(payment_id: int) -> dict | None:
+    with _conn() as con:
+        r = con.execute("SELECT * FROM purchase_invoice_payments WHERE id=?", (payment_id,)).fetchone()
+        return dict(r) if r else None
 
 
 def _apply_po_dp(con: sqlite3.Connection, invoice_id: int, by: str | None) -> int:
@@ -6815,6 +6921,80 @@ def _apply_po_dp(con: sqlite3.Connection, invoice_id: int, by: str | None) -> in
         _spo_event(con, inv["supplier_po_id"], "payment",
                    f"DP supplier Rp {applied:,} diperhitungkan ke Faktur Pembelian {inv['invoice_number']}".replace(",", "."), by)
     return applied
+
+
+DP_MANUAL_NOTE = "Alokasi DP manual"
+
+
+def allocate_spo_dp(spo_payment_id: int, invoice_id: int, amount: int, by: str | None = None) -> dict:
+    """Alokasi DP Supplier: move (part of) a supplier DP that no faktur has absorbed onto a posted faktur of the SAME
+    supplier. No new cash: the DP was already paid, so only the faktur's amount_paid and the DP's applied_amount move.
+    The auto carry at posting (_apply_po_dp) stays; this is for the leftover or for another faktur."""
+    if not isinstance(amount, int) or amount <= 0:
+        raise ValueError("Jumlah alokasi harus lebih dari 0.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        p = con.execute(
+            """SELECT p.*, o.supplier_id, o.po_number, o.status AS po_status FROM spo_payments p
+               JOIN supplier_pos o ON o.id = p.supplier_po_id WHERE p.id=?""", (spo_payment_id,)).fetchone()
+        if p is None:
+            raise LookupError("DP supplier tidak ditemukan.")
+        inv = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if inv is None:
+            raise LookupError("Faktur pembelian tidak ditemukan.")
+        if p["po_status"] == "batal":
+            raise ValueError("DP dari PO yang dibatalkan tidak bisa dialokasikan. Uang mukanya diurus lewat klaim refund supplier.")
+        if inv["status"] != "posted":
+            raise ValueError("DP hanya bisa dialokasikan ke faktur yang sudah diposting.")
+        if inv["supplier_id"] != p["supplier_id"]:
+            raise ValueError("DP hanya bisa dialokasikan ke faktur supplier yang sama dengan PO-nya.")
+        free = p["amount"] - p["applied_amount"]
+        room = inv["total"] - inv["amount_paid"]
+        if free <= 0:
+            raise ValueError("DP ini sudah habis dialokasikan.")
+        if room <= 0:
+            raise ValueError("Faktur ini sudah lunas, tidak ada sisa tagihan untuk dialokasikan.")
+        if amount > free:
+            raise ValueError(f"Jumlah alokasi melebihi sisa DP (Rp {free:,}).".replace(",", "."))
+        if amount > room:
+            raise ValueError(f"Jumlah alokasi melebihi sisa tagihan faktur (Rp {room:,}).".replace(",", "."))
+        con.execute("UPDATE spo_payments SET applied_amount = applied_amount + ?, applied_invoice_id=? WHERE id=?", (amount, invoice_id, spo_payment_id))
+        _pi_payment_row(con, invoice_id, amount, "dp", by, paid_at=p["paid_at"], method=p["method"], reference_no=p["reference_no"],
+                        note=f"{DP_MANUAL_NOTE} dari {p['po_number']}", spo_payment_id=spo_payment_id)
+        con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid + ?, updated_at=? WHERE id=?", (amount, _now(), invoice_id))
+        _spo_event(con, p["supplier_po_id"], "payment",
+                   f"DP Rp {amount:,} dialokasikan manual ke Faktur Pembelian {inv['invoice_number']}".replace(",", "."), by)
+        return dict(con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone())
+
+
+def reverse_dp_allocation(payment_row_id: int, reason: str, by: str | None = None) -> dict:
+    """Undo one manual DP allocation: the DP becomes available again and the faktur owes that amount again."""
+    reason = (reason or "").strip()
+    if len(reason) < 5:
+        raise ValueError("Alasan pembatalan alokasi wajib diisi (minimal 5 karakter).")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        r = con.execute("SELECT * FROM purchase_invoice_payments WHERE id=?", (payment_row_id,)).fetchone()
+        if r is None:
+            raise LookupError("Baris alokasi tidak ditemukan.")
+        if r["kind"] != "dp" or not r["spo_payment_id"] or not (r["note"] or "").startswith(DP_MANUAL_NOTE):
+            raise ValueError("Hanya alokasi DP manual yang bisa dibatalkan di sini. DP otomatis kembali saat faktur di-void.")
+        if con.execute("SELECT 1 FROM purchase_invoice_payments WHERE reverses_id=?", (payment_row_id,)).fetchone():
+            raise ValueError("Alokasi ini sudah dibatalkan.")
+        inv = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (r["invoice_id"],)).fetchone()
+        if inv["status"] != "posted":
+            raise ValueError("Alokasi hanya bisa dibatalkan selama faktur masih diposting.")
+        p = con.execute("SELECT p.*, o.status AS po_status, o.po_number FROM spo_payments p JOIN supplier_pos o ON o.id = p.supplier_po_id WHERE p.id=?",
+                        (r["spo_payment_id"],)).fetchone()
+        if p["po_status"] == "batal":
+            raise ValueError("PO asal DP sudah dibatalkan, alokasi tidak bisa dibalik.")
+        con.execute("UPDATE spo_payments SET applied_amount = MAX(applied_amount - ?, 0) WHERE id=?", (r["amount"], r["spo_payment_id"]))
+        _pi_payment_row(con, r["invoice_id"], -r["amount"], "dp_batal", by, method=r["method"], reference_no=r["reference_no"],
+                        note=f"Alokasi DP dibatalkan: {reason}", spo_payment_id=r["spo_payment_id"], reverses_id=payment_row_id)
+        con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid - ?, updated_at=? WHERE id=?", (r["amount"], _now(), r["invoice_id"]))
+        _spo_event(con, p["supplier_po_id"], "payment",
+                   f"Alokasi DP Rp {r['amount']:,} ke Faktur {inv['invoice_number']} dibatalkan: {reason}".replace(",", "."), by)
+        return dict(con.execute("SELECT * FROM purchase_invoices WHERE id=?", (r["invoice_id"],)).fetchone())
 
 
 def _active_po_faktur(con: sqlite3.Connection, supplier_po_id: str) -> dict | None:

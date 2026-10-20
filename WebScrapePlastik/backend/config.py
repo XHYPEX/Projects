@@ -10,6 +10,12 @@ PRODUCT_IMAGE_DIR = Path(
     os.environ.get("PRODUCT_IMAGE_DIR", str(Path(__file__).parent.parent / "data" / "product_images"))
 )
 
+# Proof of payment (transfer slip photo / PDF) attached to a supplier payment. Same rules as the product photos:
+# server-generated names, bytes on disk, the row keeps only the name. Override with PAYMENT_PROOF_DIR.
+PAYMENT_PROOF_DIR = Path(
+    os.environ.get("PAYMENT_PROOF_DIR", str(Path(__file__).parent.parent / "data" / "payment_proofs"))
+)
+
 # The shop's wall-clock offset from UTC, in minutes (WIB = 420, WITA = 480,
 # WIT = 540; Indonesia has no daylight saving, so a fixed offset is exact and
 # needs no tz database -- which a local Windows install may not have).

@@ -218,7 +218,18 @@ def invoice_detail(invoice_id: int) -> dict | None:
         inv = dict(inv)
         row = next((r for r in _rows(con, today, (inv["status"],)) if r["id"] == invoice_id), None) or {}
         items = [dict(r) for r in con.execute("SELECT * FROM purchase_invoice_items WHERE invoice_id=? ORDER BY line_no, id", (invoice_id,)).fetchall()]
-        pays = [dict(r) for r in con.execute("SELECT * FROM purchase_invoice_payments WHERE invoice_id=? ORDER BY paid_at ASC, id ASC", (invoice_id,)).fetchall()]
+        db._kk_assign(con)
+        pays = [dict(r) for r in con.execute(
+            """SELECT p.*, sp.kk_number AS dp_kk_number FROM purchase_invoice_payments p LEFT JOIN spo_payments sp ON sp.id = p.spo_payment_id
+               WHERE p.invoice_id=? ORDER BY p.paid_at ASC, p.id ASC""", (invoice_id,)).fetchall()]
+        running = inv["total"]
+        for p in pays:
+            running -= p["amount"]
+            p["balance_after"] = max(running, 0)
+            p["doc_no"] = p["kk_number"] if p["kind"] in ("bayar", "batal") else p["dp_kk_number"] if p["kind"] in ("dp", "dp_batal") else p["reference_no"]
+            p["has_proof"] = bool(p["proof_file"])
+            p["proof_url"] = f"/api/purchase-invoices/{invoice_id}/payments/{p['id']}/proof" if p["proof_file"] else None
+            p.pop("proof_file", None)
         cn_by_no = {r["cn_number"]: dict(r) for r in con.execute(
             """SELECT c.*, r.return_number FROM supplier_credit_notes c LEFT JOIN supplier_returns r ON r.id = c.return_id
                WHERE c.cn_number IS NOT NULL""").fetchall()}
@@ -292,8 +303,9 @@ def dp_view() -> dict:
     with _conn() as con:
         used: dict[int, list[dict]] = {}
         for r in con.execute(
-                """SELECT p.spo_payment_id, p.invoice_id, p.amount, i.invoice_number FROM purchase_invoice_payments p
-                   JOIN purchase_invoices i ON i.id = p.invoice_id WHERE p.kind='dp' AND p.spo_payment_id IS NOT NULL""").fetchall():
+                """SELECT p.spo_payment_id, p.invoice_id, i.invoice_number, i.status, SUM(p.amount) AS amount FROM purchase_invoice_payments p
+                   JOIN purchase_invoices i ON i.id = p.invoice_id WHERE p.kind IN ('dp','dp_batal') AND p.spo_payment_id IS NOT NULL AND i.status <> 'void'
+                   GROUP BY p.spo_payment_id, p.invoice_id HAVING SUM(p.amount) <> 0""").fetchall():
             used.setdefault(r["spo_payment_id"], []).append({"invoice_id": r["invoice_id"], "invoice_number": r["invoice_number"], "amount": r["amount"]})
         rows = [dict(r) for r in con.execute(
             """SELECT p.id, p.supplier_po_id, p.paid_at, p.amount, p.applied_amount, p.method, p.reference_no, p.bank_account, p.note,
@@ -318,6 +330,39 @@ def dp_view() -> dict:
                     "count": len(rows)}}
 
 
+def dp_targets(spo_payment_id: int) -> dict | None:
+    """Alokasi DP step 1 (from a DP): posted faktur of the same supplier that still owe something."""
+    with _conn() as con:
+        p = con.execute(
+            """SELECT p.id, p.amount, p.applied_amount, p.paid_at, p.reference_no, p.method, o.po_number, o.status AS po_status, o.supplier_id,
+                      s.name AS supplier_name FROM spo_payments p JOIN supplier_pos o ON o.id = p.supplier_po_id
+               JOIN suppliers s ON s.id = o.supplier_id WHERE p.id=?""", (spo_payment_id,)).fetchone()
+        if p is None:
+            return None
+        p = dict(p)
+        invoices = [dict(r) for r in con.execute(
+            """SELECT i.id, i.invoice_number, i.supplier_invoice_no, i.due_date, i.total, i.amount_paid, i.total - i.amount_paid AS outstanding,
+                      sp.po_number FROM purchase_invoices i LEFT JOIN supplier_pos sp ON sp.id = i.supplier_po_id
+               WHERE i.supplier_id=? AND i.status='posted' AND i.total - i.amount_paid > 0 ORDER BY i.due_date, i.id""", (p["supplier_id"],)).fetchall()]
+    free = max(p["amount"] - p["applied_amount"], 0)
+    return {"dp": {**p, "free": free, "can_allocate": free > 0 and p["po_status"] != "batal"}, "invoices": invoices}
+
+
+def dp_options(invoice_id: int) -> dict | None:
+    """Alokasi DP step 1 (from a faktur): unused DP of the faktur's supplier."""
+    with _conn() as con:
+        inv = con.execute("SELECT id, invoice_number, supplier_id, status, total, amount_paid FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+        if inv is None:
+            return None
+        inv = dict(inv)
+        dps = [dict(r) for r in con.execute(
+            """SELECT p.id, p.paid_at, p.amount, p.applied_amount, p.amount - p.applied_amount AS free, p.method, p.reference_no, o.po_number
+               FROM spo_payments p JOIN supplier_pos o ON o.id = p.supplier_po_id
+               WHERE o.supplier_id=? AND o.status <> 'batal' AND p.amount - p.applied_amount > 0 ORDER BY p.paid_at, p.id""", (inv["supplier_id"],)).fetchall()]
+    outstanding = max(inv["total"] - inv["amount_paid"], 0)
+    return {"invoice": {**inv, "outstanding": outstanding, "can_allocate": inv["status"] == "posted" and outstanding > 0}, "dps": dps}
+
+
 def credit_view() -> dict:
     with _conn() as con:
         rows = [dict(r) for r in con.execute(
@@ -337,6 +382,48 @@ def credit_view() -> dict:
     live = [r for r in rows if r["status"] == "aktif"]
     return {"items": rows, "kpi": {"total": sum(r["amount"] for r in live), "allocated": sum(r["allocated"] for r in live),
                                    "free": sum(r["free"] for r in live), "count": len(live)}}
+
+
+def credit_detail(cn_id: int) -> dict | None:
+    """One credit note: where it came from, how it was allocated, and what it does to the faktur it is applied to."""
+    with _conn() as con:
+        c = con.execute(
+            """SELECT c.*, s.name AS supplier_name, r.return_number, r.doc_status AS return_status, r.return_date, r.requested_settlement, o.po_number
+               FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id LEFT JOIN supplier_returns r ON r.id = c.return_id
+               LEFT JOIN supplier_pos o ON o.id = c.supplier_po_id WHERE c.id=?""", (cn_id,)).fetchone()
+        if c is None:
+            return None
+        c = dict(c)
+        allocs = [dict(a) for a in con.execute(
+            """SELECT a.id, a.invoice_id, a.amount, a.created_by, a.created_at, i.invoice_number, i.total, i.amount_paid, i.supplier_po_id
+               FROM supplier_credit_allocations a JOIN purchase_invoices i ON i.id = a.invoice_id WHERE a.credit_note_id=? ORDER BY a.id""", (cn_id,)).fetchall()]
+        allocated = db._sr_cn_allocated(con, cn_id)
+    items = []
+    if c["return_id"]:
+        try:
+            items = db.get_supplier_return(c["return_id"]).get("items", [])
+        except Exception:
+            items = []
+    free = max(c["amount"] - allocated, 0) if c["status"] == "aktif" and c["kind"] == "kredit" else 0
+    return {**c, "allocations": allocs, "allocated": allocated, "free": free, "items": items,
+            "status_label": "Dibatalkan" if c["status"] != "aktif" else ("Siap dialokasikan" if free else "Teralokasi")}
+
+
+def refund_detail(claim_id: int) -> dict | None:
+    """One refund claim (a cancelled PO whose DP the supplier must give back): the DP paid, what has come back, what is left."""
+    claim = next((c for c in db.list_refund_claims() if c["id"] == claim_id), None)
+    if claim is None:
+        return None
+    with _conn() as con:
+        db._kk_assign(con)
+        dps = [dict(r) for r in con.execute(
+            "SELECT id, paid_at, amount, method, reference_no, bank_account, kk_number FROM spo_payments WHERE supplier_po_id=? ORDER BY paid_at, id", (claim["supplier_po_id"],)).fetchall()]
+    events = [{"at": d["paid_at"], "label": "DP dibayarkan", "detail": f"{d['kk_number'] or ''} · {d['reference_no'] or d['method']}".strip(" ·"), "amount": d["amount"]} for d in dps]
+    for cn in claim["credit_notes"]:
+        events.append({"at": cn["issued_at"], "label": "Refund diterima" if cn["kind"] == "refund" else "Kredit supplier", "detail": f"{cn['cn_number'] or ''} · {cn['reference_no'] or cn['method'] or ''}".strip(" ·"),
+                       "amount": cn["amount"]})
+    events.sort(key=lambda e: e["at"] or "")
+    return {**claim, "dps": dps, "dp_total": sum(d["amount"] for d in dps), "events": events}
 
 
 def refund_view() -> dict:
@@ -416,11 +503,20 @@ def reconciliation() -> dict:
         for cl in con.execute("SELECT cl.*, s.name AS supplier_name, o.po_number FROM supplier_refund_claims cl JOIN suppliers s ON s.id = cl.supplier_id JOIN supplier_pos o ON o.id = cl.supplier_po_id WHERE cl.status='menunggu'").fetchall():
             out.append({"kind": "refund", "category": "Refund / kredit supplier belum diterima", "ref_type": "po", "ref_id": cl["supplier_po_id"], "number": cl["claim_no"],
                         "supplier": cl["supplier_name"], "value": cl["amount"] - cl["settled_amount"], "detail": f"Dari pembatalan {cl['po_number']}", "status": "Menunggu"})
+        db._kk_assign(con)
+        for r in con.execute(
+                """SELECT p.id, p.invoice_id, p.amount, p.method, p.reference_no, p.proof_status, p.kk_number, i.invoice_number, s.name AS supplier_name
+                   FROM purchase_invoice_payments p JOIN purchase_invoices i ON i.id = p.invoice_id JOIN suppliers s ON s.id = i.supplier_id
+                   WHERE p.kind='bayar' AND p.method='transfer' AND COALESCE(p.proof_status, '') <> 'terverifikasi' AND i.status='posted' ORDER BY p.id""").fetchall():
+            out.append({"kind": "bukti", "category": "Bukti pembayaran belum diunggah" if r["proof_status"] is None else "Bukti pembayaran menunggu verifikasi",
+                        "ref_type": "invoice", "ref_id": r["invoice_id"], "number": r["kk_number"] or r["invoice_number"], "supplier": r["supplier_name"],
+                        "value": r["amount"], "detail": f"Transfer faktur {r['invoice_number']}" + (f" · ref {r['reference_no']}" if r["reference_no"] else ""),
+                        "status": "Pending" if r["proof_status"] is None else "Perlu verifikasi"})
         matched = sum(1 for r in rows if r["supplier_po_id"] and r["id"] not in flagged)
     count = lambda k: sum(1 for x in out if x["kind"] == k)
     return {"as_of": today.isoformat(), "items": out,
             "kpi": {"cocok": matched, "selisih": count("selisih"), "duplikat": count("duplikat"), "draft": count("draft"), "tahan": count("tahan"),
-                    "alokasi": count("dp") + count("kredit"), "refund": count("refund")}}
+                    "alokasi": count("dp") + count("kredit"), "refund": count("refund"), "bukti": count("bukti")}}
 
 
 def aging() -> dict:
@@ -440,26 +536,40 @@ def aging() -> dict:
             "composition": {k: (round(b[k] * 100 / b["total"], 1) if b["total"] else 0) for k in ("not_due", "today", "overdue_1_30", "overdue_30_plus")}}
 
 
+def export_rows(kind: str, filters: dict | None = None) -> tuple[list[list], tuple]:
+    """The report as rows (first row(s) are headers), shared by the CSV and Excel exports. Returns (rows, bold row indexes)."""
+    rows: list[list] = []
+    if kind == "aging":
+        a = aging()
+        rows.append([f"Aging utang supplier per {a['as_of']}"])
+        rows.append(["Supplier", "Belum jatuh tempo", "Jatuh tempo hari ini", "Overdue 1-30 hari", "Overdue >30 hari", "Total outstanding"])
+        for s in a["items"]:
+            rows.append([s["supplier"], s["not_due"], s["today"], s["overdue_1_30"], s["overdue_30_plus"], s["total"]])
+        t = a["totals"]
+        rows.append(["TOTAL", t["not_due"], t["today"], t["overdue_1_30"], t["overdue_30_plus"], t["total"]])
+        return rows, (0, 1, len(rows) - 1)
+    data = invoices(filters or {}, "due_date", False, 1, 0)
+    rows.append(["No. Faktur", "Faktur Supplier", "Supplier", "No. PO", "Tanggal Faktur", "Jatuh Tempo", "Total Tagihan", "DP", "Dibayar", "Kredit", "Sisa", "Status", "Jatuh Tempo (ket.)"])
+    for r in data["items"]:
+        rows.append([r["invoice_number"], r["supplier_invoice_no"] or "", r["supplier_name"], r["po_number"] or "", r["invoice_date"], r["due_date"],
+                     r["total"], r["dp"], r["cash"], r["credit"], r["outstanding"], r["pay_status_label"], r["due_label"]])
+    s = data["summary"]
+    rows.append([])
+    rows.append(["Total tagihan", s["total"]])
+    rows.append(["Total dibayar", s["paid"]])
+    rows.append(["Total outstanding", s["outstanding"]])
+    return rows, (0,)
+
+
 def export_csv(kind: str, filters: dict | None = None) -> str:
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
-    if kind == "aging":
-        a = aging()
-        w.writerow([f"Aging utang supplier per {a['as_of']}"])
-        w.writerow(["Supplier", "Belum jatuh tempo", "Jatuh tempo hari ini", "Overdue 1-30 hari", "Overdue >30 hari", "Total outstanding"])
-        for s in a["items"]:
-            w.writerow([s["supplier"], s["not_due"], s["today"], s["overdue_1_30"], s["overdue_30_plus"], s["total"]])
-        t = a["totals"]
-        w.writerow(["TOTAL", t["not_due"], t["today"], t["overdue_1_30"], t["overdue_30_plus"], t["total"]])
-    else:
-        data = invoices(filters or {}, "due_date", False, 1, 0)
-        w.writerow(["No. Faktur", "Faktur Supplier", "Supplier", "No. PO", "Tanggal Faktur", "Jatuh Tempo", "Total Tagihan", "DP", "Dibayar", "Kredit", "Sisa", "Status", "Jatuh Tempo (ket.)"])
-        for r in data["items"]:
-            w.writerow([r["invoice_number"], r["supplier_invoice_no"] or "", r["supplier_name"], r["po_number"] or "", r["invoice_date"], r["due_date"],
-                        r["total"], r["dp"], r["cash"], r["credit"], r["outstanding"], r["pay_status_label"], r["due_label"]])
-        s = data["summary"]
-        w.writerow([])
-        w.writerow(["Total tagihan", s["total"]])
-        w.writerow(["Total dibayar", s["paid"]])
-        w.writerow(["Total outstanding", s["outstanding"]])
+    for row in export_rows(kind, filters)[0]:
+        w.writerow(row)
     return buf.getvalue()
+
+
+def export_xlsx(kind: str, filters: dict | None = None) -> bytes:
+    from backend.xlsx_min import build_xlsx
+    rows, bold = export_rows(kind, filters)
+    return build_xlsx(rows, "Aging Payable" if kind == "aging" else "Faktur & Utang", bold, [26, 22, 26, 22, 16, 16, 16, 14, 14, 14, 16, 18, 22] if kind != "aging" else [28, 20, 20, 20, 20, 20])

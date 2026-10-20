@@ -1875,6 +1875,7 @@
                 · Sisa <span id="pi-outstanding-display" class="tabular-nums font-medium text-failed">Rp 0</span>
               </div>
             </div>
+            <button id="pi-dp-alloc-btn" type="button" onclick="dpOpenAllocateForInvoice()" class="hidden px-3 py-1.5 border border-accent/60 text-accentDark rounded-lg text-xs font-semibold hover:bg-accent/10 transition-colors">Alokasikan DP</button>
           </div>
           <div id="pi-payment-form" class="grid grid-cols-2 sm:grid-cols-[9rem_8rem_9rem_1fr] gap-2 mt-3">
             <div class="relative">
@@ -1882,11 +1883,20 @@
               <input id="pi-payment-amount" type="text" inputmode="numeric" placeholder="Jumlah bayar" aria-label="Jumlah bayar"
                 class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
             </div>
-            <select id="pi-payment-method" aria-label="Metode bayar" class="select-chevron border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">
+            <select id="pi-payment-method" aria-label="Metode bayar" onchange="piPayRecalc()" class="select-chevron border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">
               <option value="transfer">Transfer</option><option value="cash">Tunai</option><option value="giro">Giro</option>
             </select>
             <input id="pi-payment-date" type="date" aria-label="Tanggal bayar" data-no-uppercase class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" />
-            <input id="pi-payment-ref" type="text" maxlength="60" placeholder="No. referensi / catatan" aria-label="Nomor referensi" data-no-uppercase class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" />
+            <input id="pi-payment-ref" type="text" maxlength="60" oninput="piPayRecalc()" placeholder="No. referensi / catatan" aria-label="Nomor referensi" data-no-uppercase class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" />
+            <div id="pi-pay-extra" class="col-span-2 sm:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div id="pi-pay-src-wrap"><input id="pi-payment-src" list="pi-src-list" maxlength="80" placeholder="Rekening sumber (rekening toko)" aria-label="Rekening sumber" oninput="piPayRecalc()"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" /><datalist id="pi-src-list"></datalist></div>
+              <div id="pi-pay-dst-wrap"><input id="pi-payment-dst" maxlength="80" placeholder="Rekening tujuan supplier (bank / no. rek)" aria-label="Rekening tujuan" oninput="piPayRecalc()"
+                class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink" /></div>
+              <label class="flex items-center gap-2 border border-line rounded-lg px-3 py-1.5 text-sm bg-white text-muted cursor-pointer"><span class="shrink-0 text-xs">Bukti</span>
+                <input id="pi-payment-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="piPayRecalc()" class="min-w-0 flex-1 text-xs" /></label>
+            </div>
+            <div id="pi-pay-summary" class="col-span-2 sm:col-span-4 rounded-lg border border-line bg-white px-3 py-2 text-xs"></div>
             <div class="col-span-2 sm:col-span-4 flex justify-end">
               <button type="button" onclick="submitPurchaseInvoicePayment()"
                 class="px-4 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 transition-colors">Catat Bayar</button>
@@ -3450,19 +3460,22 @@
           <input id="ko-to" type="date" onchange="koLoad()" data-no-uppercase class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
         <div><label for="ko-method" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Metode</label>
           <select id="ko-method" onchange="koLoad()" class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
-            <option value="">Semua metode</option><option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option></select></div>
+            <option value="">Semua metode</option><option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option><option value="giro">Giro</option></select></div>
+        <div><label for="ko-kind" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Jenis</label>
+          <select id="ko-kind" onchange="koLoad()" class="border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+            <option value="semua">Semua jenis</option><option value="supplier">Pembayaran supplier</option><option value="refund">Refund pelanggan</option></select></div>
       </div>
-      <div id="ko-totals" class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4"></div>
+      <div id="ko-totals" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4"></div>
       <div class="bg-white border border-line rounded-xl overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead class="bg-bg2"><tr>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap">Tanggal</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nota</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
+              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dokumen</th>
+              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Jenis / Pihak</th>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Metode</th>
               <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nominal</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Bukti</th>
+              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Bukti / Rekening</th>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
               <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dikeluarkan oleh</th>
             </tr></thead>
@@ -5379,7 +5392,7 @@ const ROUTE_META = {
     icon: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9v6M9.5 11.5 12 9l2.5 2.5"/>',
   },
   "/kas-keluar": {
-    subtitle: "Semua uang yang dikembalikan ke pelanggan, lengkap dengan bukti dan nota asalnya.",
+    subtitle: "Semua uang yang keluar: pembayaran dan DP supplier serta refund pelanggan, lengkap dengan nomor KK, bukti, dan dokumen asalnya.",
     icon: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9v6M9.5 12.5 12 15l2.5-2.5"/>',
   },
   "/users": {
@@ -12319,7 +12332,7 @@ function apRenderInvoices(d) {
       <span class="inline-flex items-center gap-2"><span class="rounded-md bg-accent/10 text-accentDark font-semibold px-2 py-1">Total outstanding: ${apMoney(d.summary.outstanding)}</span>
       <button type="button" ${d.page <= 1 ? "disabled" : ""} onclick="AP.page--; apGo('invoices')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">‹</button><span class="tabular-nums">Halaman ${d.page} dari ${pages}</span>
       <button type="button" ${d.page >= pages ? "disabled" : ""} onclick="AP.page++; apGo('invoices')" class="px-2.5 py-1 border border-line rounded-md bg-white text-ink disabled:opacity-40">›</button></span></div>`);
-  apBody().innerHTML = apHead("Daftar Faktur & Utang Supplier", "Kelola daftar tagihan terverifikasi, pembayaran, kredit, dan saldo outstanding.", apBtn("Export Excel", "apExport('invoices')") + apBtn("Lihat Tagihan Jatuh Tempo", "apGo('due')", true)) + filters + table
+  apBody().innerHTML = apHead("Daftar Faktur & Utang Supplier", "Kelola daftar tagihan terverifikasi, pembayaran, kredit, dan saldo outstanding.", apBtn("Export Excel", "apExport('invoices')") + apBtn("CSV", "apExport('invoices', 'csv')") + apBtn("Lihat Tagihan Jatuh Tempo", "apGo('due')", true)) + filters + table
     + crNote("border-sky-200 bg-sky-50 text-sky-900 mt-4", "Nomor faktur dan nomor PO bisa diklik untuk membuka dokumen sumber. Aging Payable bukan modul input kas keluar: pembayaran dicatat di Faktur Pembelian.");
 }
 
@@ -12332,8 +12345,8 @@ function apFilter() {
 function apFilterReset() { AP.f = { q: "", supplier_id: "", pay_status: "", due: "", date_from: "", date_to: "", po: "", outstanding: false }; AP.page = 1; apGo("invoices"); }
 function apSort(k) { if (AP.sort === k) AP.dir = AP.dir === "asc" ? "desc" : "asc"; else { AP.sort = k; AP.dir = k === "total" || k === "outstanding" ? "desc" : "asc"; } AP.page = 1; apGo("invoices"); }
 
-function apExport(kind) {
-  const q = new URLSearchParams({ kind });
+function apExport(kind, fmt = "xlsx") {
+  const q = new URLSearchParams({ kind, format: fmt });
   if (kind === "invoices") for (const [k, v] of Object.entries(AP.f)) if (v !== "" && v !== false && v != null) q.set(k, v);
   window.location.href = `/api/account-payable/export?${q}`;
 }
@@ -12367,7 +12380,7 @@ function apRenderDetail(d) {
   const matching = d.matching.length ? apTable(`<th class="${AP_TH}">Produk</th><th class="${AP_THR}">Qty PO</th><th class="${AP_THR}">Qty GR</th><th class="${AP_THR}">Qty faktur</th><th class="${AP_THR}">Harga PO</th><th class="${AP_THR}">Harga faktur</th><th class="${AP_TH}">Hasil</th>`,
     d.matching.map(m => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(m.product)}${m.note ? `<div class="text-[11px] text-amber-700">${esc(m.note)}</div>` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_po ?? "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_gr ?? "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_inv}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.price_po == null ? "—" : apMoney(m.price_po)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(m.price_inv)}</td><td class="${AP_TD}">${m.result === "sesuai" ? crPill("bg-emerald-50 text-emerald-700", "Sesuai") : crPill("bg-amber-50 text-amber-700", m.result === "tidak_di_po" ? "Di luar PO" : "Selisih")}</td></tr>`).join(""), "")
     : '<p class="px-4 py-6 text-sm text-muted">Faktur ini tidak dibuat dari Purchase Order, jadi tidak ada yang dicocokkan.</p>';
-  const hist = `<div class="px-4 py-2">${d.payments.length ? d.payments.map(p => `<div class="flex items-start gap-3 py-2.5 border-b border-line last:border-b-0"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5 shrink-0"></span><div class="min-w-0 flex-1"><div class="text-[11px] text-muted">${apDate(p.paid_at)}</div><div class="text-sm font-semibold text-ink">${esc(p.kind_label)}</div><div class="text-xs text-muted">${[p.method ? (PAYMENT_METHOD_LABELS[p.method] || p.method) : "", p.reference_no ? "Ref " + esc(p.reference_no) : "", p.note ? esc(p.note) : "", p.created_by ? esc(p.created_by) : ""].filter(Boolean).join(" · ")}${p.credit_note?.return_id ? ` · ${apRetLink(p.credit_note.return_id, p.credit_note.return_number)}` : ""}</div></div><div class="tabular-nums font-semibold ${p.amount < 0 ? "text-failed" : "text-ink"}">${p.amount < 0 ? "− " : ""}${apMoney(Math.abs(p.amount))}</div></div>`).join("") : '<p class="py-6 text-sm text-muted">Belum ada pembayaran, DP, atau kredit pada faktur ini.</p>'}</div>`;
+  const hist = `<div class="px-4 py-2">${d.payments.length ? d.payments.map(p => `<div class="flex items-start gap-3 py-2.5 border-b border-line last:border-b-0"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5 shrink-0"></span><div class="min-w-0 flex-1"><div class="text-[11px] text-muted">${apDate(p.paid_at)}</div><div class="text-sm font-semibold text-ink">${esc(p.kind_label)}${p.doc_no ? ` <span class="font-mono text-[12px] text-accentDark font-normal">${esc(p.doc_no)}</span>` : ""}</div><div class="text-xs text-muted">${[p.method ? (PAYMENT_METHOD_LABELS[p.method] || p.method) : "", p.reference_no ? "Ref " + esc(p.reference_no) : "", p.note ? esc(p.note) : "", p.created_by ? esc(p.created_by) : ""].filter(Boolean).join(" · ")}${p.credit_note?.return_id ? ` · ${apRetLink(p.credit_note.return_id, p.credit_note.return_number)}` : ""}</div></div><div class="text-right"><div class="tabular-nums font-semibold ${p.amount < 0 ? "text-failed" : "text-ink"}">${p.amount < 0 ? "− " : ""}${apMoney(Math.abs(p.amount))}</div><div class="text-[11px] text-muted tabular-nums">sisa ${apMoney(p.balance_after)}</div></div></div>`).join("") : '<p class="py-6 text-sm text-muted">Belum ada pembayaran, DP, atau kredit pada faktur ini.</p>'}</div>`;
   const docs = `<div class="px-4 py-3 space-y-2">${[
     d.po ? ["Purchase Order", d.po.po_number, `openSupplierPoFromFaktur('${esc(d.po.id)}')`, d.po.status] : null,
     ...d.grs.map(g => ["Goods Receipt", g.gr_number || "GR", `openSupplierPoFromFaktur('${esc(d.po.id)}')`, `${g.qty} pcs`]),
@@ -12375,11 +12388,95 @@ function apRenderDetail(d) {
     ...d.returns.map(r => ["Retur Supplier", r.return_number, `rtsOpen(${r.id})`, "nota kredit"]),
   ].filter(Boolean).map(([k, n, js, sub]) => `<div class="flex items-center justify-between gap-3 border border-line rounded-lg px-3 py-2"><div><div class="font-mono text-sm font-semibold text-ink">${esc(n)}</div><div class="text-[11px] text-muted">${k} · ${esc(sub)}</div></div>${apSmallBtn("Lihat dokumen", js)}</div>`).join("")}</div>`;
   apBody().innerHTML = apHead("Detail Aging Payable", `${d.invoice_number} · ${d.supplier_name} · ${d.pay_status === "lunas" ? "lunas" : "dibayar " + (d.pay_status === "sebagian" ? "sebagian" : "belum")}`,
-    apBtn("← Kembali", `apGo('${AP.tab}')`) + apBtn("Buka Faktur Pembelian", `openPurchaseInvoiceById(${d.id})`) + (d.can_pay ? apBtn("Bayar Tagihan", `openPurchaseInvoiceById(${d.id})`, true) : ""))
+    apBtn("← Kembali", `apGo('${AP.tab}')`) + apBtn("Buka Faktur Pembelian", `openPurchaseInvoiceById(${d.id})`) + apBtn("Riwayat & Bukti", `apOpenPayments(${d.id})`) + (d.can_pay ? apBtn("Bayar Tagihan", `openPurchaseInvoiceById(${d.id})`, true) : ""))
+    + `<div class="${apGrid(5)}">${crTile("Total tagihan", apMoney(d.total), d.invoice_number, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("DP dialokasikan", apMoney(d.dp), "uang muka dari PO", "bg-[#F2F6FD] border-[#DCE6F6]")}${crTile("Transfer / tunai dibayar", apMoney(d.cash), "pembayaran supplier", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Credit Note", apMoney(d.credit), "nota kredit retur", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Sisa utang", `<span class="${d.outstanding ? "text-failed" : ""}">${apMoney(d.outstanding)}</span>`, d.outstanding ? "belum lunas" : "lunas", "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`
     + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${idCard}${apPanel("Posisi utang saat ini", pos)}</div>`
     + `<div class="mb-4">${apPanel("Rincian barang dan penerimaan", items)}</div>`
     + `<div class="mb-4">${apPanel("Pencocokan PO ↔ Goods Receipt ↔ Faktur", matching, "Hanya untuk pengecekan; tidak mengubah faktur atau stok")}</div>`
     + `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">${apPanel("Riwayat penyelesaian", hist, "Pembayaran, DP, dan kredit berbeda sumber")}${apPanel("Dokumen terkait", docs)}</div>`;
+}
+
+// ── Riwayat & Bukti Pembayaran (per faktur) ──
+async function apOpenPayments(id, pick = null) {
+  AP.detail = id; AP.pay = pick;
+  apRenderTabs();
+  apBody().innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  let d;
+  try { d = await apGet(`invoices/${id}`); } catch (e) { showToast(e.message); apGo(AP.tab); return; }
+  apRenderPayments(d);
+}
+
+function apProofPill(p) {
+  if (p.kind !== "bayar") return crPill("bg-stone-100 text-stone-600", p.kind === "kredit" ? "Dialokasikan" : p.kind.startsWith("dp") ? "Alokasi" : "Dicatat");
+  if (!p.has_proof) return crPill("bg-amber-50 text-amber-700", "Bukti pending");
+  return p.proof_status === "terverifikasi" ? crPill("bg-emerald-50 text-emerald-700", "Terverifikasi") : crPill("bg-sky-50 text-sky-700", "Tersimpan");
+}
+
+function apRenderPayments(d) {
+  const pays = d.payments;
+  const sel = pays.find(p => p.id === AP.pay) || pays.filter(p => p.kind === "bayar").slice(-1)[0] || pays[pays.length - 1];
+  const rows = pays.map(p => `<tr class="border-b border-line last:border-b-0 ${sel && p.id === sel.id ? "bg-accent/5" : ""}"><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(p.paid_at)}</td><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(p.doc_no || "—")}</td><td class="${AP_TD} text-ink">${esc(p.kind_label)}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[p.method] || p.method || "—")}</td><td class="${AP_TD} text-muted">${[p.source_account ? esc(p.source_account) : "", p.reference_no ? "Ref " + esc(p.reference_no) : ""].filter(Boolean).join(" · ") || "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold ${p.amount < 0 ? "text-failed" : ""}">${p.amount < 0 ? "− " : ""}${apMoney(Math.abs(p.amount))}</td><td class="${AP_TD}">${apProofPill(p)}</td><td class="${AP_TD}">${apSmallBtn(p.has_proof ? "Lihat" : "Pilih", `apOpenPayments(${d.id}, ${p.id})`)}</td></tr>`).join("");
+  let preview = '<p class="px-4 py-10 text-center text-sm text-muted">Belum ada pembayaran pada faktur ini.</p>';
+  let audit = "";
+  if (sel) {
+    const isImg = sel.proof_url && !/\.pdf$/i.test(sel.proof_name || "");
+    const proofBox = sel.proof_url
+      ? (isImg ? `<a href="${sel.proof_url}" target="_blank" rel="noopener"><img src="${sel.proof_url}" alt="Bukti pembayaran" class="max-h-72 mx-auto rounded-lg border border-line bg-white" onerror="this.replaceWith(Object.assign(document.createElement('a'), {href: '${sel.proof_url}', target: '_blank', textContent: 'Buka bukti (${esc(sel.proof_name || "file")})', className: 'text-accentDark underline text-sm'}))"></a>` : `<a href="${sel.proof_url}" target="_blank" rel="noopener" class="text-accentDark underline text-sm">Buka bukti (${esc(sel.proof_name || "PDF")})</a>`)
+      : `<div class="text-sm text-muted">${sel.kind === "bayar" ? "Bukti belum diunggah. Unggah dari halaman faktur (Riwayat pembayaran)." : "Jenis ini tidak memerlukan bukti transfer."}</div>`;
+    preview = `<div class="px-4 py-4"><div class="rounded-xl border border-line bg-bg2 px-4 py-5 text-center">${proofBox}<div class="font-sans text-2xl font-semibold tabular-nums mt-3">${apMoney(Math.abs(sel.amount))}</div><div class="mt-1">${apProofPill(sel)}</div></div>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-3 mt-4 text-sm">${[["Penerima", d.supplier_name], ["Rekening tujuan", sel.dest_account], ["Tanggal", apDate(sel.paid_at)], ["Nomor Kas Keluar", sel.doc_no], ["Rekening sumber", sel.source_account], ["Referensi", sel.reference_no]].map(([l, v]) => `<div><div class="text-[11px] text-muted">${l}</div><div class="font-medium text-ink break-words">${v ? esc(v) : "—"}</div></div>`).join("")}</div></div>`;
+    audit = `<div class="px-4 py-3"><div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">${[["Pembuat transaksi", sel.created_by], ["Pemeriksa bukti", sel.verified_by], ["Status bukti", sel.kind === "bayar" ? (sel.has_proof ? (sel.proof_status === "terverifikasi" ? "Terverifikasi" : "Tersimpan, belum diverifikasi") : "Belum ada") : "—"], ["Bukti diunggah oleh", sel.proof_by]].map(([l, v]) => `<div><div class="text-[11px] text-muted">${l}</div><div class="font-medium text-ink">${v ? esc(v) : "—"}</div></div>`).join("")}</div>
+      ${crNote("border-amber-200 bg-amber-50 text-amber-900 mt-3 text-xs", "Setelah diposting, transaksi tidak diedit langsung. Koreksi lewat pembatalan pembayaran / alokasi yang tercatat di Log Aktivitas.")}
+      <div class="mt-3 text-xs font-semibold text-muted uppercase tracking-wider">Dokumen terkait</div>
+      <div class="space-y-2 mt-1.5">${[["Faktur supplier", d.invoice_number, `openPurchaseInvoiceById(${d.id})`], sel.doc_no && sel.kind === "bayar" ? ["Kas Keluar", sel.doc_no, "location.hash='/kas-keluar'"] : null, d.po ? ["Purchase Order", d.po.po_number, `openSupplierPoFromFaktur('${esc(d.po.id)}')`] : null].filter(Boolean).map(([k, n, js]) => `<div class="flex items-center justify-between border border-line rounded-lg px-3 py-2"><div><div class="font-mono text-sm font-semibold text-ink">${esc(n)}</div><div class="text-[11px] text-muted">${k}</div></div>${apSmallBtn("Buka", js)}</div>`).join("")}</div></div>`;
+  }
+  apBody().innerHTML = apHead(`Riwayat & Bukti Pembayaran`, `${d.invoice_number} · ${d.supplier_name} · dokumen pembayaran dan alokasi ditampilkan terpisah`,
+    apBtn("← Kembali ke detail", `apOpenDetail(${d.id})`) + apBtn("Buka Faktur", `openPurchaseInvoiceById(${d.id})`, true))
+    + `<div class="mb-4">${apPanel(`Riwayat pembayaran faktur ${esc(d.invoice_number)}`, apTable(`<th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Dokumen</th><th class="${AP_TH}">Jenis</th><th class="${AP_TH}">Metode</th><th class="${AP_TH}">Rekening sumber / referensi</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Status</th><th class="${AP_TH}">Bukti</th>`, rows, "Belum ada pembayaran."))}</div>`
+    + `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">${apPanel("Preview bukti", preview)}${apPanel("Audit & keamanan pembayaran", audit || '<p class="px-4 py-6 text-sm text-muted">—</p>')}</div>`;
+}
+
+// ── Detail Credit Note (Retur Supplier) ──
+async function apOpenCredit(id) {
+  apRenderTabs();
+  apBody().innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  let c;
+  try { c = await apGet(`credits/${id}`); } catch (e) { showToast(e.message); apGo("credits"); return; }
+  const row = (l, v) => crRow(l, v);
+  const info = crCard("Informasi nota kredit", row("Nomor credit note", `<span class="font-mono">${esc(c.cn_number || "—")}</span>`) + row("Supplier", esc(c.supplier_name)) + row("Sumber retur", c.return_id ? apRetLink(c.return_id, c.return_number) : c.po_number ? apPoLink(c.supplier_po_id, c.po_number) : "")
+    + row("Tanggal kredit", apDate(c.issued_at)) + row("Nomor kredit supplier", esc(c.supplier_cn_no || "")) + row("Nilai disetujui", `<b>${apMoney(c.amount)}</b>`) + row("Status kredit", crPill(c.status !== "aktif" ? "bg-stone-100 text-stone-600" : c.free ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700", c.status_label))
+    + row("Faktur tujuan", c.allocations.length ? c.allocations.map(a => apNum(a.invoice_number, `apOpenDetail(${a.invoice_id})`)).join(", ") : "Belum dialokasikan") + row("Jenis penyelesaian", "Potong tagihan"));
+  const alloc = `<div class="px-4 py-3 text-sm">${c.allocations.length ? c.allocations.map(a => `<div class="flex items-center justify-between py-2 border-b border-line"><span class="text-muted">${esc(a.invoice_number)} · total ${apMoney(a.total)}</span><span class="tabular-nums font-medium text-ink">− ${apMoney(a.amount)}</span></div>`).join("") : '<p class="text-muted py-2">Nota kredit ini belum dipotongkan ke faktur. Alokasi dilakukan di Retur Supplier.</p>'}
+    <div class="flex items-center justify-between mt-3 rounded-lg bg-accent/10 px-3 py-3"><span class="font-semibold text-sm text-ink">Sisa saldo kredit</span><span class="font-sans text-xl font-semibold tabular-nums text-accentDark">${apMoney(c.free)}</span></div>
+    <div class="flex flex-wrap items-center gap-2 mt-3 text-xs">${["Retur Supplier", "Credit Note", "Aging Payable"].map((t, i) => `${i ? '<span class="text-muted">→</span>' : ""}<span class="border border-line rounded-lg bg-bg2 px-3 py-2 font-semibold text-ink">${t}</span>`).join("")}</div></div>`;
+  const items = apTable(`<th class="${AP_TH}">Barang</th><th class="${AP_THR}">Qty</th><th class="${AP_TH}">Alasan retur</th><th class="${AP_TH}">Hasil supplier</th><th class="${AP_THR}">Kredit</th>`,
+    (c.items || []).map(i => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(i.product_name)}</td><td class="${AP_TD} text-right tabular-nums">${i.qty}</td><td class="${AP_TD} text-muted">${esc(i.reason_detail || i.reason_code || "—")}</td><td class="${AP_TD}">${i.settlement ? crPill("bg-violet-50 text-violet-700", i.settlement === "kredit" ? "Nota kredit" : i.settlement) : "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney((i.qty_approved || 0) * (i.unit_cost || 0))}</td></tr>`).join(""), "Nota kredit ini tidak berasal dari retur barang.");
+  apBody().innerHTML = apHead("Credit Note dari Retur Supplier", `${c.cn_number || ""} · ${c.supplier_name}`, apBtn("← Kembali", "apGo('credits')") + (c.return_id ? apBtn("Lihat Retur", `rtsOpen(${c.return_id})`, true) : ""))
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${info}${apPanel("Alokasi credit note", alloc)}</div>`
+    + apPanel("Rincian item retur yang diberi kredit", items)
+    + crNote("border-amber-200 bg-amber-50 text-amber-900 mt-4", "Penggantian barang tidak otomatis menjadi nota kredit. Pilih penyelesaian sesuai konfirmasi supplier di Retur Supplier.");
+}
+
+// ── Detail klaim refund (PO dibatalkan) ──
+async function apOpenRefund(id) {
+  apRenderTabs();
+  apBody().innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
+  let c;
+  try { c = await apGet(`refunds/${id}`); } catch (e) { showToast(e.message); apGo("refunds"); return; }
+  const row = (l, v) => crRow(l, v);
+  const info = crCard(`Kasus pembatalan ${c.po_number}`, row("Supplier", esc(c.supplier_name)) + row("PO", apPoLink(c.supplier_po_id, c.po_number)) + row("DP yang telah dibayar", apMoney(c.dp_total)) + row("Nomor permintaan refund", `<span class="font-mono">${esc(c.claim_no)}</span>`)
+    + row("Jenis", c.kind === "refund" ? "Uang kembali" : "Kredit supplier") + row("Status", crPill(c.status === "menunggu" ? "bg-amber-50 text-amber-700" : c.status === "dibatalkan" ? "bg-stone-100 text-stone-600" : "bg-emerald-50 text-emerald-700", c.status === "menunggu" ? "Menunggu" : c.status === "dibatalkan" ? "Dibatalkan" : "Selesai")) + row("Alasan", esc(c.note || c.reason || "")));
+  const flow = `<div class="px-4 py-3 text-sm"><div class="flex items-center justify-between py-2 border-b border-line"><span class="text-muted">Nilai klaim</span><span class="tabular-nums font-medium">${apMoney(c.amount)}</span></div>
+    <div class="flex items-center justify-between py-2 border-b border-line"><span class="text-muted">Refund / kredit benar-benar diterima</span><span class="tabular-nums font-medium">− ${apMoney(c.settled_amount)}</span></div>
+    <div class="flex items-center justify-between mt-3 rounded-lg bg-accent/10 px-3 py-3"><span class="font-semibold text-sm text-ink">Sisa piutang refund</span><span class="font-sans text-xl font-semibold tabular-nums text-accentDark">${apMoney(c.left)}</span></div>
+    <div class="mt-3 text-xs font-semibold text-muted uppercase tracking-wider">Alur kejadian</div>${c.events.map(e => `<div class="flex items-start gap-3 py-2 border-b border-line last:border-b-0"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5 shrink-0"></span><div class="flex-1 min-w-0"><div class="text-[11px] text-muted">${apDate(e.at)}</div><div class="text-sm font-semibold text-ink">${esc(e.label)}</div><div class="text-xs text-muted">${esc(e.detail)}</div></div><div class="tabular-nums font-semibold">${apMoney(e.amount)}</div></div>`).join("")}</div>`;
+  const hist = apTable(`<th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Dokumen</th><th class="${AP_TH}">Jenis</th><th class="${AP_TH}">Metode</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Status</th>`,
+    c.credit_notes.map(n => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(n.issued_at)}</td><td class="${AP_TD} font-mono text-[13px]">${esc(n.cn_number || "—")}</td><td class="${AP_TD}">${n.kind === "refund" ? "Refund dari supplier" : "Kredit supplier"}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[n.method] || n.method || "")}${n.reference_no ? " · " + esc(n.reference_no) : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(n.amount)}</td><td class="${AP_TD}">${crPill(n.status === "aktif" ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-600", n.status === "aktif" ? "Diterima" : "Dibatalkan")}</td></tr>`).join("")
+    + (c.left > 0 ? `<tr><td class="${AP_TD} text-muted">—</td><td class="${AP_TD} font-mono text-[13px]">${esc(c.claim_no)}</td><td class="${AP_TD}">Sisa refund ditagih</td><td class="${AP_TD} text-muted">Belum diterima</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.left)}</td><td class="${AP_TD}">${crPill("bg-amber-50 text-amber-700", "Outstanding")}</td></tr>` : ""), "Belum ada pengembalian dana.");
+  apBody().innerHTML = apHead("Refund Supplier & Pembatalan", `${c.claim_no} · ${c.supplier_name}`, apBtn("← Kembali", "apGo('refunds')") + apBtn("Buka Purchase Order", `openSupplierPoFromFaktur('${esc(c.supplier_po_id)}')`, true))
+    + crNote("border-sky-200 bg-sky-50 text-sky-900 mb-4", "Pengembalian uang dari supplier harus dibuktikan. Pembatalan PO tidak otomatis mengembalikan saldo bank; klaim ditutup di Purchase Order setelah uang benar-benar masuk.")
+    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${info}${apPanel("Pemantauan piutang refund", flow)}</div>`
+    + apPanel("Riwayat pengembalian dana", hist);
 }
 
 // ── Jatuh tempo ──
@@ -12418,20 +12515,20 @@ function apRenderDp(d) {
   const tiles = `<div class="${apGrid(5)}">
     ${crTile("DP supplier dibayar", apMoney(k.paid), "pada PO aktif", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah dialokasikan", apMoney(k.applied), "ke faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}
     ${crTile("Sisa uang muka", apMoney(k.free), "dapat dipakai", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP PO dibatalkan", apMoney(k.cancelled), "menunggu refund", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Transaksi DP", String(k.count), "tercatat di PO", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
-  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD}"><div class="font-mono text-[13px] text-ink">${esc(r.reference_no || "—")}</div><div class="text-[11px] text-muted">${esc(r.bank_account || "")}</div></td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${apPoLink(r.supplier_po_id, r.po_number)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.paid_at)}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.invoices.length ? r.invoices.map(i => `${apNum(i.invoice_number, `openPurchaseInvoiceById(${i.invoice_id})`)} <span class="text-xs text-muted">${apMoney(i.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${r.status === "batal" ? "—" : apMoney(r.free)}</td><td class="${AP_TD}">${crPill({ teralokasi: "bg-emerald-50 text-emerald-700", sebagian: "bg-amber-50 text-amber-700", tersedia: "bg-violet-50 text-violet-700", batal: "bg-rose-50 text-rose-700" }[r.status], r.status_label)}</td></tr>`).join("");
+  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD}"><div class="font-mono text-[13px] text-ink">${esc(r.reference_no || "—")}</div><div class="text-[11px] text-muted">${esc(r.bank_account || "")}</div></td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${apPoLink(r.supplier_po_id, r.po_number)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.paid_at)}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.invoices.length ? r.invoices.map(i => `${apNum(i.invoice_number, `openPurchaseInvoiceById(${i.invoice_id})`)} <span class="text-xs text-muted">${apMoney(i.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${r.status === "batal" ? "—" : apMoney(r.free)}</td><td class="${AP_TD}">${crPill({ teralokasi: "bg-emerald-50 text-emerald-700", sebagian: "bg-amber-50 text-amber-700", tersedia: "bg-violet-50 text-violet-700", batal: "bg-rose-50 text-rose-700" }[r.status], r.status_label)}</td><td class="${AP_TD}">${r.free > 0 && r.status !== "batal" ? apSmallBtn("Alokasikan", `dpOpenAllocate(${r.id})`) : ""}</td></tr>`).join("");
   const flow = `<div class="px-4 py-4 text-sm"><div class="flex flex-wrap items-center gap-2 text-xs">${["DP dibayar di PO", "Saldo DP", "Dialokasikan saat faktur diposting"].map((t, i) => `${i ? '<span class="text-muted">→</span>' : ""}<span class="border border-line rounded-lg bg-bg2 px-3 py-2 font-semibold text-ink">${t}</span>`).join("")}</div>
-    <p class="text-xs text-muted mt-3">Uang muka dicatat saat benar-benar dibayar di Purchase Order. Saat faktur dari PO itu diposting, DP otomatis dibawa ke faktur (bukan kas keluar baru) dan satu DP hanya terpakai sampai saldonya habis.</p></div>`;
+    <p class="text-xs text-muted mt-3">Uang muka dicatat saat benar-benar dibayar di Purchase Order. Saat faktur dari PO itu diposting, DP otomatis dibawa ke faktur (bukan kas keluar baru) dan satu DP hanya terpakai sampai saldonya habis. Sisa DP bisa dialokasikan manual ke faktur supplier yang sama lewat tombol Alokasikan (tanpa kas baru).</p></div>`;
   apBody().innerHTML = apHead("Uang Muka / DP Supplier", "Pantau uang muka yang telah dibayarkan dan pemakaiannya ke faktur.", apBtn("Lihat Purchase Order", "location.hash='/supplier-po'", true)) + tiles + `<div class="mb-4">${apPanel("Perjalanan uang muka", flow)}</div>`
-    + apPanel("Riwayat uang muka", apTable(`<th class="${AP_TH}">Referensi</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">PO</th><th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Metode</th><th class="${AP_THR}">Nominal</th><th class="${AP_TH}">Teralokasi ke faktur</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Status</th>`, rows, "Belum ada uang muka supplier."));
+    + apPanel("Riwayat uang muka", apTable(`<th class="${AP_TH}">Referensi</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">PO</th><th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Metode</th><th class="${AP_THR}">Nominal</th><th class="${AP_TH}">Teralokasi ke faktur</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Status</th><th class="${AP_TH}">Aksi</th>`, rows, "Belum ada uang muka supplier."));
 }
 
 // ── Credit note ──
 function apRenderCredits(d) {
   const k = d.kpi;
   const tiles = `<div class="${apGrid(3)}">${crTile("Nota kredit aktif", apMoney(k.total), `${k.count} dokumen`, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah dialokasikan", apMoney(k.allocated), "memotong faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Saldo kredit tersedia", apMoney(k.free), "belum dialokasikan", "bg-[#F6F2FD] border-[#E5DCF5]")}</div>`;
-  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(r.cn_number || "—")}${r.supplier_cn_no ? `<div class="text-[11px] text-muted font-sans">Supplier: ${esc(r.supplier_cn_no)}</div>` : ""}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.po_number ? apPoLink(r.supplier_po_id, r.po_number) : "—"}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.allocations.length ? r.allocations.map(a => `${apNum(a.invoice_number, `openPurchaseInvoiceById(${a.invoice_id})`)} <span class="text-xs text-muted">${apMoney(a.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(r.free)}</td><td class="${AP_TD}">${crPill(r.status !== "aktif" ? "bg-stone-100 text-stone-600" : r.free ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700", r.status_label)}</td></tr>`).join("");
+  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(r.cn_number || "—")}${r.supplier_cn_no ? `<div class="text-[11px] text-muted font-sans">Supplier: ${esc(r.supplier_cn_no)}</div>` : ""}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.po_number ? apPoLink(r.supplier_po_id, r.po_number) : "—"}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.allocations.length ? r.allocations.map(a => `${apNum(a.invoice_number, `openPurchaseInvoiceById(${a.invoice_id})`)} <span class="text-xs text-muted">${apMoney(a.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(r.free)}</td><td class="${AP_TD}">${crPill(r.status !== "aktif" ? "bg-stone-100 text-stone-600" : r.free ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700", r.status_label)}</td><td class="${AP_TD}">${apSmallBtn("Detail", `apOpenCredit(${r.id})`)}</td></tr>`).join("");
   apBody().innerHTML = apHead("Credit Note dari Retur Supplier", "Nota kredit resmi menjadi pengurang tagihan tanpa transaksi kas ganda.", apBtn("Lihat Retur Supplier", "location.hash='/retur-supplier'", true)) + tiles
-    + apPanel("Daftar nota kredit", apTable(`<th class="${AP_TH}">No. Credit Note</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Sumber</th><th class="${AP_TH}">Tanggal</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Dialokasikan ke faktur</th><th class="${AP_THR}">Saldo</th><th class="${AP_TH}">Status</th>`, rows, "Belum ada nota kredit."))
+    + apPanel("Daftar nota kredit", apTable(`<th class="${AP_TH}">No. Credit Note</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Sumber</th><th class="${AP_TH}">Tanggal</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Dialokasikan ke faktur</th><th class="${AP_THR}">Saldo</th><th class="${AP_TH}">Status</th><th class="${AP_TH}">Aksi</th>`, rows, "Belum ada nota kredit."))
     + crNote("border-amber-200 bg-amber-50 text-amber-900 mt-4", "Penggantian barang tidak otomatis menjadi nota kredit. Nota kredit baru dihitung setelah dicatat dan disetujui di Retur Supplier; alokasinya ke faktur dilakukan di sana, bukan dari halaman ini.");
 }
 
@@ -12439,10 +12536,10 @@ function apRenderCredits(d) {
 function apRenderRefunds(d) {
   const k = d.kpi;
   const tiles = `<div class="${apGrid(3)}">${crTile("Klaim refund / kredit", apMoney(k.claimed), "dari PO yang dibatalkan", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah diterima", apMoney(k.settled), "uang masuk / kredit terkonfirmasi", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Piutang refund", `<span class="${k.open ? "text-failed" : ""}">${apMoney(k.open)}</span>`, `${k.open_count} klaim menunggu`, "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`;
-  const claimRows = d.claims.map(c => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(c.claim_no)}</td><td class="${AP_TD} text-ink">${esc(c.supplier_name)}</td><td class="${AP_TD}">${apPoLink(c.supplier_po_id, c.po_number)}</td><td class="${AP_TD}">${c.kind === "refund" ? "Uang kembali" : "Kredit supplier"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(c.settled_amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.left)}</td><td class="${AP_TD}">${crPill(c.status === "menunggu" ? "bg-amber-50 text-amber-700" : c.status === "dibatalkan" ? "bg-stone-100 text-stone-600" : "bg-emerald-50 text-emerald-700", c.status === "menunggu" ? "Menunggu" : c.status === "dibatalkan" ? "Dibatalkan" : c.kind === "refund" ? "Diterima" : "Dikonfirmasi")}</td></tr>`).join("");
+  const claimRows = d.claims.map(c => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(c.claim_no)}</td><td class="${AP_TD} text-ink">${esc(c.supplier_name)}</td><td class="${AP_TD}">${apPoLink(c.supplier_po_id, c.po_number)}</td><td class="${AP_TD}">${c.kind === "refund" ? "Uang kembali" : "Kredit supplier"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(c.settled_amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.left)}</td><td class="${AP_TD}">${crPill(c.status === "menunggu" ? "bg-amber-50 text-amber-700" : c.status === "dibatalkan" ? "bg-stone-100 text-stone-600" : "bg-emerald-50 text-emerald-700", c.status === "menunggu" ? "Menunggu" : c.status === "dibatalkan" ? "Dibatalkan" : c.kind === "refund" ? "Diterima" : "Dikonfirmasi")}</td><td class="${AP_TD}">${apSmallBtn("Detail", `apOpenRefund(${c.id})`)}</td></tr>`).join("");
   const recRows = d.received.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.claim_no ? esc(r.claim_no) + (r.po_number ? ` · ${esc(r.po_number)}` : "") : "—"}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}${r.reference_no ? ` · ${esc(r.reference_no)}` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${crPill(r.status === "aktif" ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-600", r.status === "aktif" ? "Diterima" : "Dibatalkan")}</td></tr>`).join("");
   apBody().innerHTML = apHead("Refund Supplier & Pembatalan", "Pembatalan PO, refund, dan nota kredit diproses sesuai persetujuan supplier.", apBtn("Buka Purchase Order", "location.hash='/supplier-po'", true)) + tiles
-    + `<div class="mb-4">${apPanel("Klaim pembatalan PO", apTable(`<th class="${AP_TH}">No. Klaim</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">PO</th><th class="${AP_TH}">Jenis</th><th class="${AP_THR}">Nilai</th><th class="${AP_THR}">Diterima</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Status</th>`, claimRows, "Tidak ada klaim refund."))}</div>`
+    + `<div class="mb-4">${apPanel("Klaim pembatalan PO", apTable(`<th class="${AP_TH}">No. Klaim</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">PO</th><th class="${AP_TH}">Jenis</th><th class="${AP_THR}">Nilai</th><th class="${AP_THR}">Diterima</th><th class="${AP_THR}">Sisa</th><th class="${AP_TH}">Status</th><th class="${AP_TH}">Aksi</th>`, claimRows, "Tidak ada klaim refund."))}</div>`
     + apPanel("Riwayat pengembalian dana", apTable(`<th class="${AP_TH}">Tanggal</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Sumber</th><th class="${AP_TH}">Metode / referensi</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Status</th>`, recRows, "Belum ada uang refund yang diterima."))
     + crNote("border-amber-200 bg-amber-50 text-amber-900 mt-4", "Pengembalian uang dari supplier harus dibuktikan. Pembatalan PO tidak otomatis mengembalikan saldo bank; klaim ditutup di Purchase Order setelah uang benar-benar masuk.");
 }
@@ -12450,9 +12547,9 @@ function apRenderRefunds(d) {
 // ── Rekonsiliasi ──
 function apRenderRecon(d) {
   const k = d.kpi;
-  const tiles = `<div class="${apGrid(6)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih), "selisih dengan GR / PO", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Faktur ditahan", String(k.tahan || 0), "menunggu klarifikasi / Admin", "bg-[#FFF8E8] border-[#F2E3B8]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP / kredit belum terpakai", String(k.alokasi), "perlu keputusan admin", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
-  const open = (x) => x.ref_type === "invoice" ? `openPurchaseInvoiceById(${x.ref_id})` : x.ref_type === "po" ? `openSupplierPoFromFaktur('${esc(x.ref_id)}')` : "apGo('credits')";
-  const rows = d.items.map(x => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(x.number || "—")}</td><td class="${AP_TD} text-ink">${esc(x.supplier)}</td><td class="${AP_TD}">${esc(x.category)}<div class="text-[11px] text-muted">${esc(x.detail || "")}</div></td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(x.value)}</td><td class="${AP_TD}">${apSmallBtn("Buka dokumen", open(x))}</td><td class="${AP_TD}">${crPill({ tahan: "bg-amber-50 text-amber-700", selisih: "bg-amber-50 text-amber-700", duplikat: "bg-violet-50 text-violet-700", draft: "bg-stone-100 text-stone-600", dp: "bg-sky-50 text-sky-700", kredit: "bg-sky-50 text-sky-700", refund: "bg-amber-50 text-amber-700" }[x.kind], x.status)}</td></tr>`).join("");
+  const tiles = `<div class="${apGrid(6)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih + (k.tahan || 0)), "selisih GR / PO atau ditahan", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Bukti pembayaran pending", String(k.bukti || 0), "menunggu unggah / verifikasi", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Alokasi DP / kredit belum cocok", String(k.alokasi), "perlu keputusan admin", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#FFF8E8] border-[#F2E3B8]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const open = (x) => x.ref_type === "invoice" ? `openPurchaseInvoiceById(${x.ref_id})` : x.ref_type === "po" ? (x.kind === "dp" ? "apGo('dp')" : `openSupplierPoFromFaktur('${esc(x.ref_id)}')`) : "apGo('credits')";
+  const rows = d.items.map(x => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(x.number || "—")}</td><td class="${AP_TD} text-ink">${esc(x.supplier)}</td><td class="${AP_TD}">${esc(x.category)}<div class="text-[11px] text-muted">${esc(x.detail || "")}</div></td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(x.value)}</td><td class="${AP_TD}">${apSmallBtn({ selisih: "Review Selisih", bukti: "Verifikasi Bukti", duplikat: "Cek Duplikasi", tahan: "Tinjau", dp: "Alokasikan DP" }[x.kind] || "Buka dokumen", open(x))}</td><td class="${AP_TD}">${crPill({ bukti: "bg-violet-50 text-violet-700", tahan: "bg-amber-50 text-amber-700", selisih: "bg-amber-50 text-amber-700", duplikat: "bg-violet-50 text-violet-700", draft: "bg-stone-100 text-stone-600", dp: "bg-sky-50 text-sky-700", kredit: "bg-sky-50 text-sky-700", refund: "bg-amber-50 text-amber-700" }[x.kind], x.status)}</td></tr>`).join("");
   apBody().innerHTML = apHead("Rekonsiliasi & Koreksi Tagihan", "Temukan selisih dengan jejak yang jelas, tanpa membuat pembayaran dua kali.", apBtn("Buka Log Aktivitas", "location.hash='/activity'")) + tiles
     + `<div class="mb-4">${apPanel("Daftar pengecualian & koreksi", apTable(`<th class="${AP_TH}">Nomor</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Kategori selisih</th><th class="${AP_THR}">Nilai terdampak</th><th class="${AP_TH}">Tindakan</th><th class="${AP_TH}">Status</th>`, rows, "Tidak ada pengecualian. Semua faktur cocok."))}</div>`
     + crNote("border-amber-200 bg-amber-50 text-amber-900", "<b>Halaman ini hanya menandai.</b> Koreksi dilakukan di dokumen asal (faktur, PO, retur) dengan hak akses Admin, dan perubahannya tercatat di Log Aktivitas. Jangan mengubah mutasi historis secara langsung.");
@@ -12469,7 +12566,7 @@ function apRenderAging(d) {
   const legend = [["not_due", "Belum jatuh tempo", "bg-emerald-400"], ["today", "Hari ini", "bg-violet-400"], ["overdue_1_30", "Overdue 1–30 hari", "bg-orange-400"], ["overdue_30_plus", "Overdue > 30 hari", "bg-rose-500"]].map(([k, l, cl]) => `<div class="flex items-center justify-between py-1.5 text-sm"><span class="inline-flex items-center gap-2 text-muted"><i class="w-2.5 h-2.5 rounded-sm ${cl}"></i>${l}</span><span class="tabular-nums font-medium text-ink">${c[k]}%</span></div>`).join("");
   const sheet = `<div id="ap-aging-sheet" class="cr-print-target"><div class="ap-print-only hidden flex justify-between items-end mb-3"><div><div class="text-lg font-bold">${esc((typeof SHOP_PROFILE !== "undefined" && SHOP_PROFILE.name) || "SINAR GALAKSI VARIASI MOBIL")}</div><div class="text-xs">Laporan Utang Supplier &amp; Aging</div></div><div class="text-xs">Per ${apDate(d.as_of)}</div></div>`
     + apTable(`<th class="${AP_TH}">Supplier</th><th class="${AP_THR}">Belum jatuh tempo</th><th class="${AP_THR}">Jatuh tempo hari ini</th><th class="${AP_THR}">Overdue 1–30 hari</th><th class="${AP_THR}">Overdue &gt;30 hari</th><th class="${AP_THR}">Total outstanding</th>`, rows, "Tidak ada utang yang terbuka.") + "</div>";
-  apBody().innerHTML = apHead("Laporan Utang Supplier & Aging", "Ringkasan outstanding dan umur utang per supplier, siap diekspor.", apBtn("Print PDF", "crPrintNode('ap-aging-sheet', 'A4 landscape')") + apBtn("Export Excel", "apExport('aging')", true)) + tiles
+  apBody().innerHTML = apHead("Laporan Utang Supplier & Aging", "Ringkasan outstanding dan umur utang per supplier, siap diekspor.", apBtn("Print PDF", "crPrintNode('ap-aging-sheet', 'A4 landscape')") + apBtn("CSV", "apExport('aging', 'csv')") + apBtn("Export Excel", "apExport('aging')", true)) + tiles
     + `<div class="mb-4">${apPanel("Aging report per supplier", sheet, `Snapshot per ${apDate(d.as_of)}`)}</div>`
     + apPanel("Komposisi umur utang", `<div class="px-4 py-4"><div class="flex items-baseline justify-between"><span class="text-xs text-muted">Total saldo</span><span class="font-sans text-xl font-semibold tabular-nums text-ink">${apMoney(t.total)}</span></div>${bar}<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-3">${legend}</div><p class="text-xs text-muted mt-2">Utang dihitung dari faktur yang sudah diposting, setelah DP, pembayaran, dan kredit.</p></div>`);
 }
@@ -12598,6 +12695,8 @@ async function koLoad() {
   const q = new URLSearchParams({ date_from: from, date_to: to });
   const method = document.getElementById("ko-method").value;
   if (method) q.set("method", method);
+  const kind = document.getElementById("ko-kind").value;
+  if (kind && kind !== "semua") q.set("kind", kind);
   let data;
   try {
     const resp = await fetch(`/api/cash-outs?${q}`);
@@ -12606,18 +12705,35 @@ async function koLoad() {
   } catch (e) { showToast(e.message || "Kas keluar tidak bisa dimuat."); return; }
   if (seq !== koSeq) return;
   const tile = (label, value, sub = "") => `<div class="border border-line rounded-xl bg-bg2 px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">${label}</div><div class="font-sans text-xl font-semibold text-ink tabular-nums">${value}</div>${sub ? `<div class="text-xs text-muted mt-0.5">${sub}</div>` : ""}</div>`;
+  const labels = { ...PAYMENT_METHOD_LABELS, giro: "Giro", lainnya: "Lainnya" };
+  const src = data.by_source || {};
   document.getElementById("ko-totals").innerHTML = tile("Total Kas Keluar", esc(formatIDR(data.total)), `${data.count} transaksi`)
-    + Object.keys(PAYMENT_METHOD_LABELS).map(k => tile(esc(PAYMENT_METHOD_LABELS[k]), esc(formatIDR(data.by_method[k] || 0)))).join("");
+    + tile("Pembayaran faktur supplier", esc(formatIDR(src.supplier || 0)), "bayar tagihan") + tile("DP supplier (uang muka PO)", esc(formatIDR(src.dp || 0)), "dibayar di Purchase Order") + tile("Refund pelanggan", esc(formatIDR(src.refund || 0)), "uang dikembalikan")
+    + Object.keys(labels).filter(k => k in PAYMENT_METHOD_LABELS || data.by_method[k]).map(k => tile(esc(labels[k]), esc(formatIDR(data.by_method[k] || 0)))).join("");
   document.getElementById("ko-empty").classList.toggle("hidden", data.count > 0);
+  const koDoc = i => i.source === "refund"
+    ? `<a href="#/invoices" onclick="openReceiptFromHistory('${esc(i.receipt_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(i.receipt_no || "—")}</a>${i.po_number ? `<div class="text-xs text-muted">${esc(i.po_number)}</div>` : ""}`
+    : i.source === "supplier"
+      ? `<span class="font-mono text-ink">${esc(i.kk_number || "—")}</span><div class="text-xs"><a href="#/account-payable" onclick="apOpenPaymentsFromKas(${i.invoice_id}, ${i.id}); return false;" class="text-accentDark hover:underline font-mono">${esc(i.invoice_number)}</a>${i.po_number ? ` · ${esc(i.po_number)}` : ""}</div>`
+      : `<span class="font-mono text-ink">${esc(i.kk_number || "—")}</span><div class="text-xs"><a href="#/supplier-po" onclick="openSupplierPoFromFaktur('${esc(i.po_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(i.po_number)}</a></div>`;
+  const koWho = i => i.source === "refund" ? `${esc(i.customer_name || "—")}<div class="text-xs text-muted">${esc(i.plate_full || "")}</div>` : `${esc(i.supplier_name || "—")}<div class="text-xs text-muted">${esc(i.source_label)}</div>`;
+  const koProof = i => i.source === "refund" ? (i.proof_ref ? esc(i.proof_ref) : '<span class="text-muted">— (sebelum bukti wajib)</span>')
+    : `${i.proof_ref ? esc(i.proof_ref) : '<span class="text-muted">—</span>'}${i.source_account ? `<div class="text-xs text-muted">dari ${esc(i.source_account)}</div>` : ""}${i.dest_account ? `<div class="text-xs text-muted">ke ${esc(i.dest_account)}</div>` : ""}${i.source === "supplier" && i.method === "transfer" ? `<div class="text-[11px] ${i.proof_status === "terverifikasi" ? "text-done" : "text-amber-700"}">${i.proof_status === "terverifikasi" ? "bukti terverifikasi" : i.proof_status ? "bukti tersimpan" : "bukti pending"}</div>` : ""}`;
   document.getElementById("ko-tbody").innerHTML = data.items.map(i => `<tr class="border-b border-line last:border-b-0 align-top">
     <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatReceiptWhen(i.paid_at, true))}</td>
-    <td class="px-3 py-2"><a href="#/invoices" onclick="openReceiptFromHistory('${esc(i.receipt_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(i.receipt_no || "—")}</a>${i.po_number ? `<div class="text-xs text-muted">${esc(i.po_number)}</div>` : ""}</td>
-    <td class="px-3 py-2 text-ink">${esc(i.customer_name || "—")}<div class="text-xs text-muted">${esc(i.plate_full || "")}</div></td>
-    <td class="px-3 py-2 text-ink">${esc(PAYMENT_METHOD_LABELS[i.method] || i.method)}</td>
+    <td class="px-3 py-2">${koDoc(i)}</td>
+    <td class="px-3 py-2 text-ink">${koWho(i)}</td>
+    <td class="px-3 py-2 text-ink">${esc(labels[i.method] || i.method)}</td>
     <td class="px-3 py-2 text-right tabular-nums font-medium text-failed whitespace-nowrap">${esc(formatIDR(i.amount))}</td>
-    <td class="px-3 py-2 text-ink">${i.proof_ref ? esc(i.proof_ref) : '<span class="text-muted">— (sebelum bukti wajib)</span>'}</td>
+    <td class="px-3 py-2 text-ink">${koProof(i)}</td>
     <td class="px-3 py-2 text-muted">${esc(i.note || "")}</td>
     <td class="px-3 py-2 text-muted">${esc(i.created_by || "—")}</td></tr>`).join("");
+}
+
+// From Kas Keluar: open the payment's proof page in Aging Payable.
+function apOpenPaymentsFromKas(invoiceId, paymentId) {
+  location.hash = "/account-payable";
+  setTimeout(() => apOpenPayments(invoiceId, paymentId), 500);
 }
 
 async function loadDashboardOverview() {
@@ -16496,17 +16612,30 @@ function applyPurchaseInvoiceMode(inv) {
     document.getElementById("pi-paid-display").textContent = formatIDR(inv.amount_paid);
     document.getElementById("pi-outstanding-display").textContent = formatIDR(posted ? inv.outstanding : 0);
     document.getElementById("pi-payment-form").classList.toggle("hidden", !(posted && inv.outstanding > 0));
+    document.getElementById("pi-dp-alloc-btn").classList.toggle("hidden", !(isAdmin() && posted && inv.outstanding > 0));
     document.getElementById("pi-payment-amount").value = "";
     document.getElementById("pi-payment-ref").value = "";
     document.getElementById("pi-payment-date").value = toDateInputValue(new Date());
+    piPayInit();
     document.getElementById("pi-payment-history").innerHTML = pays.length ? `
       <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Riwayat</div>
       <div class="divide-y divide-line border border-line rounded-lg bg-white">${pays.map(p => `
         <div class="flex items-center justify-between gap-3 px-3 py-1.5">
-          <span class="min-w-0"><span class="text-ink">${esc(PI_PAYMENT_KINDS[p.kind] || p.kind)}</span>
-            <span class="text-xs text-muted"> · ${esc(formatReceiptWhen(p.paid_at, true))}${p.method ? " · " + esc(SPO_PAY_METHOD_LABELS[p.method] || p.method) : ""}${p.reference_no ? " · " + esc(p.reference_no) : ""}${p.note ? " · " + esc(p.note) : ""}${p.created_by ? " · " + esc(p.created_by) : ""}</span></span>
-          <span class="shrink-0 tabular-nums ${p.amount < 0 ? "text-failed" : "text-ink"}">${formatIDR(p.amount)}</span></div>`).join("")}</div>` : "";
+          <span class="min-w-0"><span class="text-ink">${esc(PI_PAYMENT_KINDS[p.kind] || p.kind)}</span>${p.kk_number ? ` <span class="font-mono text-[11px] text-accentDark">${esc(p.kk_number)}</span>` : ""}
+            <span class="text-xs text-muted"> · ${esc(formatReceiptWhen(p.paid_at, true))}${p.method ? " · " + esc(SPO_PAY_METHOD_LABELS[p.method] || p.method) : ""}${p.reference_no ? " · " + esc(p.reference_no) : ""}${p.source_account ? " · dari " + esc(p.source_account) : ""}${p.dest_account ? " · ke " + esc(p.dest_account) : ""}${p.note ? " · " + esc(p.note) : ""}${p.created_by ? " · " + esc(p.created_by) : ""}</span></span>
+          <span class="shrink-0 flex items-center gap-2">${piProofControls(p)}${dpReversible(p, pays, posted) ? `<button type="button" onclick="dpOpenReverse(${p.id})" class="text-[11px] text-failed hover:underline">Batalkan alokasi</button>` : ""}<span class="tabular-nums ${p.amount < 0 ? "text-failed" : "text-ink"}">${formatIDR(p.amount)}</span></span></div>`).join("")}</div>` : "";
   }
+}
+
+// Proof of a supplier payment: upload (anyone), view, and Admin verification. Only "Pembayaran" rows carry a proof.
+function piProofControls(p) {
+  if (p.kind !== "bayar") return "";
+  const link = "text-[11px] text-accentDark hover:underline";
+  const pill = (cls, t) => `<span class="rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}">${t}</span>`;
+  if (!p.has_proof) return `${pill("bg-amber-50 text-amber-700", "Bukti pending")}<button type="button" onclick="piPickProof(${p.id})" class="${link}">Unggah bukti</button>`;
+  const view = `<a href="/api/purchase-invoices/${currentPurchaseInvoice.id}/payments/${p.id}/proof" target="_blank" rel="noopener" class="${link}">Lihat bukti</a>`;
+  if (p.proof_status === "terverifikasi") return `${pill("bg-emerald-50 text-emerald-700", "Terverifikasi")}${view}`;
+  return `${pill("bg-sky-50 text-sky-700", "Tersimpan")}${view}<button type="button" onclick="piPickProof(${p.id})" class="${link}">Ganti</button>${isAdmin() ? `<button type="button" onclick="piVerifyProof(${p.id})" class="${link} font-semibold">Verifikasi</button>` : ""}`;
 }
 
 // K-12: how each change to a faktur's paid amount came about.
@@ -16881,6 +17010,120 @@ function handleDeletePurchaseInvoiceClick(btnEl) {
   armPiButton(btnEl, ["bg-failed", "text-bg"], "text-failed", "Hapus", deletePurchaseInvoice);
 }
 
+// ── Alokasi DP Supplier ──────────────────────────────────────────────────────
+// Moves a DP that no faktur has absorbed onto a posted faktur of the same supplier. No new cash: the DP was paid
+// already, so only the faktur's paid amount and the DP balance change. Admin only (the server enforces it).
+let DPA = null;
+
+function dpReversible(p, pays, posted) {
+  return isAdmin() && posted && p.kind === "dp" && (p.note || "").startsWith("Alokasi DP manual") && !pays.some(x => x.reverses_id === p.id);
+}
+
+async function dpOpenAllocate(dpId) {
+  const resp = await fetch(`/api/account-payable/dp/${dpId}/targets`);
+  const d = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${d.detail || resp.status}`); return; }
+  if (!d.dp.can_allocate) { showToast("DP ini tidak punya sisa untuk dialokasikan."); return; }
+  if (!d.invoices.length) { showToast("Belum ada faktur posted supplier ini yang masih punya sisa tagihan."); return; }
+  DPA = { from: "dp", dps: [{ id: d.dp.id, po_number: d.dp.po_number, reference_no: d.dp.reference_no, free: d.dp.free, paid_at: d.dp.paid_at }],
+          invoices: d.invoices, supplier: d.dp.supplier_name };
+  dpRenderModal();
+}
+
+async function dpOpenAllocateForInvoice() {
+  if (!currentPurchaseInvoice) return;
+  const inv = currentPurchaseInvoice;
+  const resp = await fetch(`/api/account-payable/invoices/${inv.id}/dp-options`);
+  const d = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${d.detail || resp.status}`); return; }
+  if (!d.dps.length) { showToast("Tidak ada sisa DP supplier ini yang bisa dialokasikan."); return; }
+  DPA = { from: "invoice", dps: d.dps, invoices: [{ id: inv.id, invoice_number: inv.invoice_number, total: inv.total, amount_paid: inv.amount_paid,
+          outstanding: d.invoice.outstanding, po_number: inv.supplier_po_number }], supplier: inv.supplier_name || inv.supplier_name_snapshot };
+  dpRenderModal();
+}
+
+function dpRenderModal() {
+  const d = DPA;
+  const field = (label, html) => `<div><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">${label}</div>${html}</div>`;
+  const box = "w-full border border-line rounded-lg px-3 py-2 text-sm bg-bg2 text-ink";
+  const sel = (id, opts) => `<select id="${id}" onchange="dpRecalc(true)" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">${opts}</select>`;
+  const dpOpts = d.dps.map(x => `<option value="${x.id}">${esc(x.po_number)}${x.reference_no ? " · " + esc(x.reference_no) : ""} · sisa ${formatIDR(x.free)}</option>`).join("");
+  const invOpts = d.invoices.map(x => `<option value="${x.id}">${esc(x.invoice_number)} · sisa ${formatIDR(x.outstanding)}</option>`).join("");
+  openModal("Alokasikan DP ke Faktur", `<div class="space-y-3">
+    <div class="rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-xs px-3 py-2">DP sudah dibayarkan ke supplier sebelumnya. Proses ini hanya menghubungkan uang muka dengan tagihan, tanpa membuat pengeluaran kas kedua.</div>
+    <div class="grid grid-cols-2 gap-3">
+      ${field("Supplier", `<div class="${box}">${esc(d.supplier)}</div>`)}
+      ${field("Referensi uang muka", d.dps.length > 1 ? sel("dpa-dp", dpOpts) : `<div class="${box} text-accentDark font-semibold">${esc(d.dps[0].po_number)}${d.dps[0].reference_no ? " · " + esc(d.dps[0].reference_no) : ""}</div><input type="hidden" id="dpa-dp" value="${d.dps[0].id}">`)}
+      ${field("Faktur tujuan", d.invoices.length > 1 ? sel("dpa-inv", invOpts) : `<div class="${box} text-accentDark font-semibold">${esc(d.invoices[0].invoice_number)}</div><input type="hidden" id="dpa-inv" value="${d.invoices[0].id}">`)}
+      ${field("Total faktur", `<div id="dpa-total" class="${box}"></div>`)}
+      ${field("Sisa DP tersedia", `<div id="dpa-free" class="${box}"></div>`)}
+      ${field("Jumlah alokasi", `<input id="dpa-amount" type="text" inputmode="numeric" data-no-uppercase oninput="dpRecalc(false)" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">`)}
+    </div>
+    <div class="border-t border-line pt-2 text-sm space-y-1.5">
+      <div class="flex justify-between"><span class="text-muted">Tagihan sebelum alokasi</span><span id="dpa-before" class="tabular-nums font-semibold"></span></div>
+      <div class="flex justify-between"><span class="text-muted">DP dialokasikan</span><span id="dpa-take" class="tabular-nums font-semibold"></span></div>
+      <div class="flex justify-between items-center rounded-lg bg-accent/10 px-3 py-2"><span class="font-semibold text-accentDark">Tagihan setelah alokasi</span><span id="dpa-after" class="tabular-nums font-bold text-accentDark text-base"></span></div>
+    </div>
+    <div id="dpa-warn" class="hidden text-xs text-failed"></div>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+      <button id="dpa-go" type="button" onclick="dpSubmitAllocate()" class="px-4 py-1.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed">✓ Konfirmasi Alokasi</button></div></div>`);
+  dpRecalc(true);
+}
+
+function dpRecalc(resetAmount) {
+  const d = DPA; if (!d) return;
+  const dp = d.dps.find(x => String(x.id) === document.getElementById("dpa-dp").value);
+  const inv = d.invoices.find(x => String(x.id) === document.getElementById("dpa-inv").value);
+  const max = Math.min(dp.free, inv.outstanding);
+  const amtEl = document.getElementById("dpa-amount");
+  if (resetAmount) amtEl.value = String(max);
+  const amt = parseInt((amtEl.value || "").replace(/\D/g, ""), 10) || 0;
+  document.getElementById("dpa-total").textContent = formatIDR(inv.total);
+  document.getElementById("dpa-free").textContent = formatIDR(dp.free);
+  document.getElementById("dpa-before").textContent = formatIDR(inv.outstanding);
+  document.getElementById("dpa-take").textContent = "− " + formatIDR(amt);
+  document.getElementById("dpa-after").textContent = formatIDR(Math.max(inv.outstanding - amt, 0));
+  const warn = document.getElementById("dpa-warn");
+  const bad = amt <= 0 ? "Isi jumlah alokasi." : amt > dp.free ? `Melebihi sisa DP (${formatIDR(dp.free)}).` : amt > inv.outstanding ? `Melebihi sisa tagihan faktur (${formatIDR(inv.outstanding)}).` : "";
+  warn.textContent = bad; warn.classList.toggle("hidden", !bad);
+  document.getElementById("dpa-go").disabled = Boolean(bad);
+}
+
+async function dpSubmitAllocate() {
+  const invId = document.getElementById("dpa-inv").value;
+  const amount = parseInt((document.getElementById("dpa-amount").value || "").replace(/\D/g, ""), 10) || 0;
+  const resp = await fetch(`/api/purchase-invoices/${invId}/dp-allocation`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ spo_payment_id: parseInt(document.getElementById("dpa-dp").value, 10), amount }) });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${body.detail || resp.status}`); return; }
+  closeModal();
+  showToast(`DP ${formatIDR(amount)} dialokasikan ke ${body.invoice_number}.`, "success");
+  if (DPA && DPA.from === "invoice" && currentPurchaseInvoice) await openPurchaseInvoice(currentPurchaseInvoice.id);
+  else if (typeof apGo === "function" && location.hash.includes("account-payable")) apGo("dp");
+  DPA = null;
+}
+
+function dpOpenReverse(rowId) {
+  openModal("Batalkan Alokasi DP", `<div class="space-y-3">
+    <p class="text-sm text-muted">DP kembali menjadi saldo tersedia dan faktur menanggung nominal itu lagi. Tercatat di log aktivitas.</p>
+    <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Alasan</label>
+      <input id="dpa-reason" type="text" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></div>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Batal</button>
+      <button type="button" onclick="dpSubmitReverse(${rowId})" class="px-4 py-1.5 bg-failed text-bg rounded-lg text-sm font-medium hover:bg-failed/90">Batalkan Alokasi</button></div></div>`);
+}
+
+async function dpSubmitReverse(rowId) {
+  if (!currentPurchaseInvoice) return;
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/dp-allocation/${rowId}/reverse`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: document.getElementById("dpa-reason").value.trim() }) });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${body.detail || resp.status}`); return; }
+  closeModal();
+  showToast("Alokasi DP dibatalkan.", "success");
+  await openPurchaseInvoice(currentPurchaseInvoice.id);
+}
+
 // ── Three-Way Matching & Verifikasi Faktur ───────────────────────────────────
 let piMatch = null;
 
@@ -17075,15 +17318,86 @@ async function submitPurchaseInvoicePayment() {
   const method = document.getElementById("pi-payment-method").value;
   const ref = document.getElementById("pi-payment-ref").value.trim();
   if (method !== "cash" && !ref) { showToast(`Nomor referensi ${method === "giro" ? "giro" : "transfer"} wajib diisi.`); return; }
+  const file = document.getElementById("pi-payment-proof").files[0] || null;
+  if (file && !PI_PROOF_TYPES.includes(file.type)) { showToast("Bukti harus berupa JPEG, PNG, WebP, atau PDF."); return; }
+  if (file && file.size > 5 * 1024 * 1024) { showToast("Ukuran bukti maksimal 5 MB."); return; }
   const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/payments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, method, paid_date: document.getElementById("pi-payment-date").value || null, reference_no: ref || null }),
+    body: JSON.stringify({ amount, method, paid_date: document.getElementById("pi-payment-date").value || null, reference_no: ref || null,
+      source_account: document.getElementById("pi-payment-src").value.trim() || null, dest_account: document.getElementById("pi-payment-dst").value.trim() || null }),
   });
   if (!resp.ok) { const err = await resp.json(); showToast(`Gagal: ${err.detail}`); return; }
   const inv = await resp.json();
-  showToast(inv.payment_status === "lunas" ? "Faktur lunas." : "Pembayaran dicatat.", "success");
+  let proofMsg = "";
+  if (file) {
+    const row = [...inv.payments].filter(p => p.kind === "bayar").sort((a, b) => b.id - a.id)[0];
+    const up = row ? await piUploadProofFile(inv.id, row.id, file) : false;
+    proofMsg = up ? " Bukti diunggah." : " Pembayaran tercatat, tetapi bukti gagal diunggah (unggah ulang dari riwayat).";
+  }
+  showToast((inv.payment_status === "lunas" ? "Faktur lunas." : "Pembayaran dicatat.") + proofMsg, "success");
   await openPurchaseInvoice(inv.id);
+}
+
+const PI_PROOF_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+async function piUploadProofFile(invoiceId, paymentId, file) {
+  const resp = await fetch(`/api/purchase-invoices/${invoiceId}/payments/${paymentId}/proof?name=${encodeURIComponent(file.name)}`, {
+    method: "PUT", headers: { "Content-Type": file.type }, body: file });
+  if (!resp.ok) { const e = await resp.json().catch(() => ({})); showToast(`Gagal unggah bukti: ${e.detail || resp.status}`); return false; }
+  return true;
+}
+
+function piPickProof(paymentId) {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = PI_PROOF_TYPES.join(",");
+  input.onchange = async () => {
+    const f = input.files[0]; if (!f || !currentPurchaseInvoice) return;
+    if (!PI_PROOF_TYPES.includes(f.type)) { showToast("Bukti harus berupa JPEG, PNG, WebP, atau PDF."); return; }
+    if (f.size > 5 * 1024 * 1024) { showToast("Ukuran bukti maksimal 5 MB."); return; }
+    if (await piUploadProofFile(currentPurchaseInvoice.id, paymentId, f)) { showToast("Bukti diunggah.", "success"); await openPurchaseInvoice(currentPurchaseInvoice.id); }
+  };
+  input.click();
+}
+
+async function piVerifyProof(paymentId) {
+  if (!currentPurchaseInvoice) return;
+  const resp = await fetch(`/api/purchase-invoices/${currentPurchaseInvoice.id}/payments/${paymentId}/proof/verify`, { method: "POST" });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(`Gagal: ${body.detail || resp.status}`); return; }
+  showToast("Bukti pembayaran diverifikasi.", "success");
+  await openPurchaseInvoice(currentPurchaseInvoice.id);
+}
+
+// Live summary under the payment form: debt before / this payment / debt after, plus the three things an approver looks for.
+function piPayRecalc() {
+  const inv = currentPurchaseInvoice; if (!inv) return;
+  const method = document.getElementById("pi-payment-method").value;
+  const amount = priceValue(document.getElementById("pi-payment-amount")) || 0;
+  const accounts = method !== "cash";
+  document.getElementById("pi-pay-src-wrap").classList.toggle("hidden", !accounts);
+  document.getElementById("pi-pay-dst-wrap").classList.toggle("hidden", !accounts);
+  const ref = document.getElementById("pi-payment-ref").value.trim();
+  const tick = (ok, label) => `<span class="inline-flex items-center gap-1 ${ok ? "text-done" : "text-muted"}"><b>${ok ? "✓" : "○"}</b>${label}</span>`;
+  const after = Math.max(inv.outstanding - amount, 0);
+  document.getElementById("pi-pay-summary").innerHTML = `<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <span class="text-muted">Sisa utang <b class="text-ink tabular-nums">${formatIDR(inv.outstanding)}</b> − pembayaran <b class="text-ink tabular-nums">${formatIDR(amount)}</b> = sisa setelah bayar <b class="text-accentDark tabular-nums">${formatIDR(after)}</b></span>
+      <span class="flex flex-wrap gap-x-3">${accounts ? tick(Boolean(document.getElementById("pi-payment-dst").value.trim()), "rekening tujuan") + tick(Boolean(document.getElementById("pi-payment-src").value.trim()), "rekening sumber") : ""}${tick(Boolean(ref) || !accounts, "nomor referensi")}${tick(Boolean(document.getElementById("pi-payment-proof").files[0]), "bukti")}</span></div>
+    <div class="text-[11px] text-muted mt-1">Bukti belum wajib, tetapi transfer tanpa bukti tampil di Rekonsiliasi sebagai “Bukti pembayaran pending”. Pembayaran ini otomatis masuk Kas Keluar.</div>`;
+}
+
+async function piPayInit() {
+  const list = document.getElementById("pi-src-list");
+  if (!list.dataset.loaded) {
+    try {
+      const r = await fetch("/api/transfer-accounts");
+      if (r.ok) { list.innerHTML = (await r.json()).map(a => `<option value="${esc(a.name)}"></option>`).join(""); list.dataset.loaded = "1"; }
+    } catch (_) {}
+  }
+  document.getElementById("pi-payment-proof").value = "";
+  document.getElementById("pi-payment-src").value = "";
+  document.getElementById("pi-payment-dst").value = "";
+  piPayRecalc();
 }
 
 // ── Cashier: customer nota (Nota Penjualan) ──────────────────────────────────

@@ -788,6 +788,8 @@ class PurchaseInvoicePaymentRequest(BaseModel):
     paid_date: str | None = None
     reference_no: str | None = None
     note: str | None = None
+    source_account: str | None = None  # the shop's account the money left from
+    dest_account: str | None = None  # the supplier's account it went to
 
 
 class PurchaseInvoicePaymentOut(BaseModel):
@@ -799,6 +801,18 @@ class PurchaseInvoicePaymentOut(BaseModel):
     reference_no: str | None = None
     note: str | None = None
     created_by: str | None = None
+    reverses_id: int | None = None
+    spo_payment_id: int | None = None
+    source_account: str | None = None
+    dest_account: str | None = None
+    proof_name: str | None = None
+    proof_status: str | None = None  # None = no proof yet | tersimpan | terverifikasi
+    proof_by: str | None = None
+    proof_at: str | None = None
+    verified_by: str | None = None
+    verified_at: str | None = None
+    kk_number: str | None = None
+    has_proof: bool = False
 
 
 class PurchaseInvoiceOut(BaseModel):
@@ -858,6 +872,15 @@ class InvoiceHoldRequest(BaseModel):
 
 
 class InvoiceExceptionRequest(BaseModel):
+    reason: str
+
+
+class DpAllocateRequest(BaseModel):
+    spo_payment_id: int
+    amount: int
+
+
+class DpReverseRequest(BaseModel):
     reason: str
 
 

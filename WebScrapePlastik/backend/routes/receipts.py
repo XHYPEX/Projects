@@ -102,6 +102,27 @@ def _clean_name(raw: str | None) -> str | None:
     return stripped or None
 
 
+def _has_installation(items: list[dict] | None) -> bool:
+    """A nota with work on the car (a line with a technician) needs the plate and the customer's phone; a walk-in
+    purchase (owner, 21-10-2026: "orang umum", motor, belanja biasa) may leave both empty."""
+    return any((i.get("_assign") or {}).get("technician_ids") for i in items or [])
+
+
+def _check_plate(region: str | None, number: str | None, suffix: str | None, required: bool) -> tuple[str, str, str]:
+    region, number, suffix = (region or "").strip().upper(), (number or "").strip(), (suffix or "").strip().upper()
+    if not (region or number or suffix):
+        if required:
+            raise HTTPException(status_code=422, detail="No. plat wajib diisi bila ada barang yang dipasang (teknisi).")
+        return "", "", ""
+    if region not in PLATE_CODES:
+        raise HTTPException(status_code=422, detail=f"Kode wilayah plat tidak dikenal: {region or '-'}")
+    if not NUMBER_RE.match(number):
+        raise HTTPException(status_code=422, detail="Nomor plat harus 1-4 digit.")
+    if not SUFFIX_RE.match(suffix):
+        raise HTTPException(status_code=422, detail="Huruf belakang plat harus 1-3 huruf.")
+    return region, number, suffix
+
+
 def _validate_items(items: list[ReceiptItemRequest]) -> list[dict]:
     validated: list[dict] = []
     for item in items:
@@ -231,15 +252,6 @@ async def _require_customer(loop, customer_id: int, allow_inactive: bool = False
 
 @router.post("/receipts", response_model=ReceiptResponse, status_code=201)
 async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_current_user)):
-    plate_region = req.plate_region.upper()
-    plate_suffix = req.plate_suffix.upper()
-
-    if plate_region not in PLATE_CODES:
-        raise HTTPException(status_code=422, detail=f"Kode wilayah plat tidak dikenal: {req.plate_region}")
-    if not NUMBER_RE.match(req.plate_number):
-        raise HTTPException(status_code=422, detail="Nomor plat harus 1-4 digit.")
-    if not SUFFIX_RE.match(plate_suffix):
-        raise HTTPException(status_code=422, detail="Huruf belakang plat harus 1-3 huruf.")
     if not req.items:
         raise HTTPException(status_code=422, detail="Minimal harus ada satu item.")
     if req.status is not None and req.status != "void":
@@ -262,8 +274,10 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     # The phone is required unless a master customer is picked, in which case it
     # defaults to that customer's number (see _resolve_receipt_customer).
     customer_phone = normalize_phone(req.customer_phone)
-    if not customer_phone and req.customer_id is None:
-        raise HTTPException(status_code=422, detail="Nomor HP wajib diisi.")
+    installing = _has_installation(_validate_items(req.items))
+    plate_region, plate_number, plate_suffix = _check_plate(req.plate_region, req.plate_number, req.plate_suffix, installing)
+    if not customer_phone and req.customer_id is None and installing:
+        raise HTTPException(status_code=422, detail="Nomor HP wajib diisi bila ada barang yang dipasang (teknisi).")
     if customer_phone and not PHONE_RE.match(customer_phone):
         raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit (boleh diawali tanda +).")
     customer_name = _clean_name(req.customer_name)
@@ -294,7 +308,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     receipt_id = str(uuid4())
     try:
         result = await loop.run_in_executor(
-            None, create_receipt, receipt_id, plate_region, req.plate_number, plate_suffix, items, req.discount,
+            None, create_receipt, receipt_id, plate_region, plate_number, plate_suffix, items, req.discount,
             req.amount_paid, req.status, customer_phone, customer_name, req.started_at, req.payment_method,
             req.customer_id, transfer_sender, transfer_account, user["username"], req.work_status,
             _clean_extra(req, False), _override_reason(req, user), req.payment_confirmed, price_actor(user),
@@ -430,18 +444,15 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     else:
         _refuse_if_closed(existing)
 
+    installing = _has_installation(_validate_items(req.items)) if req.items else False
     plate_region: str | None = None
     plate_suffix: str | None = None
-    if req.plate_region is not None:
-        plate_region = req.plate_region.upper()
-        if plate_region not in PLATE_CODES:
-            raise HTTPException(status_code=422, detail=f"Kode wilayah plat tidak dikenal: {req.plate_region}")
-    if req.plate_number is not None and not NUMBER_RE.match(req.plate_number):
-        raise HTTPException(status_code=422, detail="Nomor plat harus 1-4 digit.")
-    if req.plate_suffix is not None:
-        plate_suffix = req.plate_suffix.upper()
-        if not SUFFIX_RE.match(plate_suffix):
-            raise HTTPException(status_code=422, detail="Huruf belakang plat harus 1-3 huruf.")
+    plate_number: str | None = None
+    if req.plate_region is not None or req.plate_number is not None or req.plate_suffix is not None:
+        plate_region, plate_number, plate_suffix = _check_plate(
+            req.plate_region if req.plate_region is not None else existing["plate_region"],
+            req.plate_number if req.plate_number is not None else existing["plate_number"],
+            req.plate_suffix if req.plate_suffix is not None else existing["plate_suffix"], installing)
 
     if req.items is not None and not req.items:
         raise HTTPException(status_code=422, detail="Minimal harus ada satu item.")
@@ -465,9 +476,10 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     if req.customer_phone is not None:
         customer_phone = normalize_phone(req.customer_phone)
         if not customer_phone:
-            if req.customer_id is None:
-                raise HTTPException(status_code=422, detail="Nomor HP wajib diisi.")
-            customer_phone = None  # blank next to a picked customer: take that customer's number
+            if req.customer_id is None and installing:
+                raise HTTPException(status_code=422, detail="Nomor HP wajib diisi bila ada barang yang dipasang (teknisi).")
+            # Blank next to a picked customer: take that customer's number. Blank on a walk-in nota: no phone.
+            customer_phone = None if req.customer_id is not None else ""
         elif not PHONE_RE.match(customer_phone):
             raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit (boleh diawali tanda +).")
     if req.customer_id is not None:
@@ -513,7 +525,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             update_receipt,
             receipt_id,
             plate_region,
-            req.plate_number,
+            plate_number,
             plate_suffix,
             items,
             req.discount,

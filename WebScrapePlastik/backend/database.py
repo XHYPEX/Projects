@@ -2477,7 +2477,12 @@ _RECEIPT_SELECT = f"""SELECT r.*,
         (SELECT COUNT(*) FROM receipts x WHERE x.preorder_id = r.preorder_id AND x.status <> 'void') AS invoice_count,
         (SELECT COALESCE(SUM(p.amount),0) FROM receipt_payments p WHERE p.receipt_id = r.id AND p.state = 'pending') AS pending_amount,
         (SELECT s.service_no FROM service_orders s WHERE s.id = r.service_order_id) AS service_no,
-        (SELECT e.name FROM employees e WHERE e.id = r.sales_employee_id) AS sales_employee_name
+        (SELECT e.name FROM employees e WHERE e.id = r.sales_employee_id) AS sales_employee_name,
+        -- A nota with work on the car: a vehicle plate, a technician on a line, or a jasa line. Without any of them
+        -- (a walk-in purchase: motor, belanja biasa) the Pengerjaan status means nothing and is not shown.
+        (EXISTS (SELECT 1 FROM receipt_item_technicians t WHERE t.receipt_id = r.id)
+         OR EXISTS (SELECT 1 FROM receipt_items ji WHERE ji.receipt_id = r.id AND ji.item_type = 'jasa')
+         OR r.preorder_id IS NOT NULL OR r.service_order_id IS NOT NULL OR TRIM(r.plate_full) <> '') AS has_job
     FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id"""
 
 
@@ -2769,7 +2774,7 @@ def create_receipt(
     allow_discount_below_cost: bool = False,
     allow_discount_stack: bool = False,
 ) -> dict:
-    plate_full = f"{plate_region} {plate_number} {plate_suffix}"
+    plate_full = " ".join(x for x in (plate_region, plate_number, plate_suffix) if x)  # '' for a walk-in nota
     if payment_method != "transfer":
         transfer_sender = transfer_account = None
     # K-18: an unconfirmed transfer/QRIS is Pending -- recorded, but not counted as paid.
@@ -2854,8 +2859,9 @@ def create_receipt(
         )
         _apply_receipt_stock_delta(con, receipt_id, {}, after_holdings, walkin=({}, after_holdings),
                                    override_reason=stock_override_reason, by=created_by)
-        _log_receipt_event(con, receipt_id, "created", {
-            "draft": "Draft dibuat", "pengerjaan": "Nota dibuat, pengerjaan dimulai",
+        walk_in = not plate_full and not any((i.get("_assign") or {}).get("technician_ids") or i.get("item_type") == "jasa" for i in resolved_items)
+        _log_receipt_event(con, receipt_id, "created", "Draft dibuat" if work_status == "draft" else "Nota dibuat (pembelian langsung)" if walk_in else {
+            "pengerjaan": "Nota dibuat, pengerjaan dimulai",
             "belum": "Nota dibuat, belum dikerjakan", "selesai": "Nota dibuat, pengerjaan selesai",
         }.get(work_status, "Nota dibuat"), created_by)
         if work_status == "selesai":
@@ -3171,7 +3177,7 @@ def update_receipt(
         new_plate_region = plate_region if plate_region is not None else existing["plate_region"]
         new_plate_number = plate_number if plate_number is not None else existing["plate_number"]
         new_plate_suffix = plate_suffix if plate_suffix is not None else existing["plate_suffix"]
-        new_plate_full = f"{new_plate_region} {new_plate_number} {new_plate_suffix}"
+        new_plate_full = " ".join(x for x in (new_plate_region, new_plate_number, new_plate_suffix) if x)
 
         new_customer_phone = customer_phone if customer_phone is not None else existing["customer_phone"]
         # name is nullable, so "clear it" (None) is distinct from "leave unchanged" — the route

@@ -79,9 +79,9 @@ class ReceiptExtra(BaseModel):
 class ReceiptRequest(ReceiptExtra):
     # Admin only: why this sale may use stock reserved for a Sales Order customer (K-02).
     stock_override_reason: str | None = None
-    plate_region: str
-    plate_number: str
-    plate_suffix: str
+    plate_region: str = ""  # empty for a walk-in purchase (no installation)
+    plate_number: str = ""  # empty for a walk-in purchase (no installation)
+    plate_suffix: str = ""  # empty for a walk-in purchase (no installation)
     # Required unless customer_id is given (then it defaults to that customer's
     # phone) -- the route enforces it, so the old "phone is mandatory" message
     # still comes from one place.
@@ -205,6 +205,7 @@ class ReceiptItemOut(BaseModel):
 
 class ReceiptOut(ReceiptExtra):
     sales_employee_name: str | None = None
+    has_job: bool = True  # False = walk-in purchase: no technician and no jasa line, no Pengerjaan status shown
     revision: str | None = None
     id: str
     plate_region: str

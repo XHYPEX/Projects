@@ -308,7 +308,7 @@
 
     /* Kasir item table (Gambar 01): header and rows share one template. Every cell has an explicit column per
        width so a row never reflows unexpectedly: phone = stacked, laptop = Teknisi/Sales on a second line,
-       >=1536px = one line like the mockup (Aksi pinned to row 1 at every width). */
+       >=1700px = one line like the mockup (Aksi pinned to row 1 at every width). */
     .kasir-grid { display: grid; column-gap: 0.75rem; row-gap: 0.5rem; align-items: center; grid-template-columns: 1.1rem 1.5rem minmax(0, 1fr) minmax(0, 1fr) 2.25rem; }
     .kasir-grid > .k-chk { grid-column: 1; } .kasir-grid > .k-no { grid-column: 2; } .kasir-grid > .k-prod { grid-column: 3 / span 2; }
     .kasir-grid > .k-qty { grid-column: 3; } .kasir-grid > .k-price { grid-column: 4; } .kasir-grid > .k-disc { grid-column: 3; } .kasir-grid > .k-sub { grid-column: 4; }
@@ -316,26 +316,26 @@
     .kasir-grid > .k-full { grid-column: 1 / -1; }
     .kasir-grid-head > .k-tech, .kasir-grid-head > .k-sales { display: none; }
     @media (min-width: 1024px) {
-      .kasir-grid { grid-template-columns: 1.1rem 1.5rem minmax(0, 1fr) 6.25rem 6.5rem 6.25rem 6.75rem 2.25rem; }
+      .kasir-grid { grid-template-columns: 1.1rem 1.5rem minmax(0, 1fr) 6.25rem 8.75rem 7rem 7.75rem 2.25rem; }
       .kasir-grid > .k-prod { grid-column: 3; } .kasir-grid > .k-qty { grid-column: 4; } .kasir-grid > .k-price { grid-column: 5; }
       .kasir-grid > .k-disc { grid-column: 6; } .kasir-grid > .k-sub { grid-column: 7; } .kasir-grid > .k-act { grid-column: 8; grid-row: 1; }
       .kasir-grid > .k-tech { grid-column: 3 / span 2; } .kasir-grid > .k-sales { grid-column: 5 / span 3; }
     }
-    @media (min-width: 1536px) {
-      .kasir-grid { grid-template-columns: 1.1rem 1.25rem minmax(11rem, 1fr) 5.75rem 6.5rem 5.75rem 6.75rem minmax(8.5rem, 0.6fr) minmax(7.5rem, 0.5fr) 2.25rem; column-gap: 0.6rem; }
+    @media (min-width: 1700px) {
+      .kasir-grid { grid-template-columns: 1.1rem 1.25rem minmax(0, 1fr) 6rem 8.75rem 7rem 7.75rem 10rem 9rem 2.25rem; column-gap: 0.6rem; }
       .kasir-grid > .k-tech { grid-column: 8; grid-row: 1; } .kasir-grid > .k-sales { grid-column: 9; grid-row: 1; } .kasir-grid > .k-act { grid-column: 10; grid-row: 1; }
       .kasir-grid-head > .k-tech, .kasir-grid-head > .k-sales { display: block; }
     }
     /* Informasi Transaksi: date and number side by side unless the card is narrow (three cards in a row on 1536-1800px). */
     .kasir-info-grid { grid-template-columns: minmax(0, 1fr); }
-    @media (min-width: 640px) and (max-width: 1535px), (min-width: 1800px) { .kasir-info-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+    @media (min-width: 640px) and (max-width: 1279px) { .kasir-info-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
     .kasir-tab { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.9rem; font-size: 0.875rem; font-weight: 600; color: #6B6B66;
       border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .kasir-tab:hover { color: #141413; }
     .kasir-tab.is-active { color: #C4633F; border-bottom-color: #D97757; }
     .kasir-method { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: #141413; padding: 0.35rem 0.25rem; border-radius: 0.5rem; cursor: pointer; }
     .kasir-method:hover { background: #F7F5F0; }
-    .kasir-pick { width: 100%; display: flex; align-items: center; gap: 0.35rem; min-height: 2.25rem; border: 1px solid #E5E3DC; border-radius: 0.5rem;
+    .kasir-pick { width: 100%; min-width: 0; overflow: hidden; display: flex; align-items: center; gap: 0.35rem; min-height: 2.25rem; border: 1px solid #E5E3DC; border-radius: 0.5rem;
       padding: 0.35rem 0.5rem 0.35rem 0.65rem; font-size: 0.8125rem; text-align: left; background: #FFFFFF; color: #141413; }
     .kasir-pick:hover:not(:disabled) { border-color: rgba(217, 119, 87, 0.6); }
     .kasir-pick:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -1135,7 +1135,7 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label for="customer-phone" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="text-failed">*</span></label>
+                    <label for="customer-phone" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="normal-case font-normal">(wajib bila ada pemasangan)</span></label>
                     <input id="customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off"
                     class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     oninput="this.value=this.value.replace(/[^0-9+\s\-.()]/g,''); markActiveTabDirty(); onCashierPhoneEdited();" />
@@ -1169,12 +1169,12 @@
                   <div><label for="veh-year-input" class="sr-only">Tahun</label><input id="veh-year-input" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="2020" oninput="this.value=this.value.replace(/[^0-9]/g,'');" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" /></div>
                 </div>
                 <div>
-                  <label for="plate-region" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">No. Plat <span class="text-failed">*</span></label>
+                  <label for="plate-region" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">No. Plat <span class="normal-case font-normal">(wajib bila ada pemasangan)</span></label>
                   <div class="flex items-center gap-2">
                     <svg class="text-muted shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6.5" width="19" height="11" rx="2"/><path d="M6 12h3M11 12h7"/></svg>
                     <input id="plate-region" type="text" maxlength="2" placeholder="B"
                     class="w-14 text-center uppercase border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,''); validatePlateRegion();" />
+                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,''); validatePlateRegion(); renderCashierWorkUi();" />
                   <span class="text-muted" aria-hidden="true">·</span>
                   <input id="plate-number" type="text" maxlength="4" inputmode="numeric" placeholder="1234" aria-label="Nomor plat"
                     class="w-[4.5rem] text-center border border-line rounded-lg px-2 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -1220,7 +1220,7 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-accentDark" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                   Tambah Item
                 </button>
-                <button id="add-service-btn" type="button" onclick="addServiceRow()"
+                <button id="add-service-btn" type="button" onclick="kasirAddService()"
                   class="inline-flex items-center gap-1.5 px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-muted" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/></svg>
                   Tambah Jasa
@@ -1383,6 +1383,7 @@
 
           <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] px-4 py-4">
             <div class="text-sm font-semibold text-ink mb-2">Status Transaksi</div>
+            <div id="kasir-work-block" class="mb-3">
             <label for="kasir-work-target" class="block text-xs text-muted mb-1">Status Pengerjaan</label>
             <div class="flex items-center gap-2">
               <select id="kasir-work-target" class="select-chevron flex-1 min-w-0 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted">
@@ -1391,7 +1392,8 @@
               </select>
               <button id="cashier-status-btn" type="button" onclick="openWorkStatusModal()" class="hidden px-3 py-2 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Ubah</button>
             </div>
-            <div class="block text-xs text-muted mt-3 mb-1">Status Pembayaran</div>
+            </div>
+            <div class="block text-xs text-muted mb-1">Status Pembayaran</div>
             <div id="kasir-pay-status" class="border border-line rounded-lg px-3 py-2 text-sm bg-bg2/50 text-ink">Belum Bayar</div>
             <p class="text-[11px] text-muted mt-1">Dihitung dari pembayaran sah, tidak dipilih manual.</p>
             <label for="remarks-input" class="block text-xs text-muted mt-3 mb-1">Keterangan <span class="text-muted/70">(Opsional)</span></label>
@@ -1399,7 +1401,7 @@
               class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40"></textarea>
 
             <div class="mt-3 grid gap-2">
-              <button id="cashier-draft-btn" type="button" onclick="saveReceipt('draft')" class="hidden w-full px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Draft</button>
+              <button id="cashier-draft-btn" type="button" onclick="kasirDraftClick()" class="hidden w-full px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Draft</button>
               <div id="kasir-main-wrap" class="relative hidden">
                 <div class="flex">
                   <button id="kasir-main-btn" type="button" onclick="kasirStartSave('print')"
@@ -4894,7 +4896,9 @@ function shouldUppercase(el) {
   if (!el) return false;
   const tag = el.tagName;
   if (tag !== "INPUT" && tag !== "TEXTAREA") return false;
-  if (el.dataset.noUppercase !== undefined) return false;
+  // Owner (21-10-2026): every typed field is UPPERCASE, notes and names included. Only data-keep-case (login
+  // usernames) and the credential / non-text types below keep what was typed.
+  if (el.dataset.keepCase !== undefined) return false;
   if (tag === "INPUT" && UPPERCASE_SKIP_TYPES.has((el.type || "text").toLowerCase())) return false;
   if (el.autocomplete === "username" || el.autocomplete === "current-password" || el.autocomplete === "new-password") return false;
   return true;
@@ -4946,7 +4950,7 @@ function showAuthOverlay(mode) {
       <div class="space-y-3">
         <div>
           <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Username</label>
-          <input id="setup-username" type="text" data-no-uppercase autocomplete="username"
+          <input id="setup-username" type="text" data-no-uppercase data-keep-case autocomplete="username"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         </div>
         <div>
@@ -4965,7 +4969,7 @@ function showAuthOverlay(mode) {
       <div class="space-y-3">
         <div>
           <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Username</label>
-          <input id="login-username" type="text" data-no-uppercase autocomplete="username"
+          <input id="login-username" type="text" data-no-uppercase data-keep-case autocomplete="username"
             class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
         </div>
         <div>
@@ -5402,6 +5406,7 @@ function renderPageHeader() {
   const tile = document.querySelector("#topbar-icon svg");
   if (sub) sub.textContent = meta ? meta.subtitle : "";
   if (tile) tile.innerHTML = meta ? meta.icon : "";
+  if (currentRoute() === "/cashier") kasirTopbar(getActiveTab());
   renderSidebarDate();
 }
 
@@ -6327,6 +6332,7 @@ function setRowTechs(row, techs) {
   if (techs.length) row.dataset.techs = JSON.stringify(techs); else delete row.dataset.techs;
   refreshRowAssign(row);
   markActiveTabDirty();
+  renderCashierWorkUi();
 }
 function clearRowTechs(row) { if (!isCashierReadOnly()) setRowTechs(row, []); }
 function refreshRowAssign(row) {
@@ -6335,15 +6341,15 @@ function refreshRowAssign(row) {
   const blank = isBlankItemRow(row);
   const techs = rowTechs(row);
   const chev = `<svg class="ml-auto shrink-0 text-muted" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
-  techBtn.innerHTML = (techs.length ? `<span class="truncate font-medium">${esc(techs.map(t => t.name).join(", "))}</span>` : `<span class="ph truncate">Pilih teknisi (opsional)</span>`) + chev;
+  techBtn.innerHTML = (techs.length ? `<span class="min-w-0 truncate font-medium">${esc(techs.map(t => t.name).join(", "))}</span>` : `<span class="ph min-w-0 truncate">Pilih teknisi (opsional)</span>`) + chev;
   techBtn.title = techs.length ? techs.map(t => t.name + (t.is_active === false ? " (nonaktif)" : "")).join(", ") : "";
   row.querySelector(".item-tech-clear").classList.toggle("hidden", !techs.length || isCashierReadOnly());
   row.querySelector(".item-work-link").classList.toggle("hidden", !(techs.length && row.dataset.itemId && getActiveTab()?.workStatus && getActiveTab().workStatus !== "draft"));
   const tab = getActiveTab();
   const own = row.dataset.salesId ? row.dataset.salesName : "";
   const main = !own && tab && tab.salesEmployeeId ? tab.salesEmployeeName : "";
-  row.querySelector(".item-sales").innerHTML = (own ? `<span class="truncate font-medium">${esc(own)}</span>`
-    : main ? `<span class="truncate">${esc(main)} <span class="ph">(utama)</span></span>` : `<span class="ph truncate">Pilih sales (opsional)</span>`) + chev;
+  row.querySelector(".item-sales").innerHTML = (own ? `<span class="min-w-0 truncate font-medium">${esc(own)}</span>`
+    : main ? `<span class="min-w-0 truncate">${esc(main)} <span class="ph">(utama)</span></span>` : `<span class="ph min-w-0 truncate">Pilih sales (opsional)</span>`) + chev;
   for (const b of [techBtn, row.querySelector(".item-sales")]) b.classList.toggle("invisible", blank);
 }
 function refreshAllRowAssign() { document.querySelectorAll("#item-rows .item-row").forEach(refreshRowAssign); }
@@ -6514,7 +6520,7 @@ function kasirSearchAdd(item) {
     q.focus();
   } else { closeModal(); kasirRefocus(); }
 }
-function kasirAddService() { if (!isCashierReadOnly()) addServiceRow(); }
+function kasirAddService() { if (!isCashierReadOnly()) { addServiceRow(); renderCashierWorkUi(); } }
 function kasirRefocus() { if (currentRoute() === "/cashier") itemEntryInput()?.focus(); }
 
 // Tabs Daftar Item / Catatan Pengerjaan, row selection
@@ -6567,7 +6573,8 @@ function kasirPayHint() {
     : !amt ? "Kosong = belum bayar. Isi nominal DP atau pembayaran penuh."
     : amt > cashierLastTotal ? "Jumlah bayar melebihi total."
     : ["transfer", "qris"].includes(m) ? "Setelah disimpan, detail rekening / konfirmasi dana diisi di jendela pembayaran."
-    : amt < cashierLastTotal ? `DP ${formatIDR(amt)}, sisa ${formatIDR(cashierLastTotal - amt)}.` : "Dibayar penuh.";
+    : (amt < cashierLastTotal ? `DP ${formatIDR(amt)}, sisa ${formatIDR(cashierLastTotal - amt)}.` : "Dibayar penuh.")
+      + " Dicatat saat Simpan Nota (Draft tidak menerima pembayaran).";
 }
 function kasirToggleSaveMenu(force) {
   const m = document.getElementById("kasir-save-menu");
@@ -6576,6 +6583,21 @@ function kasirToggleSaveMenu(force) {
 document.addEventListener("click", e => {
   if (!e.target.closest("#kasir-main-wrap")) document.getElementById("kasir-save-menu")?.classList.add("hidden");
 });
+
+// A Draft takes no money (and no stock). With a Jumlah Bayar typed in, Simpan Draft would silently drop the DP, so the
+// cashier is asked: save it as a Nota with that DP (car left at the shop, work later), or a Draft without payment.
+function kasirDraftClick() {
+  const amt = priceValue(document.getElementById("amount-paid-input"));
+  const m = kasirMethod();
+  if (!(amt > 0 && m !== "piutang")) { saveReceipt("draft"); return; }
+  openModal("Draft belum bisa menerima pembayaran", `<div class="space-y-3 text-sm">
+    <p class="text-ink">Jumlah Bayar <b>${formatIDR(amt)}</b> (${esc(payMethodLabel(m))}) sudah diisi, tetapi Draft tidak mencatat pembayaran apa pun.</p>
+    ${grNote("blue", "Pelanggan sudah bayar DP dan mobil ditinggal? Simpan sebagai <b>Nota</b> (Belum Dikerjakan): DP tercatat, nota tetap bisa diubah dan ditambah barang, pengerjaan dimulai nanti.")}
+    <div class="flex flex-wrap justify-end gap-2 pt-1">
+      <button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
+      <button type="button" class="${GR_BTN3}" onclick="closeModal(); kasirPayAmount(0); saveReceipt('draft')">Simpan Draft tanpa pembayaran</button>
+      <button type="button" class="${GR_BTN}" onclick="closeModal(); kasirStartSave('nota')">Simpan Nota + DP ${formatIDR(amt)}</button></div></div>`);
+}
 
 // Review (06) -> Konfirmasi (07) -> save, then payment and print as chosen. Printing never moves stock or money.
 let kasirSaveCtx = null;
@@ -6628,7 +6650,9 @@ function kasirConfirm() {
   const rows = [...document.querySelectorAll("#item-rows .item-row")].filter(r => !isBlankItemRow(r));
   const jobs = rows.filter(r => rowTechs(r).length).length;
   const target = document.getElementById("kasir-work-target").value;
-  const def = c.choice === "start" || (c.choice !== "nota" && target === "pengerjaan") ? "start" : "nota";
+  const job = kasirHasJob(tab);
+  const def = job && (c.choice === "start" || (c.choice !== "nota" && target === "pengerjaan")) ? "start" : "nota";
+  if (!job && c.action === "start") c.action = "nota";
   c.action = c.action || def;
   const opt = (key, title, sub, badge = "") => `<label class="flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer ${c.action === key ? "border-accent bg-accent/5" : "border-line hover:bg-bg2"}">
       <input type="radio" name="kasir-act" value="${key}" ${c.action === key ? "checked" : ""} onchange="kasirSaveCtx.action=this.value; kasirConfirm()" class="accent-[#D97757]">
@@ -6642,8 +6666,8 @@ function kasirConfirm() {
       ${grStat("blue", "Barang", `${rows.length} Item`, `${jobs} pemasangan tercatat`)}</div>
     <div class="border border-line rounded-xl p-4 space-y-2"><div class="text-sm font-semibold text-ink mb-1">Tindakan Simpan</div>
       ${tab.receiptId && tab.workStatus !== "draft" ? "" : opt("draft", "Simpan Draft", "Belum final, dapat dilanjutkan")}
-      ${opt("nota", "Simpan Nota", "Simpan transaksi tanpa memulai kerja")}
-      ${opt("start", "Simpan & Mulai Pengerjaan", "", jobs ? `<span class="ml-2">${grPill("green", "Disarankan")}</span>` : "")}</div>
+      ${job ? opt("nota", "Simpan Nota", "Simpan transaksi tanpa memulai kerja") : opt("nota", "Simpan Nota", "Pembelian langsung, tanpa pengerjaan")}
+      ${job ? opt("start", "Simpan & Mulai Pengerjaan", "", jobs ? `<span class="ml-2">${grPill("green", "Disarankan")}</span>` : "") : ""}</div>
     <div class="text-sm text-ink">Pembayaran: <span class="font-medium">${c.action === "draft" ? "Draft belum menerima pembayaran." : esc(payLine)}</span></div>
     <label class="flex items-center gap-2 text-sm"><input id="kasir-print-after" type="checkbox" class="accent-[#D97757]" ${c.print ? "checked" : ""} ${c.action === "draft" ? "disabled" : ""} onchange="kasirSaveCtx.print=this.checked"> Cetak nota setelah disimpan</label>
     ${grNote("amber", "Simpan dan cetak tidak otomatis mengubah status menjadi Lunas atau Pekerjaan Selesai. Cetak ulang tidak mengubah stok maupun pembayaran.")}
@@ -6656,14 +6680,15 @@ async function kasirDoSave() {
   if (!c || !tab) return;
   const btn = document.getElementById("kasir-confirm-btn");
   if (btn) btn.disabled = true;
-  const mode = { draft: "draft", nota: "belum", start: "start" }[c.action];
+  // A walk-in purchase has no work: it is saved with its Pengerjaan already done, so paying closes it.
+  const mode = c.action === "nota" && !kasirHasJob(tab) ? "selesai" : { draft: "draft", nota: "belum", start: "start" }[c.action];
   const paying = c.action !== "draft" && c.method !== "piutang" && c.amount > 0;
   const direct = paying && ["cash", "debit"].includes(c.method);
   const creating = !tab.receiptId;
   closeModal();
   const ok = await saveReceipt(mode, { quiet: true, payNow: direct && creating ? { amount_paid: c.amount, payment_method: c.method } : null });
   if (!ok) return;
-  let msg = { draft: "Draft disimpan.", belum: "Nota disimpan.", start: "Nota disimpan, pengerjaan dimulai." }[mode];
+  let msg = { draft: "Draft disimpan.", belum: "Nota disimpan.", start: "Nota disimpan, pengerjaan dimulai.", selesai: "Nota disimpan." }[mode];
   if (direct && !creating) {
     const r = await fetch(`/api/receipts/${encodeURIComponent(tab.receiptId)}/payments`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: c.amount, method: c.method, note: c.amount < tab.total ? "DP" : null }) });
@@ -6693,6 +6718,32 @@ document.addEventListener("keydown", e => {
   else kasirAddService();
 });
 
+// A walk-in purchase (no plate, no technician on any line, no jasa line, not from a Sales Order / Service) has no
+// work to follow: its Pengerjaan status is not shown and saving it closes the work at once (Lunas = selesai).
+// A car left at the shop has its plate filled in, so it keeps its Pengerjaan even before a technician is picked.
+function kasirHasJob(tab) {
+  if (!tab) return false;
+  if (tab.preorderId) return true;
+  if (tab.tabId === activeCashierTabId) {
+    if (["plate-region", "plate-number", "plate-suffix"].some(id => document.getElementById(id)?.value.trim())) return true;
+    return [...document.querySelectorAll("#item-rows .item-row")].some(r => !isBlankItemRow(r) && (rowTechs(r).length || r.dataset.itemType === "jasa"));
+  }
+  return tab.hasJob !== false;
+}
+// Like the other modules (Purchase Order, Goods Receipt), the top bar names the open document: its number, then who
+// it is for and where it stands.
+function kasirTopbar(tab) {
+  if (currentRoute() !== "/cashier" || !tab) return;
+  const no = tab.receiptNo || cashierNextNo;
+  const plate = [tab.plateRegion, tab.plateNumber, tab.plateSuffix].filter(Boolean).join(" ");
+  const who = tab.customerFullName || tab.customerName || plate || "Pembeli umum";
+  const state = !tab.receiptId ? "Nota baru, belum disimpan" : tab.status === "void" ? "Void"
+    : tab.workStatus === "draft" ? "Draft" : [kasirHasJob(tab) ? WORK_STATUS_LABELS[tab.workStatus] : "", PAYMENT_STATUS_LABELS[paymentKey(Number(tab.total) || 0, Number(tab.amountPaid) || 0, tab.status)]].filter(Boolean).join(" · ");
+  const t = document.getElementById("topbar-title"), sub = document.getElementById("topbar-subtitle");
+  if (t) t.textContent = no || "Kasir";
+  if (sub) sub.textContent = [who, state].filter(Boolean).join(" · ");
+}
+
 // Rail state that follows the active tab: payment section for new notas, status select, header, nota number.
 function renderKasirRail(tab) {
   const saved = !!tab.receiptId;
@@ -6709,6 +6760,9 @@ function renderKasirRail(tab) {
   if (radio) radio.checked = true;
   document.querySelectorAll('input[name="kasir-method"]').forEach(r => { r.disabled = !editable; });
   document.getElementById("amount-paid-input").disabled = !editable || choice === "piutang" || !draftish;
+  const job = kasirHasJob(tab);
+  document.getElementById("kasir-work-block").classList.toggle("hidden", !job);
+  kasirTopbar(tab);
   const sel = document.getElementById("kasir-work-target");
   if (draftish) {
     sel.innerHTML = `<option value="belum">Belum Dikerjakan</option><option value="pengerjaan">Dalam Pengerjaan</option>`;
@@ -7305,6 +7359,9 @@ function renderCashierNotaNo(tab) {
     : (tab.receiptId ? "Ubah nota" : "Nota baru");
   const sum = document.getElementById("cashier-summary-no");
   if (sum) { sum.textContent = no || ""; sum.classList.toggle("hidden", !no); }
+  const box = document.getElementById("kasir-no-box");
+  if (box) box.textContent = no || "—";
+  kasirTopbar(tab);
   if (!tab.receiptNo && !cashierNextNo && !cashierNextNoBusy) refreshCashierNextNo();
 }
 
@@ -7434,25 +7491,31 @@ function collectReceiptPayload() {
 }
 
 function validateReceiptForm(payload) {
-  if (!payload.plate_region || !plateCodes[payload.plate_region]) {
-    showToast("Kode wilayah plat tidak valid.");
-    return false;
+  // Plate and phone are needed when something is installed on the car (a line with a technician); a walk-in
+  // purchase ("orang umum", motor, belanja biasa) may leave both empty.
+  const installing = payload.items.some(i => (i.technician_ids || []).length);
+  const anyPlate = payload.plate_region || payload.plate_number || payload.plate_suffix;
+  if (anyPlate || installing) {
+    if (!payload.plate_region || !plateCodes[payload.plate_region]) {
+      showToast(anyPlate ? "Kode wilayah plat tidak valid." : "No. plat wajib diisi karena ada barang yang dipasang (teknisi).");
+      return false;
+    }
+    if (!/^\d{1,4}$/.test(payload.plate_number)) {
+      showToast("Nomor plat harus 1-4 digit.");
+      return false;
+    }
+    if (!/^[A-Z]{1,3}$/.test(payload.plate_suffix)) {
+      showToast("Huruf belakang plat harus 1-3 huruf.");
+      return false;
+    }
   }
-  if (!/^\d{1,4}$/.test(payload.plate_number)) {
-    showToast("Nomor plat harus 1-4 digit.");
-    return false;
-  }
-  if (!/^[A-Z]{1,3}$/.test(payload.plate_suffix)) {
-    showToast("Huruf belakang plat harus 1-3 huruf.");
-    return false;
-  }
-  // phone is required; normalize the same way the backend does before checking format.
+  // Normalize the phone the same way the backend does before checking format.
   const phoneDigits = (payload.customer_phone || "").replace(/[\s\-.()]/g, "");
-  if (!phoneDigits) {
-    showToast("Nomor HP wajib diisi.");
+  if (!phoneDigits && installing && !payload.customer_id) {
+    showToast("Nomor HP wajib diisi karena ada barang yang dipasang (teknisi).");
     return false;
   }
-  if (!/^\+?\d{7,15}$/.test(phoneDigits)) {
+  if (phoneDigits && !/^\+?\d{7,15}$/.test(phoneDigits)) {
     showToast("Nomor HP harus 7-15 digit (boleh diawali +).");
     return false;
   }
@@ -7546,7 +7609,7 @@ function renderCashierWorkUi() {
   const isDone = saved && tab.status === "done" && ws === "selesai";
   const poChip = saved && tab.preorderId
     ? ` <button type="button" onclick="openPreorderFromDashboard('${esc(tab.preorderId)}')" title="Buka Sales Order" class="inline-flex items-center whitespace-nowrap shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border border-accent/40 text-accentDark hover:bg-accent/10">${esc(tab.poNumber || "Sales Order")}${tab.invoiceCount > 1 ? ` · Invoice ${tab.invoiceSeq}` : ""}</button>` : "";
-  const badge = saved ? workBadge(ws, tab.status, tab.workStage, tab.handedOverAt, tab.handoverDebt) : UNSAVED_BADGE;
+  const badge = !saved ? UNSAVED_BADGE : kasirHasJob(tab) || ws === "draft" ? workBadge(ws, tab.status, tab.workStage, tab.handedOverAt, tab.handoverDebt) : "";
   document.getElementById("cashier-work-badge").innerHTML = badge + poChip;
   document.getElementById("cashier-work-pill").innerHTML = badge;
 
@@ -7575,7 +7638,7 @@ function renderCashierWorkUi() {
   renderKasirRail(tab);
 }
 
-const SAVE_MODE_TARGET = { draft: "draft", belum: "belum", start: "pengerjaan", pay: "belum" };
+const SAVE_MODE_TARGET = { draft: "draft", belum: "belum", start: "pengerjaan", pay: "belum", selesai: "selesai" };
 
 function setCashierBarDisabled(on) {
   ["cashier-draft-btn", "cashier-belum-btn", "cashier-start-btn", "cashier-save-btn", "cashier-status-btn", "cashier-pay-btn"].forEach(id => {
@@ -7691,6 +7754,7 @@ async function saveReceipt(mode = "save", opts = {}) {
     draft: "Draft disimpan.",
     belum: "Nota disimpan, belum dikerjakan.",
     start: "Nota disimpan, pengerjaan dimulai.",
+    selesai: "Nota disimpan.",
     save: "Perubahan disimpan.",
   }[mode], "success");
   return true;
@@ -8205,7 +8269,15 @@ let cashierTlData = { events: [], payments: [], preorders: [], total: 0 };
 async function loadCashierTimeline() {
   const card = document.getElementById("cashier-timeline-card");
   const tab = getActiveTab();
-  if (!tab || !tab.receiptId) { card.classList.add("hidden"); renderCashierRailExtras(); return; }
+  if (!tab || !tab.receiptId) {
+    // A new nota has no history yet; the card stays in place so the log is never "gone".
+    ++cashierTimelineSeq;
+    card.classList.toggle("hidden", !tab);
+    document.getElementById("cashier-tl-tabs").innerHTML = "";
+    document.getElementById("cashier-timeline").innerHTML = `<p class="text-sm text-muted">Riwayat perubahan, pembayaran, dan status nota tampil di sini setelah nota disimpan.</p>`;
+    renderCashierRailExtras();
+    return;
+  }
   const id = tab.receiptId;
   const seq = ++cashierTimelineSeq;
   let events = [], payments = [], preorders = [];
@@ -8377,7 +8449,8 @@ function renderCashierRailExtras() {
   const pay = document.getElementById("cashier-pay-card");
   const quick = document.getElementById("cashier-quick-card");
   if (!pay || !quick) return;
-  pay.classList.toggle("hidden", !saved);
+  const isDraft = saved && tab.workStatus === "draft";
+  pay.classList.toggle("hidden", !saved || isDraft);
   quick.classList.toggle("hidden", !saved);
   if (!saved) return;
   const list = cashierTlData.payments;
@@ -8388,12 +8461,13 @@ function renderCashierRailExtras() {
           <td class="px-1 py-1.5 text-right">${p.amount > 0 && !p.reversed && p.state === "sah" && tab.status !== "void" && !(tab.status === "done" && tab.workStatus === "selesai") ? `<button type="button" class="admin-only text-failed hover:bg-failed/10 rounded p-1" title="Batalkan pembayaran" aria-label="Batalkan pembayaran" onclick="openReversePaymentModal(${p.id})">${trash}</button>` : ""}</td></tr>`).join("")
       }</tbody></table>`
     : `<p class="text-xs text-muted">Belum ada pembayaran.</p>`;
-  const canPay = tab.status === "pending";
+  const canPay = tab.status === "pending" && !isDraft;
   document.getElementById("cashier-pay-add-btn").classList.toggle("hidden", !canPay);
   const q = (id) => document.getElementById(id);
   q("cashier-quick-save").disabled = !!q("cashier-save-btn")?.disabled || q("cashier-save-btn")?.classList.contains("hidden");
   q("cashier-quick-pay").disabled = !canPay;
   q("cashier-quick-status").disabled = !!q("cashier-status-btn")?.classList.contains("hidden");
+  q("cashier-quick-status").classList.toggle("hidden", !kasirHasJob(tab));
   q("cashier-quick-print").disabled = false;
   // K-08: Serah Terima is offered once the work is Selesai; it also shows who took the vehicle and when.
   const hb = q("cashier-quick-handover");
@@ -8490,6 +8564,7 @@ function tabStateFromReceipt(tabId, r) {
       salesId: it.sales_employee_id || null, salesName: it.sales_employee_name || "", workStatus: it.work_status || "",
     })),
     remarks: r.remarks || "", salesEmployeeId: r.sales_employee_id || null, salesEmployeeName: r.sales_employee_name || "",
+    hasJob: r.has_job !== false,
     preorderId: r.preorder_id || null,
     poNumber: r.po_number || "",
     invoiceSeq: r.invoice_seq || 1,
@@ -8528,7 +8603,7 @@ function tabStateFromReceipt(tabId, r) {
 
 function tabLabel(tab) {
   const plate = [tab.plateRegion, tab.plateNumber, tab.plateSuffix].filter(Boolean).join(" ");
-  return plate || "Nota baru";
+  return plate || (tab.receiptId ? (tab.customerFullName || tab.customerName || tab.receiptNo || "Pembeli umum") : "Nota baru");
 }
 
 function getActiveTab() {
@@ -8628,7 +8703,7 @@ function renderCashierTabBar() {
           class="inline-flex items-center gap-2 pl-3.5 pr-2 py-2 max-w-[15rem] rounded-l-xl text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           <span class="status-dot is-${tab.status} shrink-0"></span>
           <span class="truncate">${esc(tabLabel(tab))}</span>
-          ${tab.receiptId ? workBadge(tab.workStatus, tab.status) : ""}
+          ${tab.receiptId && (tab.hasJob !== false || tab.workStatus === "draft") ? workBadge(tab.workStatus, tab.status) : ""}
           ${tab.dirty ? '<span class="text-accent leading-none shrink-0" title="Belum disimpan" role="img" aria-label="Belum disimpan">&bull;</span>' : ""}
         </button>
         <button type="button" onclick="closeCashierTab('${tab.tabId}')" aria-label="Tutup nota"
@@ -8761,7 +8836,7 @@ function applyCashierVoidLock(tab) {
 
   const banner = document.getElementById("cashier-void-banner");
   banner.textContent = isPaid
-    ? "Nota ini sudah lunas dan pengerjaan selesai (ditutup), tidak bisa diubah lagi."
+    ? (kasirHasJob(tab) ? "Nota ini sudah lunas dan pengerjaan selesai (ditutup), tidak bisa diubah lagi." : "Nota ini sudah lunas (selesai), tidak bisa diubah lagi.")
     : "Nota ini sudah di-void dan tidak bisa diubah lagi." + (tab.voidReason
         ? ` Alasan: ${tab.voidReason}.` : "") + (tab.voidedBy ? ` Oleh ${tab.voidedBy}${tab.voidedAt ? ", " + formatDateTimeSeconds(tab.voidedAt) : ""}.` : "");
   banner.classList.toggle("hidden", !(isVoid || isPaid));
@@ -9087,7 +9162,7 @@ function renderReceiptHistory() {
           <div class="flex items-center gap-2 text-sm font-medium text-ink">
             <span class="status-dot is-${r.status} shrink-0"></span>
             <span class="truncate">${esc(r.plate_full)}</span>
-            ${workBadge(r.work_status, r.status, r.work_stage, r.handed_over_at, r.handover_debt)}${r.work_status === "draft" ? "" : paymentBadge(r.total, r.amount_paid, r.status, r.pending_amount)}
+            ${r.has_job === false && r.work_status !== "draft" ? "" : workBadge(r.work_status, r.status, r.work_stage, r.handed_over_at, r.handover_debt)}${r.work_status === "draft" ? "" : paymentBadge(r.total, r.amount_paid, r.status, r.pending_amount)}
             <span class="ml-auto shrink-0 text-xs font-normal text-muted tabular-nums">${esc(formatReceiptWhen(r.created_at, !todayOnly))}</span>
           </div>
           <div class="mt-0.5 pl-[15px] flex items-baseline justify-between gap-2 text-xs">
@@ -17005,8 +17080,9 @@ function grPrefillShipping() {
   if (couriers.length) f.courier = couriers.join(", ");
   if (resi.length) f.tracking_no = resi.join(", ");
   if (pkgs.size) f.package_count = `${pkgs.size} paket`;
-  if (couriers.length || resi.length || pkgs.size) f.arrival_method = "ekspedisi";
-  f._shipFromPo = !!(couriers.length || resi.length || pkgs.size);
+  const shipped = arrived.some(l => l.ship_method) || [...pkgs.values()].some(p => p.ship_method);
+  if (couriers.length || resi.length || pkgs.size || shipped) f.arrival_method = "ekspedisi";
+  f._shipFromPo = !!(couriers.length || resi.length || pkgs.size || shipped);
 }
 function grStepShip() {
   ++grSeq;
@@ -27572,7 +27648,7 @@ function openAddUserModal() {
     <div class="space-y-3">
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Username</label>
-        <input id="new-user-username" type="text" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+        <input id="new-user-username" type="text" data-no-uppercase data-keep-case class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
       </div>
       <div>
         <label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Password (min. 8 karakter)</label>

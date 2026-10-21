@@ -1509,6 +1509,8 @@ def work_orders(scope: str = "aktif", q: str | None = None) -> dict:
     for r in recs:
         items = rows.get(r["id"], [])
         jobs = [i for i in items if i["technicians"]]
+        if not r.get("has_job"):
+            continue  # a walk-in purchase has no work to follow
         out.append({"id": r["id"], "receipt_no": r["receipt_no"], "plate_full": r["plate_full"], "vehicle_make": r["vehicle_make"],
                     "vehicle_model": r["vehicle_model"], "customer_name": r["customer_full_name"], "total": r["total"],
                     "amount_paid": r["amount_paid"], "status": r["status"], "work_status": r["work_status"], "created_at": r["created_at"],

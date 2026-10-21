@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 from fractions import Fraction
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -1442,6 +1443,16 @@ def init_db() -> None:
         if not con.execute("SELECT 1 FROM app_migrations WHERE name='stok_lines_ready'").fetchone():
             _promote_shelf_ready_lines(con, "sistem")
             con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('stok_lines_ready', ?)", (_now(),))
+        from backend import incentives
+        incentives.migrate(con)
+        sr_cols = {r["name"] for r in con.execute("PRAGMA table_info(supplier_returns)").fetchall()}
+        if "origin" not in sr_cols:  # 'barang_masuk' = made from a posted Goods Receipt (potong tagihan)
+            con.execute("ALTER TABLE supplier_returns ADD COLUMN origin TEXT")
+        # 21-10-2026: a faktur is numbered by the supplier's own invoice number; existing ones that have it take it.
+        if not con.execute("SELECT 1 FROM app_migrations WHERE name='faktur_no_from_supplier'").fetchone():
+            for r in con.execute("SELECT id FROM purchase_invoices WHERE status<>'void' AND TRIM(COALESCE(supplier_invoice_no,''))<>''").fetchall():
+                _sync_faktur_number(con, r["id"])
+            con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('faktur_no_from_supplier', ?)", (_now(),))
 
 
 def _now() -> str:
@@ -2465,7 +2476,8 @@ _RECEIPT_SELECT = f"""SELECT r.*,
         (SELECT p.po_number FROM preorders p WHERE p.id = r.preorder_id) AS po_number,
         (SELECT COUNT(*) FROM receipts x WHERE x.preorder_id = r.preorder_id AND x.status <> 'void') AS invoice_count,
         (SELECT COALESCE(SUM(p.amount),0) FROM receipt_payments p WHERE p.receipt_id = r.id AND p.state = 'pending') AS pending_amount,
-        (SELECT s.service_no FROM service_orders s WHERE s.id = r.service_order_id) AS service_no
+        (SELECT s.service_no FROM service_orders s WHERE s.id = r.service_order_id) AS service_no,
+        (SELECT e.name FROM employees e WHERE e.id = r.sales_employee_id) AS sales_employee_name
     FROM receipts r LEFT JOIN customers c ON c.id = r.customer_id"""
 
 
@@ -2785,15 +2797,15 @@ def create_receipt(
                (id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
                 subtotal, discount, total, created_at, started_at, status, amount_paid, payment_method, customer_id,
                 receipt_no, transfer_sender, transfer_account, work_status, work_notes, cashier_name,
-                estimated_finish_at, vehicle_make, vehicle_model, vehicle_color, vehicle_year, draft_saved_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                estimated_finish_at, vehicle_make, vehicle_model, vehicle_color, vehicle_year, draft_saved_at, remarks)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 receipt_id, plate_region, plate_number, plate_suffix, plate_full, customer_phone, customer_name,
                 subtotal, discount, total, created_at, started_at, final_status, amount_paid, payment_method,
                 customer_id, receipt_no, transfer_sender, transfer_account, work_status,
                 extra.get("work_notes"), extra.get("cashier_name"), extra.get("estimated_finish_at"),
                 extra.get("vehicle_make"), extra.get("vehicle_model"), extra.get("vehicle_color"),
-                extra.get("vehicle_year"), created_at if work_status == "draft" else None,
+                extra.get("vehicle_year"), created_at if work_status == "draft" else None, extra.get("remarks"),
             ),
         )
         _link_receipt_vehicle(con, receipt_id, created_by)
@@ -2821,21 +2833,19 @@ def create_receipt(
                 and (amount_paid > 0 or pending_amount > 0):
             raise ValueError(_PRICE_PENDING_MSG)
         con.execute(f"UPDATE receipts SET {', '.join(c + '=?' for c in _DISC_COLS)} WHERE id=?", (*disc.values(), receipt_id))
-        con.executemany(
-            """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
-                                          item_type, line_discount, added_at, added_by, added_during_work, serial_no,
-                                          list_price, price_state, price_reason, price_requested_by, price_requested_at,
-                                          price_approved_by, price_approved_at, price_below_cost)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
+        for item in resolved_items:
+            item["_row_id"] = con.execute(
+                """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
+                                              item_type, line_discount, added_at, added_by, added_during_work, serial_no,
+                                              list_price, price_state, price_reason, price_requested_by, price_requested_at,
+                                              price_approved_by, price_approved_at, price_below_cost)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     receipt_id, item["product_name"], item["quantity"], item["unit_price"], item.get("warranty_date"),
                     item["master_item_id"], item.get("item_type") or "barang", item.get("line_discount") or 0,
                     created_at, created_by, item.get("serial_no"), *[item["_price"][c] for c in _PRICE_COLS],
-                )
-                for item in resolved_items
-            ],
-        )
+                ),
+            ).lastrowid
 
         # A brand-new receipt has no prior holding; a draft or a receipt created straight
         # into 'void' (the only status a caller can set directly) holds nothing.
@@ -2848,6 +2858,9 @@ def create_receipt(
             "draft": "Draft dibuat", "pengerjaan": "Nota dibuat, pengerjaan dimulai",
             "belum": "Nota dibuat, belum dikerjakan", "selesai": "Nota dibuat, pengerjaan selesai",
         }.get(work_status, "Nota dibuat"), created_by)
+        if work_status == "selesai":
+            _incentives().finish_assigned_items(con, receipt_id, created_by)
+        _incentives().sync_receipt(con, receipt_id, created_by, _assignments(extra, resolved_items))
 
         customer_full_name = con.execute(
             _RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)
@@ -3078,8 +3091,29 @@ def get_receipt_summary(tz_offset_minutes: int | None = None) -> dict:
 
 _RECEIPT_EXTRA_FIELDS = (
     "work_notes", "cashier_name", "estimated_finish_at", "vehicle_make", "vehicle_model", "vehicle_color",
-    "vehicle_year",
+    "vehicle_year", "remarks",
 )
+
+
+def _incentives():
+    from backend import incentives
+    return incentives
+
+
+def _assignments(extra: dict | None, items: list[dict] | None) -> dict:
+    """Who sells and who installs, as sent by the Kasir: the nota's sales utama (when sent) and, per line that was
+    written in this save, the fields the client included. Only what was sent is changed."""
+    out: dict = {}
+    if extra and "sales_employee_id" in extra:
+        out["sales_employee_id"] = extra["sales_employee_id"]
+    per = {}
+    for item in items or []:
+        sent = item.get("_assign") or {}
+        if sent and item.get("_row_id"):
+            per[item["_row_id"]] = sent
+    if per:
+        out["items"] = per
+    return out
 
 
 def update_receipt(
@@ -3248,6 +3282,7 @@ def update_receipt(
                         bits.append(f"diskon {(old['line_discount'] or 0):,} -> {(item.get('line_discount') or 0):,}".replace(",", "."))
                     if bits:
                         changed_notes.append(f"{item['product_name']}: " + ", ".join(bits))
+                    item["_row_id"] = old["id"]
                     con.execute(
                         """INSERT INTO receipt_items (id, receipt_id, product_name, quantity, unit_price, warranty_date,
                                master_item_id, item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id,
@@ -3266,7 +3301,7 @@ def update_receipt(
                         changed_notes.append(f"{item['product_name']}: harga khusus "
                                              + ("DISETUJUI Admin" if item["_price"]["price_state"] == "approved" else "diajukan, menunggu persetujuan Admin"))
                 else:
-                    con.execute(
+                    item["_row_id"] = con.execute(
                         """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date,
                                master_item_id, item_type, line_discount, added_at, added_by, added_during_work, serial_no,
                                list_price, price_state, price_reason, price_requested_by, price_requested_at,
@@ -3276,7 +3311,7 @@ def update_receipt(
                          item.get("warranty_date"), item["master_item_id"], item.get("item_type") or "barang",
                          item.get("line_discount") or 0, now_iso, changed_by, during_work, item.get("serial_no"),
                          *[item["_price"][c] for c in _PRICE_COLS]),
-                    )
+                    ).lastrowid
                     added_names.append(item["product_name"])
             if added_names and not is_draft:
                 _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added_names), changed_by)
@@ -3361,7 +3396,7 @@ def update_receipt(
                customer_phone=?, customer_name=?, customer_id=?, subtotal=?, discount=?, total=?, status=?,
                amount_paid=?, payment_method=?, transfer_sender=?, transfer_account=?, work_status=?,
                work_notes=?, cashier_name=?, estimated_finish_at=?, vehicle_make=?, vehicle_model=?,
-               vehicle_color=?, vehicle_year=?, draft_saved_at=? WHERE id=?""",
+               vehicle_color=?, vehicle_year=?, remarks=?, draft_saved_at=? WHERE id=?""",
             (
                 new_plate_region, new_plate_number, new_plate_suffix, new_plate_full,
                 new_customer_phone, new_customer_name, new_customer_id,
@@ -3403,6 +3438,8 @@ def update_receipt(
             )
             _log_receipt_event(con, receipt_id, "void", note, changed_by)
 
+        _incentives().sync_receipt(con, receipt_id, changed_by,
+                                   _assignments(extra, resolved_items if items is not None else None))
         updated = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
         return dict(updated)
 
@@ -3625,7 +3662,7 @@ def return_receipt_item(
             _insert_receipt_payment(con, receipt_id, -cash_out, method, f"Refund retur {item['product_name']}: {reason}", by,
                                     kind="refund", proof_ref=_refund_proof(proof_ref))
         now = _now()
-        con.execute(
+        return_id = con.execute(
             """INSERT INTO receipt_returns (receipt_id, receipt_item_id, product_name, master_item_id, quantity, item_value,
                    refund_amount, cash_out, method, destination, reason, returned_by, returned_at,
                    kind, reason_code, restock_qty, supplier_qty, damaged_qty)
@@ -3633,7 +3670,9 @@ def return_receipt_item(
             (receipt_id, item_id, item["product_name"], item["master_item_id"], quantity, value, refund_amount,
              cash_out, method if cash_out else None, destination, reason_text, by, now,
              kind, reason_code, restock_qty, supplier_qty, damaged_qty),
-        )
+        ).lastrowid
+        # Insentif follows the return (sales pro rata; teknisi kept once installed) -- once per return.
+        _incentives().on_item_returned(con, receipt_id, item_id, return_id, quantity, by)
         # Units not put back on the shelf are still in the shop: they wait in Stok Karantina. Those meant
         # for the supplier become a supplier-return candidate (decision 10); nothing is sent automatically.
         if item["master_item_id"] is not None and (supplier_qty or damaged_qty):
@@ -3690,7 +3729,16 @@ def _install_so_lines(con: sqlite3.Connection, receipt_id: str, by: str | None) 
         con.execute("UPDATE preorder_items SET status='terpasang' WHERE id=?", (ln["id"],))
         _log_preorder_status(con, po["id"], ln["id"], ln["product_name"], "terpasang", now, by, ln["status"])
     con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, po["id"]))
-    _po_invoice_sync(con, po["id"], by, {receipt_id: before})
+    # The invoice is being finished by its own Pengerjaan Selesai: its status is set by the caller, not by the sync.
+    _so_work_follow.skip = receipt_id
+    try:
+        _po_invoice_sync(con, po["id"], by, {receipt_id: before})
+    finally:
+        _so_work_follow.skip = None
+
+
+# Per request thread: the invoice whose Pengerjaan the Sales Order sync must leave alone (see _install_so_lines).
+_so_work_follow = threading.local()
 
 
 def change_receipt_work_status(
@@ -3727,6 +3775,7 @@ def change_receipt_work_status(
                                        override_reason=stock_override_reason, by=changed_by)
         if to_status == "selesai":
             _install_so_lines(con, receipt_id, changed_by)
+            _incentives().finish_assigned_items(con, receipt_id, changed_by)
         # K-06: entering Dalam Pengerjaan starts at Persiapan; going back to Belum Dikerjakan forgets the stage.
         new_stage = row["work_stage"]
         if to_status == "pengerjaan" and not new_stage:
@@ -3744,6 +3793,7 @@ def change_receipt_work_status(
         labels = {"belum": "Belum Dikerjakan", "pengerjaan": "Dalam Pengerjaan", "selesai": "Pengerjaan Selesai"}
         text = f"Status: {labels[to_status]}" + (f" — {note}" if note else "")
         _log_receipt_event(con, receipt_id, "status", text, changed_by)
+        _incentives().sync_receipt(con, receipt_id, changed_by)
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
 
@@ -3920,7 +3970,17 @@ def get_receipt_items(receipt_id: str) -> list[dict]:
                WHERE ri.receipt_id=? ORDER BY ri.id ASC""",
             (receipt_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        # Who installs / sells each line (names only: nothing about incentives is ever part of a nota).
+        assigned = _incentives().item_assignments(con, receipt_id)
+        out = []
+        for r in rows:
+            d = dict(r)
+            a = assigned.get(d["id"]) or {}
+            d["technicians"] = a.get("technicians") or []
+            d["sales_employee_id"], d["sales_employee_name"] = a.get("sales_employee_id"), a.get("sales_name")
+            d["work_status"], d["work_done_at"] = a.get("work_status"), a.get("work_done_at")
+            out.append(d)
+        return out
 
 
 def delete_receipt(receipt_id: str) -> None:
@@ -3932,6 +3992,7 @@ def delete_receipt(receipt_id: str) -> None:
             raise ValueError("Invoice ini milik Sales Order dan tidak bisa dihapus. Void saja bila pesanan batal.")
         if con.execute("SELECT 1 FROM receipt_returns WHERE receipt_id=?", (receipt_id,)).fetchone():
             raise ValueError("Nota ini sudah ada retur barang, jadi tidak bisa dihapus.")
+        _incentives().on_receipt_deleted(con, receipt_id)
         existing = dict(row)
 
         # Stock: deleting a receipt that still held stock returns it, same as a
@@ -6636,7 +6697,9 @@ def get_stock_ledger(master_item_id: int) -> list[dict]:
 
 
 def _next_purchase_invoice_number(con: sqlite3.Connection, today_str: str) -> str:
-    prefix = f"FP-{today_str}-"
+    """A placeholder for a draft whose supplier invoice number is not known yet. The faktur number IS the supplier's
+    own invoice number (owner, 21-10-2026): _sync_faktur_number replaces this as soon as that number is filled in."""
+    prefix = f"DRAFT-{today_str}-"
     row = con.execute(
         "SELECT invoice_number FROM purchase_invoices WHERE invoice_number LIKE ? ORDER BY invoice_number DESC LIMIT 1",
         (f"{prefix}%",),
@@ -6738,6 +6801,25 @@ def _check_supplier_invoice_no(con: sqlite3.Connection, supplier_id: int, suppli
         raise ValueError(f"No. faktur supplier {no} sudah dicatat di {dup['invoice_number']}.")
 
 
+def _sync_faktur_number(con: sqlite3.Connection, invoice_id: int) -> None:
+    """The faktur is numbered by the supplier's own invoice number, not by a running number. invoice_number stays
+    unique (two suppliers can use the same number, and a voided faktur keeps its own), so a clash gets the supplier
+    name added. Everything else refers to the faktur by id, so renaming it is safe."""
+    row = con.execute("SELECT id, invoice_number, supplier_invoice_no, supplier_name_snapshot FROM purchase_invoices WHERE id=?",
+                      (invoice_id,)).fetchone()
+    no = " ".join((row["supplier_invoice_no"] or "").split()) if row else ""
+    if not no or row["invoice_number"] == no:
+        return
+    taken = lambda n: con.execute("SELECT 1 FROM purchase_invoices WHERE invoice_number=? AND id<>?", (n, invoice_id)).fetchone()
+    target = no
+    if taken(target):
+        target = f"{no} · {row['supplier_name_snapshot']}"
+    if taken(target):
+        target = f"{no} · {row['supplier_name_snapshot']} #{invoice_id}"
+    if row["invoice_number"] != target:
+        con.execute("UPDATE purchase_invoices SET invoice_number=? WHERE id=?", (target, invoice_id))
+
+
 def create_purchase_invoice(
     supplier_id: int,
     invoice_date: str,
@@ -6791,6 +6873,7 @@ def create_purchase_invoice(
         )
         invoice_id = cur.lastrowid
         _insert_purchase_invoice_items(con, invoice_id, items)
+        _sync_faktur_number(con, invoice_id)
         row = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         return dict(row)
 
@@ -6854,6 +6937,7 @@ def update_purchase_invoice(
         )
         con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
         _insert_purchase_invoice_items(con, invoice_id, items)
+        _sync_faktur_number(con, invoice_id)
         if row["supplier_po_id"] and row["verify_status"] != "belum":
             # The faktur changed after it was checked: the checking (or the Admin's exception) no longer covers it.
             con.execute("UPDATE purchase_invoices SET verify_status='belum', verify_note=NULL, verified_by=NULL, verified_at=NULL, "
@@ -6952,6 +7036,9 @@ def post_purchase_invoice(invoice_id: int, by: str | None = None) -> dict:
             raise ValueError(f"Faktur pembelian {invoice_id} tidak bisa diposting: tidak ada baris barang")
         from backend import invoice_verify
         invoice_verify.require_verified(con, dict(row))
+        if not (row["supplier_invoice_no"] or "").strip():
+            raise ValueError("Isi No. Invoice Supplier dulu: nomor itu menjadi nomor faktur. Simpan, lalu posting.")
+        _sync_faktur_number(con, invoice_id)
         con.execute(
             "UPDATE purchase_invoices SET status='posted', updated_at=? WHERE id=?", (_now(), invoice_id)
         )
@@ -7269,9 +7356,14 @@ def po_billable_lines(con: sqlite3.Connection, supplier_po_id: str) -> list[dict
         by_price: dict[int, int] = {}
         counted = 0
         for r in con.execute(
-                """SELECT ii.qty_in, ii.cost_price, ii.is_over FROM inbound_items ii JOIN inbound_documents d ON d.id = ii.document_id
+                """SELECT ii.qty_in, ii.cost_price, ii.is_over,
+                          (SELECT COALESCE(SUM(sri.qty), 0) FROM supplier_return_items sri JOIN supplier_returns sr ON sr.id = sri.return_id
+                           WHERE sri.inbound_item_id = ii.id AND sr.origin='barang_masuk' AND sr.doc_status<>'dibatalkan'
+                             AND sri.settlement IS NULL) AS returned
+                   FROM inbound_items ii JOIN inbound_documents d ON d.id = ii.document_id
                    WHERE ii.spo_item_id=? AND d.status='posted' ORDER BY ii.id""", (i["id"],)):
-            by_price[r["cost_price"]] = by_price.get(r["cost_price"], 0) + r["qty_in"]
+            # Goods sent back from Barang Masuk before the faktur was posted are not billed (no Credit Note needed).
+            by_price[r["cost_price"]] = by_price.get(r["cost_price"], 0) + r["qty_in"] - r["returned"]
             if not r["is_over"]:
                 counted += r["qty_in"]
         if received > counted:
@@ -7341,6 +7433,7 @@ def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) 
              note, now, now, supplier_po_id, totals["shipping_cost"], totals["shipping_dpp"], totals["shipping_tax"]),
         )
         _insert_purchase_invoice_items(con, cur.lastrowid, lines)
+        _sync_faktur_number(con, cur.lastrowid)
         _spo_event(con, supplier_po_id, "invoice", "Draft Faktur Pembelian dibuat dari PO ini", by)
         return dict(con.execute("SELECT * FROM purchase_invoices WHERE id=?", (cur.lastrowid,)).fetchone())
 
@@ -8514,17 +8607,36 @@ def _po_invoice_sync_one(con: sqlite3.Connection, po: dict, receipt_id: str, po_
     if status == "done" and rec["status"] != "done" and _receipt_price_pending(con, receipt_id):
         status = "pending"  # K-22: not Lunas on a price nobody approved yet
     work = rec["work_status"]
+    work_note = None
     if work == "menunggu" and po_items and all(pi["status"] in PO_ARRIVED_STATUSES for pi in po_items):
-        work = "belum"
+        work, work_note = "belum", "Status: Belum Dikerjakan — semua barang Sales Order sudah sampai"
+    # The invoice's Pengerjaan follows the Sales Order lines it bills: every line Terpasang = Pengerjaan Selesai,
+    # some Terpasang = Dalam Pengerjaan. (The other way round, Pengerjaan Selesai on the invoice already installs
+    # the lines, see _install_so_lines.) A line taken back from Terpasang reopens a finished, not yet closed invoice.
+    live = [pi for pi in po_items if pi["status"] != PO_LINE_CANCELLED]
+    installed = [pi for pi in live if pi["status"] in PO_INSTALLED_STATUSES]
+    if live and work != "draft" and status != "void" and getattr(_so_work_follow, "skip", None) != receipt_id:
+        if len(installed) == len(live) and work != "selesai":
+            work, work_note = "selesai", "Status: Pengerjaan Selesai — semua barang Sales Order sudah terpasang"
+        elif installed and len(installed) < len(live) and work in ("menunggu", "belum"):
+            work, work_note = "pengerjaan", "Status: Dalam Pengerjaan — sebagian barang Sales Order sudah terpasang"
+        elif len(installed) < len(live) and work == "selesai" and rec["status"] != "done":
+            work, work_note = "pengerjaan", "Status: Dalam Pengerjaan — ada barang Sales Order yang belum terpasang lagi"
+    if work == "pengerjaan" and rec["work_status"] != "pengerjaan" and not rec.get("work_stage"):
+        con.execute("UPDATE receipts SET work_stage='persiapan' WHERE id=?", (receipt_id,))
     con.execute("UPDATE receipts SET subtotal=?, discount=?, total=?, status=?, work_status=? WHERE id=?",
                 (subtotal, discount, total, status, work, receipt_id))
+    if work == "selesai" and rec["work_status"] != "selesai":
+        _incentives().finish_assigned_items(con, receipt_id, by)
+    elif rec["work_status"] == "selesai" and work != "selesai":
+        _clear_handover(con, receipt_id, "pengerjaan dibuka kembali", by)
     tag = f" (Sales Order {po['po_number']})"
     if added and not created:
         _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added) + tag, by)
     if changed:
         _log_receipt_event(con, receipt_id, "item_changed", "Item diubah: " + "; ".join(changed) + tag, by)
-    if work != rec["work_status"]:
-        _log_receipt_event(con, receipt_id, "status", "Status: Belum Dikerjakan — semua barang Sales Order sudah sampai", by)
+    if work != rec["work_status"] and work_note:
+        _log_receipt_event(con, receipt_id, "status", work_note, by)
     if total < rec["amount_paid"] and total != rec["total"]:
         _log_receipt_event(
             con, receipt_id, "overpaid",
@@ -8532,6 +8644,7 @@ def _po_invoice_sync_one(con: sqlite3.Connection, po: dict, receipt_id: str, po_
             by,
         )
     _apply_receipt_stock_delta(con, receipt_id, before, _po_invoice_holdings(con, receipt_id))
+    _incentives().sync_receipt(con, receipt_id, by)
 
 
 def po_invoice_payment(

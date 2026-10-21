@@ -17,6 +17,7 @@ from backend.routes.categories import router as categories_router
 from backend.routes.customers import router as customers_router
 from backend.routes.inventory import router as inventory_router
 from backend.routes.goods_receipts import router as goods_receipts_router
+from backend.routes.incentives import router as incentives_router, work_router as work_orders_router
 from backend.routes.opname import router as opname_router
 from backend.routes.preorders import router as preorders_router
 from backend.routes.quarantine import router as quarantine_router
@@ -77,6 +78,8 @@ app.include_router(activity_router, prefix="/api", dependencies=[Depends(require
 app.include_router(customers_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(inventory_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(goods_receipts_router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(work_orders_router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(incentives_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(categories_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(opname_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(preorders_router, prefix="/api", dependencies=[Depends(get_current_user)])

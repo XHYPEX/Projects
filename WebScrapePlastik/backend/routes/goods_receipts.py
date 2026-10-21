@@ -145,6 +145,32 @@ async def recreate(document_id: int, user: dict = Depends(get_current_user)):
     return await _run(gr.detail, new_id)
 
 
+class ReturnLine(BaseModel):
+    inbound_item_id: int
+    qty: int
+    reason_code: str | None = None
+    reason_detail: str | None = None
+
+
+class ReturnRequest(BaseModel):
+    method: str = "sales"
+    note: str | None = None
+    lines: list[ReturnLine]
+
+
+@router.get("/goods-receipts/{document_id}/return-lines")
+async def return_lines(document_id: int):
+    return await _run(gr.return_lines, document_id)
+
+
+@router.post("/goods-receipts/{document_id}/return", dependencies=[Depends(require_admin)])
+async def return_to_supplier(document_id: int, req: ReturnRequest, user: dict = Depends(get_current_user)):
+    try:
+        return await _run(gr.return_to_supplier, document_id, req.model_dump(), user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
 @router.get("/goods-receipts/{document_id}/integration")
 async def integration(document_id: int):
     return await _run(gr.integration, document_id)

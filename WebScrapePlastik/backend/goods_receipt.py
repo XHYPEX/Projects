@@ -70,6 +70,7 @@ def _open_po_lines(con: sqlite3.Connection, po_id: str) -> list[dict]:
     for i in db._spo_items(con, po_id):
         left = _left(i)
         packages = [{"id": p["id"], "package_no": p["package_no"], "forwarder_name": p.get("forwarder_name"),
+                     "tracking_no": p.get("tracking_no"), "ship_method": p.get("ship_method"),
                      "remaining": next(l["remaining"] for l in p["lines"] if l["item_id"] == i["id"])}
                     for p in db._spo_packages(con, po_id)
                     if not p["cancelled"] and any(l["item_id"] == i["id"] and l["remaining"] > 0 for l in p["lines"])]
@@ -82,6 +83,8 @@ def _open_po_lines(con: sqlite3.Connection, po_id: str) -> list[dict]:
             "qty_po": i["quantity"] - i["qty_cancelled"], "qty_received": i["qty_received"], "qty_left": left,
             "po_price": db._po_net_price(i), "customer_po_number": i.get("customer_po_number"),
             "customer_name": i.get("customer_name"), "item_status": i.get("item_status"), "packages": packages,
+            # How the supplier said it is coming (PO > Ubah Status / Paket Pengiriman): prefills Isi Penerimaan.
+            "courier": i.get("courier"), "tracking_no": i.get("tracking_no"), "ship_method": i.get("ship_method"),
         })
     return out
 
@@ -849,3 +852,171 @@ def integration(document_id: int) -> dict:
             "po_rows": po_rows, "qty_po_total": sum(r["qty_po"] for r in po_rows),
             "qty_left_total": sum(r["qty_left"] for r in po_rows), "qty_gr": good + bad, "qty_good": good, "qty_bad": bad,
             "stock_in": stock_in, "codes": len(codes), "labels_printed": d["labels_printed"], "fakturs": fakturs}
+
+
+# --- Retur ke Supplier from a posted Goods Receipt (owner, 21-10-2026) ---------------------------------------------
+# The shop does not void Account Payable to send goods back: it cuts the bill. A return made here is an Admin action
+# that at once (1) takes the goods off the sellable shelf into quarantine, waiting for the supplier to collect them,
+# (2) settles the money: a Credit Note allocated to the GR's posted faktur (anything beyond what is still owed stays
+# as supplier credit), or, when the faktur is still a draft or does not exist yet, fewer units on that faktur.
+# It is a normal Retur Supplier document, so pickup / shipping is finished from the Retur Supplier menu.
+
+def return_lines(document_id: int) -> dict:
+    data = db.supplier_return_inbound_lines(document_id)
+    with db._conn() as con:
+        out = []
+        for r in data["lines"]:
+            if not r["inbound_item_id"]:
+                continue
+            po = con.execute("""SELECT sp.id, sp.po_number FROM inbound_items ii JOIN supplier_po_items spi ON spi.id = ii.spo_item_id
+                                JOIN supplier_pos sp ON sp.id = spi.supplier_po_id WHERE ii.id=?""", (r["inbound_item_id"],)).fetchone()
+            fk = _faktur_for_po(con, po["id"]) if po else None
+            out.append({**r, "po_number": po["po_number"] if po else None,
+                        "faktur": {"id": fk["id"], "number": fk["invoice_number"], "status": fk["status"],
+                                   "outstanding": fk["total"] - fk["amount_paid"], "tax_rate": fk["tax_rate"]} if fk else None})
+        returns = [dict(x) for x in con.execute(
+            """SELECT r.id, r.return_number, r.doc_status, r.handover_status, r.created_at,
+                      (SELECT COALESCE(SUM(qty),0) FROM supplier_return_items i WHERE i.return_id=r.id) AS qty
+               FROM supplier_returns r WHERE r.inbound_document_id=? ORDER BY r.id DESC""", (document_id,))]
+    return {**data, "lines": out, "returns": returns, "reasons": db.SR_REASONS}
+
+
+def _faktur_for_po(con: sqlite3.Connection, po_id: str):
+    return con.execute("SELECT * FROM purchase_invoices WHERE supplier_po_id=? AND status<>'void' ORDER BY id DESC LIMIT 1", (po_id,)).fetchone()
+
+
+def _cn_value(qty: int, unit_cost: int, tax_rate: float) -> int:
+    return int(round(qty * unit_cost * (1 + float(tax_rate or 0) / 100)))
+
+
+def return_to_supplier(document_id: int, data: dict, user: dict) -> dict:
+    if user.get("role") != "admin":
+        raise PermissionError("Hanya Admin yang boleh membuat retur ke supplier dari Barang Masuk.")
+    by = user["username"]
+    method = data.get("method") or "sales"
+    if method not in db.SR_METHODS:
+        raise ValueError("Pilih cara pengembalian: diambil sales atau dikirim ekspedisi.")
+    note = _text(data.get("note"))
+    offered = {r["inbound_item_id"]: r for r in db.supplier_return_inbound_lines(document_id)["lines"] if r["inbound_item_id"]}
+    picks = []
+    for ln in data.get("lines") or []:
+        qty = _int(ln.get("qty") or 0, "Qty retur")
+        if qty == 0:
+            continue
+        row = offered.get(int(ln.get("inbound_item_id") or 0))
+        if row is None:
+            raise ValueError("Baris retur tidak ada di Goods Receipt ini.")
+        if qty > row["returnable"]:
+            raise ValueError(f"{row['product_name']}: bisa diretur paling banyak {row['returnable']}.")
+        reason = ln.get("reason_code") or None
+        if reason not in db.SR_REASONS:
+            raise ValueError(f"Pilih alasan retur untuk {row['product_name']}.")
+        detail = _text(ln.get("reason_detail"))
+        if reason == "lainnya" and not detail:
+            raise ValueError(f"Tulis alasan retur {row['product_name']}.")
+        picks.append({**row, "qty": qty, "reason_code": reason, "reason_detail": detail})
+    if not picks:
+        raise ValueError("Isi qty barang yang diretur.")
+    with db._conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        doc = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
+        if doc is None or doc["status"] != "posted":
+            raise ValueError("Retur hanya dari Goods Receipt yang sudah diposting.")
+        # Which PO and faktur each line belongs to.
+        for p in picks:
+            po = con.execute("""SELECT spi.supplier_po_id FROM inbound_items ii JOIN supplier_po_items spi ON spi.id = ii.spo_item_id
+                                WHERE ii.id=?""", (p["inbound_item_id"],)).fetchone()
+            p["po_id"] = po["supplier_po_id"] if po else None
+            fk = _faktur_for_po(con, p["po_id"]) if p["po_id"] else None
+            p["faktur"] = dict(fk) if fk else None
+            p["settlement"] = "kredit" if fk and fk["status"] == "posted" else "potong_faktur"
+        now = db._now()
+        first_fk = next((p["faktur"]["id"] for p in picks if p["faktur"]), None)
+        number = db._sr_number(con, "RTS", "supplier_returns", "return_number")
+        rid = con.execute(
+            """INSERT INTO supplier_returns (return_number, return_date, supplier_id, return_type, requested_settlement, supplier_po_id,
+                   inbound_document_id, purchase_invoice_id, notes, method, doc_status, handover_status, submitted_by, submitted_at,
+                   approved_by, approved_at, created_by, created_at, updated_at, origin)
+               VALUES (?, ?, ?, 'bermasalah', 'kredit', ?, ?, ?, ?, ?, 'diproses', ?, ?, ?, ?, ?, ?, ?, ?, 'barang_masuk')""",
+            (number, db.shop_today().isoformat(), doc["supplier_id"], picks[0]["po_id"], document_id, first_fk, note, method,
+             "siap" if method == "ekspedisi" else "menunggu_ambil", by, now, by, now, by, now, now)).lastrowid
+        for pos, p in enumerate(picks):
+            lot_id = p["quarantine_lot_id"]
+            if p["source"] == "stok":
+                mi = con.execute("SELECT * FROM master_items WHERE id=?", (p["master_item_id"],)).fetchone()
+                if mi is None or mi["stock_qty"] < p["qty"]:
+                    raise ValueError(f"Stok {p['product_name']} tinggal {mi['stock_qty'] if mi else 0}, tidak cukup untuk diretur {p['qty']}.")
+                new_qty = mi["stock_qty"] - p["qty"]
+                con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_qty, mi["id"]))
+                lot_id = db._quarantine_in(con, master_item_id=mi["id"], product_name=mi["name"], qty=p["qty"], condition="perlu_cek",
+                                           source_type="retur_supplier", source_ref=number, source_id=str(rid), supplier_id=doc["supplier_id"],
+                                           unit_cost=p["unit_cost"], candidate=False, note=None, by=by)
+                con.execute("""INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at, created_by)
+                               VALUES (?, 'KARANTINA', ?, ?, 'supplier_return', ?, ?, ?, ?)""",
+                            (mi["id"], -p["qty"], new_qty, rid, f"Retur ke supplier {number} dari {doc['doc_number']}", now, by))
+            con.execute(
+                """INSERT INTO supplier_return_items (return_id, source, source_lot_id, quarantine_lot_id, inbound_item_id, master_item_id,
+                       product_name, qty, unit_cost, condition, reason_code, reason_detail, qty_approved, settlement, position)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (rid, p["source"], p["quarantine_lot_id"], lot_id, p["inbound_item_id"], p["master_item_id"], p["product_name"], p["qty"],
+                 p["unit_cost"], "perlu_cek" if p["source"] == "stok" else p["condition"], p["reason_code"], p["reason_detail"],
+                 p["qty"], "kredit" if p["settlement"] == "kredit" else None, pos))
+        msgs = []
+        # Money, per faktur.
+        by_fk: dict = {}
+        for p in picks:
+            key = p["faktur"]["id"] if p["faktur"] else None
+            by_fk.setdefault(key, []).append(p)
+        for fk_id, ps in by_fk.items():
+            fk = ps[0]["faktur"]
+            if fk and fk["status"] == "posted":
+                amount = sum(_cn_value(p["qty"], p["unit_cost"], fk["tax_rate"]) for p in ps)
+                cn_id = con.execute(
+                    """INSERT INTO supplier_credit_notes (cn_number, kind, supplier_id, return_id, amount, issued_at, note, created_by, created_at)
+                       VALUES (?, 'kredit', ?, ?, ?, ?, ?, ?, ?)""",
+                    (db._sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number"), doc["supplier_id"], rid, amount,
+                     db.shop_today().isoformat(), f"Retur dari {doc['doc_number']}", by, now)).lastrowid
+                cn = dict(con.execute("SELECT * FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone())
+                got = db._sr_allocate(con, cn, fk["id"], min(amount, max(fk["total"] - fk["amount_paid"], 0)), by)
+                txt = f"Credit Note {cn['cn_number']} Rp {db._sr_rupiah(amount)} memotong faktur {fk['invoice_number']} sebesar Rp {db._sr_rupiah(got)}"
+                if amount > got:
+                    txt += f"; sisa Rp {db._sr_rupiah(amount - got)} jadi saldo kredit supplier"
+                msgs.append(txt)
+                con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'retur', ?)",
+                            (fk["id"], now, by, f"Retur {number}: {txt}"))
+            elif fk:  # draft faktur: bill fewer units
+                for p in ps:
+                    left = p["qty"]
+                    for it in con.execute("""SELECT * FROM purchase_invoice_items WHERE invoice_id=? AND master_item_id=?
+                                             ORDER BY (unit_price=?) DESC, id""", (fk["id"], p["master_item_id"], p["unit_cost"])).fetchall():
+                        if left <= 0:
+                            break
+                        take = min(left, it["qty"])
+                        if take == it["qty"]:
+                            con.execute("DELETE FROM purchase_invoice_items WHERE id=?", (it["id"],))
+                        else:
+                            con.execute("UPDATE purchase_invoice_items SET qty=qty-?, line_total=(qty-?)*unit_price WHERE id=?", (take, take, it["id"]))
+                        left -= take
+                _recompute_faktur(con, fk["id"])
+                cut = ", ".join(f"{p['product_name']} -{p['qty']}" for p in ps)
+                txt = f"Draft faktur {fk['invoice_number']}: qty dikurangi ({cut})"
+                msgs.append(txt)
+                con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'retur', ?)",
+                            (fk["id"], now, by, f"Retur {number}: {txt}"))
+            else:
+                msgs.append("Belum ada faktur: barang yang diretur tidak ikut ditagih saat faktur dibuat")
+        db._sr_event(con, rid, "disetujui", f"Retur dari Barang Masuk {doc['doc_number']} oleh Admin; barang ditahan di karantina "
+                                            f"menunggu {'dikirim' if method == 'ekspedisi' else 'diambil sales supplier'}. " + ". ".join(msgs), by)
+        db._inbound_event(con, document_id, "retur", f"Retur ke supplier {number}: " + ", ".join(f"{p['product_name']} {p['qty']}" for p in picks)
+                          + ". " + ". ".join(msgs), by)
+        db._sr_refresh(con, rid, by)
+    return {"return_id": rid, "return_number": number, "messages": msgs, **return_lines(document_id)}
+
+
+def _recompute_faktur(con: sqlite3.Connection, invoice_id: int) -> None:
+    inv = con.execute("SELECT * FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
+    items = [dict(r) for r in con.execute("SELECT qty, unit_price FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,)).fetchall()]
+    t = db.compute_purchase_invoice_totals(items, inv["discount"], inv["tax_rate"], inv["shipping_cost"], inv["shipping_dpp"], inv["shipping_tax"])
+    con.execute("""UPDATE purchase_invoices SET subtotal=?, discount=?, tax_amount=?, total=?, updated_at=?, verify_status='belum',
+                   verify_note=NULL, verified_by=NULL, verified_at=NULL WHERE id=?""",
+                (t["subtotal"], t["discount"], t["tax_amount"], t["total"], db._now(), invoice_id))

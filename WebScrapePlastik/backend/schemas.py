@@ -51,6 +51,16 @@ class ReceiptItemRequest(BaseModel):
     price_reason: str | None = None
     allow_below_cost: bool = False
     serial_no: str | None = None  # K-S2: SN of a serviceable item, so a later warranty claim can find this line
+    # Who installs this line (Master Karyawan ids, several allowed) and who sold it (overrides the nota's sales utama).
+    # Left out = unchanged. Never anything about incentives: those are computed and shown only in the Insentif module.
+    technician_ids: list[int] | None = None
+    sales_employee_id: int | None = None
+
+
+class EmployeeRef(BaseModel):
+    id: int
+    name: str
+    is_active: bool = True
 
 
 class ReceiptExtra(BaseModel):
@@ -62,6 +72,8 @@ class ReceiptExtra(BaseModel):
     vehicle_model: str | None = None
     vehicle_color: str | None = None
     vehicle_year: str | None = None
+    remarks: str | None = None  # Keterangan (free note on the nota)
+    sales_employee_id: int | None = None  # Sales utama of the nota (Master Karyawan)
 
 
 class ReceiptRequest(ReceiptExtra):
@@ -184,9 +196,15 @@ class ReceiptItemOut(BaseModel):
     # the cost middleware zeroes it for staff).
     master_price: int | None = None
     avg_cost_price: int = 0
+    technicians: list[EmployeeRef] = []
+    sales_employee_id: int | None = None
+    sales_employee_name: str | None = None
+    work_status: str | None = None  # progress of this line's work: antrian / dikerjakan / selesai / batal
+    work_done_at: str | None = None
 
 
 class ReceiptOut(ReceiptExtra):
+    sales_employee_name: str | None = None
     revision: str | None = None
     id: str
     plate_region: str

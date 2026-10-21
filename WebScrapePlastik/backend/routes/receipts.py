@@ -122,6 +122,10 @@ def _validate_items(items: list[ReceiptItemRequest]) -> list[dict]:
                 raise HTTPException(status_code=422, detail="Tanggal garansi tidak valid, gunakan format YYYY-MM-DD.")
         row = item.model_dump()
         row["serial_no"] = (row.get("serial_no") or "").strip().upper()[:80] or None
+        # Only the assignment fields the client actually sent are applied (see database._assignments).
+        row["_assign"] = {k: row.pop(k) for k in ("technician_ids", "sales_employee_id") if k in item.model_fields_set}
+        row.pop("technician_ids", None)
+        row.pop("sales_employee_id", None)
         validated.append(row)
     return validated
 
@@ -156,11 +160,13 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         price_approved_by=row.get("price_approved_by"), price_approved_at=row.get("price_approved_at"),
         price_below_cost=bool(row.get("price_below_cost")),
         master_price=row.get("master_price"), avg_cost_price=row.get("avg_cost_price") or 0,
+        technicians=row.get("technicians") or [], sales_employee_id=row.get("sales_employee_id"),
+        sales_employee_name=row.get("sales_employee_name"), work_status=row.get("work_status"), work_done_at=row.get("work_done_at"),
     )
 
 
 EXTRA_MAX = {"work_notes": 1000, "cashier_name": 80, "estimated_finish_at": 40, "vehicle_make": 60,
-             "vehicle_model": 60, "vehicle_color": 40, "vehicle_year": 8}
+             "vehicle_model": 60, "vehicle_color": 40, "vehicle_year": 8, "remarks": 500}
 
 
 def _override_reason(req, user: dict) -> str | None:
@@ -186,6 +192,8 @@ def _clean_extra(req: ReceiptExtra, only_sent: bool) -> dict:
         if value and len(value) > limit:
             raise HTTPException(status_code=422, detail=f"{key} maksimal {limit} karakter.")
         out[key] = value
+    if not only_sent or "sales_employee_id" in req.model_fields_set:
+        out["sales_employee_id"] = req.sales_employee_id
     return out
 
 

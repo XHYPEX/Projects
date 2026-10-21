@@ -798,6 +798,7 @@ def init_db() -> None:
         for col, ddl in (("spo_item_id", "INTEGER"), ("condition", "TEXT"), ("location", "TEXT"), ("spo_package_id", "INTEGER")):
             if col not in ibi_cols:
                 con.execute(f"ALTER TABLE inbound_items ADD COLUMN {col} {ddl}")
+        _migrate_goods_receipt(con)
         con.execute("""CREATE TABLE IF NOT EXISTS inbound_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             document_id INTEGER NOT NULL REFERENCES inbound_documents(id),
@@ -5121,7 +5122,27 @@ def get_master_item_by_code(code: str) -> dict | None:
         by_barcode = get_master_item_by_barcode(code)
         if by_barcode is not None:
             return by_barcode
+    # Then the shop's own Kode Manual (what Goods Receipt labels encode), or a code it replaced: labels already
+    # on the shelf keep scanning.
+    by_manual = _get_master_item_by_manual_code(code)
+    if by_manual is not None:
+        return by_manual
     return get_master_item_by_sku(code)
+
+
+def _get_master_item_by_manual_code(code: str) -> dict | None:
+    c = re.sub(r"\s+", "", (code or "").strip().upper())
+    with _conn() as con:
+        row = con.execute(
+            """SELECT mi.*, s.name AS supplier_name, b.name AS brand_name FROM master_items mi
+               JOIN suppliers s ON s.id = mi.supplier_id
+               JOIN brands b ON b.id = mi.brand_id
+               WHERE mi.is_active=1 AND (UPPER(mi.manual_code)=?
+                     OR mi.id IN (SELECT master_item_id FROM item_code_aliases WHERE UPPER(code)=?))
+               ORDER BY UPPER(mi.manual_code)=? DESC LIMIT 1""",
+            (c, c, c),
+        ).fetchone()
+        return dict(row) if row is not None else None
 
 
 # Stock state of a product, judged against its own minimum stock (min_stock, default 5).
@@ -5182,9 +5203,9 @@ def list_master_items(
     where_clauses = []
     params: list = []
     if search:
-        where_clauses.append("(mi.name LIKE ? OR mi.sku LIKE ?)")
+        where_clauses.append("(mi.name LIKE ? OR mi.sku LIKE ? OR IFNULL(mi.manual_code,'') LIKE ?)")
         like = f"%{search}%"
-        params.extend([like, like])
+        params.extend([like, like, like])
     if supplier_id is not None:
         where_clauses.append("mi.supplier_id=?")
         params.append(supplier_id)
@@ -5404,8 +5425,8 @@ def autocomplete_master_items(
     params: list = []
     for word in (query.split() or [query]):
         like = f"%{word}%"
-        where_clauses.append("(mi.name LIKE ? OR mi.sku LIKE ? OR mi.barcode LIKE ?)")
-        params += [like, like, like]
+        where_clauses.append("(mi.name LIKE ? OR mi.sku LIKE ? OR mi.barcode LIKE ? OR IFNULL(mi.manual_code,'') LIKE ?)")
+        params += [like, like, like, like]
     if supplier_id is not None:
         where_clauses.append("mi.supplier_id=?")
         params.append(supplier_id)
@@ -5414,7 +5435,7 @@ def autocomplete_master_items(
         params.append(brand_id)
     where_sql = " AND ".join(where_clauses)
 
-    order_params = [query, query, f"{query}%"]
+    order_params = [query, query, query, f"{query}%"]
     with _conn() as con:
         rows = con.execute(
             f"""SELECT mi.*, s.name AS supplier_name, b.name AS brand_name
@@ -5424,7 +5445,7 @@ def autocomplete_master_items(
                 WHERE {where_sql}
                 ORDER BY
                     CASE
-                        WHEN UPPER(mi.barcode)=UPPER(?) OR UPPER(mi.sku)=UPPER(?) THEN 0
+                        WHEN UPPER(mi.barcode)=UPPER(?) OR UPPER(mi.sku)=UPPER(?) OR UPPER(IFNULL(mi.manual_code,''))=UPPER(?) THEN 0
                         WHEN UPPER(mi.sku) LIKE UPPER(?) THEN 1
                         ELSE 2
                     END,
@@ -5438,8 +5459,89 @@ def autocomplete_master_items(
 # --- Inbound documents ------------------------------------------------------
 
 
+def _migrate_goods_receipt(con: sqlite3.Connection) -> None:
+    """Goods Receipt (2026-10-21): one GR may span several POs of one supplier, a line splits into good / bad and
+    PO / excess on posting, and each SKU carries one Kode Manual for its labels."""
+    # One document may hold the same product twice (it is on two POs, or part of it is excess), so the old
+    # one-row-per-product rule goes. SQLite can only drop a table constraint by rebuilding the table.
+    sql = con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='inbound_items'").fetchone()["sql"]
+    if re.search(r"UNIQUE\s*\(\s*document_id\s*,\s*master_item_id\s*\)", sql):
+        # Build the copy under a new name and rename it last: renaming the live table first would make
+        # SQLite rewrite the other tables' REFERENCES inbound_items(...) to the old name.
+        cols = ", ".join(r["name"] for r in con.execute("PRAGMA table_info(inbound_items)").fetchall())
+        new_sql = re.sub(r",\s*UNIQUE\s*\(\s*document_id\s*,\s*master_item_id\s*\)", "", sql)
+        new_sql = re.sub(r"^CREATE TABLE\s+\"?inbound_items\"?", "CREATE TABLE inbound_items_new", new_sql)
+        con.execute("DROP TABLE IF EXISTS inbound_items_new")
+        con.execute(new_sql)
+        con.execute(f"INSERT INTO inbound_items_new ({cols}) SELECT {cols} FROM inbound_items")
+        con.execute("DROP TABLE inbound_items")
+        con.execute("ALTER TABLE inbound_items_new RENAME TO inbound_items")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_inbound_items_document_id ON inbound_items(document_id)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_inbound_items_master_item_id ON inbound_items(master_item_id)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_inbound_items_spo_item ON inbound_items(spo_item_id)")
+    ibi_cols = {r["name"] for r in con.execute("PRAGMA table_info(inbound_items)").fetchall()}
+    for col, ddl in (
+        ("qty_bad", "INTEGER NOT NULL DEFAULT 0"), ("bad_condition", "TEXT"), ("bad_note", "TEXT"), ("check_note", "TEXT"),
+        ("price_reason", "TEXT"), ("po_unit_price", "INTEGER"), ("is_over", "INTEGER NOT NULL DEFAULT 0"),
+        ("over_approved_qty", "INTEGER NOT NULL DEFAULT 0"), ("over_cost_price", "INTEGER"),
+    ):
+        if col not in ibi_cols:
+            con.execute(f"ALTER TABLE inbound_items ADD COLUMN {col} {ddl}")
+    ib_cols = {r["name"] for r in con.execute("PRAGMA table_info(inbound_documents)").fetchall()}
+    for col, ddl in (
+        ("flow", "TEXT"), ("received_time", "TEXT"), ("arrival_method", "TEXT"), ("courier", "TEXT"), ("tracking_no", "TEXT"),
+        ("package_count", "TEXT"), ("price_ack_by", "TEXT"), ("price_ack_at", "TEXT"), ("approval_state", "TEXT"),
+        ("approval_requested_by", "TEXT"), ("approval_requested_at", "TEXT"), ("approval_note", "TEXT"),
+        ("approval_by", "TEXT"), ("approval_at", "TEXT"), ("approval_reason", "TEXT"), ("recreated_from", "INTEGER"),
+    ):
+        if col not in ib_cols:
+            con.execute(f"ALTER TABLE inbound_documents ADD COLUMN {col} {ddl}")
+    con.executescript("""
+        CREATE TABLE IF NOT EXISTS inbound_document_pos (
+            document_id INTEGER NOT NULL REFERENCES inbound_documents(id),
+            supplier_po_id TEXT NOT NULL REFERENCES supplier_pos(id),
+            PRIMARY KEY (document_id, supplier_po_id));
+        CREATE INDEX IF NOT EXISTS idx_inbound_document_pos_po ON inbound_document_pos(supplier_po_id);
+        CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT, updated_by TEXT, updated_at TEXT);
+        CREATE TABLE IF NOT EXISTS item_code_aliases (
+            code TEXT PRIMARY KEY, master_item_id INTEGER NOT NULL REFERENCES master_items(id),
+            created_at TEXT NOT NULL, created_by TEXT);
+        CREATE TABLE IF NOT EXISTS item_code_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, master_item_id INTEGER NOT NULL REFERENCES master_items(id),
+            old_code TEXT, new_code TEXT, reason TEXT, by_user TEXT, at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS barcode_prints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, master_item_id INTEGER NOT NULL REFERENCES master_items(id),
+            code TEXT NOT NULL, qty INTEGER NOT NULL, kind TEXT NOT NULL, inbound_document_id INTEGER,
+            by_user TEXT, at TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_barcode_prints_item ON barcode_prints(master_item_id);
+        CREATE INDEX IF NOT EXISTS idx_barcode_prints_doc ON barcode_prints(inbound_document_id);
+    """)
+    mi_cols = {r["name"] for r in con.execute("PRAGMA table_info(master_items)").fetchall()}
+    if "manual_code" not in mi_cols:
+        con.execute("ALTER TABLE master_items ADD COLUMN manual_code TEXT")
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_master_items_manual_code ON master_items(manual_code) WHERE manual_code IS NOT NULL")
+    # A document made before multi-PO knew its PO only in the header; give it the link row too.
+    con.execute("""INSERT OR IGNORE INTO inbound_document_pos (document_id, supplier_po_id)
+                   SELECT id, supplier_po_id FROM inbound_documents WHERE supplier_po_id IS NOT NULL""")
+
+
+def _next_gr_number(con: sqlite3.Connection, day_str: str) -> str:
+    """GR-YYYYMMDD-NNN, shared by Goods Receipt documents and the PO receipts they write, so a number is never
+    handed out twice. (Older Barang Masuk documents were numbered BM-/IN-… and keep that.)"""
+    prefix = f"GR-{day_str}-"
+    seq = 0
+    for sql in ("SELECT doc_number AS n FROM inbound_documents WHERE doc_number LIKE ?",
+                "SELECT gr_number AS n FROM spo_receipts WHERE gr_number LIKE ?"):
+        for r in con.execute(sql, (f"{prefix}%",)).fetchall():
+            tail = (r["n"] or "").rsplit("-", 1)[-1]
+            if tail.isdigit():
+                seq = max(seq, int(tail))
+    return f"{prefix}{seq + 1:03d}"
+
+
 def _next_doc_number(con: sqlite3.Connection, today_str: str) -> str:
-    """BM-YYYYMMDD-NNN. (Older documents were numbered IN-YYYYMMDD-NNNN and keep that.)"""
+    """BM-YYYYMMDD-NNN: an inbound document that is not a Goods Receipt from a PO (e.g. replacement goods of a
+    Retur Supplier). Older documents were numbered IN-YYYYMMDD-NNNN and keep that."""
     prefix = f"BM-{today_str}-"
     row = con.execute(
         "SELECT doc_number FROM inbound_documents WHERE doc_number LIKE ? ORDER BY doc_number DESC LIMIT 1",
@@ -5511,38 +5613,6 @@ def create_inbound_document(
         _inbound_event(con, document_id, "created", "Draft disimpan", by)
         row = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         return dict(row)
-
-
-def update_inbound_document(
-    document_id: int,
-    supplier_id: int,
-    received_date: str,
-    supplier_invoice_no: str | None,
-    notes: str | None,
-    items: list[dict],
-    meta: dict | None = None,
-    by: str | None = None,
-) -> dict:
-    with _conn() as con:
-        row = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
-        if row is None:
-            raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
-        if row["status"] != "draft":
-            raise ValueError(
-                f"Dokumen barang masuk {document_id} tidak bisa diubah: statusnya '{row['status']}', hanya dokumen draft yang bisa diubah"
-            )
-        total_value = sum(i["qty_in"] * i["cost_price"] for i in items)
-        con.execute(
-            "UPDATE inbound_documents SET supplier_id=?, received_date=?, supplier_invoice_no=?, notes=?, total_value=?, "
-            "supplier_po_id=?, surat_jalan_no=?, officer=?, source=?, manual_reason=?, reviewed_by=NULL, reviewed_at=NULL WHERE id=?",
-            (supplier_id, received_date, supplier_invoice_no, notes, total_value,
-             *(((meta or {}).get(k) or None) for k in _INBOUND_META), document_id),
-        )
-        con.execute("DELETE FROM inbound_items WHERE document_id=?", (document_id,))
-        _insert_inbound_items(con, document_id, items)
-        _inbound_event(con, document_id, "updated", "Draft diperbarui", by)
-        updated = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
-        return dict(updated)
 
 
 def get_inbound_document(document_id: int) -> dict | None:
@@ -5685,35 +5755,97 @@ def _recompute_master_item_costing(con: sqlite3.Connection, master_item_id: int)
     return {"avg_cost_price": avg_cost_price, "total_qty": total_qty}
 
 
-def _spo_apply_inbound_receipt(con: sqlite3.Connection, header, lines: list[dict], by: str | None) -> None:
-    """Counts a posted Barang Masuk against its Purchase Order: qty_received, a GR record, PO events and status."""
-    supplier_po_id = header["supplier_po_id"]
+def _spo_apply_inbound_receipt(con: sqlite3.Connection, header, lines: list[dict], by: str | None) -> list[str]:
+    """Counts a posted Goods Receipt against its Purchase Order(s): one receipt record per PO (all sharing the GR
+    number), qty_received / qty_bad, PO events and status. `lines` are the posted rows that count against a PO
+    (never the excess). Returns the POs touched."""
     now = _now()
-    received_date = header["received_date"]
-    gr_prefix = f"GR-{received_date.replace('-', '')}-"
-    gr_n = con.execute("SELECT COUNT(*) AS n FROM spo_receipts WHERE gr_number LIKE ?", (gr_prefix + "%",)).fetchone()["n"] + 1
-    gr_number = f"{gr_prefix}{gr_n:03d}"
-    cur = con.execute(
-        """INSERT INTO spo_receipts (supplier_po_id, received_date, surat_jalan_no, warehouse_location, note,
-                                     inbound_document_id, created_by, created_at, gr_number, officer)
-           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)""",
-        (supplier_po_id, received_date, header["surat_jalan_no"], header["notes"], header["id"], by, now, gr_number,
-         header["officer"] or by),
-    )
-    total = 0
+    doc_no = header["doc_number"] or ""
+    gr_number = doc_no if doc_no.startswith("GR-") else _next_gr_number(con, header["received_date"].replace("-", ""))
+    by_po: dict[str, list[dict]] = {}
     for i in lines:
-        bad = (i.get("condition") or "baik") in BAD_RECEIVE_CONDITIONS
-        counted = i.get("_counted", i["qty_in"])  # K-11: never count past what the PO expects
-        con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ?, qty_bad = qty_bad + ? WHERE id=?",
-                    (counted, counted if bad else 0, i["spo_item_id"]))
-        con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location, package_id) VALUES (?, ?, ?, ?, ?, ?)",
-                    (cur.lastrowid, i["spo_item_id"], counted, i.get("condition") or "baik", i.get("location"), i.get("_package_id")))
-        total += counted
-    _spo_finish_if_settled(con, supplier_po_id)
-    _spo_event(con, supplier_po_id, "receive",
-               f"Barang diterima {gr_number} ({total} pcs) lewat Barang Masuk {header['doc_number']}"
-               + (f", surat jalan {header['surat_jalan_no']}" if header["surat_jalan_no"] else ""), by)
-    _spo_sync_all(con, supplier_po_id, by, now)
+        po_id = con.execute("SELECT supplier_po_id FROM supplier_po_items WHERE id=?", (i["spo_item_id"],)).fetchone()["supplier_po_id"]
+        by_po.setdefault(po_id, []).append(i)
+    for po_id, rows in by_po.items():
+        cur = con.execute(
+            """INSERT INTO spo_receipts (supplier_po_id, received_date, surat_jalan_no, warehouse_location, note,
+                                         inbound_document_id, created_by, created_at, gr_number, officer)
+               VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)""",
+            (po_id, header["received_date"], header["surat_jalan_no"], header["notes"], header["id"], by, now, gr_number,
+             header["officer"] or by),
+        )
+        total = 0
+        for i in rows:
+            bad = (i.get("condition") or "baik") in BAD_RECEIVE_CONDITIONS
+            con.execute("UPDATE supplier_po_items SET qty_received = qty_received + ?, qty_bad = qty_bad + ? WHERE id=?",
+                        (i["qty_in"], i["qty_in"] if bad else 0, i["spo_item_id"]))
+            con.execute("INSERT INTO spo_receipt_lines (receipt_id, item_id, quantity, condition, location, package_id) VALUES (?, ?, ?, ?, ?, ?)",
+                        (cur.lastrowid, i["spo_item_id"], i["qty_in"], i.get("condition") or "baik", i.get("location"), i.get("spo_package_id")))
+            total += i["qty_in"]
+        _spo_finish_if_settled(con, po_id)
+        _spo_event(con, po_id, "receive",
+                   f"Barang diterima {gr_number} ({total} pcs) lewat Goods Receipt {doc_no}"
+                   + (f", surat jalan {header['surat_jalan_no']}" if header["surat_jalan_no"] else ""), by)
+        _spo_sync_all(con, po_id, by, now)
+    return list(by_po)
+
+
+def _po_net_price(spi) -> int:
+    return spi["est_unit_price"] - round(spi["est_unit_price"] * (spi["discount_pct"] or 0) / 100)
+
+
+def get_setting(key: str, default: str | None = None, con: sqlite3.Connection | None = None) -> str | None:
+    if con is None:
+        with _conn() as c:
+            return get_setting(key, default, c)
+    row = con.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row is not None and row["value"] is not None else default
+
+
+def set_setting(key: str, value: str, by: str | None) -> None:
+    with _conn() as con:
+        con.execute("INSERT INTO app_settings (key, value, updated_by, updated_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_by=excluded.updated_by, updated_at=excluded.updated_at",
+                    (key, value, by, _now()))
+
+
+GR_PRICE_TOLERANCE_KEY = "gr_price_tolerance_pct"
+GR_PRICE_TOLERANCE_DEFAULT = 5.0
+
+
+def gr_price_tolerance(con: sqlite3.Connection | None = None) -> float:
+    try:
+        return float(get_setting(GR_PRICE_TOLERANCE_KEY, str(GR_PRICE_TOLERANCE_DEFAULT), con))
+    except ValueError:
+        return GR_PRICE_TOLERANCE_DEFAULT
+
+
+def gr_price_over_tolerance(po_price: int, actual: int, tolerance_pct: float) -> bool:
+    """A GR price differing from the PO by more than the tolerance (either way) needs an Admin."""
+    if actual == po_price:
+        return False
+    if po_price <= 0:
+        return True
+    return abs(actual - po_price) * 100 > tolerance_pct * po_price
+
+
+def _gr_line_parts(line: dict, po_qty: int, over_price: int | None) -> list[dict]:
+    """How one GR line lands as stock batches: the part that fills the PO and the excess, each split into good and
+    bad. Bad units fill the PO part first. Every part keeps the PO line, so the excess still traces back to it."""
+    bad = line.get("qty_bad") or 0
+    bad_cond = line.get("bad_condition") or line.get("condition")
+    if not bad and (line.get("condition") or "baik") in BAD_RECEIVE_CONDITIONS:
+        bad, bad_cond = line["qty_in"], line["condition"]  # an older draft: the whole line has one condition
+    over = line["qty_in"] - po_qty
+    bad_po = min(bad, po_qty)
+    bad_over = bad - bad_po
+    parts = [
+        {"qty_in": po_qty - bad_po, "condition": "baik", "is_over": 0, "cost_price": line["cost_price"]},
+        {"qty_in": bad_po, "condition": bad_cond, "is_over": 0, "cost_price": line["cost_price"]},
+        {"qty_in": over - bad_over, "condition": "baik", "is_over": 1, "cost_price": over_price},
+        {"qty_in": bad_over, "condition": bad_cond, "is_over": 1, "cost_price": over_price},
+    ]
+    return [p for p in parts if p["qty_in"] > 0]
 
 
 def _over_permission(accept_over: bool, over_reason: str | None, is_admin: bool) -> str | None:
@@ -5744,6 +5876,9 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
             )
         if header["source"] == "manual" and not header["reviewed_at"]:
             raise ValueError("Barang Masuk manual (tanpa PO) harus diperiksa dulu sebelum diposting.")
+        is_gr = header["flow"] == "gr"
+        if is_gr and not header["reviewed_at"]:
+            raise ValueError("Selesaikan Periksa Barang (qty baik / rusak) sebelum posting.")
 
         # Step 2: re-validate received_date, even though it may have already been
         # checked at creation time (it can go stale between draft creation and posting).
@@ -5759,37 +5894,91 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
             raise ValueError(f"Tanggal terima {received_date} lebih dari 30 hari yang lalu")
 
         # Step 3: fetch line items, reject if empty.
-        items = [dict(r) for r in con.execute("SELECT * FROM inbound_items WHERE document_id=?", (document_id,)).fetchall()]
+        items = [dict(r) for r in con.execute("SELECT * FROM inbound_items WHERE document_id=? ORDER BY id", (document_id,)).fetchall()]
         if not items:
             raise ValueError(f"Dokumen barang masuk {document_id} tidak bisa diposting: tidak ada baris barang")
 
-        po_lines = [i for i in items if i.get("spo_item_id")]
+        # Each PO line is checked against ITS PO (a GR may cover several POs of the supplier): the PO part may not
+        # exceed what the PO still expects, the excess needs an Admin (K-11), a price off the PO needs a reason and
+        # a confirmation, and beyond the tolerance an Admin.
+        approved = header["approval_state"] == "approved"
+        tolerance = gr_price_tolerance(con)
         over_notes: list[str] = []
-        if header["supplier_po_id"] and po_lines:
-            po_row = con.execute("SELECT status FROM supplier_pos WHERE id=?", (header["supplier_po_id"],)).fetchone()
-            if po_row is None or po_row["status"] not in ("dipesan", "sebagian_diterima"):
-                raise ValueError("Purchase Order terkait belum diterbitkan atau sudah selesai/dibatalkan.")
-            for i in po_lines:
-                spi = con.execute("SELECT * FROM supplier_po_items WHERE id=? AND supplier_po_id=?",
-                                  (i["spo_item_id"], header["supplier_po_id"])).fetchone()
-                if spi is None:
-                    raise ValueError("Baris Purchase Order tidak ditemukan pada dokumen ini.")
-                left = spi["quantity"] - spi["qty_cancelled"] - spi["qty_received"]
-                if i["qty_in"] > left:
-                    if not over_ok:
-                        raise ValueError(f"Jumlah untuk “{spi['product_name']}” melebihi sisa pesanan PO ({left}). "
-                                         "Admin dapat menerima kelebihannya sebagai stok umum.")
-                    # K-11: the PO is counted only up to what it still expects; the rest is plain stock.
-                    i["_counted"] = max(left, 0)
-                    over_notes.append(f"{i['qty_in'] - max(left, 0)} pcs “{spi['product_name']}”")
-                i["_package_id"] = _spo_check_receive_package(
-                    con, header["supplier_po_id"], i["spo_item_id"], i.get("spo_package_id"), i.get("_counted", i["qty_in"]))
+        price_notes: list[str] = []
+        plans: list[tuple[dict, int, int | None]] = []
+        for i in items:
+            if not i.get("spo_item_id"):
+                plans.append((i, i["qty_in"], None))
+                continue
+            spi = con.execute(
+                """SELECT spi.*, sp.status AS po_status, sp.po_number FROM supplier_po_items spi
+                   JOIN supplier_pos sp ON sp.id = spi.supplier_po_id WHERE spi.id=?""", (i["spo_item_id"],)).fetchone()
+            if spi is None:
+                raise ValueError("Baris Purchase Order pada dokumen ini tidak ditemukan.")
+            if spi["po_status"] not in ("dipesan", "sebagian_diterima"):
+                raise ValueError(f"Purchase Order {spi['po_number']} belum diterbitkan atau sudah selesai/dibatalkan.")
+            left = max(spi["quantity"] - spi["qty_cancelled"] - spi["qty_received"], 0)
+            po_qty = min(i["qty_in"], left)
+            over = i["qty_in"] - po_qty
+            over_price = None
+            if over > 0:
+                if approved and (i.get("over_approved_qty") or 0) >= over and i.get("over_cost_price") is not None:
+                    over_price = i["over_cost_price"]
+                elif over_ok:
+                    over_price = i["cost_price"]
+                elif approved and (i.get("over_approved_qty") or 0) > 0:
+                    raise ValueError(f"Sisa PO untuk “{spi['product_name']}” berubah sejak disetujui (kelebihan kini {over} pcs). "
+                                     "Minta persetujuan Admin lagi.")
+                else:
+                    raise ValueError(f"Jumlah untuk “{spi['product_name']}” melebihi sisa pesanan PO ({left}). "
+                                     "Kelebihan hanya bisa diterima dengan persetujuan Admin.")
+                over_notes.append(f"{over} pcs “{spi['product_name']}” ({spi['po_number']}) @ Rp {over_price:,}".replace(",", "."))
+            po_price = _po_net_price(spi)
+            if is_gr and i["cost_price"] != po_price:
+                if not (i.get("price_reason") or "").strip():
+                    raise ValueError(f"Isi alasan perubahan harga untuk “{spi['product_name']}”.")
+                if not header["price_ack_at"]:
+                    raise ValueError("Konfirmasi selisih harga terhadap PO dulu sebelum posting.")
+                if gr_price_over_tolerance(po_price, i["cost_price"], tolerance) and not approved:
+                    raise ValueError(f"Harga “{spi['product_name']}” berbeda lebih dari {tolerance:g}% dari PO. "
+                                     "Perlu persetujuan Admin sebelum posting.")
+                price_notes.append(f"{spi['product_name']}: PO Rp {po_price:,} → aktual Rp {i['cost_price']:,} "
+                                   f"({i['cost_price'] - po_price:+,}), alasan: {i['price_reason']}".replace(",", "."))
+            if po_qty > 0:
+                i["spo_package_id"] = _spo_check_receive_package(
+                    con, spi["supplier_po_id"], i["spo_item_id"], i.get("spo_package_id"), po_qty)
+            else:
+                i["spo_package_id"] = None
+            plans.append((i, po_qty, over_price))
 
         # Step 4: flip status to posted FIRST — the avg-cost recompute below filters
         # on d.status='posted' and must see this document's own new rows.
         if con.execute("UPDATE inbound_documents SET status='posted' WHERE id=? AND status='draft'",
                        (document_id,)).rowcount != 1:
             raise ValueError(f"Dokumen barang masuk {document_id} sudah diposting.")
+
+        # Step 4b: a line becomes homogeneous batches (PO part / excess × good / bad). The first part keeps the
+        # line's row; the rest are copies of it.
+        for i, po_qty, over_price in plans:
+            if not i.get("spo_item_id") and not (i.get("qty_bad") or 0):
+                continue  # nothing to split on a line outside a PO with one condition
+            parts = _gr_line_parts(i, po_qty if i.get("spo_item_id") else i["qty_in"], over_price)
+            first, rest = parts[0], parts[1:]
+            con.execute("UPDATE inbound_items SET qty_in=?, condition=?, is_over=?, cost_price=?, spo_package_id=? WHERE id=?",
+                        (first["qty_in"], first["condition"], first["is_over"], first["cost_price"],
+                         i["spo_package_id"] if not first["is_over"] else None, i["id"]))
+            for part in rest:
+                con.execute(
+                    """INSERT INTO inbound_items (document_id, master_item_id, qty_in, cost_price, spo_item_id, spo_package_id,
+                           condition, location, qty_bad, bad_condition, bad_note, check_note, price_reason, po_unit_price,
+                           is_over, over_approved_qty, over_cost_price)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (document_id, i["master_item_id"], part["qty_in"], part["cost_price"], i.get("spo_item_id"),
+                     i["spo_package_id"] if not part["is_over"] else None, part["condition"], i.get("location"),
+                     i.get("qty_bad") or 0, i.get("bad_condition"), i.get("bad_note"), i.get("check_note"),
+                     i.get("price_reason"), i.get("po_unit_price"), part["is_over"], i.get("over_approved_qty") or 0,
+                     i.get("over_cost_price")))
+        items = [dict(r) for r in con.execute("SELECT * FROM inbound_items WHERE document_id=? ORDER BY id", (document_id,)).fetchall()]
 
         # Step 5: resolve unresolved new-product lines into real master items + SKUs.
         for item in items:
@@ -5859,7 +6048,8 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
             mi = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
             doc_items_for_mi = [i for i in items if i["master_item_id"] == master_item_id and not i["bad"]]
             qty_in_total = sum(i["qty_in"] for i in doc_items_for_mi)
-            this_doc_cost_price = doc_items_for_mi[-1]["cost_price"]
+            # The excess may be priced differently (even free); the last purchase price is the PO part's.
+            this_doc_cost_price = ([i for i in doc_items_for_mi if not i.get("is_over")] or doc_items_for_mi)[-1]["cost_price"]
 
             costing = _recompute_master_item_costing(con, master_item_id)
             new_stock_qty = mi["stock_qty"] + qty_in_total
@@ -5884,27 +6074,58 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
         )
 
         # A document opened from the PO page already counted its receipt (GR) there; one made in
-        # Barang Masuk counts it now, when the goods really become stock.
-        if header["supplier_po_id"] and po_lines and not con.execute(
-                "SELECT 1 FROM spo_receipts WHERE inbound_document_id=?", (document_id,)).fetchone():
-            _spo_apply_inbound_receipt(con, header, po_lines, by)
+        # Barang Masuk counts it now, when the goods really become stock. The excess never counts.
+        po_rows = [i for i in items if i.get("spo_item_id") and not i.get("is_over")]
+        touched_pos: list[str] = []
+        if po_rows and not con.execute("SELECT 1 FROM spo_receipts WHERE inbound_document_id=?", (document_id,)).fetchone():
+            touched_pos = _spo_apply_inbound_receipt(con, header, po_rows, by)
         con.execute("UPDATE inbound_documents SET posted_by=?, posted_at=? WHERE id=?", (by, _now(), document_id))
-        if header["supplier_po_id"]:
+        if header["supplier_po_id"] and header["supplier_po_id"] not in touched_pos:
             # K-10: the goods are stock now, so the Sales Order lines they were bought for can move on.
             _spo_sync_all(con, header["supplier_po_id"], by, _now())
         # ...and a 'Stok Tersedia' line still waiting for shelf stock of these items may be covered now.
         _promote_shelf_ready_lines(con, by, master_item_ids=touched_ids)
         if over_notes:
-            _spo_event(con, header["supplier_po_id"], "over",
-                       f"Kelebihan barang diterima sebagai stok umum lewat {header['doc_number']}: " + ", ".join(over_notes)
-                       + f". Izin admin: {over_ok}", by)
-            _inbound_event(con, document_id, "over", "Kelebihan dari PO diterima sebagai stok umum: " + ", ".join(over_notes) + f". Izin admin: {over_ok}", by)
+            who = f"disetujui {header['approval_by']}: {header['approval_reason']}" if approved else f"Izin admin: {over_ok}"
+            note = "Kelebihan dari PO diterima sebagai stok umum: " + ", ".join(over_notes) + f". {who}"
+            for po_id in {con.execute("SELECT supplier_po_id FROM supplier_po_items WHERE id=?", (i["spo_item_id"],)).fetchone()[0]
+                          for i in items if i.get("is_over")}:
+                _spo_event(con, po_id, "over", f"{note} (lewat {header['doc_number']})", by)
+            _inbound_event(con, document_id, "over", note, by)
+        if price_notes:
+            _inbound_event(con, document_id, "price", "Harga beli aktual berbeda dari PO: " + "; ".join(price_notes), by)
         bad_total = sum(i["qty_in"] for i in items if i["bad"])
         _inbound_event(con, document_id, "posted",
                        f"Posting berhasil, stok bertambah {sum(i['qty_in'] for i in items if not i['bad'])} pcs"
                        + (f"; {bad_total} pcs rusak/tidak sesuai masuk Stok Karantina" if bad_total else ""), by)
         updated = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
         return dict(updated)
+
+
+def _reverse_doc_po_receipts(con: sqlite3.Connection, header, by: str | None, why: str) -> None:
+    """Takes back every PO receipt this document counted (one per PO for a multi-PO GR), with the damaged goods
+    those receipts put in quarantine, so each PO shows again what is really in."""
+    for rcpt in con.execute("SELECT * FROM spo_receipts WHERE inbound_document_id=?", (header["id"],)).fetchall():
+        _quarantine_cancel_source(con, "terima_barang", str(rcpt["id"]), by,
+                                  f"Penerimaan {rcpt['gr_number'] or ''} dibatalkan ({why})")
+        for ln in con.execute("SELECT item_id, quantity, condition FROM spo_receipt_lines WHERE receipt_id=?", (rcpt["id"],)).fetchall():
+            bad = (ln["condition"] or "baik") in BAD_RECEIVE_CONDITIONS
+            con.execute("UPDATE supplier_po_items SET qty_received = MAX(qty_received - ?, 0), qty_bad = MAX(qty_bad - ?, 0) WHERE id=?",
+                        (ln["quantity"], ln["quantity"] if bad else 0, ln["item_id"]))
+        _spo_finish_if_settled(con, rcpt["supplier_po_id"])
+        _spo_event(con, rcpt["supplier_po_id"], "receive", f"Penerimaan {rcpt['gr_number'] or ''} dibatalkan ({why})", by)
+        _spo_sync_all(con, rcpt["supplier_po_id"], by, _now())
+
+
+def inbound_document_po_ids(con: sqlite3.Connection, document_id: int) -> list[str]:
+    """Every PO a document refers to: the ones picked for it and the ones its lines belong to."""
+    rows = con.execute(
+        """SELECT supplier_po_id FROM inbound_document_pos WHERE document_id=?
+           UNION SELECT spi.supplier_po_id FROM inbound_items ii JOIN supplier_po_items spi ON spi.id = ii.spo_item_id
+                 WHERE ii.document_id=?
+           UNION SELECT supplier_po_id FROM inbound_documents WHERE id=? AND supplier_po_id IS NOT NULL""",
+        (document_id, document_id, document_id)).fetchall()
+    return [r[0] for r in rows]
 
 
 def void_inbound_document(document_id: int, reason: str, by: str | None = None) -> dict:
@@ -5916,11 +6137,32 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
         if header["status"] == "void":
             raise ValueError(f"Dokumen barang masuk {document_id} sudah dibatalkan")
 
-        _inbound_event(con, document_id, "void", f"Dibatalkan: {reason}", by)
         if header["status"] == "draft":
+            _inbound_event(con, document_id, "void", f"Dibatalkan: {reason}", by)
+            # A draft opened by the old PO-page "Terima Barang" was already counted on its PO there. Cancelling it
+            # must take that count back too, or the PO would show goods as received that never became stock.
+            _reverse_doc_po_receipts(con, header, by, f"draft {header['doc_number']} dibatalkan")
             con.execute("UPDATE inbound_documents SET status='void' WHERE id=?", (document_id,))
             updated = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
             return dict(updated)
+
+        # Posted void: a correction of what the shop already relies on, so it is refused while anything downstream
+        # still uses this receipt.
+        po_ids = inbound_document_po_ids(con, document_id)
+        if po_ids:
+            inv = con.execute(
+                f"SELECT invoice_number FROM purchase_invoices WHERE status='posted' AND supplier_po_id IN ({','.join('?' * len(po_ids))}) LIMIT 1",
+                po_ids).fetchone()
+            if inv is not None:
+                raise ValueError(f"Dokumen {header['doc_number']} tidak bisa dibatalkan: barangnya sudah ditagih di Faktur Pembelian "
+                                 f"{inv['invoice_number']} yang sudah diposting. Void faktur itu dulu.")
+        ret = con.execute(
+            """SELECT r.return_number FROM supplier_return_items i JOIN supplier_returns r ON r.id = i.return_id
+               JOIN inbound_items ii ON ii.id = i.inbound_item_id
+               WHERE ii.document_id=? AND r.doc_status<>'dibatalkan' LIMIT 1""", (document_id,)).fetchone()
+        if ret is not None:
+            raise ValueError(f"Dokumen {header['doc_number']} tidak bisa dibatalkan: dipakai di Retur Supplier {ret['return_number']}.")
+        _inbound_event(con, document_id, "void", f"Dibatalkan: {reason}", by)
 
         # Posted void: reject unless every item's stock is fully intact.
         items = [
@@ -5972,20 +6214,8 @@ def void_inbound_document(document_id: int, reason: str, by: str | None = None) 
                 (master_item_id, -item["qty_in"], new_stock_qty, document_id, reason, _now(), by),
             )
 
-        # The receipt this document counted against its PO is taken back too, so the PO shows what is really in.
-        rcpt = con.execute("SELECT * FROM spo_receipts WHERE inbound_document_id=?", (document_id,)).fetchone()
-        if rcpt is not None:
-            # Damaged goods of that receipt went to quarantine at Terima Barang; they are undone with it.
-            _quarantine_cancel_source(con, "terima_barang", str(rcpt["id"]), by,
-                                      f"Penerimaan {rcpt['gr_number'] or ''} dibatalkan (Barang Masuk {header['doc_number']} void)")
-            for ln in con.execute("SELECT item_id, quantity, condition FROM spo_receipt_lines WHERE receipt_id=?", (rcpt["id"],)).fetchall():
-                bad = (ln["condition"] or "baik") in BAD_RECEIVE_CONDITIONS
-                con.execute("UPDATE supplier_po_items SET qty_received = MAX(qty_received - ?, 0), qty_bad = MAX(qty_bad - ?, 0) WHERE id=?",
-                            (ln["quantity"], ln["quantity"] if bad else 0, ln["item_id"]))
-            _spo_finish_if_settled(con, rcpt["supplier_po_id"])
-            _spo_event(con, rcpt["supplier_po_id"], "receive",
-                       f"Penerimaan {rcpt['gr_number'] or ''} dibatalkan (Barang Masuk {header['doc_number']} void)", by)
-            _spo_sync_all(con, rcpt["supplier_po_id"], by, _now())
+        # The receipts this document counted against its PO(s) are taken back too.
+        _reverse_doc_po_receipts(con, header, by, f"Barang Masuk {header['doc_number']} void")
 
         con.execute("UPDATE inbound_documents SET status='void' WHERE id=?", (document_id,))
         updated = con.execute("SELECT * FROM inbound_documents WHERE id=?", (document_id,)).fetchone()
@@ -7028,6 +7258,39 @@ def _active_po_faktur(con: sqlite3.Connection, supplier_po_id: str) -> dict | No
     return dict(row) if row else None
 
 
+def po_billable_lines(con: sqlite3.Connection, supplier_po_id: str) -> list[dict]:
+    """What a faktur from this PO bills: each PO line's received goods at the price its posted Goods Receipt
+    confirmed (an Admin-approved excess included, at its own price), and goods received before Goods Receipt
+    existed at the PO price. One entry per line and price."""
+    out = []
+    for i in _spo_items(con, supplier_po_id):
+        po_price = _po_net_price(i)
+        received = min(i["quantity"] - i["qty_cancelled"], i["qty_received"])
+        by_price: dict[int, int] = {}
+        counted = 0
+        for r in con.execute(
+                """SELECT ii.qty_in, ii.cost_price, ii.is_over FROM inbound_items ii JOIN inbound_documents d ON d.id = ii.document_id
+                   WHERE ii.spo_item_id=? AND d.status='posted' ORDER BY ii.id""", (i["id"],)):
+            by_price[r["cost_price"]] = by_price.get(r["cost_price"], 0) + r["qty_in"]
+            if not r["is_over"]:
+                counted += r["qty_in"]
+        if received > counted:
+            by_price[po_price] = by_price.get(po_price, 0) + received - counted
+        for price, qty in by_price.items():
+            if qty > 0:
+                out.append({"spo_item_id": i["id"], "master_item_id": i["master_item_id"], "product_name": i["product_name"],
+                            "sku": i.get("sku"), "unit": i.get("unit") or "", "qty": qty, "unit_price": price, "po_price": po_price})
+    return out
+
+
+def po_over_qty(con: sqlite3.Connection, supplier_po_id: str) -> dict[int, int]:
+    """Excess an Admin accepted per PO line (posted GRs): billable, though never counted on the PO."""
+    return {r[0]: r[1] for r in con.execute(
+        """SELECT ii.spo_item_id, SUM(ii.qty_in) FROM inbound_items ii JOIN inbound_documents d ON d.id = ii.document_id
+           JOIN supplier_po_items spi ON spi.id = ii.spo_item_id
+           WHERE spi.supplier_po_id=? AND d.status='posted' AND ii.is_over=1 GROUP BY ii.spo_item_id""", (supplier_po_id,))}
+
+
 def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) -> dict:
     """K-12 'Buat Faktur Pembelian' on an issued PO: a draft faktur with the PO's lines (ordered minus
     cancelled, at the PO price after line discount), header discount, PPN and shipping as its own line.
@@ -7044,16 +7307,10 @@ def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) 
         have = _active_po_faktur(con, supplier_po_id)
         if have:
             raise ValueError(f"PO ini sudah punya Faktur Pembelian {have['invoice_number']}.")
-        items = _spo_items(con, supplier_po_id)
-        lines = []
-        for i in items:
-            # Three-Way Matching: the faktur bills what has been received (Goods Receipt), not what was ordered.
-            qty = min(i["quantity"] - i["qty_cancelled"], i["qty_received"])
-            if qty <= 0:
-                continue
-            price = i["est_unit_price"] - round(i["est_unit_price"] * (i["discount_pct"] or 0) / 100)
-            lines.append({"master_item_id": i["master_item_id"], "product_name": i["product_name"], "sku": i.get("sku"),
-                          "unit": i.get("unit") or "", "qty": qty, "unit_price": price})
+        # Three-Way Matching: the faktur bills what has been received (Goods Receipt) at the price the GR confirmed,
+        # not what was ordered.
+        lines = [{k: b[k] for k in ("master_item_id", "product_name", "sku", "unit", "qty", "unit_price")}
+                 for b in po_billable_lines(con, supplier_po_id)]
         if not lines:
             raise ValueError("Belum ada barang yang diterima dari PO ini. Faktur dibuat dari barang yang sudah diterima (Goods Receipt); "
                              "catat penerimaan barang dulu.")
@@ -7090,7 +7347,7 @@ def create_purchase_invoice_from_po(supplier_po_id: str, by: str | None = None) 
 
 def list_po_received_for_faktur(supplier_id: int | None) -> list[dict]:
     """Goods Receipt waiting for a faktur: this supplier's issued POs that have received goods and no active faktur
-    yet, with each received line at its PO price. Read-only; 'Ambil' on the Faktur Pembelian page then uses the
+    yet, with each received line at its Goods Receipt price. Read-only; 'Ambil' on the Faktur Pembelian page then uses the
     existing create-from-PO flow, so the faktur stays linked to its PO and goes through the same matching.
     With no supplier, every supplier's (the 'Buat dari Goods Receipt' picker on the faktur list)."""
     out = []
@@ -7103,14 +7360,8 @@ def list_po_received_for_faktur(supplier_id: int | None) -> list[dict]:
             po = dict(po)
             if _active_po_faktur(con, po["id"]):
                 continue
-            lines = []
-            for i in _spo_items(con, po["id"]):
-                qty = min(i["quantity"] - i["qty_cancelled"], i["qty_received"])
-                if qty <= 0:
-                    continue
-                price = i["est_unit_price"] - round(i["est_unit_price"] * (i["discount_pct"] or 0) / 100)
-                lines.append({"product_name": i["product_name"], "unit": i.get("unit") or "", "qty": qty, "unit_price": price,
-                              "line_total": qty * price})
+            lines = [{"product_name": b["product_name"], "unit": b["unit"], "qty": b["qty"], "unit_price": b["unit_price"],
+                      "po_price": b["po_price"], "line_total": b["qty"] * b["unit_price"]} for b in po_billable_lines(con, po["id"])]
             if lines:
                 out.append({"po_id": po["id"], "po_number": po["po_number"], "status": po["status"],
                             "supplier_name": po["supplier_name_snapshot"],
@@ -10461,11 +10712,7 @@ def receive_supplier_po(
         for r in arrived:
             if r.get("condition") and r["condition"] not in SPO_ITEM_CONDITIONS:
                 raise ValueError(f"Kondisi barang harus salah satu dari: {', '.join(SPO_ITEM_CONDITIONS)}.")
-        gr_prefix = f"GR-{received_date.replace('-', '')}-"
-        gr_n = con.execute(
-            "SELECT COUNT(*) AS n FROM spo_receipts WHERE gr_number LIKE ?", (gr_prefix + "%",)
-        ).fetchone()["n"] + 1
-        gr_number = f"{gr_prefix}{gr_n:03d}"
+        gr_number = _next_gr_number(con, received_date.replace("-", ""))
         cur = con.execute(
             """INSERT INTO spo_receipts (supplier_po_id, received_date, surat_jalan_no, warehouse_location, note,
                                          created_by, created_at, gr_number, officer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",

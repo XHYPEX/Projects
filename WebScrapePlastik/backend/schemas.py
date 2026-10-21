@@ -537,6 +537,7 @@ class SkuPreviewOut(BaseModel):
 class MasterItemOut(BaseModel):
     id: int
     sku: str
+    manual_code: str | None = None  # the shop's own label code (Goods Receipt barcode), one per SKU
     sku_prefix: str
     sku_seq: int
     supplier_id: int
@@ -1444,6 +1445,8 @@ class InboundPostRequest(BaseModel):
     # K-11 (admin only): post lines that exceed the PO's remaining quantity; the excess is general stock.
     accept_over: bool = False
     over_reason: str | None = None
+    # A draft from before Goods Receipt: the poster has seen the duplicate / stock check first.
+    legacy_checked: bool = False
 
 
 class SupplierPoStageRequest(BaseModel):

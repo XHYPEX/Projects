@@ -5,7 +5,7 @@ can be posted (become debt):
 
   * every faktur line is a product of the PO,
   * the quantity billed does not exceed what has been received (Goods Receipt),
-  * the unit price is the PO price (after the PO's line discount),
+  * the unit price is the price the posted Goods Receipt confirmed (or the PO price, after its line discount),
   * the supplier is the PO's supplier, and the supplier's faktur number is not used twice.
 
 Everything matches -> any user can verify it (a four-point checklist is recorded). Something differs -> the
@@ -36,11 +36,22 @@ def _key(master_id, name) -> tuple:
 def match_lines(con: sqlite3.Connection, po_id: str, items: list[dict]) -> list[dict]:
     """PO ↔ Goods Receipt ↔ Faktur, one row per product. For checking only."""
     po_groups: dict[tuple, dict] = {}
+    over = db.po_over_qty(con, po_id)
     for p in con.execute("SELECT * FROM supplier_po_items WHERE supplier_po_id=? ORDER BY position, id", (po_id,)).fetchall():
-        g = po_groups.setdefault(_key(p["master_item_id"], p["product_name"]), {"name": p["product_name"], "qty_po": 0, "qty_gr": 0, "prices": set()})
+        g = po_groups.setdefault(_key(p["master_item_id"], p["product_name"]),
+                                 {"name": p["product_name"], "qty_po": 0, "qty_gr": 0, "qty_over": 0, "prices": set(), "gr_prices": set()})
         g["qty_po"] += p["quantity"] - (p["qty_cancelled"] or 0)
-        g["qty_gr"] += p["qty_received"]
-        g["prices"].add(p["est_unit_price"] - round(p["est_unit_price"] * (p["discount_pct"] or 0) / 100))
+        # An excess the Admin accepted on the Goods Receipt may be billed too (it was received, just not ordered).
+        g["qty_gr"] += p["qty_received"] + over.get(p["id"], 0)
+        g["qty_over"] += over.get(p["id"], 0)
+        g["prices"].add(db._po_net_price(p))
+    # The price the posted Goods Receipt confirmed is the operational reference: a faktur at that price is not
+    # flagged again for the PO-vs-GR difference already confirmed there.
+    for b in db.po_billable_lines(con, po_id):
+        g = po_groups.get(_key(b["master_item_id"], b["product_name"]))
+        if g is not None:
+            g["prices"].add(b["unit_price"])
+            g["gr_prices"].add(b["unit_price"])
     inv_groups: dict[tuple, dict] = {}
     for it in items:
         g = inv_groups.setdefault(_key(it.get("master_item_id"), it["product_name"]), {"name": it["product_name"], "qty": 0, "prices": []})
@@ -63,14 +74,15 @@ def match_lines(con: sqlite3.Connection, po_id: str, items: list[dict]) -> list[
         if g["qty"] > po["qty_gr"]:
             notes.append(f"Qty faktur melebihi barang diterima ({g['qty']} > {po['qty_gr']})")
             diff += (g["qty"] - po["qty_gr"]) * price_inv
-        if g["qty"] > po["qty_po"]:
+        if g["qty"] > po["qty_po"] + po["qty_over"]:
             notes.append("Qty faktur melebihi PO")
         bad_price = [pr for pr in g["prices"] if pr not in po["prices"]]
-        price_po = min(po["prices"]) if po["prices"] else 0
+        ref = sorted(po["gr_prices"]) or sorted(po["prices"])
+        price_ref = ref[0] if ref else 0
         if bad_price:
-            notes.append(f"Harga faktur beda dari PO (Rp {bad_price[0]:,} vs Rp {price_po:,})".replace(",", "."))
-            diff += abs(bad_price[0] - price_po) * min(g["qty"], po["qty_gr"] or g["qty"])
-        out.append({"product": g["name"], "qty_po": po["qty_po"], "qty_gr": po["qty_gr"], "qty_inv": g["qty"], "price_po": price_po,
+            notes.append(f"Harga faktur beda dari harga Goods Receipt / PO (Rp {bad_price[0]:,} vs Rp {price_ref:,})".replace(",", "."))
+            diff += abs(bad_price[0] - price_ref) * min(g["qty"], po["qty_gr"] or g["qty"])
+        out.append({"product": g["name"], "qty_po": po["qty_po"], "qty_over": po["qty_over"], "qty_gr": po["qty_gr"], "qty_inv": g["qty"], "price_po": price_ref,
                     "price_inv": price_inv, "result": "selisih" if notes else "sesuai", "note": "; ".join(notes), "diff_value": diff})
     return out
 
@@ -95,17 +107,17 @@ def match_invoice(con: sqlite3.Connection, invoice_id: int) -> dict:
     dup = con.execute(
         "SELECT invoice_number FROM purchase_invoices WHERE supplier_id=? AND status<>'void' AND id<>? AND TRIM(IFNULL(supplier_invoice_no,''))<>'' "
         "AND UPPER(TRIM(supplier_invoice_no))=UPPER(TRIM(?))", (inv["supplier_id"], invoice_id, inv["supplier_invoice_no"] or "")).fetchone()
-    bad_qty = [l for l in lines if l["result"] == "tidak_di_po" or (l["qty_gr"] is not None and l["qty_inv"] > l["qty_gr"]) or (l["qty_po"] is not None and l["qty_inv"] > l["qty_po"])]
+    bad_qty = [l for l in lines if l["result"] == "tidak_di_po" or (l["qty_gr"] is not None and l["qty_inv"] > l["qty_gr"]) or (l["qty_po"] is not None and l["qty_inv"] > l["qty_po"] + (l.get("qty_over") or 0))]
     bad_price = [l for l in lines if l["result"] == "selisih" and "Harga" in l["note"]]
     checks = [
         {"key": "supplier", "label": "Supplier faktur sama dengan supplier PO", "ok": po is not None and po["supplier_id"] == inv["supplier_id"]},
         {"key": "po", "label": "PO masih aktif (sudah diterbitkan, belum dibatalkan)", "ok": po is not None and po["status"] in ("dipesan", "sebagian_diterima", "diterima")},
         {"key": "qty", "label": "Qty faktur tidak melebihi barang yang diterima", "ok": not bad_qty},
-        {"key": "harga", "label": "Harga sesuai persetujuan PO", "ok": not bad_price},
+        {"key": "harga", "label": "Harga sesuai harga Goods Receipt / PO", "ok": not bad_price},
         {"key": "duplikat", "label": "Nomor faktur supplier belum pernah dicatat", "ok": dup is None},
     ]
     ok = all(c["ok"] for c in checks)
-    summary = {"invoice_total": inv["total"], "gr_value": sum((l["qty_gr"] or 0) * (l["price_po"] or 0) for l in lines),
+    summary = {"invoice_total": inv["total"], "gr_value": sum(b["qty"] * b["unit_price"] for b in db.po_billable_lines(con, inv["supplier_po_id"])),
                "po_outstanding": sum(o["value"] for o in outstanding), "diff_value": sum(l["diff_value"] for l in lines),
                "po_number": con.execute("SELECT po_number FROM supplier_pos WHERE id=?", (inv["supplier_po_id"],)).fetchone()["po_number"] if po else None}
     # a stored 'terverifikasi' only counts while the documents still match what was verified

@@ -32,7 +32,6 @@ from backend.database import (
     get_supplier_po_summary,
     issue_supplier_po,
     parse_ymd,
-    receive_supplier_po,
     release_spo_line_to_stock,
     set_supplier_po_stage,
     set_supplier_po_tracking,
@@ -239,13 +238,9 @@ async def set_tracking_route(
 async def receive_supplier_po_route(
     supplier_po_id: str, req: SupplierPoReceiveRequest, user: dict = Depends(get_current_user)
 ):
-    return await _run(
-        receive_supplier_po, supplier_po_id, [line.model_dump() for line in req.items], user["username"],
-        received_date=_text(req.received_date), surat_jalan_no=_text(req.surat_jalan_no),
-        warehouse_location=_text(req.warehouse_location), note=_text(req.note), create_inbound=req.create_inbound,
-        officer=_text(req.officer), accept_over=req.accept_over, over_reason=_text(req.over_reason),
-        is_admin=user.get("role") == "admin",
-    )
+    # One receiving system (owner, 2026-10-21): "Terima Barang" now opens the Goods Receipt wizard, where stock,
+    # quarantine and the PO's received qty move together, once, when the GR is posted.
+    raise HTTPException(status_code=410, detail="Penerimaan barang sekarang lewat Goods Receipt (menu Barang Masuk).")
 
 
 @router.put("/supplier-pos/{supplier_po_id}/receive-draft", response_model=SupplierPoDetail)

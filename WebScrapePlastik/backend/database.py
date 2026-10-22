@@ -9876,7 +9876,8 @@ def get_supplier_po(supplier_po_id: str) -> dict | None:
     return {**po, **_spo_totals(po, items), "refund_claims": claims, "open_invoices": open_invoices,
             "items": items, "events": events, "payments": payments,
             "receipts": receipts, "cancellations": cancellations, "shipments": shipments,
-            "packages": packages, "package_history": pkg_history, "receive_draft": receive_draft, "so_cancelled_lines": so_cancelled}
+            "packages": packages, "package_history": pkg_history, "receive_draft": receive_draft, "so_cancelled_lines": so_cancelled,
+            "shipping_plan": _spo_shipping_plan(po, items, packages)}
 
 
 def _spo_shipping_status(po: dict, items: list[dict]) -> str | None:
@@ -10767,6 +10768,165 @@ def cancel_spo_package(supplier_po_id: str, package_id: int, reason: str, by: st
         _spo_event(con, supplier_po_id, "package", f"Paket {pkg['package_no']} dibatalkan — {reason}", by)
     return get_supplier_po(supplier_po_id)
 
+
+
+# ---------------------------------------------------------------------------
+# Rencana Pengiriman (owner, 22-10-2026): the route of every unit is set in one table per PO (rows = PO lines,
+# columns = Udara / Laut / ...). Each route is a package: saving the plan grows or shrinks the open package of
+# that route, or makes a new one, so the shipping info (forwarder, resi, ETA, status) lives only on packages.
+# ---------------------------------------------------------------------------
+SPO_PLAN_METHOD_LABELS = {"udara": "Udara", "laut": "Laut", "darat": "Darat", "ambil_sendiri": "Ambil Sendiri", "lainnya": "Lainnya"}
+
+
+def _spo_lane_target(pkgs: list[dict], method: str) -> dict | None:
+    """The package of a route that the plan may still change: the newest one of that route that is not on the
+    road yet and not fully received. Packages already moving keep what they carry."""
+    for p in reversed(pkgs):
+        if p["cancelled"] or p["ship_method"] != method or p["status"] in SPO_PKG_MOVING:
+            continue
+        if p["lines"] and p["remaining_qty"] <= 0:
+            continue
+        return p
+    return None
+
+
+def _spo_shipping_plan(po: dict, items: list[dict], pkgs: list[dict]) -> dict:
+    """Per PO line: units per route (sum of that route's package lines), the least each route may be set to (units in
+    packages the plan cannot change, plus what already arrived in the changeable one), units in a package with no
+    route, and what is not on any route yet."""
+    live = [p for p in pkgs if not p["cancelled"]]
+    targets = {m: _spo_lane_target(live, m) for m in SPO_SHIP_METHODS}
+    rows = []
+    for it in items:
+        ordered = it["quantity"] - it["qty_cancelled"]
+        if ordered <= 0:
+            continue
+        lanes: dict[str, dict] = {}
+        other = got_in_pkg = 0
+        for p in live:
+            for l in p["lines"]:
+                if l["item_id"] != it["id"]:
+                    continue
+                got_in_pkg += l["received"]
+                if not p["ship_method"]:
+                    other += l["quantity"]
+                    continue
+                e = lanes.setdefault(p["ship_method"], {"qty": 0, "floor": 0, "packages": []})
+                e["qty"] += l["quantity"]
+                t = targets.get(p["ship_method"])
+                e["floor"] += l["received"] if t and t["id"] == p["id"] else l["quantity"]
+                e["packages"].append({"id": p["id"], "no": p["package_no"].rsplit("-", 1)[-1], "qty": l["quantity"],
+                                      "received": l["received"], "state": p["state"], "status": p["status"]})
+        outside = max(it["qty_received"] - got_in_pkg, 0)   # arrived on a Barang Masuk that named no package
+        capacity = max(ordered - outside, 0)
+        planned = sum(e["qty"] for e in lanes.values()) + other
+        rows.append({"item_id": it["id"], "product_name": it["product_name"], "sku": it.get("sku"), "unit": it.get("unit"),
+                     "customer_po_number": it.get("customer_po_number"), "ordered": ordered, "received": it["qty_received"],
+                     "received_outside": outside, "capacity": capacity, "lanes": lanes, "other": other,
+                     "unassigned": capacity - planned})
+    used = [m for m in SPO_SHIP_METHODS if any(m in r["lanes"] for r in rows)]
+    return {"rows": rows, "methods": SPO_PLAN_METHOD_LABELS, "used_methods": used,
+            "editable": po["status"] in ("dipesan", "sebagian_diterima")}
+
+
+def save_spo_shipping_plan(supplier_po_id: str, data: dict, by: str | None = None) -> dict:
+    """Simpan Rencana Pengiriman: data = {"items": [{"item_id", "lanes": {route: qty}}]}. A route left out of a
+    row keeps what it has. All or nothing; stock never moves here."""
+    rows_in = data.get("items") or []
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        po = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
+        if po is None:
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
+        po = dict(po)
+        if po["status"] not in ("dipesan", "sebagian_diterima"):
+            raise ValueError("Rencana pengiriman diatur setelah PO diterbitkan dan sebelum selesai diterima.")
+        pkgs = _spo_packages(con, supplier_po_id)
+        plan = _spo_shipping_plan(po, _spo_items(con, supplier_po_id), pkgs)
+        by_item = {r["item_id"]: r for r in plan["rows"]}
+        deltas: dict[str, dict[int, int]] = {}
+        summary = []
+        for d in rows_in:
+            r = by_item.get(int(d.get("item_id") or 0))
+            if r is None:
+                raise ValueError("Barang tidak ada di PO ini atau sudah dibatalkan.")
+            wants = {}
+            for m, q in (d.get("lanes") or {}).items():
+                if m not in SPO_SHIP_METHODS:
+                    raise ValueError(f"Jalur pengiriman tidak dikenal: {m}.")
+                try:
+                    q = int(q or 0)
+                except (TypeError, ValueError):
+                    raise ValueError("Jumlah harus angka.")
+                if q < 0:
+                    raise ValueError("Jumlah tidak boleh minus.")
+                wants[m] = q
+            final = {m: e["qty"] for m, e in r["lanes"].items()}
+            for m, q in wants.items():
+                floor = r["lanes"].get(m, {}).get("floor", 0)
+                if q < floor:
+                    raise ValueError(f"“{r['product_name']}”: jalur {SPO_PLAN_METHOD_LABELS[m]} minimal {floor} "
+                                     "(sudah dalam perjalanan / sudah diterima).")
+                final[m] = q
+            total = sum(final.values()) + r["other"]
+            if total > r["capacity"]:
+                raise ValueError(f"“{r['product_name']}”: total rencana {total} melebihi jumlah yang dipesan ({r['capacity']}).")
+            for m, q in final.items():
+                delta = q - r["lanes"].get(m, {}).get("qty", 0)
+                if delta:
+                    deltas.setdefault(m, {})[r["item_id"]] = delta
+            if any(deltas.get(m, {}).get(r["item_id"]) for m in final):
+                summary.append(f"{r['product_name']}: " + ", ".join(f"{SPO_PLAN_METHOD_LABELS[m]} {q}" for m, q in final.items() if q)
+                               + (f" (belum diatur {r['capacity'] - total})" if r["capacity"] - total else ""))
+        if not deltas:
+            return get_supplier_po(supplier_po_id)
+        now = _now()
+        live = [p for p in pkgs if not p["cancelled"]]
+        n = con.execute("SELECT COUNT(*) AS n FROM spo_packages WHERE supplier_po_id=?", (supplier_po_id,)).fetchone()["n"]
+        notes = []
+        for m in SPO_SHIP_METHODS:
+            dm = deltas.get(m)
+            if not dm:
+                continue
+            target = _spo_lane_target(live, m)
+            if target is None:
+                lines = [(i, q) for i, q in dm.items() if q > 0]
+                if not lines:
+                    continue
+                n += 1
+                package_no = f"{po['po_number']}-P{n}"
+                pid = con.execute(
+                    """INSERT INTO spo_packages (supplier_po_id, package_no, ship_method, status, note, created_by, created_at, updated_at)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (supplier_po_id, package_no, m, "menunggu_konfirmasi", "Dari Rencana Pengiriman", by, now, now)).lastrowid
+                con.executemany("INSERT INTO spo_package_lines (package_id, item_id, quantity) VALUES (?,?,?)",
+                                [(pid, i, q) for i, q in lines])
+                _pkg_history(con, pid, supplier_po_id, {"status": "menunggu_konfirmasi", "ship_method": m, "tracking_no": None,
+                                                        "eta_date": None, "transit_location": None, "note": "Dari Rencana Pengiriman"}, None, by)
+                notes.append(f"paket {package_no.rsplit('-', 1)[-1]} {SPO_PLAN_METHOD_LABELS[m]} dibuat ({sum(q for _, q in lines)} pcs)")
+                continue
+            qty = {l["item_id"]: l["quantity"] for l in target["lines"]}
+            for i, dq in dm.items():
+                qty[i] = qty.get(i, 0) + dq
+            keep = [(i, q) for i, q in qty.items() if q > 0]
+            short = target["package_no"].rsplit("-", 1)[-1]
+            if not keep:
+                con.execute("UPDATE spo_packages SET cancelled=1, cancel_reason=?, updated_at=? WHERE id=?",
+                            ("Kosong setelah Rencana Pengiriman diubah", now, target["id"]))
+                notes.append(f"paket {short} {SPO_PLAN_METHOD_LABELS[m]} dibatalkan (kosong)")
+                continue
+            con.execute("DELETE FROM spo_package_lines WHERE package_id=?", (target["id"],))
+            con.executemany("INSERT INTO spo_package_lines (package_id, item_id, quantity) VALUES (?,?,?)",
+                            [(target["id"], i, q) for i, q in keep])
+            con.execute("UPDATE spo_packages SET updated_at=? WHERE id=?", (now, target["id"]))
+            _pkg_history(con, target["id"], supplier_po_id, {"status": target["status"], "ship_method": m, "tracking_no": target["tracking_no"],
+                                                             "eta_date": target["eta_date"], "transit_location": target["transit_location"],
+                                                             "note": "Isi paket diubah lewat Rencana Pengiriman"}, target["forwarder_name"], by)
+            notes.append(f"paket {short} {SPO_PLAN_METHOD_LABELS[m]} jadi {sum(q for _, q in keep)} pcs")
+        con.execute("UPDATE supplier_pos SET updated_at=? WHERE id=?", (now, supplier_po_id))
+        _spo_event(con, supplier_po_id, "package", "Rencana pengiriman: " + "; ".join(summary) + (" — " + ", ".join(notes) if notes else ""), by)
+        _spo_sync_all(con, supplier_po_id, by, now)
+    return get_supplier_po(supplier_po_id)
 
 
 def _spo_finish_if_settled(con: sqlite3.Connection, supplier_po_id: str) -> None:

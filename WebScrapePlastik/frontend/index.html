@@ -1429,7 +1429,7 @@
               <button id="cashier-quick-save" type="button" onclick="document.getElementById('cashier-save-btn').click()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Perubahan</button>
               <button id="cashier-quick-pay" type="button" onclick="openCashierSettleModal()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Tambah Pembayaran</button>
               <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-3 py-2 border border-blue-600 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ubah Status Pengerjaan</button>
-              <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left transition-colors">Serah Terima Kendaraan</button>
+              <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden inline-flex items-center gap-2 px-3 py-2 border border-yellow-400 rounded-lg text-sm font-medium text-yellow-950 bg-yellow-300 hover:bg-yellow-400 text-left transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17H3v-5l2-5h11l3 5h2v5h-2"/><path d="M5 12h14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/></svg><span id="cashier-quick-handover-label">Serah Terima Kendaraan</span></button>
               <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-3 py-2 border border-green-600 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 text-left transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>Cetak Nota</button>
             </div>
           </section>
@@ -2697,10 +2697,11 @@
         </div>
 
         <div data-spo-tab="pengiriman">
+          <div id="spo-plan-section" class="mb-4"></div>
           <div id="spo-pkg-section" class="mb-4"></div>
-          <div id="spo-ship-cards" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4"></div>
-          <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Riwayat Pengiriman Item</div>
+          <div id="spo-ship-cards" class="mb-4"></div>
+          <div id="spo-ship-history-card" class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
+            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Riwayat Pengiriman per Item (data lama)</div>
             <div class="overflow-x-auto"><table class="w-full text-xs">
               <thead class="bg-bg2"><tr><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Item</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Item</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Metode</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Ekspedisi / Resi</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">ETA</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Oleh</th></tr></thead>
               <tbody id="spo-ship-history"></tbody></table></div>
@@ -8501,7 +8502,7 @@ function renderCashierRailExtras() {
   // K-08: Serah Terima is offered once the work is Selesai; it also shows who took the vehicle and when.
   const hb = q("cashier-quick-handover");
   hb.classList.toggle("hidden", !(tab.workStatus === "selesai" && tab.status !== "void"));
-  hb.textContent = tab.handedOverAt ? "Lihat Serah Terima" : "Serah Terima Kendaraan";
+  q("cashier-quick-handover-label").textContent = tab.handedOverAt ? "Lihat Serah Terima" : "Serah Terima Kendaraan";
 }
 
 // ── Cashier: multi-tab workspace ──────────────────────────────────────────────
@@ -23302,37 +23303,123 @@ function spoShipMethodPill(m) {
   return m ? `<span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-medium ${SPO_SHIP_METHOD_CLS[m] || "bg-bg2 text-ink"}">${esc(SPO_SHIP_METHODS[m] || m)}</span>` : '<span class="text-muted">&mdash;</span>';
 }
 
+// Rencana Pengiriman (owner, 22-10-2026): the route of every unit is set here, in one table per PO. Each route is
+// a package; forwarder, resi, ETA and status are filled on the package card, never per item.
+let spoPlanExtra = new Set();
+const SPO_PLAN_DEFAULT = ["udara", "laut"];
+function spoPlanMethods(plan) {
+  const order = Object.keys(plan.methods);
+  const on = new Set([...SPO_PLAN_DEFAULT, ...plan.used_methods, ...spoPlanExtra]);
+  return order.filter(m => on.has(m));
+}
 function renderSpoShippingTab(po) {
+  renderSpoPlan(po);
   renderSpoPackages(po);
+  const plan = po.shipping_plan || { rows: [] };
   const live = po.items.filter(i => i.item_status !== "dibatalkan");
-  document.getElementById("spo-ship-cards").innerHTML = live.length ? live.map(i => {
-    const left = spoItemLeft(i);
-    return `<div class="bg-white border border-line rounded-xl p-4">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0"><div class="font-medium text-ink truncate">${esc(i.product_name)}</div>
-          <div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}${i.customer_name ? " · " + esc(i.customer_name) : ""}</div></div>
-        ${spoItemStatusPill(i.item_status)}</div>
-      <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs mt-3">
-        <dt class="text-muted">Metode</dt><dd>${spoShipMethodPill(i.ship_method)}</dd>
-        <dt class="text-muted">Ekspedisi</dt><dd class="text-ink">${esc(i.courier || "—")}</dd>
-        <dt class="text-muted">No. Resi</dt><dd class="text-ink font-mono">${esc(i.tracking_no || "—")}</dd>
-        <dt class="text-muted">Tgl Kirim</dt><dd class="text-ink">${i.shipped_date ? esc(formatPoDate(i.shipped_date)) : "—"}</dd>
-        <dt class="text-muted">ETA</dt><dd class="text-ink">${i.eta_date ? esc(formatPoDate(i.eta_date)) : "—"}</dd>
-        <dt class="text-muted">Lokasi</dt><dd class="text-ink">${esc(i.transit_location || "—")}</dd></dl>
-      ${i.has_packages ? `<div class="mt-3 text-xs text-muted">Dibagi ke paket pengiriman: ${i.pkg_open} pcs di jalan${i.pkg_free > 0 ? `, ${i.pkg_free} pcs belum dipaketkan` : ""}. Status diatur lewat paketnya.</div>`
-        : (po.status === "dipesan" || po.status === "sebagian_diterima") && left > 0 ? `<div class="mt-3 text-right">${spoActionButton("Update Status Pengiriman", `openSpoItemShippingModal(${i.id})`, true)}</div>` : ""}
-    </div>`;
-  }).join("") : '<p class="text-sm text-muted">Belum ada item.</p>';
+  const pkgOf = Object.fromEntries((po.packages || []).map(p => [p.id, p]));
+  document.getElementById("spo-ship-cards").innerHTML = live.length ? `<div class="bg-white border border-line rounded-xl p-4 sm:p-5">
+    <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">Ringkasan Pengiriman per Barang</div>
+    <div class="divide-y divide-line">${live.map(i => {
+      const r = plan.rows.find(x => x.item_id === i.id);
+      const chips = r ? Object.entries(r.lanes).filter(([, e]) => e.qty > 0).map(([m, e]) => `<span class="inline-flex items-center gap-1.5 border border-line rounded-full pl-1 pr-2.5 py-0.5 text-xs">${spoShipMethodPill(m)}<b class="tabular-nums">${e.qty}</b>
+        <span class="text-muted">${e.packages.map(p => `${esc(p.no)} · ${esc((SPO_ITEM_STATUS[p.state] || [p.state])[0])}`).join(", ")}</span></span>`).join(" ") : "";
+      const legacy = !i.has_packages && (i.ship_method || i.courier || i.tracking_no)
+        ? `<div class="text-[11px] text-muted mt-1">Data per item (lama): ${esc([SPO_SHIP_METHODS[i.ship_method] || i.ship_method, i.courier, i.tracking_no ? "resi " + i.tracking_no : ""].filter(Boolean).join(" · "))} — ${esc((SPO_ITEM_STATUS[i.item_status] || [i.item_status])[0])}</div>` : "";
+      return `<div class="py-2.5 flex flex-wrap items-start gap-x-4 gap-y-1.5">
+        <div class="min-w-[220px] flex-1"><div class="font-medium text-ink">${esc(i.product_name)}</div>
+          <div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}${i.customer_name ? " · " + esc(i.customer_name) : ""} · ${r ? r.ordered : i.quantity} pcs${r && r.received ? ` · diterima ${r.received}` : ""}</div>${legacy}</div>
+        <div class="flex flex-wrap items-center gap-1.5">${chips}${r && r.other ? `<span class="text-xs text-muted">paket tanpa jalur ${r.other}</span>` : ""}
+          ${r && r.unassigned > 0 ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">belum diatur ${r.unassigned}</span>` : ""}</div></div>`;
+    }).join("")}</div></div>` : '<p class="text-sm text-muted">Belum ada item.</p>';
   const names = Object.fromEntries(po.items.map(i => [i.id, i.product_name]));
   const rows = [...(po.shipments || [])].reverse();
-  document.getElementById("spo-ship-history").innerHTML = rows.length ? rows.map(h => `<tr class="border-b border-line last:border-b-0">
+  document.getElementById("spo-ship-history-card").classList.toggle("hidden", !rows.length);
+  document.getElementById("spo-ship-history").innerHTML = rows.map(h => `<tr class="border-b border-line last:border-b-0">
     <td class="px-3 py-2 tabular-nums text-muted whitespace-nowrap">${esc(formatReceiptWhen(h.at, true))}</td>
     <td class="px-3 py-2 text-ink">${esc(names[h.item_id] || "—")}</td><td class="px-3 py-2">${spoItemStatusPill(h.status)}</td>
     <td class="px-3 py-2">${spoShipMethodPill(h.ship_method)}</td>
     <td class="px-3 py-2 text-ink">${esc([h.forwarder, h.tracking_no].filter(Boolean).join(" · ") || "—")}</td>
     <td class="px-3 py-2 tabular-nums text-ink">${h.eta_date ? esc(formatPoDate(h.eta_date)) : "—"}</td>
-    <td class="px-3 py-2 text-muted">${esc(h.by_user || "—")}</td></tr>`).join("")
-    : `<tr><td colspan="7" class="px-3 py-6 text-center text-muted">Belum ada pembaruan pengiriman per item.</td></tr>`;
+    <td class="px-3 py-2 text-muted">${esc(h.by_user || "—")}</td></tr>`).join("");
+}
+
+function renderSpoPlan(po) {
+  const box = document.getElementById("spo-plan-section");
+  const plan = po.shipping_plan;
+  if (!plan || !plan.rows.length) { box.innerHTML = ""; return; }
+  const methods = spoPlanMethods(plan), edit = plan.editable;
+  const anyOther = plan.rows.some(r => r.other > 0);
+  const addable = Object.keys(plan.methods).filter(m => !methods.includes(m));
+  const cell = (r, m) => {
+    const e = r.lanes[m] || { qty: 0, floor: 0 };
+    if (!edit) return `<td class="px-3 py-2 text-center tabular-nums">${e.qty || '<span class="text-muted">—</span>'}</td>`;
+    return `<td class="px-2 py-1.5 text-center"><input type="number" min="${e.floor}" max="${r.capacity}" value="${e.qty || ""}" placeholder="0" data-plan-item="${r.item_id}" data-plan-m="${m}" data-floor="${e.floor}"
+        oninput="spoPlanRecalc()" class="w-20 border border-line rounded-lg px-2 py-1.5 text-sm text-center tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+      ${e.floor ? `<div class="text-[10px] text-muted mt-0.5" title="Sudah dalam perjalanan / sudah diterima">min ${e.floor}</div>` : ""}</td>`;
+  };
+  box.innerHTML = `<div class="bg-white border border-line rounded-xl p-4 sm:p-5">
+    <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
+      <div><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Rencana Pengiriman</div>
+        <div class="text-xs text-muted">Isi berapa unit tiap barang dikirim lewat jalur apa. Simpan membuat satu paket per jalur; ekspedisi, resi, ETA, dan status diisi di kartu paket.</div></div>
+      ${edit ? `<div class="flex flex-wrap items-center gap-2">${methods.slice(0, 2).map(m => spoActionButton(`Semua via ${plan.methods[m]}`, `spoPlanAll('${m}')`)).join("")}
+        ${addable.length ? `<select onchange="if(this.value){spoPlanExtra.add(this.value); renderSpoPlan(currentSpo);}" class="border border-line rounded-lg px-2 py-1.5 text-xs bg-white text-ink"><option value="">+ Jalur</option>${addable.map(m => `<option value="${m}">${esc(plan.methods[m])}</option>`).join("")}</select>` : ""}</div>` : ""}</div>
+    <div class="overflow-x-auto border border-line rounded-xl"><table class="w-full min-w-[640px] text-sm">
+      <thead class="bg-bg2"><tr><th class="${SPO_TH}">Barang</th><th class="${SPO_THR}">Pesan</th>${methods.map(m => `<th class="text-center px-3 py-2 border-b border-line">${spoShipMethodPill(m)}</th>`).join("")}
+        ${anyOther ? `<th class="${SPO_THR}">Paket tanpa jalur</th>` : ""}<th class="${SPO_THR}">Belum diatur</th></tr></thead>
+      <tbody>${plan.rows.map(r => `<tr class="border-b border-line last:border-b-0">
+        <td class="px-3 py-2"><div class="font-medium text-ink">${esc(r.product_name)}</div><div class="text-[11px] text-muted">${esc(r.customer_po_number || "Stok toko")}${r.received_outside ? ` · ${r.received_outside} diterima tanpa paket` : ""}</div></td>
+        <td class="px-3 py-2 text-right tabular-nums">${r.capacity}</td>${methods.map(m => cell(r, m)).join("")}
+        ${anyOther ? `<td class="px-3 py-2 text-right tabular-nums text-muted">${r.other || "—"}</td>` : ""}
+        <td class="px-3 py-2 text-right tabular-nums font-medium" data-plan-left="${r.item_id}" data-cap="${r.capacity}" data-other="${r.other}">${r.unassigned}</td></tr>`).join("")}</tbody>
+      <tfoot class="bg-bg2/60"><tr><td class="px-3 py-2 text-xs font-semibold text-ink">Total</td><td class="px-3 py-2 text-right tabular-nums font-semibold">${plan.rows.reduce((a, r) => a + r.capacity, 0)}</td>
+        ${methods.map(m => `<td class="px-3 py-2 text-center tabular-nums font-semibold" data-plan-total="${m}"></td>`).join("")}${anyOther ? "<td></td>" : ""}<td class="px-3 py-2 text-right tabular-nums font-semibold" data-plan-total="left"></td></tr></tfoot></table></div>
+    ${edit ? `<div class="flex flex-wrap items-center justify-between gap-2 mt-3"><p id="spo-plan-msg" class="text-xs text-muted"></p>
+      <div class="flex gap-2">${spoActionButton("Reset", "renderSpoPlan(currentSpo)")}<button type="button" id="spo-plan-save" onclick="spoPlanSave()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 transition-colors">Simpan Rencana</button></div></div>`
+      : `<p class="text-xs text-muted mt-3">${po.status === "draft" ? "Rencana pengiriman diisi setelah PO diterbitkan." : "PO ini sudah selesai; rencana tidak bisa diubah."}</p>`}</div>`;
+  spoPlanRecalc();
+}
+function spoPlanInputs() { return [...document.querySelectorAll("#spo-plan-section [data-plan-item]")]; }
+function spoPlanRecalc() {
+  const plan = currentSpo?.shipping_plan; if (!plan) return;
+  const inputs = spoPlanInputs(), totals = {};
+  let bad = 0, open = 0;
+  for (const r of plan.rows) {
+    const mine = inputs.filter(x => Number(x.dataset.planItem) === r.item_id);
+    const sum = mine.length ? mine.reduce((a, x) => a + (parseInt(x.value, 10) || 0), 0) : Object.values(r.lanes).reduce((a, e) => a + e.qty, 0);
+    mine.forEach(x => { const v = parseInt(x.value, 10) || 0; totals[x.dataset.planM] = (totals[x.dataset.planM] || 0) + v; x.classList.toggle("border-failed", v < Number(x.dataset.floor)); if (v < Number(x.dataset.floor)) bad++; });
+    if (!mine.length) for (const [m, e] of Object.entries(r.lanes)) totals[m] = (totals[m] || 0) + e.qty;
+    const left = r.capacity - r.other - sum;
+    const cell = document.querySelector(`#spo-plan-section [data-plan-left="${r.item_id}"]`);
+    if (cell) { cell.textContent = left === 0 ? "0 ✓" : String(left); cell.className = `px-3 py-2 text-right tabular-nums font-medium ${left < 0 ? "text-failed" : left > 0 ? "text-amber-700" : "text-green-700"}`; }
+    if (left < 0) bad++;
+    open += Math.max(left, 0);
+  }
+  document.querySelectorAll("#spo-plan-section [data-plan-total]").forEach(td => { const k = td.dataset.planTotal; td.textContent = k === "left" ? open : (totals[k] || 0); });
+  const msg = document.getElementById("spo-plan-msg"), btn = document.getElementById("spo-plan-save");
+  if (msg) { msg.textContent = bad ? "Ada isian melebihi jumlah pesan atau di bawah yang sudah dikirim (merah)." : open ? `${open} unit belum punya jalur; boleh disimpan dan diatur nanti.` : "Semua unit sudah punya jalur."; msg.className = `text-xs ${bad ? "text-failed" : "text-muted"}`; }
+  if (btn) btn.disabled = bad > 0;
+}
+function spoPlanAll(method) {
+  const plan = currentSpo?.shipping_plan; if (!plan) return;
+  for (const r of plan.rows) {
+    const mine = spoPlanInputs().filter(x => Number(x.dataset.planItem) === r.item_id);
+    let room = r.capacity - r.other;
+    for (const x of mine) if (x.dataset.planM !== method) { x.value = x.dataset.floor > 0 ? x.dataset.floor : ""; room -= Number(x.dataset.floor); }
+    const target = mine.find(x => x.dataset.planM === method);
+    if (target) target.value = Math.max(room, Number(target.dataset.floor)) || "";
+  }
+  spoPlanRecalc();
+}
+async function spoPlanSave() {
+  const plan = currentSpo?.shipping_plan; if (!plan) return;
+  const items = plan.rows.map(r => ({ item_id: r.item_id, lanes: Object.fromEntries(spoPlanInputs().filter(x => Number(x.dataset.planItem) === r.item_id).map(x => [x.dataset.planM, parseInt(x.value, 10) || 0])) }));
+  const btn = document.getElementById("spo-plan-save"); if (btn) btn.disabled = true;
+  const resp = await fetch(`/api/supplier-pos/${encodeURIComponent(currentSpo.id)}/shipping-plan`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
+  if (!resp.ok) { showToast(await responseErrorDetail(resp, "Rencana pengiriman gagal disimpan.")); if (btn) btn.disabled = false; return; }
+  spoPlanExtra = new Set();
+  renderSupplierPoDetail(await resp.json());
+  showToast("Rencana pengiriman disimpan. Lengkapi ekspedisi, resi, dan ETA di kartu paket.", "success");
 }
 
 // ── Batal PO dengan persetujuan supplier, Piutang Refund / Kredit Supplier ─────────────────────────
@@ -23491,8 +23578,8 @@ function renderSpoPackages(po) {
   box.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <div><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Paket Pengiriman</div>
         <div class="text-xs text-muted">Satu PO bisa dikirim dalam beberapa paket; satu barang bisa dibagi ke beberapa paket.${issued && unpacked > 0 ? ` <b class="text-ink">${unpacked} pcs belum masuk paket.</b>` : ""}</div></div>
-      <div class="flex gap-2">${spoActionButton("Master Ekspedisi", "openForwarderMaster()")}${issued && unpacked > 0 ? spoActionButton("+ Buat Paket", "openSpoPackageModal(null)", true) : ""}</div></div>
-    ${cards ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">${cards}</div>` : `<div class="text-sm text-muted bg-white border border-dashed border-line rounded-xl p-4 mb-3">Belum ada paket. Barang tetap bisa diatur per item di bawah, atau bagi ke paket dengan “+ Buat Paket”.</div>`}
+      <div class="flex gap-2">${spoActionButton("Master Ekspedisi", "openForwarderMaster()")}${issued && unpacked > 0 ? spoActionButton("+ Paket Manual", "openSpoPackageModal(null)") : ""}</div></div>
+    ${cards ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">${cards}</div>` : `<div class="text-sm text-muted bg-white border border-dashed border-line rounded-xl p-4 mb-3">Belum ada paket. Isi Rencana Pengiriman di atas lalu Simpan Rencana; paket per jalur dibuat otomatis.</div>`}
     ${hist.length ? `<details class="bg-white border border-line rounded-xl p-3 mb-3"><summary class="text-xs font-medium text-ink cursor-pointer">Riwayat paket (${hist.length})</summary>
       <div class="overflow-x-auto mt-2"><table class="w-full text-xs"><tbody>${hist.map(h => `<tr class="border-b border-line last:border-b-0"><td class="px-2 py-1.5 tabular-nums text-muted whitespace-nowrap">${esc(formatReceiptWhen(h.at, true))}</td><td class="px-2 py-1.5">${esc(pkgNo[h.package_id] || "")}</td><td class="px-2 py-1.5">${spoItemStatusPill(h.status)}</td><td class="px-2 py-1.5 text-ink">${esc([h.forwarder_name, h.tracking_no].filter(Boolean).join(" · ") || "—")}</td><td class="px-2 py-1.5 text-muted">${esc(h.by_user || "")}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
 }
@@ -23812,9 +23899,19 @@ function renderSupplierPoDetail(po) {
   ].join("");
 
   const canShip = issued;
+  // Route, forwarder/resi and ETA come from the packages (Rencana Pengiriman); a line never packaged keeps its old per-item data.
+  const planRows = Object.fromEntries(((po.shipping_plan || {}).rows || []).map(r => [r.item_id, r]));
+  const livePkgs = (po.packages || []).filter(p => !p.cancelled);
   document.getElementById("spo-detail-items").innerHTML = po.items.map((item, idx) => {
     const left = spoItemLeft(item);
-    const detailShip = [item.courier, item.tracking_no].filter(Boolean).map(esc).join(" · ");
+    const pr = planRows[item.id];
+    const lanes = pr ? Object.entries(pr.lanes).filter(([, e]) => e.qty > 0) : [];
+    const mine = livePkgs.filter(p => p.lines.some(l => l.item_id === item.id));
+    const routeCell = lanes.length ? lanes.map(([m, e]) => `<div class="flex items-center gap-1 mb-0.5">${spoShipMethodPill(m)}<span class="text-xs tabular-nums">${e.qty}</span></div>`).join("")
+      + (pr.unassigned > 0 ? `<div class="text-[11px] text-amber-700">belum diatur ${pr.unassigned}</div>` : "") : spoShipMethodPill(item.ship_method);
+    const detailShip = mine.length ? mine.map(p => esc([p.package_no.split("-").pop(), p.forwarder_name, p.tracking_no].filter(Boolean).join(" · "))).join("<br>")
+      : [item.courier, item.tracking_no].filter(Boolean).map(esc).join(" · ");
+    const eta = mine.map(p => p.eta_date).filter(Boolean).sort()[0] || item.eta_date;
     return `
     <tr class="border-b border-line last:border-b-0 align-top">
       <td class="px-3 py-2 text-muted tabular-nums">${idx + 1}</td>
@@ -23824,12 +23921,12 @@ function renderSupplierPoDetail(po) {
       <td class="px-3 py-2 text-ink text-xs">${esc(item.customer_name || "—")}${item.plate_full ? `<div class="text-[11px] text-muted">${esc(item.plate_full)}</div>` : ""}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums">${item.quantity - item.qty_cancelled}${item.qty_cancelled ? `<div class="text-[11px] text-failed">${item.qty_cancelled} dibatalkan</div>` : ""}</td>
       <td class="px-3 py-2 text-right tabular-nums ${item.qty_received >= item.quantity - item.qty_cancelled ? "text-done font-medium" : item.qty_received ? "text-ink" : "text-failed"}">${item.qty_received}</td>
-      <td class="px-3 py-2">${spoShipMethodPill(item.ship_method)}</td>
-      <td class="px-3 py-2 text-xs text-ink">${detailShip || '<span class="text-muted">&mdash;</span>'}${item.transit_location ? `<div class="text-[11px] text-muted">${esc(item.transit_location)}</div>` : ""}</td>
-      <td class="px-3 py-2 text-xs text-ink whitespace-nowrap tabular-nums">${item.eta_date ? esc(formatPoDate(item.eta_date)) : "—"}</td>
+      <td class="px-3 py-2">${routeCell}</td>
+      <td class="px-3 py-2 text-xs text-ink">${detailShip || '<span class="text-muted">&mdash;</span>'}${!mine.length && item.transit_location ? `<div class="text-[11px] text-muted">${esc(item.transit_location)}</div>` : ""}</td>
+      <td class="px-3 py-2 text-xs text-ink whitespace-nowrap tabular-nums">${eta ? esc(formatPoDate(eta)) : "—"}</td>
       <td class="px-3 py-2">${spoItemStatusPill(item.item_status)}</td>
       <td class="px-3 py-2"><div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
-        ${canShip && left > 0 ? spoActionButton("Ubah Status", `openSpoItemShippingModal(${item.id})`) : ""}
+        ${canShip && left > 0 ? spoActionButton("Atur Jalur", "setSpoTab('pengiriman')") : ""}
         ${issued && left > 0 && isAdmin() ? spoActionButton("Batalkan", `openSpoCancelItemModal(${item.id})`, false, true) : ""}</div></td>
     </tr>`;
   }).join("");

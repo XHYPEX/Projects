@@ -1744,6 +1744,8 @@ class SupplierPoDetail(SupplierPoOut):
     shipments: list[SupplierPoShipmentOut] = []
     packages: list[dict] = []
     package_history: list[dict] = []
+    # Rencana Pengiriman: units per route for every PO line (see database._spo_shipping_plan).
+    shipping_plan: dict | None = None
     # Piutang Refund / Kredit Supplier after a paid PO was cancelled (admin only) and the supplier's open fakturs to put credit on.
     refund_claims: list[dict] = []
     open_invoices: list[dict] = []

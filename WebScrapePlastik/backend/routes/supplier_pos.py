@@ -36,6 +36,7 @@ from backend.database import (
     set_supplier_po_stage,
     set_supplier_po_tracking,
     update_supplier_po_item_shipping,
+    save_spo_shipping_plan,
     update_supplier_po,
     update_supplier_po_invoice,
 )
@@ -388,6 +389,12 @@ async def update_package_route(
     supplier_po_id: str, package_id: int, req: SpoPackageRequest, user: dict = Depends(get_current_user)
 ):
     return await _run(update_spo_package, supplier_po_id, package_id, _package_data(req), user["username"])
+
+
+@router.put("/supplier-pos/{supplier_po_id}/shipping-plan", response_model=SupplierPoDetail)
+async def shipping_plan_route(supplier_po_id: str, body: dict, user: dict = Depends(get_current_user)):
+    """Rencana Pengiriman: units of every PO line per route (Udara / Laut / ...); each route is kept as a package."""
+    return await _run(save_spo_shipping_plan, supplier_po_id, body, user["username"])
 
 
 @router.post("/supplier-pos/{supplier_po_id}/packages/{package_id}/cancel", response_model=SupplierPoDetail)

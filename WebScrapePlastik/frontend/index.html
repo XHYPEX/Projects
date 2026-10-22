@@ -1120,7 +1120,7 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label for="customer-phone" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="normal-case font-normal">(wajib bila ada pemasangan)</span></label>
+                    <label for="customer-phone" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="normal-case font-normal">(wajib saat mulai pemasangan)</span></label>
                     <input id="customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off"
                     class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     oninput="this.value=this.value.replace(/[^0-9+\s\-.()]/g,''); markActiveTabDirty(); onCashierPhoneEdited();" />
@@ -1154,7 +1154,7 @@
                   <div><label for="veh-year-input" class="sr-only">Tahun</label><input id="veh-year-input" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="2020" oninput="this.value=this.value.replace(/[^0-9]/g,'');" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors" /></div>
                 </div>
                 <div>
-                  <label for="plate-region" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">No. Plat <span class="normal-case font-normal">(wajib bila ada pemasangan)</span></label>
+                  <label for="plate-region" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">No. Plat <span class="normal-case font-normal">(wajib saat mulai pemasangan)</span></label>
                   <div class="flex items-center gap-2">
                     <svg class="text-muted shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6.5" width="19" height="11" rx="2"/><path d="M6 12h3M11 12h7"/></svg>
                     <input id="plate-region" type="text" maxlength="2" placeholder="B"
@@ -1428,9 +1428,9 @@
             <div class="px-4 pb-4 grid gap-2">
               <button id="cashier-quick-save" type="button" onclick="document.getElementById('cashier-save-btn').click()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Perubahan</button>
               <button id="cashier-quick-pay" type="button" onclick="openCashierSettleModal()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Tambah Pembayaran</button>
-              <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Ubah Status Pengerjaan</button>
+              <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-3 py-2 border border-blue-600 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ubah Status Pengerjaan</button>
               <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left transition-colors">Serah Terima Kendaraan</button>
-              <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left transition-colors">Cetak Nota</button>
+              <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-3 py-2 border border-green-600 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 text-left transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>Cetak Nota</button>
             </div>
           </section>
 
@@ -6585,19 +6585,16 @@ document.addEventListener("click", e => {
   if (!e.target.closest("#kasir-main-wrap")) document.getElementById("kasir-save-menu")?.classList.add("hidden");
 });
 
-// A Draft takes no money (and no stock). With a Jumlah Bayar typed in, Simpan Draft would silently drop the DP, so the
-// cashier is asked: save it as a Nota with that DP (car left at the shop, work later), or a Draft without payment.
+// A Draft takes no money (and no stock). With a Jumlah Bayar typed in, Simpan Draft saves it as a Nota instead
+// (owner, 22-10-2026): the DP is recorded, the nota stays Belum Lunas and can still be edited and added to.
 function kasirDraftClick() {
   const amt = priceValue(document.getElementById("amount-paid-input"));
   const m = kasirMethod();
   if (!(amt > 0 && m !== "piutang")) { saveReceipt("draft"); return; }
-  openModal("Draft belum bisa menerima pembayaran", `<div class="space-y-3 text-sm">
-    <p class="text-ink">Jumlah Bayar <b>${formatIDR(amt)}</b> (${esc(payMethodLabel(m))}) sudah diisi, tetapi Draft tidak mencatat pembayaran apa pun.</p>
-    ${grNote("blue", "Pelanggan sudah bayar DP dan mobil ditinggal? Simpan sebagai <b>Nota</b> (Belum Dikerjakan): DP tercatat, nota tetap bisa diubah dan ditambah barang, pengerjaan dimulai nanti.")}
-    <div class="flex flex-wrap justify-end gap-2 pt-1">
-      <button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
-      <button type="button" class="${GR_BTN3}" onclick="closeModal(); kasirPayAmount(0); saveReceipt('draft')">Simpan Draft tanpa pembayaran</button>
-      <button type="button" class="${GR_BTN}" onclick="closeModal(); kasirStartSave('nota')">Simpan Nota + DP ${formatIDR(amt)}</button></div></div>`);
+  if (!validateReceiptForm(collectReceiptPayload())) return;
+  if (amt > cashierLastTotal) { showToast("Jumlah bayar tidak boleh melebihi total."); return; }
+  kasirSaveCtx = { choice: "nota", action: "nota", amount: amt, method: m, print: false, fromDraft: true };
+  kasirDoSave();
 }
 
 // Review (06) -> Konfirmasi (07) -> save, then payment and print as chosen. Printing never moves stock or money.
@@ -6654,6 +6651,7 @@ function kasirConfirm() {
   const job = kasirHasJob(tab);
   const def = job && (c.choice === "start" || (c.choice !== "nota" && target === "pengerjaan")) ? "start" : "nota";
   if (!job && c.action === "start") c.action = "nota";
+  if (c.action === "draft" && c.amount > 0 && c.method !== "piutang") c.action = null;   // money is never kept on a Draft
   c.action = c.action || def;
   const opt = (key, title, sub, badge = "") => `<label class="flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer ${c.action === key ? "border-accent bg-accent/5" : "border-line hover:bg-bg2"}">
       <input type="radio" name="kasir-act" value="${key}" ${c.action === key ? "checked" : ""} onchange="kasirSaveCtx.action=this.value; kasirConfirm()" class="accent-[#D97757]">
@@ -6666,7 +6664,7 @@ function kasirConfirm() {
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${grStat("rose", "Total nota", formatIDR(cashierLastTotal), esc(["plate-region", "plate-number", "plate-suffix"].map(id => document.getElementById(id).value).filter(Boolean).join(" ")))}
       ${grStat("blue", "Barang", `${rows.length} Item`, `${jobs} pemasangan tercatat`)}</div>
     <div class="border border-line rounded-xl p-4 space-y-2"><div class="text-sm font-semibold text-ink mb-1">Tindakan Simpan</div>
-      ${tab.receiptId && tab.workStatus !== "draft" ? "" : opt("draft", "Simpan Draft", "Belum final, dapat dilanjutkan")}
+      ${(tab.receiptId && tab.workStatus !== "draft") || (c.amount > 0 && c.method !== "piutang") ? "" : opt("draft", "Simpan Draft", "Belum final, dapat dilanjutkan")}
       ${job ? opt("nota", "Simpan Nota", "Simpan transaksi tanpa memulai kerja") : opt("nota", "Simpan Nota", "Pembelian langsung, tanpa pengerjaan")}
       ${job ? opt("start", "Simpan & Mulai Pengerjaan", "", jobs ? `<span class="ml-2">${grPill("green", "Disarankan")}</span>` : "") : ""}</div>
     <div class="text-sm text-ink">Pembayaran: <span class="font-medium">${c.action === "draft" ? "Draft belum menerima pembayaran." : esc(payLine)}</span></div>
@@ -6690,6 +6688,7 @@ async function kasirDoSave() {
   const ok = await saveReceipt(mode, { quiet: true, payNow: direct && creating ? { amount_paid: c.amount, payment_method: c.method } : null });
   if (!ok) return;
   let msg = { draft: "Draft disimpan.", belum: "Nota disimpan.", start: "Nota disimpan, pengerjaan dimulai.", selesai: "Nota disimpan." }[mode];
+  if (c.fromDraft) msg = `Ada DP ${formatIDR(c.amount)}: disimpan sebagai Nota Belum Lunas (DP tercatat, nota masih bisa diubah).`;
   if (direct && !creating) {
     const r = await fetch(`/api/receipts/${encodeURIComponent(tab.receiptId)}/payments`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: c.amount, method: c.method, note: c.amount < tab.total ? "DP" : null }) });
@@ -6712,6 +6711,7 @@ async function kasirDoSave() {
 // Keyboard: F1 scan, F2 tambah item, F3 tambah jasa (only on the Kasir page, never while a pop-up is open).
 document.addEventListener("keydown", e => {
   if (!["F1", "F2", "F3"].includes(e.key) || currentRoute() !== "/cashier") return;
+  if (document.getElementById("kasir-f1-btn")?.classList.contains("hidden")) return;
   if (!document.getElementById("modal-panel")?.classList.contains("hidden")) return;
   e.preventDefault();
   if (e.key === "F1") openKasirSearch("scan");
@@ -6763,6 +6763,9 @@ function renderKasirRail(tab) {
   document.getElementById("amount-paid-input").disabled = !editable || choice === "piutang" || !draftish;
   const job = kasirHasJob(tab);
   document.getElementById("kasir-work-block").classList.toggle("hidden", !job);
+  // A closed nota (Lunas + Pengerjaan Selesai) takes no more items, and closing it again means nothing.
+  const closedNota = saved && tab.status === "done" && ws === "selesai";
+  for (const id of ["kasir-f1-btn", "kasir-f2-btn", "kasir-f3-btn", "cashier-close-btn"]) document.getElementById(id).classList.toggle("hidden", closedNota);
   kasirTopbar(tab);
   const sel = document.getElementById("kasir-work-target");
   if (draftish) {
@@ -7491,14 +7494,15 @@ function collectReceiptPayload() {
   return payload;
 }
 
-function validateReceiptForm(payload) {
-  // Plate and phone are needed when something is installed on the car (a line with a technician); a walk-in
-  // purchase ("orang umum", motor, belanja biasa) may leave both empty.
-  const installing = payload.items.some(i => (i.technician_ids || []).length);
+function validateReceiptForm(payload, starting = false) {
+  // Plate and phone are needed once work on the vehicle starts (Dalam Pengerjaan / Selesai with a technician on a
+  // line). A Draft or a Nota saved with only a DP may leave both empty (owner, 22-10-2026); a walk-in purchase
+  // ("orang umum", motor, belanja biasa) never needs them.
+  const installing = starting && payload.items.some(i => (i.technician_ids || []).length);
   const anyPlate = payload.plate_region || payload.plate_number || payload.plate_suffix;
   if (anyPlate || installing) {
     if (!payload.plate_region || !plateCodes[payload.plate_region]) {
-      showToast(anyPlate ? "Kode wilayah plat tidak valid." : "No. plat wajib diisi karena ada barang yang dipasang (teknisi).");
+      showToast(anyPlate ? "Kode wilayah plat tidak valid." : "No. plat wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi).");
       return false;
     }
     if (!/^\d{1,4}$/.test(payload.plate_number)) {
@@ -7513,7 +7517,7 @@ function validateReceiptForm(payload) {
   // Normalize the phone the same way the backend does before checking format.
   const phoneDigits = (payload.customer_phone || "").replace(/[\s\-.()]/g, "");
   if (!phoneDigits && installing && !payload.customer_id) {
-    showToast("Nomor HP wajib diisi karena ada barang yang dipasang (teknisi).");
+    showToast("Nomor HP wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi).");
     return false;
   }
   if (phoneDigits && !/^\+?\d{7,15}$/.test(phoneDigits)) {
@@ -7712,13 +7716,14 @@ async function saveReceipt(mode = "save", opts = {}) {
   const tab = getActiveTab();
   if (!tab || tab.status === "void") return false;
   const payload = collectReceiptPayload();
-  if (!validateReceiptForm(payload)) return false;
-  // A new nota can carry its first cash / card payment in the same save (one transaction: nota + payment).
-  if (opts.payNow) Object.assign(payload, opts.payNow);
-
   const isUpdate = !!tab.receiptId;
   // Paying never changes the work stage: only a new nota or a Draft is moved on (to Belum Dikerjakan).
   const target = mode === "pay" && isUpdate && tab.workStatus !== "draft" ? null : (SAVE_MODE_TARGET[mode] || null);
+  const starting = ["pengerjaan", "selesai"].includes(target) || (isUpdate && ["pengerjaan", "selesai"].includes(tab.workStatus));
+  if (!validateReceiptForm(payload, starting)) return false;
+  // A new nota can carry its first cash / card payment in the same save (one transaction: nota + payment).
+  if (opts.payNow) Object.assign(payload, opts.payNow);
+
   const headers = { "Content-Type": "application/json" };
   let moveError = null;
   setCashierBarDisabled(true);
@@ -8058,7 +8063,7 @@ async function submitRefund() {
 // the new total is handed back at once (a negative payment on today's date).
 let returnCtx = null;
 // Only "stok" goes back on the sellable shelf; the other two wait in Stok Karantina.
-const RETURN_DEST_LABELS = { stok: "Kembali ke stok", supplier: "Ke supplier (karantina, kandidat retur)", rusak: "Rusak (karantina)" };
+const RETURN_DEST_LABELS = { stok: "Kembali ke stok", supplier: "Diretur ke supplier", rusak: "Rusak (karantina)" };
 const RETURN_REASON_LABELS = {
   salah_input: "Salah input kasir", pelanggan_batal: "Pelanggan batal", tidak_cocok: "Barang tidak cocok",
   cacat: "Barang cacat / rusak", salah_kirim: "Salah kirim / salah barang", lainnya: "Lainnya",
@@ -8143,7 +8148,7 @@ function updateReturnModal(resetRefund) {
   }
   const sp = returnDestSplit(), sum = sp.stok + sp.supplier + sp.rusak;
   const hint = document.getElementById("rt-dest-hint");
-  hint.textContent = sum === qty ? `Total ${qty} sesuai. Hanya jumlah "Kembali ke stok" yang menambah stok.` : `Total ${sum} dari ${qty}: jumlahnya harus sama.`;
+  hint.textContent = sum === qty ? `Total ${qty} sesuai. Hanya "Kembali ke stok" yang menambah stok jual. "Diretur ke supplier" masuk Stok Karantina sebagai kandidat Retur Supplier (lanjut dibuatkan dokumen retur); "Rusak" masuk karantina tanpa diretur.` : `Total ${sum} dari ${qty}: jumlahnya harus sama.`;
   hint.classList.toggle("text-failed", sum !== qty);
   hint.classList.toggle("text-muted", sum === qty);
   const reasonSel = document.getElementById("rt-reason-code");
@@ -8199,6 +8204,29 @@ async function submitReturn() {
   if (tab) await reloadTabFromServer(tab);
   if (ctx.onDone) await ctx.onDone();
   showToast(`${kind === "void_item" ? "Void" : "Retur"} ${line.product_name} x${quantity} dicatat.`, "success");
+  if (kind !== "void_item" && sp.supplier > 0) offerSupplierReturn(ctx.id, line.product_name, sp.supplier);
+}
+
+// Units the customer brought back for the supplier wait in Stok Karantina as a candidate; offer to open the
+// Retur Supplier form for them right away (nothing is sent to the supplier automatically).
+async function offerSupplierReturn(receiptId, productName, qty) {
+  let lot = null;
+  try {
+    const resp = await fetch("/api/supplier-returns/candidates");
+    if (resp.ok) lot = (await resp.json()).filter(l => l.source_type === "retur_customer" && String(l.source_id) === String(receiptId) && l.retur_candidate)
+      .sort((a, b) => b.id - a.id)[0] || null;
+  } catch (_) {}
+  openModal("Lanjut ke Retur Supplier?", `<div class="space-y-3 text-sm">
+    <p class="text-ink"><b>${esc(productName)} × ${qty}</b> sudah masuk <b>Stok Karantina</b> sebagai kandidat retur ke supplier. Barang belum dikirim; supaya bisa dikembalikan ke supplier, buat dokumen Retur Supplier.</p>
+    ${lot ? "" : '<p class="text-xs text-muted">Barang tidak ditemukan di daftar kandidat (mungkin sudah dipakai di retur lain). Anda tetap bisa memilihnya dari Stok Karantina di form Retur Supplier.</p>'}
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2">Nanti saja</button>
+      <button type="button" onclick="closeModal(); goNewSupplierReturn(${lot ? lot.id : "null"})" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">Buat Retur Supplier</button></div></div>`);
+  supplierReturnOfferLot = lot;
+}
+let supplierReturnOfferLot = null;
+function goNewSupplierReturn(lotId) {
+  rtsPendingNew = { lot: lotId && supplierReturnOfferLot?.id === lotId ? supplierReturnOfferLot : null };
+  if (currentRoute() === "/retur-supplier") rtsInit(); else location.hash = "/retur-supplier";
 }
 
 // Buka Kembali (admin): a closed nota (Lunas + Pengerjaan Selesai) is revised only with a reason on record.
@@ -8302,7 +8330,7 @@ function cashierTlGroups() {
     ["catatan", "Catatan Kasir", tab && tab.workNotes ? 1 : 0],
     ["item", "Riwayat Item", events.filter(e => e.kind === "created" || e.kind === "item_added" || e.kind === "item_changed").length],
     ["bayar", "Riwayat Pembayaran", payments.length],
-    ["status", "Riwayat Status", events.filter(e => ["status", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).length],
+    ["status", "Riwayat Status", events.filter(e => ["status", "stage", "handover", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).length],
     ["po", "Terkait Sales Order", preorders.length],
   ];
 }
@@ -8434,7 +8462,7 @@ function renderCashierTimeline() {
       [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : "") + (pay.state && pay.state !== "sah" ? " " + payStateBadge(pay) : ""), "tabular-nums font-medium")}${td(esc(pay.note || "") + (pay.proof_ref ? ` <span class="text-muted">· bukti: ${esc(pay.proof_ref)}</span>` : "") + (pay.state === "pending" ? " " + payActionButtons("nota", tab.receiptId, pay) : "") + (pay.state === "gagal" && pay.fail_reason ? ` <span class="text-failed">· ${esc(pay.fail_reason)}</span>` : ""))}${td(esc(pay.created_by || "-"))}</tr>`));
   } else if (cashierTlTab === "status") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
-      events.filter(e => ["status", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).sort(byTimeDesc)
+      events.filter(e => ["status", "stage", "handover", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).sort(byTimeDesc)
         .map(evRow(e => ({ void: "Nota di-void", reopen: "Dibuka kembali", refund: "Refund kelebihan bayar", overpaid: "Kelebihan bayar", override: "Izin admin: stok dicadangkan" })[e.kind] || "Status diubah")));
   } else {
     html = table(["No. Sales Order", "Pelanggan", "Item dari Sales Order", "DP Dialokasikan", ""],
@@ -9539,6 +9567,9 @@ function updateCashierSettleButtons() {
     btn.disabled = blocked;
     btn.title = blocked ? "Simpan perubahan nota dulu" : "";
   }
+  // Aksi Cepat's Simpan Perubahan follows the main one as the cashier types (it was only refreshed on load).
+  const qs = document.getElementById("cashier-quick-save"), sb = document.getElementById("cashier-save-btn");
+  if (qs && sb) qs.disabled = sb.disabled || sb.classList.contains("hidden");
 }
 
 // Opens "Pembayaran Nota" for a saved, pending nota. The nota is read fresh from the server, so the
@@ -24966,8 +24997,10 @@ function rtsMethodPill(m) {
 }
 
 // ── List ─────────────────────────────────────────────────────────────────────
+let rtsPendingNew = null;   // set by Kasir (customer return meant for the supplier): open the new-return form at once
 async function rtsInit() {
   try { await rtsEnsureMeta(); } catch (e) { showToast(e.message); return; }
+  if (rtsPendingNew) { const pre = rtsPendingNew; rtsPendingNew = null; rtsNew(pre.lot ? { lot: pre.lot } : undefined); return; }
   rtsRenderListShell();
   rtsShow("rts-list-panel");
   rtsLoad();

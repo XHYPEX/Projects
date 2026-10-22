@@ -103,8 +103,9 @@ def _clean_name(raw: str | None) -> str | None:
 
 
 def _has_installation(items: list[dict] | None) -> bool:
-    """A nota with work on the car (a line with a technician) needs the plate and the customer's phone; a walk-in
-    purchase (owner, 21-10-2026: "orang umum", motor, belanja biasa) may leave both empty."""
+    """A nota with work on the car (a line with a technician) needs the plate and the customer's phone once that work
+    starts; a walk-in purchase (owner, 21-10-2026: "orang umum", motor, belanja biasa) may leave both empty, and so
+    may a Draft or a Nota saved with only a DP (owner, 22-10-2026)."""
     return any((i.get("_assign") or {}).get("technician_ids") for i in items or [])
 
 
@@ -112,7 +113,7 @@ def _check_plate(region: str | None, number: str | None, suffix: str | None, req
     region, number, suffix = (region or "").strip().upper(), (number or "").strip(), (suffix or "").strip().upper()
     if not (region or number or suffix):
         if required:
-            raise HTTPException(status_code=422, detail="No. plat wajib diisi bila ada barang yang dipasang (teknisi).")
+            raise HTTPException(status_code=422, detail="No. plat wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi).")
         return "", "", ""
     if region not in PLATE_CODES:
         raise HTTPException(status_code=422, detail=f"Kode wilayah plat tidak dikenal: {region or '-'}")
@@ -274,10 +275,10 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     # The phone is required unless a master customer is picked, in which case it
     # defaults to that customer's number (see _resolve_receipt_customer).
     customer_phone = normalize_phone(req.customer_phone)
-    installing = _has_installation(_validate_items(req.items))
+    installing = _has_installation(_validate_items(req.items)) and req.work_status in ("pengerjaan", "selesai")
     plate_region, plate_number, plate_suffix = _check_plate(req.plate_region, req.plate_number, req.plate_suffix, installing)
     if not customer_phone and req.customer_id is None and installing:
-        raise HTTPException(status_code=422, detail="Nomor HP wajib diisi bila ada barang yang dipasang (teknisi).")
+        raise HTTPException(status_code=422, detail="Nomor HP wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi).")
     if customer_phone and not PHONE_RE.match(customer_phone):
         raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit (boleh diawali tanda +).")
     customer_name = _clean_name(req.customer_name)
@@ -444,7 +445,8 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     else:
         _refuse_if_closed(existing)
 
-    installing = _has_installation(_validate_items(req.items)) if req.items else False
+    installing = (_has_installation(_validate_items(req.items)) if req.items else False) \
+        and existing.get("work_status") in ("pengerjaan", "selesai")
     plate_region: str | None = None
     plate_suffix: str | None = None
     plate_number: str | None = None
@@ -477,7 +479,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
         customer_phone = normalize_phone(req.customer_phone)
         if not customer_phone:
             if req.customer_id is None and installing:
-                raise HTTPException(status_code=422, detail="Nomor HP wajib diisi bila ada barang yang dipasang (teknisi).")
+                raise HTTPException(status_code=422, detail="Nomor HP wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi).")
             # Blank next to a picked customer: take that customer's number. Blank on a walk-in nota: no phone.
             customer_phone = None if req.customer_id is not None else ""
         elif not PHONE_RE.match(customer_phone):
@@ -704,7 +706,7 @@ async def change_work_status_route(
         )
     except ValueError as e:
         msg = str(e)
-        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Status tujuan")) else 409
+        status = 404 if "tidak ditemukan" in msg else 422 if msg.startswith(("Stok", "Status tujuan", "No. plat", "Nomor HP")) else 409
         raise HTTPException(status_code=status, detail=msg)
     items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
     payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)

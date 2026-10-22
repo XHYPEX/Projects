@@ -3772,6 +3772,13 @@ def change_receipt_work_status(
             raise ValueError("Nota sudah berstatus itu.")
         if to_status not in _WORK_TRANSITIONS.get(current, set()):
             raise ValueError("Perpindahan status itu tidak diizinkan.")
+        # Owner, 22-10-2026: plate and phone may wait until the work on the vehicle really starts.
+        if to_status in ("pengerjaan", "selesai") and not row["preorder_id"] and con.execute(
+                "SELECT 1 FROM receipt_item_technicians WHERE receipt_id=? LIMIT 1", (receipt_id,)).fetchone():
+            if not (row["plate_full"] or "").strip():
+                raise ValueError("No. plat wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi). Klik Ubah, isi plat, lalu Simpan Perubahan.")
+            if not (row["customer_phone"] or "").strip() and row["customer_id"] is None:
+                raise ValueError("Nomor HP wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi). Klik Ubah, isi nomor HP, lalu Simpan Perubahan.")
         items = [dict(r) for r in con.execute(
             "SELECT * FROM receipt_items WHERE receipt_id=? ORDER BY id ASC", (receipt_id,)
         ).fetchall()]

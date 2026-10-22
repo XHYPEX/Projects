@@ -19561,7 +19561,9 @@ async function printReceiptNota(receiptId) {
 // printable area depend on the printer driver. "Atur Cetak" keeps the paper, margins and text size on
 // this computer, and "Cetak Halaman Uji" prints a ruler sheet at exactly the same page rule.
 const NOTA_PAPERS = {
-  half: { label: '9,5" × 5,5" (setengah continuous form)', w: 9.5, h: 5.5, orient: "landscape" },
+  // driver: the page size is left to the printer driver (Portrait 9,5 × 5,5 form). Sent from the page, 9,5 × 5,5 reads as
+  // landscape and the driver turned the nota 90° across the tear line (owner photo, 22-10-2026).
+  half: { label: '9,5" × 5,5" (setengah continuous form)', w: 9.5, h: 5.5, orient: "portrait (form 9,5 × 5,5)", driver: true },
   land: { label: 'Landscape 11" × 9,5" (K-16)', w: 11, h: 9.5, orient: "landscape" },
   port: { label: 'Portrait 9,5" × 11" (cara lama)', w: 9.5, h: 11, orient: "portrait" },
 };
@@ -19569,7 +19571,7 @@ const NOTA_PAPERS = {
 // keeping the margins and text size it already had.
 const NOTA_PRINT_KEY = "nota-print-prefs-v2";
 const NOTA_PRINT_OLD_KEY = "nota-print-prefs";
-const NOTA_PRINT_DEFAULTS = { paper: "half", top: 0.7, left: 0.9, right: 0.9, bottom: 0.7, scale: 100, tested: null };
+const NOTA_PRINT_DEFAULTS = { paper: "half", top: 0.7, left: 0.9, right: 0.9, bottom: 0.7, scale: 100, force: false, tested: null };
 const notaPaperSize = pg => `${String(pg.w).replace(".", ",")}″ × ${String(pg.h).replace(".", ",")}″`;
 
 function notaPrintPrefs() {
@@ -19592,10 +19594,13 @@ function notaPrintPrefs() {
   return out;
 }
 function saveNotaPrintPrefs(p) { try { localStorage.setItem(NOTA_PRINT_KEY, JSON.stringify(p)); } catch (_) {} }
-function notaPrintSignature(p) { return [p.paper, p.top, p.left, p.right, p.bottom, p.scale].join("|"); }
+function notaPrintSignature(p) { return [p.paper, p.top, p.left, p.right, p.bottom, p.scale, notaForcesSize(p)].join("|"); }
+function notaForcesSize(p) { return !NOTA_PAPERS[p.paper].driver || !!p.force; }
 function notaPageRule(p) {
   const pg = NOTA_PAPERS[p.paper];
-  return `@page { size: ${pg.w}in ${pg.h}in; margin: ${p.top}cm ${p.right}cm ${p.bottom}cm ${p.left}cm; }`;
+  const margin = `margin: ${p.top}cm ${p.right}cm ${p.bottom}cm ${p.left}cm;`;
+  // Without a size the print dialog's paper (and its Portrait/Landscape choice) is used as is.
+  return notaForcesSize(p) ? `@page { size: ${pg.w}in ${pg.h}in; ${margin} }` : `@page { ${margin} }`;
 }
 // Printable area inside the margins, in inches.
 function notaContentIn(p) {
@@ -19663,11 +19668,19 @@ function openNotaPrintSettings() {
         ${verified ? `Pengaturan ini sudah diuji di Epson LX-310 pada ${esc(formatNotaDate(p.tested.at))}.`
           : `<b>Belum diuji di Epson LX-310.</b> Ukuran ${notaPaperSize(NOTA_PAPERS[p.paper])} jangan dianggap pasti muat: cetak Halaman Uji dulu, periksa arah, rotasi driver, dan ukuran, lalu tandai sudah diuji.`}</div>
       <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Ukuran &amp; arah kertas</label>
-        <select id="nps-paper" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">${Object.entries(NOTA_PAPERS).map(([k, v]) => `<option value="${k}" ${p.paper === k ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select></div>
+        <select id="nps-paper" onchange="const d = NOTA_PAPERS[this.value].driver; ['nps-force-wrap', 'nps-help-half'].forEach(id => document.getElementById(id).classList.toggle('hidden', !d)); document.getElementById('nps-help-other').classList.toggle('hidden', !!d);" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">${Object.entries(NOTA_PAPERS).map(([k, v]) => `<option value="${k}" ${p.paper === k ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select></div>
       <div class="grid grid-cols-2 gap-3">${num("nps-top", "Margin atas (cm)", p.top)}${num("nps-bottom", "Margin bawah (cm)", p.bottom)}${num("nps-left", "Margin kiri (cm)", p.left)}${num("nps-right", "Margin kanan (cm)", p.right)}</div>
       <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Skala huruf (%)</label>
         <input id="nps-scale" type="number" step="5" min="70" max="130" value="${p.scale}" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></div>
-      <div class="rounded-lg bg-bg2 px-3 py-2 text-[11px] text-muted leading-relaxed">Di dialog cetak: pilih printer <b>EPSON LX-310</b>, ukuran kertas sesuai pilihan di atas (untuk setengah continuous form buat kertas khusus <b>9,5 × 5,5 in</b> di driver), skala 100%, tanpa header/footer. Bila hasil miring atau terpotong, ubah orientasi (Portrait/Landscape) di driver, lalu cetak Halaman Uji lagi.</div>
+      <label id="nps-force-wrap" class="${NOTA_PAPERS[p.paper].driver ? "" : "hidden"} flex items-start gap-2 text-xs text-ink"><input id="nps-force" type="checkbox" class="mt-0.5 accent-[#D97757]" ${p.force ? "checked" : ""}> Paksa ukuran kertas dari aplikasi (biarkan tidak dicentang; centang hanya bila printer tidak punya kertas 9,5 × 5,5)</label>
+      <div id="nps-help-half" class="${NOTA_PAPERS[p.paper].driver ? "" : "hidden"} rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-[11px] text-blue-900 leading-relaxed">
+        <b>Setengah continuous form (sekali saja per komputer):</b>
+        <ol class="list-decimal pl-4 mt-1 space-y-0.5">
+          <li>Windows: <b>Control Panel → Devices and Printers</b> → klik EPSON LX-310 → <b>Print server properties</b> → tab <b>Forms</b> → centang <i>Create a new form</i>, nama <b>NOTA 9.5x5.5</b>, Width <b>9.5 in</b>, Height <b>5.5 in</b>, margin 0 → Save Form.</li>
+          <li>Klik kanan EPSON LX-310 → <b>Printing preferences</b> → Paper Size <b>NOTA 9.5x5.5</b>, Orientation <b>Portrait</b>.</li>
+          <li>Saat mencetak dari Chrome: <b>More settings</b> → Paper size <b>NOTA 9.5x5.5</b>, Layout <b>Portrait</b>, Scale <b>Default</b>, Headers and footers <b>tidak dicentang</b>.</li>
+          <li>Cetak Halaman Uji: tulisan "ATAS NOTA" harus di tepi atas lembar, tidak miring, dan tidak melewati garis sobekan.</li></ol></div>
+      <div id="nps-help-other" class="${NOTA_PAPERS[p.paper].driver ? "hidden" : ""} rounded-lg bg-bg2 px-3 py-2 text-[11px] text-muted leading-relaxed">Di dialog cetak: pilih printer <b>EPSON LX-310</b>, ukuran kertas sesuai pilihan di atas, skala 100%, tanpa header/footer. Bila hasil miring atau terpotong, ubah orientasi (Portrait/Landscape) di driver, lalu cetak Halaman Uji lagi.</div>
       <label class="flex items-start gap-2 text-xs text-ink"><input id="nps-tested" type="checkbox" class="mt-0.5 accent-[#D97757]" ${verified ? "checked" : ""}> Hasil Halaman Uji sudah saya periksa dan benar (arah, rotasi, ukuran) untuk pengaturan di atas.</label>
       <div class="flex flex-wrap justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Tutup</button>
@@ -19680,7 +19693,8 @@ function openNotaPrintSettings() {
 function saveNotaPrintSettings(thenTest) {
   const val = id => Number(document.getElementById(id).value);
   const next = { paper: document.getElementById("nps-paper").value,
-    top: val("nps-top"), bottom: val("nps-bottom"), left: val("nps-left"), right: val("nps-right"), scale: val("nps-scale") };
+    top: val("nps-top"), bottom: val("nps-bottom"), left: val("nps-left"), right: val("nps-right"), scale: val("nps-scale"),
+    force: !!document.getElementById("nps-force")?.checked };
   const invalid = ["top", "bottom", "left", "right"].some(k => !(next[k] >= 0));
   const area = notaContentIn({ ...NOTA_PRINT_DEFAULTS, ...next });
   if (invalid || area.w < 6 || area.h < 3.5) { showToast("Margin terlalu besar atau tidak valid: area cetak harus minimal 6″ × 3,5″."); return; }

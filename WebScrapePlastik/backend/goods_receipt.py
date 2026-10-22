@@ -970,17 +970,25 @@ def return_to_supplier(document_id: int, data: dict, user: dict) -> dict:
         for fk_id, ps in by_fk.items():
             fk = ps[0]["faktur"]
             if fk and fk["status"] == "posted":
-                amount = sum(_cn_value(p["qty"], p["unit_cost"], fk["tax_rate"]) for p in ps)
-                cn_id = con.execute(
-                    """INSERT INTO supplier_credit_notes (cn_number, kind, supplier_id, return_id, amount, issued_at, note, created_by, created_at)
-                       VALUES (?, 'kredit', ?, ?, ?, ?, ?, ?, ?)""",
-                    (db._sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number"), doc["supplier_id"], rid, amount,
-                     db.shop_today().isoformat(), f"Retur dari {doc['doc_number']}", by, now)).lastrowid
-                cn = dict(con.execute("SELECT * FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone())
-                got = db._sr_allocate(con, cn, fk["id"], min(amount, max(fk["total"] - fk["amount_paid"], 0)), by)
-                txt = f"Credit Note {cn['cn_number']} Rp {db._sr_rupiah(amount)} memotong faktur {fk['invoice_number']} sebesar Rp {db._sr_rupiah(got)}"
-                if amount > got:
-                    txt += f"; sisa Rp {db._sr_rupiah(amount - got)} jadi saldo kredit supplier"
+                # Blueprint CN: the credit is a Draft Credit Note at the GR value; the faktur is only reduced once
+                # Admin has checked the supplier's proof, posted the note and allocated it (menu Credit Note).
+                from backend import credit_notes
+                rate = float(fk["tax_rate"] or 0)
+                items_by_ii = {r["inbound_item_id"]: r for r in con.execute(
+                    "SELECT id, inbound_item_id FROM supplier_return_items WHERE return_id=?", (rid,)).fetchall()}
+                lines = []
+                for p in ps:
+                    amt = _cn_value(p["qty"], p["unit_cost"], rate)
+                    sub, tax = credit_notes._split(amt, rate)
+                    mi = con.execute("SELECT sku, unit FROM master_items WHERE id=?", (p["master_item_id"],)).fetchone() if p["master_item_id"] else None
+                    lines.append({"kind": "barang", "return_item_id": items_by_ii[p["inbound_item_id"]]["id"], "inbound_item_id": p["inbound_item_id"],
+                                  "master_item_id": p["master_item_id"], "sku": mi["sku"] if mi else None, "unit": mi["unit"] if mi else None,
+                                  "product_name": p["product_name"], "qty": p["qty"], "unit_price": p["unit_cost"], "tax_rate": rate,
+                                  "subtotal": sub, "tax": tax, "amount": amt, "entitled": amt})
+                cn = credit_notes.create_draft(con, supplier_id=doc["supplier_id"], return_id=rid, invoice_id=fk["id"], lines=lines, by=by,
+                                               note=f"Retur {number} dari {doc['doc_number']}", source="barang_masuk")
+                txt = (f"Draft Credit Note {cn['cn_number']} Rp {db._sr_rupiah(cn['amount'])} dibuat untuk faktur {fk['invoice_number']}; "
+                       f"tagihan dipotong setelah CN diperiksa, diposting, dan dialokasikan di menu Credit Note")
                 msgs.append(txt)
                 con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'retur', ?)",
                             (fk["id"], now, by, f"Retur {number}: {txt}"))

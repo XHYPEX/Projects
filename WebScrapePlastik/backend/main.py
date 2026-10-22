@@ -31,6 +31,7 @@ from backend.routes.results import router as results_router
 from backend.routes.sales import router as sales_router
 from backend.routes.cash_receipts import router as cash_receipts_router
 from backend.routes.account_payable import router as account_payable_router
+from backend.routes.credit_notes import router as credit_notes_router
 from backend.routes.order_dashboards import router as order_dashboards_router
 from backend.routes.scrape import router as scrape_router
 from backend.routes.users import router as users_router
@@ -94,6 +95,7 @@ app.include_router(results_router, prefix="/api", dependencies=[Depends(get_curr
 app.include_router(sales_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(cash_receipts_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(account_payable_router, prefix="/api", dependencies=[Depends(require_admin)])
+app.include_router(credit_notes_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(order_dashboards_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(scrape_router, prefix="/api", dependencies=[Depends(get_current_user)])
 

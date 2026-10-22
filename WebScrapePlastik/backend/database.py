@@ -1445,6 +1445,8 @@ def init_db() -> None:
             con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('stok_lines_ready', ?)", (_now(),))
         from backend import incentives
         incentives.migrate(con)
+        from backend import credit_notes
+        credit_notes.migrate(con)
         sr_cols = {r["name"] for r in con.execute("PRAGMA table_info(supplier_returns)").fetchall()}
         if "origin" not in sr_cols:  # 'barang_masuk' = made from a posted Goods Receipt (potong tagihan)
             con.execute("ALTER TABLE supplier_returns ADD COLUMN origin TEXT")
@@ -11235,10 +11237,11 @@ def settle_refund_claim(claim_id: int, data: dict, user: dict) -> dict:
             raise ValueError("Isi nomor nota kredit dari supplier.")
         con.execute(
             """INSERT INTO supplier_credit_notes (cn_number, kind, supplier_id, return_id, amount, supplier_cn_no, issued_at, method,
-                   reference_no, note, created_by, created_at, supplier_po_id, claim_id) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   reference_no, note, created_by, created_at, supplier_po_id, claim_id, subtotal, posted_by, posted_at, source, updated_at)
+               VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pembatalan_po', ?)""",
             (_sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number") if cl["kind"] == "kredit" else None, cl["kind"], cl["supplier_id"],
              amount, _sr_text(data.get("supplier_cn_no")), issued, data.get("method") if cl["kind"] == "refund" else None,
-             _sr_text(data.get("reference_no")), _sr_text(data.get("note")), by, _now(), cl["supplier_po_id"], claim_id))
+             _sr_text(data.get("reference_no")), _sr_text(data.get("note")), by, _now(), cl["supplier_po_id"], claim_id, amount, by, _now(), _now()))
         settled = cl["settled_amount"] + amount
         done = settled >= cl["amount"]
         con.execute("UPDATE supplier_refund_claims SET settled_amount=?, status=?, closed_by=?, closed_at=? WHERE id=?",
@@ -11726,15 +11729,35 @@ def _sr_require_admin(user: dict, what: str) -> None:
         raise PermissionError(f"Hanya admin yang bisa {what}.")
 
 
+def _sr_rate(con: sqlite3.Connection, ret: dict) -> float:
+    """PPN % of the faktur the return belongs to: what the supplier was paid per unit includes it."""
+    if not ret.get("purchase_invoice_id"):
+        return 0.0
+    row = con.execute("SELECT tax_rate FROM purchase_invoices WHERE id=?", (ret["purchase_invoice_id"],)).fetchone()
+    return float(row["tax_rate"] or 0) if row else 0.0
+
+
+def _sr_value(qty: int, unit_cost: int, rate: float) -> int:
+    return int(round(qty * unit_cost * (1 + float(rate or 0) / 100)))
+
+
 def _sr_money(con: sqlite3.Connection, ret: dict, items: list[dict]) -> dict:
     """Goods value (purchase price), the money part the supplier approved (approved qty settled by credit
-    or refund, plus the shipping claim), and how much of it is settled by credit notes / refunds."""
+    or refund incl. the faktur's PPN, plus the shipping claim), and how much of it is settled by posted credit
+    notes / refunds. A Credit Note still in Draft / verification settles nothing yet (credit_pending); what the
+    shop gave up on a posted note (waived) is not claimed again."""
     goods = sum(i["qty"] * i["unit_cost"] for i in items)
-    claim = sum(i["qty_approved"] * i["unit_cost"] for i in items if i["settlement"] in ("kredit", "refund")) \
+    rate = _sr_rate(con, ret)
+    claim = sum(_sr_value(i["qty_approved"], i["unit_cost"], rate) for i in items if i["settlement"] in ("kredit", "refund")) \
         + (ret["shipping_claim_approved"] or 0)
     settled = con.execute("SELECT COALESCE(SUM(amount), 0) AS n FROM supplier_credit_notes WHERE return_id=? AND status='aktif'",
                           (ret["id"],)).fetchone()["n"]
-    return {"cost_value": goods, "claim_value": claim, "settled_value": settled, "claim_left": max(claim - settled, 0)}
+    pending = con.execute("""SELECT COALESCE(SUM(amount), 0) AS n FROM supplier_credit_notes WHERE return_id=? AND kind='kredit'
+                             AND status IN ('draft','review','disetujui')""", (ret["id"],)).fetchone()["n"]
+    waived = con.execute("""SELECT COALESCE(SUM(ci.waived), 0) AS n FROM supplier_credit_note_items ci JOIN supplier_credit_notes c ON c.id = ci.credit_note_id
+                            WHERE c.return_id=? AND c.status='aktif'""", (ret["id"],)).fetchone()["n"]
+    return {"cost_value": goods, "claim_value": claim, "settled_value": settled, "claim_left": max(claim - settled - waived, 0),
+            "credit_pending": pending, "credit_waived": waived}
 
 
 def _sr_validate_items(con: sqlite3.Connection, ret_id: int | None, supplier_id: int, items: list[dict]) -> list[dict]:
@@ -12406,13 +12429,17 @@ def _sr_cn_allocated(con: sqlite3.Connection, cn_id: int) -> int:
 
 
 def record_supplier_return_credit(return_id: int, data: dict, user: dict) -> dict:
-    """Admin: a credit note (CN-SUP-YYYYMMDD-NNN, optionally allocated to an open faktur — what does not
-    fit stays as supplier credit) or refund money received. Never more than the approved claim left."""
+    """Admin: refund money received for the approved claim. A credit note is no longer written here: 'kredit' opens
+    (or reuses) a Draft in the Credit Note module, which is verified, posted and allocated there."""
     _sr_require_admin(user, "mencatat nota kredit / refund")
     by = user.get("username")
     kind = data.get("kind")
     if kind not in ("kredit", "refund"):
         raise ValueError("Pilih Nota Kredit atau Refund.")
+    if kind == "kredit":
+        from backend import credit_notes
+        made = credit_notes.create_from_return(return_id, user, data.get("note"))
+        return {**get_supplier_return(return_id), "credit_note_id": made["id"]}
     amount = int(data.get("amount") or 0)
     if amount <= 0:
         raise ValueError("Nilai harus lebih dari 0.")
@@ -12452,6 +12479,13 @@ def record_supplier_return_credit(return_id: int, data: dict, user: dict) -> dic
 
 def allocate_supplier_credit(cn_id: int, invoice_id: int, amount: int, user: dict) -> dict:
     _sr_require_admin(user, "mengalokasikan nota kredit")
+    from backend import credit_notes
+    with _conn() as con:
+        row = con.execute("SELECT kind, return_id FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone()
+    if row is not None and row["kind"] == "kredit":
+        credit_notes.allocate(cn_id, {"allocations": [{"invoice_id": invoice_id, "amount": amount}],
+                                      "note": "Alokasi dari Retur Supplier"}, user)
+        return get_supplier_return(row["return_id"]) if row["return_id"] else {}
     by = user.get("username")
     with _conn() as con:
         con.execute("BEGIN IMMEDIATE")
@@ -12481,6 +12515,8 @@ def cancel_supplier_credit(cn_id: int, reason: str, user: dict) -> dict:
         if cn is None or cn["status"] != "aktif":
             raise ValueError("Nota kredit tidak ditemukan atau sudah dibatalkan.")
         cn = dict(cn)
+        if cn["kind"] == "kredit":
+            raise ValueError("Credit Note yang sudah diposting dibatalkan lewat Ajukan Reversal di menu Credit Note (disetujui Owner).")
         per_invoice: dict[int, int] = {}
         for a in con.execute("SELECT invoice_id, amount FROM supplier_credit_allocations WHERE credit_note_id=?", (cn_id,)):
             per_invoice[a["invoice_id"]] = per_invoice.get(a["invoice_id"], 0) + a["amount"]
@@ -12546,8 +12582,10 @@ def _sr_next_step(ret: dict, prog: dict) -> str:
     parts = []
     if prog["replacement_left"]:
         parts.append(f"terima barang pengganti ({prog['replacement_left']} lagi)")
-    if prog["claim_left"]:
-        parts.append(f"catat nota kredit / refund (sisa Rp {_sr_rupiah(prog['claim_left'])})")
+    if prog["credit_pending"]:
+        parts.append(f"verifikasi & posting Credit Note di menu Credit Note (Rp {_sr_rupiah(prog['credit_pending'])})")
+    if prog["claim_left"] > prog["credit_pending"]:
+        parts.append(f"buat Credit Note / catat refund (sisa Rp {_sr_rupiah(prog['claim_left'] - prog['credit_pending'])})")
     if prog["rejected_back_left"]:
         parts.append(f"terima kembali barang ditolak ({prog['rejected_back_left']} lagi)")
     return ("Selanjutnya: " + ", ".join(parts) + ".") if parts else "Menunggu penyelesaian."
@@ -12588,13 +12626,16 @@ def get_supplier_return(return_id: int) -> dict:
             (return_id,))]
         events = [dict(r) for r in con.execute("SELECT * FROM supplier_return_events WHERE return_id=? ORDER BY id DESC", (return_id,))]
         credits = []
+        from backend import credit_notes
         for c in con.execute("SELECT * FROM supplier_credit_notes WHERE return_id=? ORDER BY id", (return_id,)):
             c = dict(c)
             c["allocations"] = [dict(a) for a in con.execute(
                 """SELECT a.*, pi.invoice_number FROM supplier_credit_allocations a JOIN purchase_invoices pi ON pi.id = a.invoice_id
                    WHERE a.credit_note_id=? ORDER BY a.id""", (c["id"],))]
             c["allocated"] = sum(a["amount"] for a in c["allocations"])
-            c["unallocated"] = c["amount"] - c["allocated"] if c["kind"] == "kredit" and c["status"] == "aktif" else 0
+            c["unallocated"] = credit_notes.available(con, c) if c["kind"] == "kredit" else 0
+            c["status_label"] = credit_notes.CN_STATUS.get(c["status"], c["status"]) if c["kind"] == "kredit" else \
+                ("Diterima" if c["status"] == "aktif" else "Dibatalkan")
             credits.append(c)
         replacements = [dict(r) for r in con.execute(
             """SELECT r.*, d.doc_number, i.product_name FROM supplier_return_replacements r

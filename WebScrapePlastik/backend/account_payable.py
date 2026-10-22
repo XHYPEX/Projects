@@ -18,7 +18,7 @@ import sqlite3
 from datetime import date, timedelta
 
 from backend import database as db
-from backend import invoice_verify
+from backend import credit_notes, invoice_verify
 
 PAY_KIND_LABELS = {"bayar": "Pembayaran", "batal": "Pembatalan pembayaran", "dp": "Uang muka (DP) dari PO",
                    "dp_batal": "DP dikembalikan ke PO", "kredit": "Nota kredit retur"}
@@ -106,9 +106,7 @@ def _balances(con: sqlite3.Connection) -> dict:
     dp_free = con.execute(
         """SELECT COALESCE(SUM(p.amount - p.applied_amount), 0) AS n FROM spo_payments p
            JOIN supplier_pos o ON o.id = p.supplier_po_id WHERE o.status <> 'batal' AND p.amount - p.applied_amount > 0""").fetchone()["n"]
-    credit_free = 0
-    for cn in con.execute("SELECT id, amount FROM supplier_credit_notes WHERE kind='kredit' AND status='aktif'").fetchall():
-        credit_free += max(cn["amount"] - db._sr_cn_allocated(con, cn["id"]), 0)
+    credit_free = credit_notes.total_available(con)
     claims = con.execute("SELECT COALESCE(SUM(amount - settled_amount), 0) AS n FROM supplier_refund_claims WHERE status='menunggu'").fetchone()["n"]
     return {"dp_free": dp_free, "credit_free": credit_free, "refund_claims_open": claims}
 
@@ -236,7 +234,7 @@ def invoice_detail(invoice_id: int) -> dict | None:
         for p in pays:
             p["kind_label"] = PAY_KIND_LABELS.get(p["kind"], p["kind"])
             cn = cn_by_no.get(p.get("reference_no")) if p["kind"] == "kredit" else None
-            p["credit_note"] = {"cn_number": cn["cn_number"], "return_id": cn["return_id"], "return_number": cn.get("return_number")} if cn else None
+            p["credit_note"] = {"id": cn["id"], "cn_number": cn["cn_number"], "return_id": cn["return_id"], "return_number": cn.get("return_number")} if cn else None
         po = grs = None
         matching: list[dict] = []
         if inv["supplier_po_id"]:
@@ -370,15 +368,15 @@ def credit_view() -> dict:
                       c.method, c.reference_no, s.name AS supplier_name, r.return_number, o.po_number
                FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id
                LEFT JOIN supplier_returns r ON r.id = c.return_id LEFT JOIN supplier_pos o ON o.id = c.supplier_po_id
-               WHERE c.kind='kredit' ORDER BY c.issued_at DESC, c.id DESC""").fetchall()]
+               WHERE c.kind='kredit' AND c.status IN ('aktif','reversed','dibatalkan') ORDER BY c.issued_at DESC, c.id DESC""").fetchall()]
         for r in rows:
             allocs = [dict(a) for a in con.execute(
                 """SELECT a.invoice_id, i.invoice_number, SUM(a.amount) AS amount FROM supplier_credit_allocations a
                    JOIN purchase_invoices i ON i.id = a.invoice_id WHERE a.credit_note_id=? GROUP BY a.invoice_id HAVING SUM(a.amount) <> 0""", (r["id"],)).fetchall()]
             r["allocations"] = allocs
             r["allocated"] = sum(a["amount"] for a in allocs)
-            r["free"] = max(r["amount"] - r["allocated"], 0) if r["status"] == "aktif" else 0
-            r["status_label"] = "Dibatalkan" if r["status"] != "aktif" else ("Siap dialokasikan" if r["free"] else "Teralokasi")
+            r["free"] = credit_notes.available(con, r)
+            r["status_label"] = credit_notes.CN_STATUS.get(r["status"]) if r["status"] != "aktif" else ("Siap dialokasikan" if r["free"] else "Teralokasi")
     live = [r for r in rows if r["status"] == "aktif"]
     return {"items": rows, "kpi": {"total": sum(r["amount"] for r in live), "allocated": sum(r["allocated"] for r in live),
                                    "free": sum(r["free"] for r in live), "count": len(live)}}
@@ -398,15 +396,15 @@ def credit_detail(cn_id: int) -> dict | None:
             """SELECT a.id, a.invoice_id, a.amount, a.created_by, a.created_at, i.invoice_number, i.total, i.amount_paid, i.supplier_po_id
                FROM supplier_credit_allocations a JOIN purchase_invoices i ON i.id = a.invoice_id WHERE a.credit_note_id=? ORDER BY a.id""", (cn_id,)).fetchall()]
         allocated = db._sr_cn_allocated(con, cn_id)
+        free = credit_notes.available(con, c)
     items = []
     if c["return_id"]:
         try:
             items = db.get_supplier_return(c["return_id"]).get("items", [])
         except Exception:
             items = []
-    free = max(c["amount"] - allocated, 0) if c["status"] == "aktif" and c["kind"] == "kredit" else 0
     return {**c, "allocations": allocs, "allocated": allocated, "free": free, "items": items,
-            "status_label": "Dibatalkan" if c["status"] != "aktif" else ("Siap dialokasikan" if free else "Teralokasi")}
+            "status_label": credit_notes.CN_STATUS.get(c["status"]) if c["status"] != "aktif" else ("Siap dialokasikan" if free else "Teralokasi")}
 
 
 def refund_detail(claim_id: int) -> dict | None:
@@ -436,6 +434,14 @@ def refund_view() -> dict:
                LEFT JOIN supplier_returns r ON r.id = c.return_id LEFT JOIN supplier_refund_claims cl ON cl.id = c.claim_id
                LEFT JOIN supplier_pos o ON o.id = c.supplier_po_id
                WHERE c.kind='refund' ORDER BY c.issued_at DESC, c.id DESC""").fetchall()]
+        # Refund against a posted Credit Note (Kas Masuk KM-SUP-…): money in, never a supplier payment.
+        received += [dict(r) for r in con.execute(
+            """SELECT f.id, f.amount, f.received_at AS issued_at, f.method, f.refund_number || COALESCE(' · ' || f.reference_no, '') AS reference_no,
+                      f.status, c.return_id, NULL AS claim_id, s.name AS supplier_name, r.return_number, c.cn_number AS claim_no, NULL AS po_number,
+                      f.credit_note_id
+               FROM supplier_credit_refunds f JOIN supplier_credit_notes c ON c.id = f.credit_note_id JOIN suppliers s ON s.id = f.supplier_id
+               LEFT JOIN supplier_returns r ON r.id = c.return_id ORDER BY f.received_at DESC, f.id DESC""").fetchall()]
+        received.sort(key=lambda r: (r["issued_at"] or "", r["id"]), reverse=True)
     live = [c for c in claims if c["status"] != "dibatalkan"]
     return {"claims": claims, "received": received,
             "kpi": {"claimed": sum(c["amount"] for c in live), "settled": sum(c["settled_amount"] for c in live),
@@ -494,8 +500,12 @@ def reconciliation() -> dict:
             out.append({"kind": "dp", "category": "DP belum diperhitungkan ke faktur" if has_faktur else "Barang sudah diterima, belum ada faktur (DP menunggu)",
                         "ref_type": "po", "ref_id": r["id"], "number": r["po_number"], "supplier": r["supplier_name"], "value": r["free"],
                         "detail": "DP PO belum terpakai", "status": "Perlu keputusan"})
-        for c in con.execute("SELECT c.id, c.cn_number, c.amount, c.supplier_id, s.name AS supplier_name FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id WHERE c.kind='kredit' AND c.status='aktif'").fetchall():
-            free = c["amount"] - db._sr_cn_allocated(con, c["id"])
+        for c in con.execute("SELECT c.*, s.name AS supplier_name FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id WHERE c.kind='kredit' AND c.status IN ('draft','review','disetujui')").fetchall():
+            out.append({"kind": "kredit", "category": "Credit Note belum diposting", "ref_type": "credit", "ref_id": c["id"], "number": c["cn_number"],
+                        "supplier": c["supplier_name"], "value": c["amount"], "detail": credit_notes.CN_STATUS[c["status"]] + "; tagihan belum terpotong",
+                        "status": "Perlu posting"})
+        for c in con.execute("SELECT c.*, s.name AS supplier_name FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id WHERE c.kind='kredit' AND c.status='aktif'").fetchall():
+            free = credit_notes.available(con, dict(c))
             owes = any(r["supplier_id"] == c["supplier_id"] and r["outstanding"] > 0 for r in rows)
             if free > 0 and owes:
                 out.append({"kind": "kredit", "category": "Nota kredit belum dialokasikan padahal ada faktur terbuka", "ref_type": "credit", "ref_id": c["id"],

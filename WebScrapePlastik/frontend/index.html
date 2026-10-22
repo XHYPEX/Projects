@@ -668,42 +668,27 @@
         </svg>
         Sales Order
       </a>
-      <a href="#/supplier-po" data-route="/supplier-po" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>
-        </svg>
-        Purchase Order
-      </a>
-      <a href="#/inventory" data-route="/inventory" onclick="if (currentRoute() === '/inventory') grBackToList()" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/><path d="m8.5 15.5 3.5 2 3.5-2"/>
-        </svg>
-        Barang Masuk
-      </a>
-      <a href="#/retur-supplier" data-route="/retur-supplier" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M4 7h13l-3-3M20 17H7l3 3"/>
-        </svg>
-        Retur Supplier
-      </a>
+      <div>
+        <button type="button" onclick="toggleNavGroup('purchase')" data-route="/purchase-group"
+          class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>
+          <span class="flex-1 text-left">Purchase</span>
+          <svg id="nav-purchase-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted shrink-0 transition-transform duration-200 motion-reduce:transition-none"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div id="nav-purchase-submenu" class="hidden ml-[21px] pl-3 mt-0.5 py-0.5 border-l border-line space-y-0.5">
+          <a href="#/supplier-po" data-route="/supplier-po" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Purchase Order</a>
+          <a href="#/inventory" data-route="/inventory" onclick="if (currentRoute() === '/inventory') grBackToList()" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Barang Masuk</a>
+          <a href="#/purchase-invoices" data-route="/purchase-invoices" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Account Payable</a>
+          <a href="#/account-payable" data-route="/account-payable" class="admin-only nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Aging Payable</a>
+          <a href="#/retur-supplier" data-route="/retur-supplier" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Retur Supplier</a>
+          <a href="#/credit-notes" data-route="/credit-notes" class="admin-only nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Credit Note</a>
+        </div>
+      </div>
       <a href="#/service" data-route="/service" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
           <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/>
         </svg>
         Service / Garansi
-      </a>
-      <a href="#/purchase-invoices" data-route="/purchase-invoices" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/>
-          <path d="M8 8h8M8 12h8M8 16h4"/>
-        </svg>
-        Account Payable
-      </a>
-      <a href="#/account-payable" data-route="/account-payable" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M3 7h18v12H3z"/><path d="M3 11h18M8 15h3M3 7l2-3h14l2 3"/>
-        </svg>
-        Aging Payable
       </a>
       <div>
         <button type="button" onclick="toggleInventoryNavGroup()" data-route="/inventory-group"
@@ -3506,6 +3491,14 @@
     </div>
   </div>
 
+  <div id="page-credit-notes" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+    <div class="max-w-none mx-auto">
+      <div id="cn-list-panel"></div>
+      <div id="cn-detail-panel" class="hidden"></div>
+      <div id="cn-audit-panel" class="hidden"></div>
+    </div>
+  </div>
+
   <div id="page-kas-keluar" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
       <div class="flex flex-wrap items-end gap-2 mb-4">
@@ -4809,7 +4802,7 @@ const API = "";
 // and body) share one key while the first is in flight and for a few seconds after; a failed request
 // forgets its key so the corrected retry is a new one.
 (() => {
-  const NEEDS_KEY = /^\/api\/(receipts(\/[^/]+\/payments)?|preorders(\/[^/]+\/(payments|convert))?|supplier-pos(\/[^/]+\/(payments|receive|items\/\d+\/cancel))?|inventory\/(stock-adjustments|master-items|inbound-documents(\/\d+\/post)?)|goods-receipts(\/\d+\/(recreate|return))?|barcode-prints)$/;
+  const NEEDS_KEY = /^\/api\/(receipts(\/[^/]+\/payments)?|preorders(\/[^/]+\/(payments|convert))?|supplier-pos(\/[^/]+\/(payments|receive|items\/\d+\/cancel))?|inventory\/(stock-adjustments|master-items|inbound-documents(\/\d+\/post)?)|goods-receipts(\/\d+\/(recreate|return))?|barcode-prints|credit-notes(\/from-return\/\d+|\/\d+\/(submit|approve|post|allocate|refunds|reversal|files))|credit-notes\/reversals\/\d+\/decide)$/;
   const recent = new Map();   // fingerprint -> { key, until }
   const nativeFetch = window.fetch.bind(window);
   window.fetch = (input, init = {}) => {
@@ -5120,6 +5113,7 @@ const ROUTES = {
   "/dashboard-so": { title: "Dashboard Sales Order", page: "page-dashboard-so" },
   "/dashboard-po": { title: "Dashboard Purchase Order", page: "page-dashboard-po" },
   "/account-payable": { title: "Aging Payable", page: "page-account-payable" },
+  "/credit-notes": { title: "Credit Note Supplier", page: "page-credit-notes" },
   "/cash-receipt": { title: "Cash Receipt / Laporan Penerimaan", page: "page-cash-receipt" },
   "/kas-keluar": { title: "Kas Keluar", page: "page-kas-keluar" },
   "/users": { title: "Pengguna", page: "page-users" },
@@ -5135,7 +5129,7 @@ const INVENTORY_ROUTES = new Set(
 // being immediately undone by it.
 let pendingInventoryAction = null;
 
-const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar", "/cash-receipt", "/account-payable", "/master-karyawan",
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar", "/cash-receipt", "/account-payable", "/credit-notes", "/master-karyawan",
   "/insentif-master", "/insentif-monitoring", "/insentif-koreksi"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
@@ -5209,6 +5203,7 @@ function renderRoute() {
   if (route === "/stock-opname") opInit();
   if (route === "/karantina") qrLoad();
   if (route === "/retur-supplier") rtsInit();
+  if (route === "/credit-notes") cnInit();
   if (route === "/service") svcInit();
   if (route === "/master-service") msvInit();
   if (route === "/sales-order") { backToPreorderList(); }
@@ -5237,6 +5232,7 @@ const DASHBOARD_ROUTES = new Set(["/dashboard", "/dashboard-so", "/dashboard-po"
 // Collapsible sidebar groups added with the Kasir / Insentif redesign; each child route keeps its group open.
 const NAV_GROUPS = {
   kasir: new Set(["/cashier", "/invoices", "/pengerjaan"]),
+  purchase: new Set(["/supplier-po", "/inventory", "/purchase-invoices", "/account-payable", "/retur-supplier", "/credit-notes"]),
   insentif: new Set(["/insentif-master", "/insentif-monitoring", "/insentif-koreksi"]),
 };
 // Clicking the sidebar entry of the page you are already on (e.g. Monitoring Harian while a Detail Invoice is open
@@ -5248,6 +5244,7 @@ document.addEventListener("click", e => {
   if (r.startsWith("/insentif-")) insInit(r);
   else if (r === "/pengerjaan") woBack();
   else if (r === "/master-karyawan") empInit();
+  else if (r === "/credit-notes") cnInit(true);
 });
 function toggleNavGroup(key) {
   document.getElementById(`nav-${key}-submenu`).classList.toggle("hidden");
@@ -5381,6 +5378,10 @@ const ROUTE_META = {
   "/account-payable": {
     subtitle: "Pusat kontrol utang supplier: faktur, jatuh tempo, DP, kredit, refund, dan aging.",
     icon: '<path d="M3 7h18v12H3z"/><path d="M3 11h18M8 15h3M3 7l2-3h14l2 3"/>',
+  },
+  "/credit-notes": {
+    subtitle: "Draft dari retur → verifikasi → posting → alokasi ke faktur atau refund. Reversal disetujui Owner.",
+    icon: '<path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><path d="M9 9h6M9 13h6"/><path d="m14 16-2 2-2-2"/>',
   },
   "/cash-receipt": {
     subtitle: "Laporan uang masuk dari customer: siapa membayar, untuk invoice atau SO mana, lewat apa, dan masuk ke mana.",
@@ -12882,7 +12883,7 @@ function apRenderDetail(d) {
   const matching = d.matching.length ? apTable(`<th class="${AP_TH}">Produk</th><th class="${AP_THR}">Qty PO</th><th class="${AP_THR}">Qty GR</th><th class="${AP_THR}">Qty faktur</th><th class="${AP_THR}">Harga GR / PO</th><th class="${AP_THR}">Harga faktur</th><th class="${AP_TH}">Hasil</th>`,
     d.matching.map(m => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(m.product)}${m.note ? `<div class="text-[11px] text-amber-700">${esc(m.note)}</div>` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_po ?? "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_gr ?? "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.qty_inv}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${m.price_po == null ? "—" : apMoney(m.price_po)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(m.price_inv)}</td><td class="${AP_TD}">${m.result === "sesuai" ? crPill("bg-emerald-50 text-emerald-700", "Sesuai") : crPill("bg-amber-50 text-amber-700", m.result === "tidak_di_po" ? "Di luar PO" : "Selisih")}</td></tr>`).join(""), "")
     : '<p class="px-4 py-6 text-sm text-muted">Faktur ini tidak dibuat dari Purchase Order, jadi tidak ada yang dicocokkan.</p>';
-  const hist = `<div class="px-4 py-2">${d.payments.length ? d.payments.map(p => `<div class="flex items-start gap-3 py-2.5 border-b border-line last:border-b-0"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5 shrink-0"></span><div class="min-w-0 flex-1"><div class="text-[11px] text-muted">${apDate(p.paid_at)}</div><div class="text-sm font-semibold text-ink">${esc(p.kind_label)}${p.doc_no ? ` <span class="font-mono text-[12px] text-accentDark font-normal">${esc(p.doc_no)}</span>` : ""}</div><div class="text-xs text-muted">${[p.method ? (PAYMENT_METHOD_LABELS[p.method] || p.method) : "", p.reference_no ? "Ref " + esc(p.reference_no) : "", p.note ? esc(p.note) : "", p.created_by ? esc(p.created_by) : ""].filter(Boolean).join(" · ")}${p.credit_note?.return_id ? ` · ${apRetLink(p.credit_note.return_id, p.credit_note.return_number)}` : ""}</div></div><div class="text-right"><div class="tabular-nums font-semibold ${p.amount < 0 ? "text-failed" : "text-ink"}">${p.amount < 0 ? "− " : ""}${apMoney(Math.abs(p.amount))}</div><div class="text-[11px] text-muted tabular-nums">sisa ${apMoney(p.balance_after)}</div></div></div>`).join("") : '<p class="py-6 text-sm text-muted">Belum ada pembayaran, DP, atau kredit pada faktur ini.</p>'}</div>`;
+  const hist = `<div class="px-4 py-2">${d.payments.length ? d.payments.map(p => `<div class="flex items-start gap-3 py-2.5 border-b border-line last:border-b-0"><span class="w-2.5 h-2.5 rounded-full bg-accent mt-1.5 shrink-0"></span><div class="min-w-0 flex-1"><div class="text-[11px] text-muted">${apDate(p.paid_at)}</div><div class="text-sm font-semibold text-ink">${esc(p.kind_label)}${p.doc_no ? ` <span class="font-mono text-[12px] text-accentDark font-normal">${esc(p.doc_no)}</span>` : ""}</div><div class="text-xs text-muted">${[p.method ? (PAYMENT_METHOD_LABELS[p.method] || p.method) : "", p.reference_no ? "Ref " + esc(p.reference_no) : "", p.note ? esc(p.note) : "", p.created_by ? esc(p.created_by) : ""].filter(Boolean).join(" · ")}${p.credit_note?.id ? ` · ${apNum(p.credit_note.cn_number, `cnGo(${p.credit_note.id})`)}` : ""}${p.credit_note?.return_id ? ` · ${apRetLink(p.credit_note.return_id, p.credit_note.return_number)}` : ""}</div></div><div class="text-right"><div class="tabular-nums font-semibold ${p.amount < 0 ? "text-failed" : "text-ink"}">${p.amount < 0 ? "− " : ""}${apMoney(Math.abs(p.amount))}</div><div class="text-[11px] text-muted tabular-nums">sisa ${apMoney(p.balance_after)}</div></div></div>`).join("") : '<p class="py-6 text-sm text-muted">Belum ada pembayaran, DP, atau kredit pada faktur ini.</p>'}</div>`;
   const docs = `<div class="px-4 py-3 space-y-2">${[
     d.po ? ["Purchase Order", d.po.po_number, `openSupplierPoFromFaktur('${esc(d.po.id)}')`, d.po.status] : null,
     ...d.grs.map(g => ["Goods Receipt", g.gr_number || "GR", `openSupplierPoFromFaktur('${esc(d.po.id)}')`, `${g.qty} pcs`]),
@@ -12939,25 +12940,8 @@ function apRenderPayments(d) {
 }
 
 // ── Detail Credit Note (Retur Supplier) ──
-async function apOpenCredit(id) {
-  apRenderTabs();
-  apBody().innerHTML = '<div class="py-16 text-center text-sm text-muted">Memuat…</div>';
-  let c;
-  try { c = await apGet(`credits/${id}`); } catch (e) { showToast(e.message); apGo("credits"); return; }
-  const row = (l, v) => crRow(l, v);
-  const info = crCard("Informasi nota kredit", row("Nomor credit note", `<span class="font-mono">${esc(c.cn_number || "—")}</span>`) + row("Supplier", esc(c.supplier_name)) + row("Sumber retur", c.return_id ? apRetLink(c.return_id, c.return_number) : c.po_number ? apPoLink(c.supplier_po_id, c.po_number) : "")
-    + row("Tanggal kredit", apDate(c.issued_at)) + row("Nomor kredit supplier", esc(c.supplier_cn_no || "")) + row("Nilai disetujui", `<b>${apMoney(c.amount)}</b>`) + row("Status kredit", crPill(c.status !== "aktif" ? "bg-stone-100 text-stone-600" : c.free ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700", c.status_label))
-    + row("Faktur tujuan", c.allocations.length ? c.allocations.map(a => apNum(a.invoice_number, `apOpenDetail(${a.invoice_id})`)).join(", ") : "Belum dialokasikan") + row("Jenis penyelesaian", "Potong tagihan"));
-  const alloc = `<div class="px-4 py-3 text-sm">${c.allocations.length ? c.allocations.map(a => `<div class="flex items-center justify-between py-2 border-b border-line"><span class="text-muted">${esc(a.invoice_number)} · total ${apMoney(a.total)}</span><span class="tabular-nums font-medium text-ink">− ${apMoney(a.amount)}</span></div>`).join("") : '<p class="text-muted py-2">Nota kredit ini belum dipotongkan ke faktur. Alokasi dilakukan di Retur Supplier.</p>'}
-    <div class="flex items-center justify-between mt-3 rounded-lg bg-accent/10 px-3 py-3"><span class="font-semibold text-sm text-ink">Sisa saldo kredit</span><span class="font-sans text-xl font-semibold tabular-nums text-accentDark">${apMoney(c.free)}</span></div>
-    <div class="flex flex-wrap items-center gap-2 mt-3 text-xs">${["Retur Supplier", "Credit Note", "Aging Payable"].map((t, i) => `${i ? '<span class="text-muted">→</span>' : ""}<span class="border border-line rounded-lg bg-bg2 px-3 py-2 font-semibold text-ink">${t}</span>`).join("")}</div></div>`;
-  const items = apTable(`<th class="${AP_TH}">Barang</th><th class="${AP_THR}">Qty</th><th class="${AP_TH}">Alasan retur</th><th class="${AP_TH}">Hasil supplier</th><th class="${AP_THR}">Kredit</th>`,
-    (c.items || []).map(i => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(i.product_name)}</td><td class="${AP_TD} text-right tabular-nums">${i.qty}</td><td class="${AP_TD} text-muted">${esc(i.reason_detail || i.reason_code || "—")}</td><td class="${AP_TD}">${i.settlement ? crPill("bg-violet-50 text-violet-700", i.settlement === "kredit" ? "Nota kredit" : i.settlement) : "—"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney((i.qty_approved || 0) * (i.unit_cost || 0))}</td></tr>`).join(""), "Nota kredit ini tidak berasal dari retur barang.");
-  apBody().innerHTML = apHead("Credit Note dari Retur Supplier", `${c.cn_number || ""} · ${c.supplier_name}`, apBtn("← Kembali", "apGo('credits')") + (c.return_id ? apBtn("Lihat Retur", `rtsOpen(${c.return_id})`, true) : ""))
-    + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${info}${apPanel("Alokasi credit note", alloc)}</div>`
-    + apPanel("Rincian item retur yang diberi kredit", items)
-    + crNote("border-amber-200 bg-amber-50 text-amber-900 mt-4", "Penggantian barang tidak otomatis menjadi nota kredit. Pilih penyelesaian sesuai konfirmasi supplier di Retur Supplier.");
-}
+// Credit Note detail lives in its own module (menu Purchase → Credit Note).
+function apOpenCredit(id) { cnGo(id); }
 
 // ── Detail klaim refund (PO dibatalkan) ──
 async function apOpenRefund(id) {
@@ -17499,7 +17483,7 @@ function grReturnModal(id) {
   const lines = r.lines.filter(l => l.returnable > 0);
   const reasons = Object.entries(r.reasons).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
   openModal("Retur ke Supplier", `<div class="space-y-3">
-    <p class="text-sm text-muted -mt-1">Barang yang diretur langsung keluar dari stok tersedia dan ditahan sampai diambil / dikirim ke supplier. Tagihan dipotong otomatis, tanpa void faktur.</p>
+    <p class="text-sm text-muted -mt-1">Barang yang diretur langsung keluar dari stok tersedia dan ditahan sampai diambil / dikirim ke supplier. Untuk faktur yang sudah diposting dibuat <b>Draft Credit Note</b>; tagihan dipotong setelah CN diperiksa, diposting, dan dialokasikan di menu Credit Note.</p>
     <div class="overflow-x-auto border border-line rounded-lg"><table class="w-full text-sm"><thead class="bg-bg2"><tr>
       <th class="${GR_TH}">Barang</th><th class="${GR_TH}">Bisa diretur</th><th class="${GR_TH}">Qty retur</th><th class="${GR_TH}">Alasan</th><th class="${GR_TH}">Tagihan</th></tr></thead><tbody>
       ${lines.map(l => `<tr class="border-b border-line last:border-b-0 align-top">
@@ -17508,7 +17492,7 @@ function grReturnModal(id) {
         <td class="${GR_TD}"><input type="number" min="0" max="${l.returnable}" value="0" data-ret-line="${l.inbound_item_id}" data-cost="${l.unit_cost}" data-tax="${l.faktur ? l.faktur.tax_rate || 0 : 0}" oninput="grReturnPreview()" class="${GR_IN} !w-20 !py-1.5 text-right"></td>
         <td class="${GR_TD}"><select data-ret-reason="${l.inbound_item_id}" class="${GR_IN} !py-1.5 min-w-[11rem]"><option value="">Pilih alasan</option>${reasons}</select>
           <input data-ret-detail="${l.inbound_item_id}" placeholder="keterangan (opsional)" data-no-uppercase class="${GR_IN} !py-1.5 mt-1"></td>
-        <td class="${GR_TD} text-[11px] text-muted">${!l.faktur ? "Belum ada faktur: tidak ikut ditagih" : l.faktur.status === "posted" ? `Credit Note ke faktur <b class="text-ink">${esc(l.faktur.number)}</b> (sisa ${formatIDR(l.faktur.outstanding)})` : `Qty di draft faktur ${esc(l.faktur.number)} dikurangi`}</td></tr>`).join("")}
+        <td class="${GR_TD} text-[11px] text-muted">${!l.faktur ? "Belum ada faktur: tidak ikut ditagih" : l.faktur.status === "posted" ? `Draft Credit Note untuk faktur <b class="text-ink">${esc(l.faktur.number)}</b> (sisa ${formatIDR(l.faktur.outstanding)})` : `Qty di draft faktur ${esc(l.faktur.number)} dikurangi`}</td></tr>`).join("")}
     </tbody></table></div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       ${grField("Cara pengembalian", `<select id="gr-ret-method" class="${GR_IN}"><option value="sales">Diambil sales supplier</option><option value="ekspedisi">Dikirim lewat ekspedisi</option></select>`)}
@@ -17523,7 +17507,7 @@ function grReturnPreview() {
     const q = Math.max(parseInt(i.value, 10) || 0, 0); qty += q;
     val += Math.round(q * Number(i.dataset.cost) * (1 + Number(i.dataset.tax) / 100));
   });
-  document.getElementById("gr-ret-preview").innerHTML = qty ? grNote("amber", `${formatInt(qty)} unit diretur, nilai ${formatIDR(val)}. Stok tersedia berkurang ${formatInt(qty)} saat disimpan; tagihan supplier dipotong sebesar nilai ini.`) : grNote("blue", "Isi qty barang yang diretur.");
+  document.getElementById("gr-ret-preview").innerHTML = qty ? grNote("amber", `${formatInt(qty)} unit diretur, nilai ${formatIDR(val)}. Stok tersedia berkurang ${formatInt(qty)} saat disimpan; untuk faktur yang sudah diposting nilai ini menjadi Draft Credit Note (tagihan belum terpotong sampai CN diposting &amp; dialokasikan).`) : grNote("blue", "Isi qty barang yang diretur.");
 }
 async function grReturnSend(id) {
   const lines = [...document.querySelectorAll("[data-ret-line]")].map(i => ({ inbound_item_id: Number(i.dataset.retLine), qty: parseInt(i.value, 10) || 0,
@@ -25612,7 +25596,9 @@ function rtsDetailActions(r) {
   if (live && ["dikirim", "diserahkan"].includes(r.handover_status)) out.push(b("Tandai Diterima Supplier", "rtsReceivedModal()"));
   if (live && admin && r.handover_status !== "belum") out.push(b("Catat Respons Supplier", "rtsDecisionPage()", r.undecided_qty && ["dikirim", "diserahkan", "diterima_supplier"].includes(r.handover_status) ? RTS_BTN : RTS_BTN2));
   if (live && r.replacement_left && currentUser?.can_post_inbound) out.push(b("Catat Barang Pengganti Datang", "rtsReplacementPage()", RTS_BTN));
-  if (live && admin && (r.claim_left || (r.credits || []).some(c => c.unallocated > 0))) out.push(b("Refund &amp; Credit Note", "rtsCreditPage()", RTS_BTN));
+  const openCn = (r.credits || []).find(c => c.kind === "kredit" && ["draft", "review", "disetujui"].includes(c.status));
+  if (live && admin && openCn) out.push(b(`Proses ${esc(openCn.cn_number)}`, `cnGo(${openCn.id})`, RTS_BTN));
+  else if (live && admin && r.claim_left > (r.credit_pending || 0)) out.push(b("Refund &amp; Credit Note", "rtsCreditPage()", RTS_BTN));
   if (live && admin && r.rejected_back_left) out.push(b("Terima Kembali Barang Ditolak", "rtsRejectedModal()"));
   if (r.doc_status !== "draft") out.push(b("Cetak Nota Retur", `rtsOpenPrint(${r.id})`));
   if (["menunggu_persetujuan", "diproses"].includes(r.doc_status) && admin && !["dikirim", "diserahkan", "diterima_supplier"].includes(r.handover_status) && r.doc_status === "diproses") out.push(b("Kembalikan ke Draft", "rtsToDraft()", RTS_BTN3));
@@ -25637,12 +25623,13 @@ function rtsRenderDetail() {
         `<div class="rounded-lg ${c} px-2 py-2"><div class="text-[10px] uppercase tracking-wider text-muted">${k}</div><div class="font-semibold tabular-nums text-ink">${v}</div></div>`).join("")}</div>
       <div class="text-[11px] text-muted mt-1 mb-3">${esc(i.product_name)} — Available = stok jual − booking SO; karantina masih fisik di toko tapi tidak boleh dijual.</div>`).join("");
   const credits = admin && r.credits.length ? rtsCard("Refund &amp; Nota Kredit", `<div class="divide-y divide-line text-sm">${r.credits.map(c => `
-      <div class="py-2 flex flex-wrap items-start justify-between gap-2"><div><div class="font-medium text-ink">${c.kind === "kredit" ? esc(c.cn_number) : "Refund diterima"} ${c.status === "dibatalkan" ? rtsPill(RTS_TINT.red, "Dibatalkan") : ""}</div>
+      <div class="py-2 flex flex-wrap items-start justify-between gap-2"><div><div class="font-medium text-ink">${c.kind === "kredit" ? `<button type="button" onclick="cnGo(${c.id})" class="font-mono text-accentDark hover:underline">${esc(c.cn_number)}</button> ${rtsPill(RTS_TINT[CN_STATUS_TINT[c.status] || "gray"], c.status_label || c.status)}` : "Refund diterima"} ${c.kind !== "kredit" && c.status === "dibatalkan" ? rtsPill(RTS_TINT.red, "Dibatalkan") : ""}</div>
         <div class="text-[11px] text-muted">${esc(rtsDate(c.issued_at))}${c.supplier_cn_no ? " · CN supplier " + esc(c.supplier_cn_no) : ""}${c.method ? " · " + esc(c.method) : ""}${c.reference_no ? " · " + esc(c.reference_no) : ""}</div>
         ${c.allocations.length ? `<div class="text-[11px] text-ink">${c.allocations.map(a => `${a.amount < 0 ? "Dibalik" : "Alokasi"} ${formatIDR(Math.abs(a.amount))} → ${esc(a.invoice_number)}`).join("<br>")}</div>` : ""}
-        ${c.unallocated > 0 ? `<div class="text-[11px] text-amber-800">Saldo kredit belum dialokasikan ${formatIDR(c.unallocated)}</div>` : ""}</div>
+        ${c.unallocated > 0 ? `<div class="text-[11px] text-amber-800">Saldo kredit belum dialokasikan ${formatIDR(c.unallocated)}</div>` : ""}
+        ${c.kind === "kredit" && ["draft", "review", "disetujui"].includes(c.status) ? `<div class="text-[11px] text-amber-800">Belum memotong tagihan — verifikasi &amp; posting di menu Credit Note</div>` : ""}</div>
         <div class="text-right"><div class="font-semibold tabular-nums">${formatIDR(c.amount)}</div>
-          ${c.status === "aktif" ? `<button type="button" onclick="rtsCancelCredit(${c.id})" class="text-[11px] text-failed hover:underline">Batalkan</button>` : ""}</div></div>`).join("")}</div>`) : "";
+          ${c.kind === "kredit" ? `<button type="button" onclick="cnGo(${c.id})" class="text-[11px] text-accentDark hover:underline">Buka Credit Note</button>` : c.status === "aktif" ? `<button type="button" onclick="rtsCancelCredit(${c.id})" class="text-[11px] text-failed hover:underline">Batalkan</button>` : ""}</div></div>`).join("")}</div>`) : "";
   const repl = r.replacements.length ? rtsCard("Barang Pengganti", `<div class="divide-y divide-line text-sm">${r.replacements.map(x => `<div class="py-2 flex justify-between gap-3"><span>${esc(x.product_name)} × ${x.qty}${x.condition !== "baik" ? ` <span class="text-failed text-xs">(${esc(rtsLabel("conditions", x.condition))})</span>` : ""}</span><span class="text-xs text-muted">${esc(x.doc_number || "")} · ${esc(rtsWhen(x.created_at))}</span></div>`).join("")}</div>`) : "";
   document.getElementById("rts-detail-panel").innerHTML = rtsHead("Detail Retur &amp; Timeline", "Riwayat lengkap dokumen dan status proses", r.return_number) + `
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
@@ -25857,9 +25844,7 @@ let rtsCreditKind = "kredit";
 function rtsCreditPage() {
   const r = rtsCurrent, K = rtsCreditKind === "kredit";
   const keep = {}; for (const id of ["rts-cr-amount", "rts-cr-ref", "rts-cr-cn", "rts-cr-date", "rts-cr-method", "rts-cr-inv"]) { const el = document.getElementById(id); if (el) keep[id] = el.value; }
-  const inv = r.open_invoices.find(x => String(x.id) === String(keep["rts-cr-inv"] ?? r.purchase_invoice_id ?? r.open_invoices[0]?.id)) || null;
   const amt = keep["rts-cr-amount"] ? Number(String(keep["rts-cr-amount"]).replace(/\D/g, "")) : r.claim_left;
-  const unalloc = r.credits.filter(c => c.unallocated > 0);
   const html = `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
     ${rtsCard("Penyelesaian Finansial", `<div class="grid grid-cols-2 gap-3 rts-choices">
         ${rtsChoice("k", "refund", "Refund Uang", "Pengembalian dana ke toko", !K, "rtsCreditKind='refund'; rtsCreditPage()")}
@@ -25867,26 +25852,26 @@ function rtsCreditPage() {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         ${rtsField("No. Retur", rtsRO(esc(r.return_number)))}${rtsField("Supplier", rtsRO(esc(r.supplier_name)))}
         ${rtsField("Nilai Disetujui", rtsRO(formatIDR(r.claim_value)))}${rtsField(K ? "Sudah Dikredit / Direfund" : "Refund Sudah Diterima", rtsRO(formatIDR(r.settled_value)))}
-        ${rtsField(K ? "Nilai Nota Kredit" : "Nominal Refund Diterima", `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">Rp</span><input id="rts-cr-amount" type="text" inputmode="numeric" value="${amt}" class="price-input ${RTS_IN} pl-9 text-right" onchange="rtsCreditPage()"></div>`, true)}
+        ${K ? "" : rtsField("Nominal Refund Diterima", `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">Rp</span><input id="rts-cr-amount" type="text" inputmode="numeric" value="${amt}" class="price-input ${RTS_IN} pl-9 text-right" onchange="rtsCreditPage()"></div>`, true)}
         ${rtsField("Sisa Klaim", rtsRO(formatIDR(r.claim_left)))}
-        ${rtsField("Tanggal", `<input id="rts-cr-date" type="date" value="${esc(keep["rts-cr-date"] || toDateInputValue(new Date()))}" data-no-uppercase class="${RTS_IN}">`)}
-        ${K ? rtsField("No. Nota Kredit Supplier", `<input id="rts-cr-cn" type="text" value="${esc(keep["rts-cr-cn"] || "")}" data-no-uppercase class="${RTS_IN}">`)
+        ${K ? "" : rtsField("Tanggal", `<input id="rts-cr-date" type="date" value="${esc(keep["rts-cr-date"] || toDateInputValue(new Date()))}" data-no-uppercase class="${RTS_IN}">`)}
+        ${K ? ""
             : rtsField("Metode", `<select id="rts-cr-method" class="${RTS_IN}">${[["transfer", "Transfer"], ["cash", "Tunai"], ["giro", "Giro"]].map(([k, l]) => `<option value="${k}" ${k === keep["rts-cr-method"] ? "selected" : ""}>${l}</option>`).join("")}</select>`)}
         <div class="sm:col-span-2">${rtsField("Referensi Bukti", `<input id="rts-cr-ref" type="text" value="${esc(keep["rts-cr-ref"] || "")}" placeholder="${K ? "no. surat / email" : "TRF-…"}" data-no-uppercase class="${RTS_IN}">`)}</div></div>`)}
-    ${K ? rtsCard("Alokasi Credit Note ke Faktur", `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="sm:col-span-2">${rtsField("Faktur Pembelian (belum lunas)", `<select id="rts-cr-inv" class="${RTS_IN}" onchange="rtsCreditPage()"><option value="">Jangan alokasikan dulu (saldo kredit supplier)</option>${r.open_invoices.map(x => `<option value="${x.id}" ${inv && x.id === inv.id ? "selected" : ""}>${esc(x.invoice_number)} · sisa ${formatIDR(x.outstanding)}</option>`).join("")}</select>`)}</div>
-        ${rtsField("Nilai Faktur", rtsRO(inv ? formatIDR(inv.total) : "—"))}${rtsField("Sisa Tagihan", rtsRO(inv ? formatIDR(inv.outstanding) : "—"))}
-        ${rtsField("Credit Note Dialokasikan", rtsRO(inv ? formatIDR(Math.min(amt, inv.outstanding)) : formatIDR(0)))}${rtsField("Saldo Faktur Setelah Kredit", rtsRO(inv ? formatIDR(inv.outstanding - Math.min(amt, inv.outstanding)) : "—"))}</div>
-      <div class="mt-3">${rtsNote("amber", "Aturan keuangan", "Credit note hanya mengurangi tagihan yang sah sekali saja; total faktur tidak diedit. Sisa yang tidak muat menjadi saldo kredit supplier.")}</div>
-      ${unalloc.length ? `<div class="mt-3 text-xs">${unalloc.map(c => `<div class="flex flex-wrap items-center justify-between gap-2 border border-line rounded-lg px-3 py-2 mb-1"><span>${esc(c.cn_number)} saldo ${formatIDR(c.unallocated)}</span>
-        ${inv ? `<button type="button" onclick="rtsAllocate(${c.id}, ${inv.id}, ${Math.min(c.unallocated, inv.outstanding)})" class="text-accentDark font-medium hover:underline">Alokasikan ${formatIDR(Math.min(c.unallocated, inv.outstanding))} ke ${esc(inv.invoice_number)}</button>` : ""}</div>`).join("")}</div>` : ""}`)
+    ${K ? rtsCard("Credit Note Supplier", `${rtsNote("blue", "Draft dibuat di menu Credit Note", `Nilai klaim yang disetujui supplier dan belum dikreditkan: <b>${formatIDR(Math.max(r.claim_left - (r.credit_pending || 0), 0))}</b>. Draft berisi rincian per barang; nominal bisa disesuaikan dengan bukti supplier sebelum diposting.`)}
+      <div class="mt-3">${rtsNote("amber", "Alur Credit Note", "Draft → verifikasi → posting → alokasi ke faktur. Tagihan baru dipotong setelah alokasi. Total faktur tidak diedit.")}</div>`)
       : rtsCard("Bukti Refund", rtsNote("amber", "Aturan keuangan", "Refund baru dianggap diterima setelah ada bukti dana masuk. Refund bertahap boleh; total tidak boleh melebihi nilai disetujui."))}
   </div>
-  ${rtsFooter(`<button type="button" onclick="rtsBackToDetail()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="rtsCreditSubmit()" class="${RTS_BTN}" ${r.claim_left ? "" : "disabled"}>${K ? "Simpan Nota Kredit" : "Catat Refund Diterima"}</button>`)}`;
+  ${rtsFooter(`<button type="button" onclick="rtsBackToDetail()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="rtsCreditSubmit()" class="${RTS_BTN}" ${r.claim_left ? "" : "disabled"}>${K ? "Buat Draft Credit Note" : "Catat Refund Diterima"}</button>`)}`;
   rtsActionPage("Refund &amp; Credit Note Supplier", "Penyelesaian keuangan dan bukti refund", html, null);
 }
-function rtsCreditSubmit() {
+async function rtsCreditSubmit() {
   const v = id => document.getElementById(id)?.value || "", K = rtsCreditKind === "kredit";
+  if (K) {
+    try { const r = await rtsApi(`/api/credit-notes/from-return/${rtsCurrent.id}`, "POST", { note: v("rts-cr-ref") || null }); showToast("Draft Credit Note dibuat. Lengkapi bukti supplier lalu posting.", "success"); cnGo(r.id); }
+    catch (e) { showToast(e.message); }
+    return;
+  }
   rtsAct("credit", { kind: rtsCreditKind, amount: priceValue(document.getElementById("rts-cr-amount")) || 0, issued_at: v("rts-cr-date"),
     reference_no: v("rts-cr-ref"), supplier_cn_no: K ? v("rts-cr-cn") : null, method: K ? null : v("rts-cr-method"), invoice_id: K ? (v("rts-cr-inv") || null) : null },
     K ? "Nota kredit dicatat." : "Refund dicatat.");
@@ -27795,7 +27780,7 @@ const activityState = { page: 1, pageSize: 50, total: 0, actorsLoaded: false };
 
 const ENTITY_LABELS = {
   receipt: "Nota penjualan", master_item: "Barang", inbound_document: "Barang masuk",
-  purchase_invoice: "Faktur pembelian", supplier_po: "Purchase Order", preorder: "Sales Order", supplier: "Supplier", brand: "Merek",
+  purchase_invoice: "Faktur pembelian", credit_note: "Credit Note", supplier_po: "Purchase Order", preorder: "Sales Order", supplier: "Supplier", brand: "Merek",
   unit: "Satuan", stock: "Penyesuaian stok", user: "Pengguna", auth: "Masuk / keluar",
   customer: "Pelanggan", scrape: "Scraper", job: "Job scraper",
 };
@@ -27952,6 +27937,664 @@ async function checkAuth() {
   currentUser = await meResp.json();
   hideAuthOverlay();
   bootApp();
+}
+
+// ── Credit Note Supplier (Blueprint 22-10-2026) ──────────────────────────────
+// Draft (dibuat otomatis dari retur) → Menunggu Verifikasi → Disetujui → Posted → Alokasi ke faktur / Refund.
+// Draft tidak mengubah tagihan; posting menaikkan kredit supplier; alokasi baru menurunkan sisa tagihan faktur.
+// Reversal diajukan Admin, disetujui Owner. Semua angka dibaca dari /api/credit-notes (tidak dihitung ulang di sini).
+let cnState = { tab: "semua", q: "", supplier_id: "", status: "", date_from: "", date_to: "" };
+let cnList = null;
+let cnCurrent = null;
+let cnPendingOpen = null;
+let cnMode = null;            // panel aksi setelah Posted: null | alokasi | refund | kredit
+let cnAuditState = { cn_id: "", q: "", supplier_id: "", kind: "", user: "", date_from: "", date_to: "" };
+let cnAuditData = null;
+
+const CN_STATUS_TINT = { draft: "gray", review: "amber", disetujui: "blue", aktif: "green", reversed: "red", dibatalkan: "gray", ditolak: "red" };
+const CN_ALLOC_TINT = { none: "violet", partial: "amber", full: "green" };
+const cnMoney = n => formatIDR(n || 0);
+const cnStatusPill = c => rtsPill(RTS_TINT[CN_STATUS_TINT[c.status] || "gray"], c.status_label || c.status);
+const cnAllocPill = c => c.alloc_state ? rtsPill(RTS_TINT[CN_ALLOC_TINT[c.alloc_state]], c.alloc_label) : '<span class="text-muted">—</span>';
+const cnLink = (label, js) => `<button type="button" onclick="${js}" class="font-mono text-accentDark hover:underline text-left">${esc(label)}</button>`;
+const cnErrCode = msg => (/\((ERR-[A-Z]\d+)\)\s*$/.exec(msg || "") || [])[1] || "";
+const cnErrText = msg => String(msg || "").replace(/\s*\((ERR-[A-Z]\d+)\)\s*$/, "");
+
+function cnShow(panel) {
+  for (const id of ["cn-list-panel", "cn-detail-panel", "cn-audit-panel"]) document.getElementById(id).classList.toggle("hidden", id !== panel);
+  document.getElementById("page-credit-notes").scrollTop = 0;
+}
+async function cnInit(reset) {
+  try { if (!suppliersCache.length) await loadSuppliers(); } catch (_) {}
+  if (cnPendingOpen) { const id = cnPendingOpen; cnPendingOpen = null; cnOpen(id); return; }
+  if (reset) cnState = { tab: "semua", q: "", supplier_id: "", status: "", date_from: "", date_to: "" };
+  cnShow("cn-list-panel");
+  cnLoad();
+}
+function cnGo(id) {
+  if (currentRoute() === "/credit-notes") { cnOpen(id); return; }
+  cnPendingOpen = id;
+  location.hash = "/credit-notes";
+}
+function cnBackToList() { cnCurrent = null; cnMode = null; document.getElementById("topbar-title").textContent = "Credit Note Supplier"; cnShow("cn-list-panel"); cnLoad(); }
+
+// ── Daftar (Gambar 01) ───────────────────────────────────────────────────────
+async function cnLoad() {
+  const s = cnState, qs = new URLSearchParams({ tab: s.tab });
+  for (const k of ["q", "supplier_id", "status", "date_from", "date_to"]) if (s[k]) qs.set(k, s[k]);
+  try { cnList = await rtsApi(`/api/credit-notes?${qs}`); } catch (e) { showToast(e.message); return; }
+  cnRenderList();
+}
+function cnApplyFilter() {
+  const v = id => document.getElementById(id)?.value || "";
+  Object.assign(cnState, { q: v("cn-f-q").trim(), supplier_id: v("cn-f-supplier"), status: v("cn-f-status"), date_from: v("cn-f-from"), date_to: v("cn-f-to") });
+  cnLoad();
+}
+function cnResetFilter() { cnState = { tab: cnState.tab, q: "", supplier_id: "", status: "", date_from: "", date_to: "" }; cnLoad(); }
+function cnSetTab(t) { cnState.tab = t; cnLoad(); }
+
+function cnTile(label, value, sub, tint) {
+  return `<div class="bg-white border border-line rounded-xl px-4 py-3 min-w-0"><div class="text-[11px] uppercase tracking-wider text-muted font-medium">${label}</div>
+    <div class="font-sans text-xl font-semibold tabular-nums mt-1 ${tint || "text-ink"}">${value}</div><div class="text-[11px] text-muted mt-0.5 truncate">${sub || ""}</div></div>`;
+}
+function cnRenderList() {
+  const d = cnList, s = cnState, k = d.kpi;
+  const opt = (pairs, cur) => pairs.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`).join("");
+  const tabs = [["semua", "Semua"], ["proses", `Perlu Diproses (${k.open_count})`], ["tersedia", `Kredit Tersedia (${k.available_count})`], ["teralokasi", "Teralokasi Penuh"], ["ditutup", "Reversed / Ditutup"]];
+  const sp = d.supplier_position;
+  const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0 hover:bg-bg2/50 cursor-pointer" onclick="cnOpen(${r.id})">
+      <td class="px-3 py-2.5"><div class="font-mono text-[13px] font-semibold text-ink">${esc(r.cn_number || "—")}</div>${r.corrects_id ? '<div class="text-[11px] text-muted">CN koreksi</div>' : ""}${r.reversal_pending ? `<div class="mt-0.5">${rtsPill(RTS_TINT.amber, "Reversal menunggu Owner")}</div>` : ""}</td>
+      <td class="px-3 py-2.5 whitespace-nowrap text-muted">${rtsDate(r.issued_at)}</td>
+      <td class="px-3 py-2.5 text-ink">${esc(r.supplier_name)}</td>
+      <td class="px-3 py-2.5">${r.return_id ? `<span class="font-mono text-[12px]">${esc(r.return_number)}</span>` : '<span class="text-muted text-xs">Pembatalan PO</span>'}</td>
+      <td class="px-3 py-2.5 font-mono text-[12px]">${esc(r.supplier_cn_no || "—")}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap">${cnMoney(r.amount)}</td>
+      <td class="px-3 py-2.5">${cnStatusPill(r)}</td>
+      <td class="px-3 py-2.5">${cnAllocPill(r)}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">${r.status === "aktif" ? cnMoney(r.allocated + r.refunded) : '<span class="text-muted">—</span>'}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap ${r.available ? "text-accentDark font-semibold" : ""}">${r.status === "aktif" ? cnMoney(r.available) : '<span class="text-muted">—</span>'}</td>
+      <td class="px-3 py-2.5 text-[12px] font-mono">${esc(r.alloc_invoices || r.invoice_number || "—")}</td>
+      <td class="px-3 py-2.5 whitespace-nowrap" onclick="event.stopPropagation()">
+        <button type="button" onclick="cnOpen(${r.id})" class="px-2.5 py-1 border border-line rounded-md bg-white text-accentDark text-xs font-semibold hover:bg-bg2">Buka</button>
+        ${r.status === "aktif" && r.available > 0 && !r.reversal_pending ? `<button type="button" onclick="cnOpen(${r.id}, 'alokasi')" class="ml-1 px-2.5 py-1 rounded-md bg-accent text-white text-xs font-semibold hover:bg-accentDark">Alokasi</button>` : ""}</td></tr>`).join("");
+  document.getElementById("cn-list-panel").innerHTML = `
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div><h2 class="font-serif text-2xl font-semibold text-ink">Daftar Credit Note Supplier</h2>
+        <p class="text-sm text-muted mt-0.5">Kredit dari supplier atas retur. Draft tidak memotong tagihan; tagihan turun setelah CN diposting dan dialokasikan.</p></div>
+      <div class="flex flex-wrap gap-2"><button type="button" onclick="cnOpenAudit()" class="${RTS_BTN3}">Riwayat &amp; Audit</button>
+        <button type="button" onclick="cnFromReturnModal()" class="${RTS_BTN}">+ Buat dari Retur</button></div></div>
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
+      ${cnTile("CN Posted", cnMoney(k.posted_total), `${k.posted_count} dokumen`)}
+      ${cnTile("Kredit Tersedia", cnMoney(k.available), `${k.available_count} CN belum habis dipakai`, "text-accentDark")}
+      ${cnTile("Sudah Dialokasikan", cnMoney(k.allocated), "Mengurangi sisa tagihan faktur")}
+      ${cnTile("Refund Diterima", cnMoney(k.refunded), "Kas masuk dari supplier")}
+      ${cnTile("Perlu Diproses", String(k.open_count), `${cnMoney(k.open_total)} · ${k.review_count} menunggu verifikasi/posting`, k.open_count ? "text-amber-700" : "")}
+      ${cnTile("Reversal Menunggu", String(k.reversal_pending), "Perlu persetujuan Owner", k.reversal_pending ? "text-failed" : "")}
+    </div>
+    ${d.creditable_returns.some(r => !r.open_draft) ? `<div class="mb-4">${rtsNote("amber", "Ada retur dengan kredit disetujui yang belum dibuatkan Credit Note",
+      d.creditable_returns.filter(r => !r.open_draft).slice(0, 4).map(r => `${esc(r.return_number)} · ${esc(r.supplier_name)} · ${cnMoney(r.free)}`).join("; ") + ` — <button type="button" onclick="cnFromReturnModal()" class="underline font-semibold">Buat draft</button>`)}</div>` : ""}
+    <div class="flex flex-wrap items-center gap-1.5 mb-3">${tabs.map(([key, label]) => `<button type="button" onclick="cnSetTab('${key}')" class="px-3 py-1.5 rounded-full border text-xs ${s.tab === key ? "border-accent bg-accent/10 text-accentDark font-semibold" : "border-line bg-white text-ink hover:bg-bg2"}">${label}</button>`).join("")}</div>
+    ${rtsCard("Cari &amp; Filter Credit Note", `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 items-end">
+      ${rtsField("Cari", `<input id="cn-f-q" type="text" value="${esc(s.q)}" placeholder="No. CN, No. CN supplier, retur, faktur, supplier" onkeydown="if(event.key==='Enter')cnApplyFilter()" class="${RTS_IN}">`)}
+      ${rtsField("Supplier", `<select id="cn-f-supplier" onchange="cnApplyFilter()" class="${RTS_IN}"><option value="">Semua supplier</option>${opt(d.suppliers.map(x => [x.id, x.name]), s.supplier_id)}</select>`)}
+      ${rtsField("Status", `<select id="cn-f-status" onchange="cnApplyFilter()" class="${RTS_IN}"><option value="">Semua status</option>${opt(Object.entries({ draft: "Draft", review: "Menunggu Verifikasi", disetujui: "Disetujui", aktif: "Posted", reversed: "Reversed", ditolak: "Ditolak", dibatalkan: "Dibatalkan" }), s.status)}</select>`)}
+      ${rtsField("Dari tanggal", `<input id="cn-f-from" type="date" value="${esc(s.date_from)}" onchange="cnApplyFilter()" data-no-uppercase class="${RTS_IN}">`)}
+      ${rtsField("Sampai", `<input id="cn-f-to" type="date" value="${esc(s.date_to)}" onchange="cnApplyFilter()" data-no-uppercase class="${RTS_IN}">`)}
+      <div class="flex gap-2"><button type="button" onclick="cnApplyFilter()" class="${RTS_BTN}">Cari</button><button type="button" onclick="cnResetFilter()" class="${RTS_BTN3}">Reset</button></div></div>
+      ${sp ? `<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">${cnTile("Utang faktur terbuka", cnMoney(sp.outstanding), `${sp.open_invoices} faktur`)}${cnTile("Kredit tersedia", "− " + cnMoney(sp.credit_available), "Belum dialokasikan / direfund", "text-accentDark")}${cnTile("Posisi net supplier", cnMoney(sp.net), "Utang faktur − kredit tersedia")}</div>` : ""}`)}
+    <div class="mt-4 bg-white border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[1180px] text-sm">
+      <thead class="bg-bg2"><tr><th class="${RTS_TH}">No. CN</th><th class="${RTS_TH}">Tanggal</th><th class="${RTS_TH}">Supplier</th><th class="${RTS_TH}">Sumber Retur</th><th class="${RTS_TH}">No. CN Supplier</th>
+        <th class="${RTS_THR}">Nilai CN</th><th class="${RTS_TH}">Status</th><th class="${RTS_TH}">Pemakaian</th><th class="${RTS_THR}">Terpakai</th><th class="${RTS_THR}">Sisa Kredit</th><th class="${RTS_TH}">Faktur</th><th class="${RTS_TH}">Aksi</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="12" class="px-3 py-12 text-center text-sm text-muted">Belum ada Credit Note untuk filter ini. Credit Note dibuat dari retur yang kreditnya disetujui supplier.</td></tr>`}</tbody></table></div>
+    <p class="text-[11px] text-muted mt-2">Per ${rtsDate(d.as_of)} · Sisa kredit = nilai CN posted − alokasi aktif − refund. Posisi net supplier = utang faktur − kredit tersedia (alokasi tidak mengubah posisi net).</p>`;
+}
+
+async function cnFromReturnModal() {
+  let rows;
+  try { rows = await rtsApi("/api/credit-notes/returns"); } catch (e) { showToast(e.message); return; }
+  const body = rows.length ? `<div class="space-y-2 max-h-[60vh] overflow-y-auto">${rows.map(r => `<div class="flex flex-wrap items-center gap-3 border border-line rounded-lg px-3 py-2.5">
+      <div class="flex-1 min-w-0"><div class="font-mono text-sm font-semibold text-ink">${esc(r.return_number)}</div><div class="text-xs text-muted">${esc(r.supplier_name)} · ${rtsDate(r.return_date)} · klaim disetujui ${cnMoney(r.claim)}</div></div>
+      <div class="text-right"><div class="text-[11px] text-muted">Belum dikreditkan</div><div class="font-semibold tabular-nums">${cnMoney(r.free)}</div></div>
+      ${r.open_draft ? `<button type="button" onclick="closeModal(); cnOpen(${r.open_draft.id})" class="${RTS_BTN2}">Buka ${esc(r.open_draft.cn_number)}</button>`
+        : `<button type="button" onclick="cnCreateFromReturn(${r.id})" class="${RTS_BTN}">Buat Draft CN</button>`}</div>`).join("")}</div>`
+    : '<p class="text-sm text-muted">Tidak ada retur yang menunggu Credit Note. Draft dibuat setelah keputusan supplier dicatat sebagai Nota Kredit di Retur Supplier (atau otomatis saat retur dari Barang Masuk).</p>';
+  openModal("Buat Credit Note dari Retur", `<p class="text-xs text-muted mb-3">Hanya retur yang kreditnya sudah disetujui supplier. Draft tidak mengubah tagihan.</p>${body}`, { lg: true });
+}
+async function cnCreateFromReturn(returnId) {
+  try {
+    const r = await rtsApi(`/api/credit-notes/from-return/${returnId}`, "POST", {});
+    closeModal();
+    showToast(r.existing ? "Draft Credit Note untuk retur ini sudah ada." : "Draft Credit Note dibuat.", "success");
+    cnGo(r.id);
+  } catch (e) { showToast(e.message); }
+}
+
+// ── Detail (Gambar 06–12, 14–16) ─────────────────────────────────────────────
+async function cnOpen(id, mode) {
+  try { cnCurrent = await rtsApi(`/api/credit-notes/${id}`); } catch (e) { showToast(e.message); return; }
+  cnMode = mode || null;
+  cnRenderDetail();
+}
+async function cnReload() { if (cnCurrent) await cnOpen(cnCurrent.id, cnMode); }
+
+function cnChain(d) {
+  const ch = d.chain, box = (n, label, title, sub, js, active) => `<button type="button" ${js ? `onclick="${js}"` : "disabled"} class="text-left rounded-xl border px-3 py-2.5 min-w-0 ${active ? "border-accent bg-accent/5 ring-1 ring-accent/30" : title ? "border-line bg-white hover:bg-bg2" : "border-dashed border-line bg-bg2/40"}">
+      <div class="text-[10px] font-semibold tracking-wider text-muted">${n} · ${label}</div><div class="font-mono text-[13px] font-semibold text-ink truncate mt-0.5">${esc(title || "—")}</div><div class="text-[11px] text-muted truncate">${sub || ""}</div></button>`;
+  const inv = ch.invoice;
+  return `<div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+    ${box("01", "PO", ch.po?.po_number, ch.po ? `${ch.po.qty} unit dipesan` : "Tanpa PO", ch.po ? `openSupplierPoFromFaktur('${esc(ch.po.id)}')` : "")}
+    ${box("02", "GR", ch.gr?.doc_number, ch.gr ? `${ch.gr.qty} unit diterima` : "", ch.gr ? `jumpToInboundDocument(${ch.gr.id})` : "")}
+    ${box("03", "AP / Faktur", inv?.invoice_number, inv ? `Total ${cnMoney(inv.total)} · sisa ${cnMoney(inv.outstanding)}` : "Belum ada faktur", inv ? `openPurchaseInvoiceById(${inv.id})` : "")}
+    ${box("04", "Retur Supplier", ch.return?.return_number, ch.return ? `${ch.return.qty} unit · ${esc(ch.return.handover_label || "")}` : "", ch.return ? `openSupplierReturnFromGr(${ch.return.id})` : "")}
+    ${box("05", "Credit Note", d.cn_number, d.status === "aktif" ? `${cnMoney(ch.credit.amount)} · sisa ${cnMoney(ch.credit.available)}` : `${cnMoney(ch.credit.amount)} · ${esc(d.status_label)}`, "", true)}</div>`;
+}
+function cnLifecycle(d) {
+  const steps = [["draft", "Draft"], ["review", "Verifikasi"], ["disetujui", "Disetujui"], ["aktif", "Posted"], ["alokasi", "Dialokasikan"]];
+  const order = { draft: 0, review: 1, disetujui: 2, aktif: 3 };
+  let cur = order[d.status] ?? -1;
+  if (d.status === "aktif" && d.alloc_state === "full") cur = 4;
+  if (["reversed", "ditolak", "dibatalkan"].includes(d.status)) {
+    return `<div class="mb-4">${rtsNote("red", `Credit Note ${d.status_label}`, d.status === "reversed" ? "Dokumen asli tetap tersimpan; alokasinya sudah dibalik. Lihat Koreksi & Reversal di bawah."
+      : `${esc(d.reject_reason || "")}${d.rejected_by ? ` — ${esc(d.rejected_by)}, ${rtsWhen(d.rejected_at)}` : ""}`)}</div>`;
+  }
+  return `<div class="grid grid-cols-5 gap-1.5 mb-4">${steps.map(([k, l], i) => `<div class="rounded-lg border px-2 py-1.5 text-center text-[11px] ${i < cur ? "border-green-200 bg-green-50 text-green-800" : i === cur ? "border-accent/50 bg-accent/5 text-accentDark font-semibold" : "border-line bg-white text-muted"}">${i + 1}. ${l}</div>`).join("")}</div>`;
+}
+
+function cnRenderDetail() {
+  const d = cnCurrent, el = document.getElementById("cn-detail-panel");
+  document.getElementById("topbar-title").textContent = d.cn_number || "Credit Note";
+  const head = `<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div><div class="flex flex-wrap items-center gap-2"><h2 class="font-serif text-2xl font-semibold text-ink">Credit Note ${esc(d.cn_number || "")}</h2>${cnStatusPill(d)} ${d.status === "aktif" ? cnAllocPill(d) : ""}</div>
+        <p class="text-sm text-muted mt-0.5">${esc(d.supplier_name)}${d.return ? ` · dari retur ${esc(d.return.return_number)}` : ""}${d.corrects ? ` · koreksi dari ${esc(d.corrects.cn_number)}` : ""}</p></div>
+      <div class="flex flex-wrap gap-2"><button type="button" onclick="cnOpenAudit(${d.id})" class="${RTS_BTN3}">Riwayat &amp; Audit</button>
+        <button type="button" onclick="cnPrint()" class="${RTS_BTN3}">Cetak</button><button type="button" onclick="cnBackToList()" class="${RTS_BTN2}">Kembali ke Daftar</button></div></div>`;
+  const left = [`<div id="cn-alert-slot">${cnAlertBox(d)}</div>`, cnInfoCard(d), cnLinesCard(d), cnActionCard(d), cnUsageCard(d), cnReversalCard(d)].filter(Boolean).join('<div class="h-4"></div>');
+  const right = [cnSummaryCard(d), cnInvoiceImpactCard(d), cnPositionCard(d), cnFilesCard(d), cnEventsCard(d)].join('<div class="h-4"></div>');
+  el.innerHTML = head + cnChain(d) + cnLifecycle(d) + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] gap-4 items-start"><div class="min-w-0">${left}</div><div class="min-w-0">${right}</div></div>`
+    + `<div id="cn-print-wrap" class="hidden"></div>`;
+  cnShow("cn-detail-panel");
+  el.querySelectorAll(".price-input").forEach(inp => setPriceInput(inp, priceValue(inp)));
+  if (d.can.edit) cnRecalc();
+  if (cnMode === "alokasi") cnAllocRecalc();
+}
+
+// Gambar 15: kesalahan validasi tampil dengan kodenya, dekat dokumen, tanpa menghapus input.
+function cnAlertBox(d) {
+  const errs = d.check_errors || [];
+  const live = d._lastError;
+  if (!errs.length && !live) return "";
+  const item = (code, msg) => `<li class="flex gap-2"><span class="shrink-0 font-mono text-[11px] font-semibold rounded bg-red-100 text-red-800 px-1.5 py-0.5">${esc(code || "ERR")}</span><span>${esc(msg)}</span></li>`;
+  const tone = live ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900";
+  return `<section class="rounded-xl border ${tone} px-4 py-3 text-sm">
+    <div class="flex items-center justify-between gap-2 mb-2"><div class="font-semibold">${live ? "Permintaan ditolak sistem" : "Lengkapi sebelum posting"}</div>
+      <button type="button" onclick="cnReload()" class="px-2.5 py-1 rounded-md border border-current/30 bg-white text-xs font-semibold hover:bg-bg2">Periksa Ulang</button></div>
+    <ul class="space-y-1.5">${live ? item(live.code, live.text) : ""}${errs.map(e => item(e.code, e.message)).join("")}</ul>
+    <p class="text-[11px] mt-2 opacity-80">${live ? "Tidak ada perubahan data yang tersimpan dari permintaan yang ditolak. Isian Anda tetap ada; perbaiki lalu coba lagi." : "Tombol posting aktif setelah semua poin di atas terpenuhi."}</p></section>`;
+}
+function cnFail(e) {
+  const msg = e?.message || String(e);
+  showToast(cnErrText(msg) + (cnErrCode(msg) ? ` (${cnErrCode(msg)})` : ""));
+  // Keep whatever was typed: only the alert slot is redrawn, never the form.
+  const slot = document.getElementById("cn-alert-slot");
+  if (cnCurrent && slot) { cnCurrent._lastError = { code: cnErrCode(msg), text: cnErrText(msg) }; slot.innerHTML = cnAlertBox(cnCurrent); slot.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+}
+
+function cnInfoCard(d) {
+  const ro = (l, v) => rtsField(l, rtsRO(v));
+  const edit = d.can.edit;
+  const invOpts = d.invoices.filter(i => i.status !== "void").map(i => `<option value="${i.id}" ${i.id === d.purchase_invoice_id ? "selected" : ""}>${esc(i.invoice_number)}${i.supplier_invoice_no && i.supplier_invoice_no !== i.invoice_number ? " · " + esc(i.supplier_invoice_no) : ""} · sisa ${cnMoney(i.outstanding)}</option>`).join("");
+  return rtsCard("Informasi Credit Note", `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    ${ro("Nomor Credit Note (Otomatis)", `<span class="font-mono">${esc(d.cn_number || "—")}</span>`)}
+    ${ro("Supplier", esc(d.supplier_name))}
+    ${edit ? rtsField("No. CN Supplier / Referensi Persetujuan", `<input id="cn-supplier-cn-no" type="text" value="${esc(d.supplier_cn_no || "")}" maxlength="80" data-no-uppercase placeholder="mis. CN/AJ/1025 atau WA sales 22-10" class="${RTS_IN}">`, true) : ro("No. CN Supplier / Referensi", esc(d.supplier_cn_no || ""))}
+    ${edit ? rtsField("Tanggal Efektif", `<input id="cn-issued-at" type="date" value="${esc((d.issued_at || "").slice(0, 10))}" data-no-uppercase class="${RTS_IN}">`, true) : ro("Tanggal Efektif", rtsDate(d.issued_at))}
+    ${ro("Sumber Retur", d.return ? `${cnLink(d.return.return_number, `openSupplierReturnFromGr(${d.return.id})`)} <span class="text-muted text-xs">· ${esc(d.return.doc_status_label || "")}</span>` : "Pembatalan PO")}
+    ${edit ? rtsField("Faktur Asal (default alokasi)", `<select id="cn-invoice" class="${RTS_IN}"><option value="">Belum ada faktur</option>${invOpts}</select>`) : ro("Faktur Asal", d.origin_invoice ? cnLink(d.origin_invoice.invoice_number, `openPurchaseInvoiceById(${d.origin_invoice.id})`) : "Belum ada faktur")}
+    <div class="sm:col-span-2">${edit ? rtsField("Catatan", `<textarea id="cn-note" rows="2" maxlength="1000" data-no-uppercase class="${RTS_IN}">${esc(d.note || "")}</textarea>`) : ro("Catatan", esc(d.note || ""))}</div>
+    ${d.return && d.return.rma_number ? `<div class="sm:col-span-2 text-xs text-muted">No. RMA supplier: <span class="font-mono">${esc(d.return.rma_number)}</span>${d.return.decided_at ? ` · keputusan supplier ${rtsDate(d.return.decided_at)}${d.return.decision_channel ? " via " + esc(d.return.decision_channel) : ""}` : ""}</div>` : ""}
+    </div>`, `<span class="text-xs text-muted">Dibuat ${esc(d.created_by || "")} · ${rtsWhen(d.created_at)}</span>`);
+}
+
+function cnLinesCard(d) {
+  const edit = d.can.edit;
+  const rows = d.lines.map(l => {
+    const room = l.room ?? l.entitled;
+    const amount = edit ? `<input id="cn-amt-${l.id}" type="text" inputmode="numeric" value="${l.amount}" oninput="cnRecalc()" class="price-input ${RTS_IN} text-right tabular-nums !w-36 ml-auto">` : `<span class="font-semibold tabular-nums">${cnMoney(l.amount)}</span>`;
+    const waive = edit ? `<div id="cn-waive-box-${l.id}" class="${l.amount < room ? "" : "hidden"} mt-1.5 text-left"><label class="flex items-center gap-1.5 text-[11px] text-ink"><input id="cn-waive-${l.id}" type="checkbox" ${l.waived ? "checked" : ""} onchange="cnRecalc()"> Sisa <span id="cn-gap-${l.id}" class="font-semibold"></span> tidak diklaim lagi</label>
+        <input id="cn-waive-reason-${l.id}" type="text" value="${esc(l.waive_reason || "")}" maxlength="300" data-no-uppercase placeholder="Alasan (mis. supplier hanya setuju sebagian)" class="${RTS_IN} mt-1 text-xs ${l.waived ? "" : "hidden"}"></div>`
+      : l.waived ? `<div class="text-[11px] text-amber-700 mt-1">Tidak diklaim: ${cnMoney(l.waived)} — ${esc(l.waive_reason || "")}</div>` : "";
+    return `<tr class="border-b border-line last:border-b-0 align-top">
+      <td class="px-3 py-2.5"><div class="font-medium text-ink">${esc(l.product_name)}</div><div class="text-[11px] text-muted">${l.kind === "ongkir" ? "Klaim ongkir" : esc(l.sku || "")}</div></td>
+      <td class="px-3 py-2.5 text-right tabular-nums">${l.kind === "ongkir" ? "—" : `${l.qty} ${esc(l.unit || "")}`}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">${cnMoney(l.unit_price)}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums">${l.tax_rate ? `${l.tax_rate}%` : "—"}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap text-muted">${cnMoney(room)}</td>
+      <td class="px-3 py-2.5 text-right">${amount}${waive}</td></tr>`;
+  }).join("");
+  const foot = `<div class="flex flex-col items-end gap-1 mt-3 text-sm">
+    <div class="flex gap-6"><span class="text-muted">Subtotal</span><span id="cn-sum-sub" class="tabular-nums w-36 text-right">${cnMoney(d.subtotal)}</span></div>
+    <div class="flex gap-6"><span class="text-muted">PPN</span><span id="cn-sum-tax" class="tabular-nums w-36 text-right">${cnMoney(d.tax_amount)}</span></div>
+    <div class="flex gap-6 text-base font-semibold"><span>Total Credit Note</span><span id="cn-sum-total" class="tabular-nums w-36 text-right text-accentDark">${cnMoney(d.amount)}</span></div></div>`;
+  const note = edit ? rtsNote("blue", "Nominal mengikuti keputusan supplier", "Kolom <b>Hak Klaim</b> = nilai yang disetujui supplier dan belum dibuat CN lain. Bila supplier hanya menyetujui sebagian, isi nominal yang disetujui; centang \"tidak diklaim lagi\" bila sisanya ditanggung toko (dengan alasan), atau biarkan agar sisa bisa dibuat CN berikutnya.") : "";
+  return rtsCard("Rincian Kredit", `${note ? `<div class="mb-3">${note}</div>` : ""}<div class="border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[720px] text-sm">
+      <thead class="bg-bg2"><tr><th class="${RTS_TH}">Produk</th><th class="${RTS_THR}">Qty</th><th class="${RTS_THR}">Harga Beli</th><th class="${RTS_THR}">PPN</th><th class="${RTS_THR}">Hak Klaim</th><th class="${RTS_THR}">Nominal Disetujui</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="px-3 py-6 text-center text-sm text-muted">Credit Note lama tanpa rincian baris; nilai mengikuti dokumen asal.</td></tr>'}</tbody></table></div>${foot}`);
+}
+function cnRecalc() {
+  const d = cnCurrent;
+  if (!d?.can.edit) return;
+  let sub = 0, tax = 0;
+  for (const l of d.lines) {
+    const inp = document.getElementById(`cn-amt-${l.id}`);
+    if (!inp) continue;
+    const amt = priceValue(inp), rate = Number(l.tax_rate || 0), room = l.room ?? l.entitled;
+    const s = rate ? Math.round(amt / (1 + rate / 100)) : amt;
+    sub += s; tax += amt - s;
+    inp.classList.toggle("border-failed", amt > room);
+    const gap = room - amt;
+    document.getElementById(`cn-waive-box-${l.id}`)?.classList.toggle("hidden", !(gap > 0));
+    const g = document.getElementById(`cn-gap-${l.id}`); if (g) g.textContent = cnMoney(gap);
+    const chk = document.getElementById(`cn-waive-${l.id}`);
+    document.getElementById(`cn-waive-reason-${l.id}`)?.classList.toggle("hidden", !(chk?.checked && gap > 0));
+  }
+  document.getElementById("cn-sum-sub").textContent = cnMoney(sub);
+  document.getElementById("cn-sum-tax").textContent = cnMoney(tax);
+  document.getElementById("cn-sum-total").textContent = cnMoney(sub + tax);
+}
+function cnCollectDraft() {
+  const d = cnCurrent, v = id => document.getElementById(id)?.value ?? "";
+  return {
+    supplier_cn_no: v("cn-supplier-cn-no").trim(), issued_at: v("cn-issued-at"), purchase_invoice_id: v("cn-invoice") ? Number(v("cn-invoice")) : null, note: v("cn-note"),
+    lines: d.lines.map(l => ({ id: l.id, amount: priceValue(document.getElementById(`cn-amt-${l.id}`)), waive: Boolean(document.getElementById(`cn-waive-${l.id}`)?.checked),
+      waive_reason: v(`cn-waive-reason-${l.id}`).trim() })),
+  };
+}
+async function cnSaveDraft(quiet) {
+  try {
+    cnCurrent = await rtsApi(`/api/credit-notes/${cnCurrent.id}`, "PUT", cnCollectDraft());
+    if (!quiet) { showToast("Draft Credit Note disimpan.", "success"); cnRenderDetail(); }
+    return true;
+  } catch (e) { cnFail(e); return false; }
+}
+async function cnSubmit() {
+  if (!(await cnSaveDraft(true))) return;
+  try { cnCurrent = await rtsApi(`/api/credit-notes/${cnCurrent.id}/submit`, "POST", {}); showToast("Diajukan untuk verifikasi.", "success"); cnRenderDetail(); }
+  catch (e) { cnFail(e); }
+}
+
+function cnActionCard(d) {
+  if (d.status === "draft") {
+    return rtsCard("Aksi Draft", `<p class="text-sm text-muted mb-3">Draft tidak mengubah tagihan supplier. Lengkapi nomor/bukti CN dari supplier, cek nominal, lalu ajukan verifikasi.</p>
+      <div class="flex flex-wrap gap-2 justify-end"><button type="button" onclick="cnRejectModal()" class="${RTS_BTND}">Batalkan Draft</button>
+        <button type="button" onclick="cnSaveDraft()" class="${RTS_BTN2}">Simpan Draft</button><button type="button" onclick="cnSubmit()" class="${RTS_BTN}">Ajukan Verifikasi</button></div>`);
+  }
+  if (d.status === "review") {
+    const checks = Object.entries(d.checks_catalog).map(([k, l]) => `<label class="flex items-start gap-2 text-sm text-ink py-1"><input type="checkbox" id="cn-chk-${k}" class="mt-0.5"> <span>${esc(l)}</span></label>`).join("");
+    return rtsCard("Verifikasi Credit Note", `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><div class="text-xs font-semibold text-ink mb-1">Daftar periksa</div>${checks}
+          ${rtsNote("amber", "Persetujuan internal ≠ persetujuan supplier", "Nominal harus sama dengan bukti supplier, bukan otomatis harga PO. Bila beda harga PO / faktur, cek lampiran supplier.")}</div>
+        <div>${rtsField("Catatan verifikasi", `<textarea id="cn-review-note" rows="4" maxlength="500" data-no-uppercase class="${RTS_IN}"></textarea>`)}
+          <div class="text-xs text-muted mt-2">Diajukan ${esc(d.submitted_by || "")} · ${rtsWhen(d.submitted_at)}</div></div></div>
+      <div class="flex flex-wrap gap-2 justify-end mt-4"><button type="button" onclick="cnRejectModal()" class="${RTS_BTND}">Tolak</button>
+        <button type="button" onclick="cnSendBackModal()" class="${RTS_BTN3}">Kembalikan ke Draft</button><button type="button" onclick="cnApprove()" class="${RTS_BTN}">Setujui</button></div>`);
+  }
+  if (d.status === "disetujui") {
+    return rtsCard("Posting Credit Note", `<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        ${cnTile("Nilai CN", cnMoney(d.amount))}${cnTile("Kredit tersedia setelah posting", "+ " + cnMoney(d.amount), "Saldo kredit supplier", "text-accentDark")}${cnTile("Sisa tagihan faktur", d.origin_invoice ? cnMoney(d.origin_invoice.outstanding) : "—", "Tetap sampai dialokasikan")}</div>
+      <p class="text-sm text-muted">Disetujui ${esc(d.reviewed_by || "")} · ${rtsWhen(d.reviewed_at)}${d.review_note ? ` — ${esc(d.review_note)}` : ""}. Posting hanya sekali; setelah diposting nominal tidak bisa diubah (koreksi lewat reversal).</p>
+      <div class="flex flex-wrap gap-2 justify-end mt-4"><button type="button" onclick="cnSendBackModal()" class="${RTS_BTN3}">Kembalikan ke Draft</button>
+        <button type="button" id="cn-post-btn" onclick="cnPostConfirm()" class="${RTS_BTN}" ${d.can.post ? "" : "disabled"}>Posting CN</button></div>`);
+  }
+  if (d.status !== "aktif") return "";
+  if (d.pending_reversal) return rtsCard("Pemakaian Kredit", rtsNote("amber", "Ditahan", `Reversal ${esc(d.pending_reversal.rev_number)} menunggu persetujuan Owner; alokasi dan refund ditahan.`));
+  if (d.available <= 0) return rtsCard("Pemakaian Kredit", rtsNote("green", "Kredit sudah habis dipakai", "Seluruh nilai Credit Note sudah dialokasikan ke faktur dan/atau direfund."));
+  const origin = d.origin_invoice;
+  const originPaid = origin && origin.status === "posted" && origin.outstanding <= 0;
+  if (!cnMode && originPaid) {
+    // Gambar 11: faktur asal sudah lunas.
+    const opt = (key, title, sub, rec) => `<button type="button" onclick="cnSetMode('${key}')" class="text-left rounded-xl border px-4 py-3 border-line bg-white hover:bg-bg2"><div class="flex items-center gap-2 font-medium text-ink text-sm">${title}${rec ? rtsPill(RTS_TINT.green, "Rekomendasi") : ""}</div><div class="text-[11px] text-muted mt-0.5">${sub}</div></button>`;
+    return rtsCard("Credit Note untuk Faktur yang Sudah Lunas", `<div class="mb-3">${rtsNote("blue", `Faktur ${esc(origin.invoice_number)} sudah lunas`, `Faktur tetap lunas dan tidak boleh minus. Kredit ${cnMoney(d.available)} tetap tersedia untuk supplier ini.`)}</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2">${opt("kredit", "Simpan sebagai Saldo Kredit", "Kredit dipakai nanti untuk faktur berikutnya dari supplier ini.", true)}${opt("alokasi", "Alokasi ke Faktur Lain", "Potong faktur lain supplier yang sama (wajib alasan).")}${opt("refund", "Catat Refund", "Supplier mengembalikan uang; dicatat sebagai kas masuk.")}</div>`);
+  }
+  if (cnMode === "kredit") {
+    return rtsCard("Saldo Kredit Supplier", `${rtsNote("green", "Kredit disimpan", `${cnMoney(d.available)} tetap tersedia untuk ${esc(d.supplier_name)}. Gunakan tombol Alokasi saat faktur berikutnya diposting.`)}
+      <div class="flex flex-wrap gap-2 justify-end mt-3"><button type="button" onclick="cnSetMode('refund')" class="${RTS_BTN3}">Catat Refund</button><button type="button" onclick="cnSetMode('alokasi')" class="${RTS_BTN}">Alokasi ke Faktur</button></div>`);
+  }
+  if (cnMode === "refund") return cnRefundCard(d);
+  return cnAllocCard(d);
+}
+function cnSetMode(m) { cnMode = m; cnRenderDetail(); }
+
+// Gambar 08 / 10: alokasi ke faktur supplier yang sama.
+function cnAllocCard(d) {
+  const invs = d.invoices.filter(i => i.status === "posted" && (i.outstanding > 0 || i.is_origin));
+  const originDue = d.origin_invoice && d.origin_invoice.status === "posted" ? d.origin_invoice.outstanding : 0;
+  const pre = originDue > 0 ? { [d.origin_invoice.id]: Math.min(d.available, originDue) } : {};
+  const rows = invs.map(i => `<tr class="border-b border-line last:border-b-0">
+      <td class="px-3 py-2.5"><div class="font-mono text-[13px] font-semibold">${cnLink(i.invoice_number, `openPurchaseInvoiceById(${i.id})`)}</div><div class="text-[11px] text-muted">${i.is_origin ? rtsPill(RTS_TINT.blue, "Faktur asal") : "Faktur lain"}${i.po_number ? " · " + esc(i.po_number) : ""}</div></td>
+      <td class="px-3 py-2.5 whitespace-nowrap text-muted">${rtsDate(i.due_date)}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">${cnMoney(i.total)}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">${cnMoney(i.paid_cash)}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">${cnMoney(i.paid_credit)}</td>
+      <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap font-semibold">${cnMoney(i.outstanding)}</td>
+      <td class="px-3 py-2.5 text-right"><div class="flex items-center justify-end gap-1.5"><input id="cn-al-${i.id}" type="text" inputmode="numeric" value="${pre[i.id] || ""}" ${i.outstanding > 0 ? "" : "disabled"} oninput="cnAllocRecalc()" data-due="${i.outstanding}" data-origin="${i.is_origin ? 1 : 0}" class="price-input ${RTS_IN} text-right tabular-nums !w-32">
+        <button type="button" onclick="cnAllocMax(${i.id})" ${i.outstanding > 0 ? "" : "disabled"} class="px-2 py-1 border border-line rounded-md text-[11px] font-semibold text-accentDark bg-white hover:bg-bg2 disabled:opacity-40">Maks</button></div>
+        <div id="cn-al-err-${i.id}" class="text-[11px] text-failed mt-1 hidden"></div></td></tr>`).join("");
+  return rtsCard("Alokasi Credit Note ke Faktur", `<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">${cnTile("Kredit tersedia", cnMoney(d.available), "Posted − alokasi − refund", "text-accentDark")}${cnTile("Dialokasikan sekarang", `<span id="cn-al-total">${cnMoney(0)}</span>`)}${cnTile("Sisa kredit setelah alokasi", `<span id="cn-al-left">${cnMoney(d.available)}</span>`)}</div>
+    <div class="border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[820px] text-sm"><thead class="bg-bg2"><tr><th class="${RTS_TH}">Faktur</th><th class="${RTS_TH}">Jatuh Tempo</th><th class="${RTS_THR}">Nilai Faktur Asli</th><th class="${RTS_THR}">Pembayaran</th><th class="${RTS_THR}">CN Teralokasi</th><th class="${RTS_THR}">Sisa Tagihan</th><th class="${RTS_THR}">Alokasi</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="px-3 py-6 text-center text-sm text-muted">Tidak ada faktur supplier ini yang masih punya sisa tagihan. Simpan sebagai kredit atau catat refund.</td></tr>'}</tbody></table></div>
+    <div id="cn-al-cross" class="hidden mt-3">${rtsField("Alasan alokasi ke faktur lain", `<input id="cn-al-note" type="text" maxlength="300" data-no-uppercase placeholder="mis. Faktur asal sudah lunas, dipakai untuk faktur berikutnya" class="${RTS_IN}">`, true)}</div>
+    <p class="text-[11px] text-muted mt-2">Nilai faktur asli tidak berubah; alokasi dicatat terpisah dan riwayat pembayaran tidak tersentuh. Batas alokasi = min(kredit tersedia, sisa tagihan) dan dicek ulang server.</p>
+    <div class="flex flex-wrap gap-2 justify-end mt-3"><button type="button" onclick="cnSetMode('refund')" class="${RTS_BTN3}">Catat Refund</button><button type="button" onclick="cnSetMode('kredit')" class="${RTS_BTN3}">Simpan sebagai Kredit</button>
+      <button type="button" onclick="cnAllocUseMax()" class="${RTS_BTN2}">Gunakan Maksimum</button><button type="button" onclick="cnAllocate()" class="${RTS_BTN}">Simpan Alokasi</button></div>`);
+}
+function cnAllocInputs() { return [...document.querySelectorAll('[id^="cn-al-"].price-input')]; }
+function cnAllocRecalc() {
+  const d = cnCurrent;
+  let total = 0, cross = false;
+  for (const inp of cnAllocInputs()) {
+    const v = priceValue(inp), due = Number(inp.dataset.due), id = inp.id.slice(6);
+    total += v;
+    if (v > 0 && inp.dataset.origin !== "1" && d.purchase_invoice_id) cross = true;
+    const err = document.getElementById(`cn-al-err-${id}`);
+    if (err) { err.classList.toggle("hidden", !(v > due)); err.textContent = v > due ? `Maksimum ${cnMoney(due)}` : ""; }
+  }
+  const t = document.getElementById("cn-al-total"), l = document.getElementById("cn-al-left");
+  if (t) t.textContent = cnMoney(total);
+  if (l) { l.textContent = cnMoney(d.available - total); l.classList.toggle("text-failed", total > d.available); }
+  document.getElementById("cn-al-cross")?.classList.toggle("hidden", !cross);
+}
+function cnAllocMax(id) {
+  const inp = document.getElementById(`cn-al-${id}`);
+  const others = cnAllocInputs().filter(x => x !== inp).reduce((s, x) => s + priceValue(x), 0);
+  setPriceInput(inp, Math.max(Math.min(cnCurrent.available - others, Number(inp.dataset.due)), 0));
+  cnAllocRecalc();
+}
+function cnAllocUseMax() {
+  const inputs = cnAllocInputs().filter(x => !x.disabled).sort((a, b) => Number(b.dataset.origin) - Number(a.dataset.origin));
+  inputs.forEach(x => setPriceInput(x, ""));
+  let left = cnCurrent.available;
+  for (const x of inputs) { const take = Math.min(left, Number(x.dataset.due)); if (take > 0) { setPriceInput(x, take); left -= take; } if (left <= 0) break; }
+  cnAllocRecalc();
+}
+async function cnAllocate() {
+  const allocations = cnAllocInputs().map(x => ({ invoice_id: Number(x.id.slice(6)), amount: priceValue(x) })).filter(a => a.amount > 0);
+  if (!allocations.length) { showToast("Isi nominal alokasi."); return; }
+  try {
+    cnCurrent = await rtsApi(`/api/credit-notes/${cnCurrent.id}/allocate`, "POST", { allocations, note: document.getElementById("cn-al-note")?.value.trim() || "" });
+    cnMode = null; showToast("Alokasi Credit Note disimpan.", "success"); cnRenderDetail();
+  } catch (e) { cnFail(e); }
+}
+
+// Refund = uang masuk dari supplier (bukan pembayaran ke supplier).
+function cnRefundCard(d) {
+  const today = toDateInputValue(new Date());
+  const methods = Object.entries(d.refund_methods).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("");
+  return rtsCard("Catat Refund dari Supplier", `<div class="mb-3">${rtsNote("blue", "Kas masuk, bukan pembayaran ke supplier", `Refund mengurangi kredit tersedia (${cnMoney(d.available)}). Faktur yang sudah lunas tetap lunas.`)}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      ${rtsField("Nominal refund", `<input id="cn-rf-amount" type="text" inputmode="numeric" value="${d.available}" class="price-input ${RTS_IN} text-right tabular-nums">`, true)}
+      ${rtsField("Tanggal uang diterima", `<input id="cn-rf-date" type="date" value="${today}" data-no-uppercase class="${RTS_IN}">`, true)}
+      ${rtsField("Metode", `<select id="cn-rf-method" class="${RTS_IN}">${methods}</select>`, true)}
+      ${rtsField("Rekening toko penerima", `<input id="cn-rf-account" type="text" maxlength="120" data-no-uppercase placeholder="mis. BCA 1234567890" class="${RTS_IN}">`)}
+      ${rtsField("No. referensi / kwitansi", `<input id="cn-rf-ref" type="text" maxlength="120" data-no-uppercase class="${RTS_IN}">`, true)}
+      ${rtsField("Bukti (foto / PDF, opsional)", `<input id="cn-rf-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="block w-full text-sm">`)}
+      <div class="sm:col-span-2">${rtsField("Catatan", `<input id="cn-rf-note" type="text" maxlength="300" data-no-uppercase class="${RTS_IN}">`)}</div></div>
+    <div class="flex flex-wrap gap-2 justify-end mt-4"><button type="button" onclick="cnSetMode(null)" class="${RTS_BTN3}">Batal</button><button type="button" onclick="cnRecordRefund()" class="${RTS_BTN}">Simpan Refund</button></div>`);
+}
+async function cnRecordRefund() {
+  const v = id => document.getElementById(id)?.value || "";
+  const body = { amount: priceValue(document.getElementById("cn-rf-amount")), received_at: v("cn-rf-date"), method: v("cn-rf-method"), account: v("cn-rf-account").trim(),
+    reference_no: v("cn-rf-ref").trim(), note: v("cn-rf-note").trim() };
+  const file = document.getElementById("cn-rf-file")?.files?.[0];
+  try {
+    const out = await rtsApi(`/api/credit-notes/${cnCurrent.id}/refunds`, "POST", body);
+    if (file) await cnUpload(file, out.refund_id);
+    cnMode = null; showToast("Refund dicatat sebagai kas masuk.", "success"); await cnReload();
+  } catch (e) { cnFail(e); }
+}
+
+function cnUsageCard(d) {
+  if (!d.allocations.length && !d.refunds.length) return "";
+  const canUndo = d.status === "aktif" && !d.pending_reversal;
+  const al = d.allocations.map(a => `<tr class="border-b border-line last:border-b-0 ${a.amount < 0 ? "text-muted" : ""}">
+      <td class="px-3 py-2 whitespace-nowrap">${rtsWhen(a.created_at)}</td><td class="px-3 py-2">${cnLink(a.invoice_number, `openPurchaseInvoiceById(${a.invoice_id})`)}${a.cross_invoice ? ` ${rtsPill(RTS_TINT.amber, "Lintas faktur")}` : ""}</td>
+      <td class="px-3 py-2 text-right tabular-nums whitespace-nowrap ${a.amount < 0 ? "" : "font-semibold"}">${a.amount < 0 ? "− " + cnMoney(-a.amount) : cnMoney(a.amount)}</td>
+      <td class="px-3 py-2">${a.amount < 0 ? rtsPill(RTS_TINT.gray, "Pembalik") : a.undone ? rtsPill(RTS_TINT.red, "Dibatalkan") : rtsPill(RTS_TINT.green, "Aktif")}</td>
+      <td class="px-3 py-2 text-xs text-muted">${esc(a.created_by || "")}${a.note ? ` · ${esc(a.note)}` : ""}</td>
+      <td class="px-3 py-2 text-right">${canUndo && a.amount > 0 && !a.undone ? `<button type="button" onclick="cnUnallocModal(${a.id}, '${esc(a.invoice_number)}', ${a.amount})" class="px-2 py-1 border border-line rounded-md text-[11px] text-failed bg-white hover:bg-red-50">Batalkan</button>` : ""}</td></tr>`).join("");
+  const rf = d.refunds.map(r => `<tr class="border-b border-line last:border-b-0 ${r.status !== "aktif" ? "text-muted" : ""}">
+      <td class="px-3 py-2 font-mono text-[12px]">${esc(r.refund_number)}</td><td class="px-3 py-2 whitespace-nowrap">${rtsDate(r.received_at)}</td>
+      <td class="px-3 py-2 text-xs">${esc(d.refund_methods[r.method] || r.method)}${r.account ? ` · ${esc(r.account)}` : ""}${r.reference_no ? ` · ref ${esc(r.reference_no)}` : ""}</td>
+      <td class="px-3 py-2 text-right tabular-nums font-semibold">${cnMoney(r.amount)}</td><td class="px-3 py-2">${r.status === "aktif" ? rtsPill(RTS_TINT.green, "Diterima") : rtsPill(RTS_TINT.red, "Dibatalkan")}</td>
+      <td class="px-3 py-2 text-right">${d.status === "aktif" && r.status === "aktif" ? `<button type="button" onclick="cnCancelRefundModal(${r.id}, '${esc(r.refund_number)}')" class="px-2 py-1 border border-line rounded-md text-[11px] text-failed bg-white hover:bg-red-50">Batalkan</button>` : ""}</td></tr>`).join("");
+  return rtsCard("Riwayat Pemakaian Kredit", `${al ? `<div class="text-xs font-semibold text-ink mb-1.5">Alokasi ke faktur</div><div class="border border-line rounded-xl overflow-x-auto mb-3"><table class="w-full min-w-[640px] text-sm"><tbody>${al}</tbody></table></div>` : ""}
+    ${rf ? `<div class="text-xs font-semibold text-ink mb-1.5">Refund (kas masuk)</div><div class="border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[640px] text-sm"><tbody>${rf}</tbody></table></div>` : ""}`);
+}
+function cnReasonModal(title, intro, label, onOk, danger) {
+  openModal(title, `<div class="space-y-3"><p class="text-sm text-ink">${intro}</p>${rtsField(label, `<textarea id="cn-reason" rows="3" maxlength="500" data-no-uppercase class="${RTS_IN}"></textarea>`, true)}
+    <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="${onOk}" class="${danger ? RTS_BTND : RTS_BTN}">Simpan</button></div></div>`);
+}
+const cnReasonValue = () => (document.getElementById("cn-reason")?.value || "").trim();
+async function cnAct(url, body, ok) {
+  try { cnCurrent = await rtsApi(url, "POST", body); closeModal(); if (ok) showToast(ok, "success"); cnRenderDetail(); }
+  catch (e) { closeModal(); cnFail(e); }
+}
+function cnUnallocModal(aid, inv, amt) {
+  cnReasonModal("Batalkan Alokasi", `Alokasi ${cnMoney(amt)} ke ${esc(inv)} dibalik dengan baris pembalik; sisa tagihan faktur naik lagi ${cnMoney(amt)} dan kredit kembali tersedia.`, "Alasan", `cnAct('/api/credit-notes/${cnCurrent.id}/allocations/${aid}/cancel', {reason: cnReasonValue()}, 'Alokasi dibatalkan.')`, true);
+}
+function cnCancelRefundModal(rid, no) {
+  cnReasonModal("Batalkan Refund", `Refund ${esc(no)} dibatalkan (mis. salah catat). Kredit kembali tersedia.`, "Alasan", `cnAct('/api/credit-notes/${cnCurrent.id}/refunds/${rid}/cancel', {reason: cnReasonValue()}, 'Refund dibatalkan.')`, true);
+}
+function cnRejectModal() {
+  const draft = cnCurrent.status === "draft";
+  cnReasonModal(draft ? "Batalkan Draft" : "Tolak Credit Note", draft ? "Draft dibatalkan; nilai klaim retur kembali bisa dibuatkan Credit Note." : "Credit Note ditolak dan tidak bisa diposting. Nilai klaim retur kembali bebas.",
+    "Alasan", `cnAct('/api/credit-notes/${cnCurrent.id}/reject', {reason: cnReasonValue()}, '${draft ? "Draft dibatalkan." : "Credit Note ditolak."}')`, true);
+}
+function cnSendBackModal() {
+  cnReasonModal("Kembalikan ke Draft", "Credit Note kembali ke Draft untuk diperbaiki.", "Yang perlu diperbaiki", `cnAct('/api/credit-notes/${cnCurrent.id}/send-back', {note: cnReasonValue()}, 'Dikembalikan ke Draft.')`);
+}
+async function cnApprove() {
+  const checks = Object.keys(cnCurrent.checks_catalog).filter(k => document.getElementById(`cn-chk-${k}`)?.checked);
+  try { cnCurrent = await rtsApi(`/api/credit-notes/${cnCurrent.id}/approve`, "POST", { checks, note: document.getElementById("cn-review-note")?.value.trim() || "" }); showToast("Credit Note disetujui. Siap diposting.", "success"); cnRenderDetail(); }
+  catch (e) { cnFail(e); }
+}
+function cnPostConfirm() {
+  const d = cnCurrent;
+  openModal("Posting Credit Note", `<div class="space-y-3 text-sm">
+    <p>Posting <b>${esc(d.cn_number)}</b> senilai <b>${cnMoney(d.amount)}</b>:</p>
+    <ul class="list-disc pl-5 text-muted space-y-1"><li>Kredit supplier ${esc(d.supplier_name)} naik ${cnMoney(d.amount)}.</li><li>Sisa tagihan faktur belum berubah sampai dialokasikan.</li><li>Stok tidak bergerak.</li><li>Setelah diposting, nominal hanya bisa dikoreksi lewat reversal (persetujuan Owner).</li></ul>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" id="cn-post-go" onclick="cnPost()" class="${RTS_BTN}">Posting Sekarang</button></div></div>`);
+}
+async function cnPost() {
+  const b = document.getElementById("cn-post-go"); if (b) b.disabled = true;
+  try {
+    cnCurrent = await rtsApi(`/api/credit-notes/${cnCurrent.id}/post`, "POST", {});
+    closeModal(); showToast("Credit Note diposting. Lanjutkan alokasi ke faktur.", "success");
+    cnMode = null; cnRenderDetail();
+  } catch (e) { closeModal(); cnFail(e); }
+}
+
+// Gambar 14: koreksi & reversal (Admin mengajukan, Owner menyetujui).
+function cnReversalCard(d) {
+  const hist = d.reversals.filter(v => v.status !== "menunggu").map(v => `<div class="border-t border-line pt-2 mt-2 text-xs"><span class="font-mono font-semibold">${esc(v.rev_number)}</span> ${v.status === "disetujui" ? rtsPill(RTS_TINT.green, "Dijalankan") : rtsPill(RTS_TINT.red, "Ditolak")}
+      <span class="text-muted">· ${esc(v.reason)} · diajukan ${esc(v.requested_by || "")}, diputus ${esc(v.decided_by || "")} ${rtsWhen(v.decided_at)}${v.decision_note ? ` — ${esc(v.decision_note)}` : ""}</span>
+      ${v.new_credit_note_id ? `<div class="mt-1">CN pengganti: ${cnLink(v.new_cn_number, `cnOpen(${v.new_credit_note_id})`)}</div>` : ""}</div>`).join("");
+  const p = d.pending_reversal;
+  if (p) {
+    const imp = p.impact || {};
+    const rows = (imp.invoices || []).map(i => `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2 font-mono text-[12px]">${esc(i.invoice_number)}</td><td class="px-3 py-2 text-right tabular-nums">${cnMoney(i.amount)}</td><td class="px-3 py-2 text-right tabular-nums">${cnMoney(i.due_before)}</td><td class="px-3 py-2 text-right tabular-nums font-semibold">${cnMoney(i.due_after)}</td></tr>`).join("");
+    return rtsCard("Koreksi &amp; Reversal", `${rtsNote("amber", `${esc(p.rev_number)} menunggu persetujuan Owner`, `Diajukan ${esc(p.requested_by || "")} · ${rtsWhen(p.requested_at)} — ${esc(p.reason)}${p.evidence ? ` (bukti: ${esc(p.evidence)})` : ""}`)}
+      <div class="text-xs font-semibold text-ink mt-3 mb-1.5">Dampak bila dijalankan</div>
+      ${rows ? `<div class="border border-line rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead class="bg-bg2"><tr><th class="${RTS_TH}">Faktur</th><th class="${RTS_THR}">Alokasi dibalik</th><th class="${RTS_THR}">Sisa tagihan kini</th><th class="${RTS_THR}">Sisa tagihan sesudah</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="text-sm text-muted">Tidak ada alokasi yang perlu dibalik.</p>'}
+      ${d.refunded ? `<div class="mt-2">${rtsNote("red", "ERR-C09", `Ada refund aktif ${cnMoney(d.refunded)}. Batalkan refund dulu sebelum reversal bisa dijalankan.`)}</div>` : ""}
+      ${p.make_replacement ? `<p class="text-sm mt-2">Setelah reversal dibuat draft CN pengganti senilai <b>${cnMoney(p.correction_amount ?? d.amount)}</b>.</p>` : ""}
+      ${d.can.decide_reversal ? `<div class="flex flex-wrap gap-2 justify-end mt-3"><button type="button" onclick="cnReasonModal('Tolak Reversal', 'Credit Note tetap Posted seperti sekarang.', 'Alasan penolakan', 'cnDecide(${p.id}, false)', true)" class="${RTS_BTND}">Tolak</button>
+        <button type="button" onclick="cnDecideConfirm(${p.id})" class="${RTS_BTN}">Setujui &amp; Jalankan Reversal</button></div>` : '<p class="text-xs text-muted mt-3">Hanya Owner yang dapat menyetujui reversal.</p>'}${hist}`);
+  }
+  if (d.status !== "aktif" && !hist) return "";
+  return rtsCard("Koreksi &amp; Reversal", `${d.status === "aktif" ? `<p class="text-sm text-muted">Credit Note yang sudah diposting tidak diedit. Koreksi dilakukan dengan reversal (alokasi dibalik, dokumen asli tetap tersimpan) lalu, bila perlu, draft CN pengganti dengan nilai yang benar.</p>
+    <div class="flex justify-end mt-3"><button type="button" onclick="cnReversalModal()" class="${RTS_BTND}">Ajukan Koreksi / Reversal</button></div>` : ""}${hist}`);
+}
+function cnReversalModal() {
+  const d = cnCurrent;
+  const per = {};
+  for (const a of d.allocations) per[a.invoice_id] = (per[a.invoice_id] || 0) + a.amount;
+  const imp = Object.entries(per).filter(([, v]) => v > 0).map(([id, v]) => { const i = d.invoices.find(x => x.id === Number(id)) || {}; return `<li>${esc(i.invoice_number || id)}: sisa tagihan ${cnMoney(i.outstanding)} → <b>${cnMoney((i.outstanding || 0) + v)}</b></li>`; }).join("");
+  openModal("Ajukan Koreksi / Reversal", `<div class="space-y-3 text-sm">
+    ${d.refunded ? rtsNote("red", "Ada refund aktif", `Refund ${cnMoney(d.refunded)} harus dibatalkan dulu sebelum Owner bisa menjalankan reversal (ERR-C09).`) : ""}
+    <div><div class="text-xs font-semibold mb-1">Dampak</div><ul class="list-disc pl-5 text-muted">${imp || "<li>Tidak ada alokasi aktif.</li>"}<li>${esc(d.cn_number)} menjadi Reversed; kredit tersedia ${cnMoney(d.available)} hilang.</li></ul></div>
+    ${rtsField("Alasan koreksi", `<textarea id="cn-rv-reason" rows="2" maxlength="500" data-no-uppercase class="${RTS_IN}"></textarea>`, true)}
+    ${rtsField("Dokumen / keterangan pendukung", `<input id="cn-rv-evidence" type="text" maxlength="500" data-no-uppercase placeholder="mis. revisi CN supplier no. …" class="${RTS_IN}">`)}
+    <label class="flex items-center gap-2"><input id="cn-rv-replace" type="checkbox" onchange="document.getElementById('cn-rv-amount-box').classList.toggle('hidden', !this.checked)"> Buat draft CN pengganti setelah reversal</label>
+    <div id="cn-rv-amount-box" class="hidden">${rtsField("Nilai CN pengganti", `<input id="cn-rv-amount" type="text" inputmode="numeric" value="${d.amount}" class="price-input ${RTS_IN} text-right tabular-nums">`)}</div>
+    <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="cnRequestReversal()" class="${RTS_BTND}">Ajukan ke Owner</button></div></div>`, { lg: true });
+  document.querySelectorAll("#modal-body .price-input").forEach(inp => setPriceInput(inp, priceValue(inp)));
+}
+async function cnRequestReversal() {
+  const replace = document.getElementById("cn-rv-replace").checked;
+  await cnAct(`/api/credit-notes/${cnCurrent.id}/reversal`, { reason: document.getElementById("cn-rv-reason").value.trim(), evidence: document.getElementById("cn-rv-evidence").value.trim(),
+    make_replacement: replace, correction_amount: replace ? priceValue(document.getElementById("cn-rv-amount")) : null }, "Reversal diajukan ke Owner.");
+}
+function cnDecideConfirm(rid) {
+  openModal("Jalankan Reversal", `<div class="space-y-3 text-sm"><p>Semua alokasi Credit Note ini dibalik dan dokumen menjadi <b>Reversed</b>. Dokumen asli tetap bisa dibuka. Lanjutkan?</p>
+    ${rtsField("Catatan Owner", `<textarea id="cn-reason" rows="2" maxlength="500" data-no-uppercase class="${RTS_IN}"></textarea>`)}
+    <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="cnDecide(${rid}, true)" class="${RTS_BTND}">Setujui &amp; Jalankan</button></div></div>`);
+}
+async function cnDecide(rid, approve) {
+  await cnAct(`/api/credit-notes/reversals/${rid}/decide`, { approve, note: cnReasonValue() }, approve ? "Reversal dijalankan." : "Reversal ditolak.");
+}
+
+function cnSummaryCard(d) {
+  const pct = d.amount ? Math.min(100, Math.round((d.allocated + d.refunded) * 100 / d.amount)) : 0;
+  const row = (l, v, cls = "") => `<div class="flex items-center justify-between py-1.5 text-sm"><span class="text-muted">${l}</span><span class="tabular-nums ${cls}">${v}</span></div>`;
+  return rtsCard("Ringkasan Nilai", `${row("Nilai Credit Note", cnMoney(d.amount), "font-semibold")}${row("Subtotal / PPN", `${cnMoney(d.subtotal)} / ${cnMoney(d.tax_amount)}`)}
+    ${d.status === "aktif" || d.status === "reversed" ? `${row("Dialokasikan ke faktur", "− " + cnMoney(d.allocated))}${row("Refund diterima", "− " + cnMoney(d.refunded))}
+    <div class="flex items-center justify-between mt-2 rounded-lg bg-accent/10 px-3 py-2.5"><span class="font-semibold text-sm text-ink">Kredit tersedia</span><span class="font-sans text-xl font-semibold tabular-nums text-accentDark">${cnMoney(d.available)}</span></div>
+    <div class="h-1.5 rounded-full bg-bg2 mt-3 overflow-hidden"><div class="h-full bg-accent" style="width:${pct}%"></div></div><div class="text-[11px] text-muted mt-1">${pct}% terpakai</div>`
+    : `<div class="mt-2">${rtsNote("blue", "Belum mengurangi tagihan", "Draft / verifikasi tidak mengubah hutang. Kredit baru tersedia setelah diposting.")}</div>`}
+    ${d.posted_at ? `<div class="text-[11px] text-muted mt-2">Diposting ${esc(d.posted_by || "")} · ${rtsWhen(d.posted_at)}</div>` : ""}`);
+}
+// Gambar 09: faktur asal setelah Credit Note — nilai asli tidak pernah ditimpa.
+function cnInvoiceImpactCard(d) {
+  const i = d.origin_invoice;
+  if (!i) return rtsCard("Dampak ke Faktur", '<p class="text-sm text-muted">Belum ada faktur asal. Saat faktur dibuat, pilih salah satu: faktur bruto + Credit Note, atau faktur sudah net (tanpa CN) — jangan keduanya.</p>');
+  const row = (l, v, cls = "") => `<div class="flex items-center justify-between py-1.5 text-sm"><span class="text-muted">${l}</span><span class="tabular-nums ${cls}">${v}</span></div>`;
+  return rtsCard("Dampak ke Faktur Asal", `<div class="font-mono text-sm font-semibold mb-2">${cnLink(i.invoice_number, `openPurchaseInvoiceById(${i.id})`)}</div>
+    ${row("Nilai faktur asli", cnMoney(i.total), "font-semibold")}${row("Pembayaran & DP", "− " + cnMoney(i.paid_cash))}${row("Credit Note teralokasi", "− " + cnMoney(i.paid_credit))}
+    <div class="flex items-center justify-between mt-2 border-t border-line pt-2"><span class="font-semibold text-sm">Sisa tagihan</span><span class="font-sans text-lg font-semibold tabular-nums">${cnMoney(i.outstanding)}</span></div>
+    <div class="text-[11px] text-muted mt-1">${cnMoney(i.total)} − ${cnMoney(i.paid_cash)} − ${cnMoney(i.paid_credit)} = ${cnMoney(i.outstanding)} · ${i.pay_status === "lunas" ? "Lunas" : i.pay_status === "sebagian" ? "Sebagian" : "Belum bayar"}</div>`);
+}
+function cnPositionCard(d) {
+  const p = d.position;
+  const row = (l, v, cls = "") => `<div class="flex items-center justify-between py-1.5 text-sm"><span class="text-muted">${l}</span><span class="tabular-nums ${cls}">${v}</span></div>`;
+  return rtsCard("Posisi Supplier", `${row(`Utang faktur terbuka (${p.open_invoices})`, cnMoney(p.outstanding))}${row("Kredit tersedia", "− " + cnMoney(p.credit_available), "text-accentDark")}
+    <div class="flex items-center justify-between mt-2 border-t border-line pt-2"><span class="font-semibold text-sm">Posisi net</span><span class="font-sans text-lg font-semibold tabular-nums">${cnMoney(p.net)}</span></div>
+    <p class="text-[11px] text-muted mt-1">Alokasi memindahkan kredit ke faktur, sehingga posisi net tidak berubah dua kali.</p>`);
+}
+function cnFilesCard(d) {
+  const closed = ["reversed", "dibatalkan", "ditolak"].includes(d.status);
+  const list = d.files.map(f => `<div class="flex items-center gap-2 py-1.5 text-sm border-b border-line last:border-b-0"><a href="/api/credit-notes/files/${f.id}" target="_blank" rel="noopener" class="flex-1 min-w-0 truncate text-accentDark hover:underline">${esc(f.filename)}</a>
+      <span class="text-[11px] text-muted">${f.refund_id ? "refund · " : ""}${esc(f.created_by || "")}</span>${d.status === "draft" ? `<button type="button" onclick="cnDeleteFile(${f.id})" class="text-[11px] text-failed hover:underline">Hapus</button>` : ""}</div>`).join("");
+  return rtsCard("Bukti &amp; Lampiran", `${list || '<p class="text-sm text-muted">Belum ada lampiran. Unggah foto/PDF Credit Note atau bukti persetujuan supplier.</p>'}
+    ${closed ? "" : `<label class="mt-3 inline-flex items-center gap-2 ${RTS_BTN3} cursor-pointer"><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="cnUploadPicked(this)">+ Unggah bukti</label>`}`);
+}
+function cnReadFile(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error("File tidak bisa dibaca.")); r.readAsDataURL(file); });
+}
+async function cnUpload(file, refundId) {
+  if (file.size > 8 * 1024 * 1024) throw new Error("Ukuran bukti maksimal 8 MB.");
+  const data = await cnReadFile(file);
+  await rtsApi(`/api/credit-notes/${cnCurrent.id}/files`, "POST", { filename: file.name, mime: file.type, data, refund_id: refundId || null });
+}
+async function cnUploadPicked(inp) {
+  const file = inp.files?.[0]; if (!file) return;
+  try {
+    if (cnCurrent.can.edit) await cnSaveDraft(true);
+    await cnUpload(file); showToast("Bukti dilampirkan.", "success"); await cnReload();
+  } catch (e) { cnFail(e); }
+}
+async function cnDeleteFile(fid) {
+  try { cnCurrent = await rtsApi(`/api/credit-notes/${cnCurrent.id}/files/${fid}`, "DELETE"); cnRenderDetail(); } catch (e) { cnFail(e); }
+}
+function cnEventsCard(d) {
+  const ev = d.events.slice(0, 6).map(e => `<div class="flex gap-2 py-2 border-b border-line last:border-b-0"><span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent shrink-0"></span>
+      <div class="min-w-0"><div class="text-sm text-ink">${esc(e.note || e.kind)}</div><div class="text-[11px] text-muted">${esc(e.by_user || "sistem")} · ${rtsWhen(e.at)}</div></div></div>`).join("");
+  return rtsCard("Riwayat Terakhir", `${ev || '<p class="text-sm text-muted">Belum ada riwayat.</p>'}<button type="button" onclick="cnOpenAudit(${d.id})" class="mt-2 text-xs font-semibold text-accentDark hover:underline">Lihat semua riwayat &amp; audit →</button>`);
+}
+
+// ── Cetak dokumen (Gambar 12) ────────────────────────────────────────────────
+function cnPrint() {
+  const d = cnCurrent, shop = (typeof SHOP_PROFILE !== "undefined" && SHOP_PROFILE.name) || "SINAR GALAKSI VARIASI MOBIL";
+  const td = "border border-stone-400 px-2 py-1";
+  const lines = d.lines.map((l, i) => `<tr><td class="${td} text-center">${i + 1}</td><td class="${td}">${esc(l.product_name)}${l.sku ? ` <span style="font-size:10px">(${esc(l.sku)})</span>` : ""}</td><td class="${td} text-right">${l.kind === "ongkir" ? "—" : l.qty}</td><td class="${td} text-right">${cnMoney(l.unit_price)}</td><td class="${td} text-right">${cnMoney(l.subtotal)}</td><td class="${td} text-right">${cnMoney(l.tax)}</td><td class="${td} text-right">${cnMoney(l.amount)}</td></tr>`).join("");
+  const allocs = d.allocations.filter(a => a.amount > 0 && !a.undone).map(a => `${esc(a.invoice_number)} ${cnMoney(a.amount)}`).join("; ");
+  document.getElementById("cn-print-wrap").innerHTML = `<div class="cr-print-target" style="font-size:12px;color:#141413">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #141413;padding-bottom:6px;margin-bottom:10px">
+      <div><div style="font-size:18px;font-weight:700">${esc(shop)}</div><div>CREDIT NOTE SUPPLIER</div></div>
+      <div style="text-align:right"><div style="font-size:16px;font-weight:700;font-family:monospace">${esc(d.cn_number || "")}</div><div>Status: ${esc(d.status_label)}</div></div></div>
+    <table style="width:100%;margin-bottom:10px"><tr><td style="width:50%;vertical-align:top">
+      <div><b>Supplier:</b> ${esc(d.supplier_name)}</div><div><b>No. CN Supplier:</b> ${esc(d.supplier_cn_no || "-")}</div><div><b>Tanggal efektif:</b> ${rtsDate(d.issued_at)}</div></td>
+      <td style="vertical-align:top"><div><b>Retur:</b> ${esc(d.return?.return_number || "-")}</div><div><b>Faktur asal:</b> ${esc(d.origin_invoice?.invoice_number || "-")}</div><div><b>PO / GR:</b> ${esc(d.chain.po?.po_number || "-")} / ${esc(d.chain.gr?.doc_number || "-")}</div></td></tr></table>
+    <table style="width:100%;border-collapse:collapse"><thead><tr><th class="${td}">No</th><th class="${td}">Barang</th><th class="${td}">Qty</th><th class="${td}">Harga</th><th class="${td}">Subtotal</th><th class="${td}">PPN</th><th class="${td}">Jumlah</th></tr></thead><tbody>${lines}</tbody>
+      <tfoot><tr><td class="${td} text-right" colspan="6"><b>Total Credit Note</b></td><td class="${td} text-right"><b>${cnMoney(d.amount)}</b></td></tr></tfoot></table>
+    <div style="margin-top:10px"><b>Pemakaian:</b> dialokasikan ${cnMoney(d.allocated)}${allocs ? ` (${allocs})` : ""}; refund ${cnMoney(d.refunded)}; sisa kredit ${cnMoney(d.available)}.</div>
+    ${d.note ? `<div style="margin-top:4px"><b>Catatan:</b> ${esc(d.note)}</div>` : ""}
+    <table style="width:100%;margin-top:28px;text-align:center"><tr><td>Dibuat,<br><br><br>${esc(d.created_by || "")}</td><td>Diverifikasi,<br><br><br>${esc(d.reviewed_by || "")}</td><td>Diposting,<br><br><br>${esc(d.posted_by || "")}</td></tr></table>
+    <div style="margin-top:12px;font-size:10px;color:#6B6B66">Dicetak ${new Date().toLocaleString("id-ID")} · Credit Note tidak memutasi stok. Nilai faktur asli tidak diubah; pengurangan tagihan tercatat sebagai alokasi.</div></div>`;
+  crPrintNode("cn-print-wrap");
+}
+
+// ── Riwayat & Audit (Gambar 13) ──────────────────────────────────────────────
+function cnOpenAudit(cnId) {
+  cnAuditState = { cn_id: cnId || "", q: "", supplier_id: "", kind: "", user: "", date_from: "", date_to: "" };
+  cnShow("cn-audit-panel");
+  cnLoadAudit();
+}
+async function cnLoadAudit() {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(cnAuditState)) if (v) qs.set(k, v);
+  try { cnAuditData = await rtsApi(`/api/credit-notes/audit?${qs}`); } catch (e) { showToast(e.message); return; }
+  cnRenderAudit();
+}
+function cnAuditApply() {
+  const v = id => document.getElementById(id)?.value || "";
+  Object.assign(cnAuditState, { q: v("cna-q").trim(), supplier_id: v("cna-supplier"), kind: v("cna-kind"), user: v("cna-user"), date_from: v("cna-from"), date_to: v("cna-to") });
+  cnLoadAudit();
+}
+function cnRenderAudit() {
+  const d = cnAuditData, s = cnAuditState;
+  const opt = (pairs, cur) => pairs.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? "selected" : ""}>${esc(l)}</option>`).join("");
+  const diff = e => { const b = e.before_json ? JSON.parse(e.before_json) : null, a = e.after_json ? JSON.parse(e.after_json) : null; if (!b && !a) return ""; const keys = [...new Set([...Object.keys(b || {}), ...Object.keys(a || {})])];
+    return `<div class="text-[11px] text-muted mt-1">${keys.map(k => `${esc(k)}: ${esc(String(b?.[k] ?? "—"))} → ${esc(String(a?.[k] ?? "—"))}`).join(" · ")}</div>`; };
+  const rows = d.items.map(e => `<tr class="border-b border-line last:border-b-0 align-top"><td class="px-3 py-2 whitespace-nowrap text-muted">${rtsWhen(e.at)}</td>
+      <td class="px-3 py-2">${cnLink(e.cn_number, `cnOpen(${e.credit_note_id})`)}</td><td class="px-3 py-2">${esc(e.supplier_name)}</td>
+      <td class="px-3 py-2">${rtsPill(RTS_TINT.gray, d.kinds[e.kind] || e.kind)}</td><td class="px-3 py-2 text-ink">${esc(e.note || "")}${diff(e)}</td>
+      <td class="px-3 py-2 text-right tabular-nums whitespace-nowrap">${e.amount == null ? "" : (e.amount < 0 ? "− " + cnMoney(-e.amount) : cnMoney(e.amount))}</td><td class="px-3 py-2 whitespace-nowrap">${esc(e.by_user || "sistem")}</td></tr>`).join("");
+  document.getElementById("cn-audit-panel").innerHTML = `<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div><h2 class="font-serif text-2xl font-semibold text-ink">Riwayat &amp; Audit Credit Note</h2><p class="text-sm text-muted mt-0.5">Jejak tidak bisa diedit atau dihapus: siapa membuat, memverifikasi, memposting, mengalokasikan, dan me-reversal.</p></div>
+      <div class="flex gap-2"><button type="button" onclick="cnAuditExport()" class="${RTS_BTN3}">Ekspor CSV</button>${cnCurrent ? `<button type="button" onclick="cnRenderDetail()" class="${RTS_BTN2}">Kembali ke ${esc(cnCurrent.cn_number)}</button>` : ""}<button type="button" onclick="cnBackToList()" class="${RTS_BTN2}">Daftar Credit Note</button></div></div>
+    ${rtsCard("Filter Riwayat", `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))_auto] gap-3 items-end">
+      ${rtsField("Cari", `<input id="cna-q" type="text" value="${esc(s.q)}" onkeydown="if(event.key==='Enter')cnAuditApply()" placeholder="No. CN, keterangan, supplier" class="${RTS_IN}">`)}
+      ${rtsField("Supplier", `<select id="cna-supplier" onchange="cnAuditApply()" class="${RTS_IN}"><option value="">Semua</option>${opt(suppliersCache.map(x => [x.id, x.name]), s.supplier_id)}</select>`)}
+      ${rtsField("Kejadian", `<select id="cna-kind" onchange="cnAuditApply()" class="${RTS_IN}"><option value="">Semua</option>${opt(Object.entries(d.kinds), s.kind)}</select>`)}
+      ${rtsField("Pengguna", `<select id="cna-user" onchange="cnAuditApply()" class="${RTS_IN}"><option value="">Semua</option>${opt(d.users.map(u => [u, u]), s.user)}</select>`)}
+      ${rtsField("Dari", `<input id="cna-from" type="date" value="${esc(s.date_from)}" onchange="cnAuditApply()" data-no-uppercase class="${RTS_IN}">`)}
+      ${rtsField("Sampai", `<input id="cna-to" type="date" value="${esc(s.date_to)}" onchange="cnAuditApply()" data-no-uppercase class="${RTS_IN}">`)}
+      <button type="button" onclick="cnAuditApply()" class="${RTS_BTN}">Cari</button></div>
+      ${s.cn_id ? `<div class="mt-3 text-xs">Hanya satu dokumen · <button type="button" onclick="cnAuditState.cn_id=''; cnLoadAudit()" class="text-accentDark underline">tampilkan semua</button></div>` : ""}`)}
+    <div class="mt-4 bg-white border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[980px] text-sm"><thead class="bg-bg2"><tr><th class="${RTS_TH}">Waktu</th><th class="${RTS_TH}">Credit Note</th><th class="${RTS_TH}">Supplier</th><th class="${RTS_TH}">Kejadian</th><th class="${RTS_TH}">Keterangan</th><th class="${RTS_THR}">Nilai</th><th class="${RTS_TH}">Oleh</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="px-3 py-10 text-center text-sm text-muted">Belum ada riwayat untuk filter ini.</td></tr>'}</tbody></table></div>`;
+}
+function cnAuditExport() {
+  const d = cnAuditData; if (!d) return;
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [["Waktu", "Credit Note", "Supplier", "Kejadian", "Keterangan", "Nilai", "Oleh"].map(q).join(";"),
+    ...d.items.map(e => [e.at, e.cn_number, e.supplier_name, d.kinds[e.kind] || e.kind, e.note, e.amount ?? "", e.by_user || "sistem"].map(q).join(";"))];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv" }));
+  a.download = `audit-credit-note-${toDateInputValue(new Date())}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 checkAuth();

@@ -576,8 +576,8 @@
     .po-frow { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.75rem; align-items: center; }
     .po-frow > label { font-size: 13px; color: #4a4a46; font-weight: 500; }
     @media (max-width: 640px) { .po-frow { grid-template-columns: 1fr; gap: 0.25rem; } }
-    .po-table { min-width: 1120px; }
-    .po-grid { display: grid; grid-template-columns: minmax(170px, 1.8fr) 62px 54px 108px 100px 142px minmax(140px, 1.3fr) 138px 112px 32px; gap: 0.5rem; align-items: center; }
+    .po-table { min-width: 1180px; }
+    .po-grid { display: grid; grid-template-columns: minmax(170px, 1.8fr) 62px 54px 140px 130px 142px minmax(130px, 0.8fr) 138px 112px 32px; gap: 0.5rem; align-items: center; }
     .po-head { padding: 0.45rem 0.25rem; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B6B66; border-bottom: 1px solid #E5E3DC; }
     .po-item-row { padding: 0.45rem 0.25rem; border-bottom: 1px solid #EFECE4; }
     .po-item-row:last-child { border-bottom: 0; }
@@ -20248,7 +20248,7 @@ function preorderRowTemplate() {
         <input type="text" inputmode="numeric" placeholder="Harga" value="0"
           class="po-row-price price-input ${PO_CELL} pl-7 text-right tabular-nums" oninput="updatePreorderTotals()" />
       </div>
-      <div class="po-row-total px-1 text-sm text-right tabular-nums text-ink">Rp 0</div>
+      <div class="po-row-total px-1 text-sm text-right tabular-nums text-ink whitespace-nowrap">Rp 0</div>
       <div class="po-src-wrap" data-src="supplier">
         <select class="po-row-source po-src w-full" data-src="supplier" onchange="onPoRowSourceChange(this)">
           ${Object.entries(SO_SOURCE_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>

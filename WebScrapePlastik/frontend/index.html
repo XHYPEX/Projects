@@ -1426,11 +1426,11 @@
           <section id="cashier-quick-card" class="hidden bg-white border border-line rounded-xl" aria-labelledby="cashier-quick-title">
             <div class="px-4 pt-4 pb-3"><h2 id="cashier-quick-title" class="font-serif text-base font-semibold text-ink">Aksi Cepat</h2></div>
             <div class="px-4 pb-4 grid gap-2">
-              <button id="cashier-quick-save" type="button" onclick="document.getElementById('cashier-save-btn').click()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Perubahan</button>
-              <button id="cashier-quick-pay" type="button" onclick="openCashierSettleModal()" class="px-3 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Tambah Pembayaran</button>
-              <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-3 py-2 border border-blue-600 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 text-left disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ubah Status Pengerjaan</button>
-              <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden inline-flex items-center gap-2 px-3 py-2 border border-yellow-400 rounded-lg text-sm font-medium text-yellow-950 bg-yellow-300 hover:bg-yellow-400 text-left transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17H3v-5l2-5h11l3 5h2v5h-2"/><path d="M5 12h14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/></svg><span id="cashier-quick-handover-label">Serah Terima Kendaraan</span></button>
-              <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-3 py-2 border border-green-600 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 text-left transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>Cetak Nota</button>
+              <button id="cashier-quick-save" type="button" onclick="document.getElementById('cashier-save-btn').click()" class="px-3 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 text-left disabled:bg-bg2 disabled:text-[#6B6B66] disabled:border-line disabled:cursor-not-allowed transition-colors">Simpan Perubahan</button>
+              <button id="cashier-quick-pay" type="button" onclick="openCashierSettleModal()" class="px-3 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 text-left disabled:bg-bg2 disabled:text-[#6B6B66] disabled:border-line disabled:cursor-not-allowed transition-colors">Tambah Pembayaran</button>
+              <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-3 py-2 border border-blue-700 rounded-lg text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 text-left leading-tight disabled:bg-blue-50 disabled:text-blue-900 disabled:border-blue-200 disabled:cursor-not-allowed transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ubah Status Pengerjaan</button>
+              <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden inline-flex items-center gap-2 px-3 py-2 border border-yellow-500 rounded-lg text-sm font-semibold text-black bg-yellow-400 hover:bg-yellow-500 text-left leading-tight transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17H3v-5l2-5h11l3 5h2v5h-2"/><path d="M5 12h14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/></svg><span id="cashier-quick-handover-label">Serah Terima Kendaraan</span></button>
+              <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-3 py-2 border border-green-700 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 text-left leading-tight transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>Cetak Nota</button>
             </div>
           </section>
 
@@ -19552,7 +19552,7 @@ async function printReceiptNota(receiptId) {
   } else if (logo && !logo.naturalWidth) {
     logo.parentElement.remove();  // already failed (missing file) before we started waiting
   }
-  // K-16: the nota is 11in wide x 9.5in tall (landscape); size and margins come from Atur Cetak.
+  // Paper size (9,5" × 5,5" by default) and margins come from Atur Cetak.
   printWithPageRule(notaPageRule(prefs), "print-nota");
 }
 
@@ -19561,15 +19561,26 @@ async function printReceiptNota(receiptId) {
 // printable area depend on the printer driver. "Atur Cetak" keeps the paper, margins and text size on
 // this computer, and "Cetak Halaman Uji" prints a ruler sheet at exactly the same page rule.
 const NOTA_PAPERS = {
-  land: { label: 'Landscape 11" × 9,5" (K-16)', w: 11, h: 9.5 },
-  port: { label: 'Portrait 9,5" × 11" (cara lama)', w: 9.5, h: 11 },
+  half: { label: '9,5" × 5,5" (setengah continuous form)', w: 9.5, h: 5.5, orient: "landscape" },
+  land: { label: 'Landscape 11" × 9,5" (K-16)', w: 11, h: 9.5, orient: "landscape" },
+  port: { label: 'Portrait 9,5" × 11" (cara lama)', w: 9.5, h: 11, orient: "portrait" },
 };
-const NOTA_PRINT_KEY = "nota-print-prefs";
-const NOTA_PRINT_DEFAULTS = { paper: "land", top: 0.7, left: 0.9, right: 0.9, bottom: 0.7, scale: 100, tested: null };
+// Owner, 22-10-2026: the nota is printed on 9,5" × 5,5". A new key so every computer moves to that size once,
+// keeping the margins and text size it already had.
+const NOTA_PRINT_KEY = "nota-print-prefs-v2";
+const NOTA_PRINT_OLD_KEY = "nota-print-prefs";
+const NOTA_PRINT_DEFAULTS = { paper: "half", top: 0.7, left: 0.9, right: 0.9, bottom: 0.7, scale: 100, tested: null };
+const notaPaperSize = pg => `${String(pg.w).replace(".", ",")}″ × ${String(pg.h).replace(".", ",")}″`;
 
 function notaPrintPrefs() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(NOTA_PRINT_KEY) || "null"); } catch (_) {}
+  if (!saved) {
+    try {
+      const old = JSON.parse(localStorage.getItem(NOTA_PRINT_OLD_KEY) || "null");
+      if (old) saved = { top: old.top, left: old.left, right: old.right, bottom: old.bottom, scale: old.scale };
+    } catch (_) {}
+  }
   const out = { ...NOTA_PRINT_DEFAULTS, ...(saved || {}) };
   if (!NOTA_PAPERS[out.paper]) out.paper = NOTA_PRINT_DEFAULTS.paper;
   for (const k of ["top", "left", "right", "bottom"]) {
@@ -19618,7 +19629,7 @@ function notaTestSheetHtml(p) {
     ${corner("KIRI-BAWAH", "left:0.35in;bottom:0.35in;")}${corner("KANAN-BAWAH", "right:0.35in;bottom:0.35in;")}
     <div style="position:absolute;left:0;right:0;top:0.7in;text-align:center;font-size:16pt;font-weight:bold;letter-spacing:0.08em;">&#9650; ATAS NOTA &#9650;</div>
     <div style="position:absolute;left:0.9in;right:0.9in;top:1.35in;font-size:10.5pt;line-height:1.45;">
-      <div style="font-size:15pt;font-weight:bold;margin-bottom:4px;">UJI CETAK NOTA &mdash; ${pg.w}&Prime; × ${pg.h}&Prime; (${p.paper === "land" ? "landscape" : "portrait"})</div>
+      <div style="font-size:15pt;font-weight:bold;margin-bottom:4px;">UJI CETAK NOTA &mdash; ${pg.w}&Prime; × ${pg.h}&Prime; (${pg.orient})</div>
       <div>Printer: Epson LX-310 &middot; dicetak ${esc(new Date().toLocaleString("id-ID"))}</div>
       <div>Margin (cm): atas ${p.top} &middot; kiri ${p.left} &middot; kanan ${p.right} &middot; bawah ${p.bottom} &middot; skala huruf ${p.scale}%</div>
       <div>Area cetak: ${area.w.toFixed(2)}&Prime; × ${area.h.toFixed(2)}&Prime; (kotak tebal di tepi halaman ini)</div>
@@ -19650,13 +19661,13 @@ function openNotaPrintSettings() {
     <div class="space-y-3">
       <div class="rounded-lg px-3 py-2 text-xs ${verified ? "bg-green-50 text-done" : "bg-amber-50 text-amber-900 border border-amber-200"}">
         ${verified ? `Pengaturan ini sudah diuji di Epson LX-310 pada ${esc(formatNotaDate(p.tested.at))}.`
-          : "<b>Belum diuji di Epson LX-310.</b> Ukuran 11&Prime; × 9,5&Prime; jangan dianggap pasti muat: cetak Halaman Uji dulu, periksa arah, rotasi driver, dan ukuran, lalu tandai sudah diuji."}</div>
+          : `<b>Belum diuji di Epson LX-310.</b> Ukuran ${notaPaperSize(NOTA_PAPERS[p.paper])} jangan dianggap pasti muat: cetak Halaman Uji dulu, periksa arah, rotasi driver, dan ukuran, lalu tandai sudah diuji.`}</div>
       <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Ukuran &amp; arah kertas</label>
         <select id="nps-paper" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">${Object.entries(NOTA_PAPERS).map(([k, v]) => `<option value="${k}" ${p.paper === k ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select></div>
       <div class="grid grid-cols-2 gap-3">${num("nps-top", "Margin atas (cm)", p.top)}${num("nps-bottom", "Margin bawah (cm)", p.bottom)}${num("nps-left", "Margin kiri (cm)", p.left)}${num("nps-right", "Margin kanan (cm)", p.right)}</div>
       <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Skala huruf (%)</label>
         <input id="nps-scale" type="number" step="5" min="70" max="130" value="${p.scale}" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></div>
-      <div class="rounded-lg bg-bg2 px-3 py-2 text-[11px] text-muted leading-relaxed">Di dialog cetak: pilih printer <b>EPSON LX-310</b>, ukuran kertas <b>9,5 × 11 in</b> atau kertas khusus <b>11 × 9,5 in</b>, skala 100%, tanpa header/footer. Bila hasil miring atau terpotong, ubah orientasi (Portrait/Landscape) di driver, lalu cetak Halaman Uji lagi.</div>
+      <div class="rounded-lg bg-bg2 px-3 py-2 text-[11px] text-muted leading-relaxed">Di dialog cetak: pilih printer <b>EPSON LX-310</b>, ukuran kertas sesuai pilihan di atas (untuk setengah continuous form buat kertas khusus <b>9,5 × 5,5 in</b> di driver), skala 100%, tanpa header/footer. Bila hasil miring atau terpotong, ubah orientasi (Portrait/Landscape) di driver, lalu cetak Halaman Uji lagi.</div>
       <label class="flex items-start gap-2 text-xs text-ink"><input id="nps-tested" type="checkbox" class="mt-0.5 accent-[#D97757]" ${verified ? "checked" : ""}> Hasil Halaman Uji sudah saya periksa dan benar (arah, rotasi, ukuran) untuk pengaturan di atas.</label>
       <div class="flex flex-wrap justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Tutup</button>
@@ -19672,7 +19683,7 @@ function saveNotaPrintSettings(thenTest) {
     top: val("nps-top"), bottom: val("nps-bottom"), left: val("nps-left"), right: val("nps-right"), scale: val("nps-scale") };
   const invalid = ["top", "bottom", "left", "right"].some(k => !(next[k] >= 0));
   const area = notaContentIn({ ...NOTA_PRINT_DEFAULTS, ...next });
-  if (invalid || area.w < 6 || area.h < 4) { showToast("Margin terlalu besar atau tidak valid: area cetak harus minimal 6″ × 4″."); return; }
+  if (invalid || area.w < 6 || area.h < 3.5) { showToast("Margin terlalu besar atau tidak valid: area cetak harus minimal 6″ × 3,5″."); return; }
   saveNotaPrintPrefs({ ...next, tested: null });
   const fixed = notaPrintPrefs();                // clamps what was typed
   if (document.getElementById("nps-tested").checked) fixed.tested = { at: new Date().toISOString(), sig: notaPrintSignature(fixed) };

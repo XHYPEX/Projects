@@ -1073,14 +1073,6 @@
                   <span id="cashier-form-title" class="hidden"></span>
                 </div>
                 <div id="kasir-nota-actions" class="col-span-full flex flex-wrap items-center gap-2 empty:hidden">
-                <button id="cashier-settle-btn" type="button" onclick="openCashierSettleModal()"
-                  class="hidden px-4 py-1.5 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">Tambah Pembayaran</button>
-<button id="cashier-copy-btn" type="button" onclick="copyActiveReceiptToNewTab()"
-                  class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Salin ke Nota Baru</button>
-<button id="cashier-print-btn" type="button" onclick="printActiveReceiptNota()"
-                  class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Cetak Nota</button>
-<button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
-                  class="hidden px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah</button>
 <button id="cashier-reopen-btn" type="button" onclick="openReopenReceiptModal()"
                   class="hidden admin-only px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Buka Kembali (Revisi)</button>
 <button id="cashier-void-btn" type="button" onclick="confirmVoidActiveReceipt()"
@@ -1331,11 +1323,6 @@
                 class="hidden admin-only mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-accent text-accentDark rounded-lg text-sm font-medium hover:bg-accent/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Kembalikan Kelebihan Bayar</button>
               <button id="cashier-return-btn" type="button" onclick="openReturnModal(getActiveTab()?.receiptId)"
                 class="hidden admin-only mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-line text-ink rounded-lg text-sm font-medium bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Retur Barang</button>
-              <button id="cashier-summary-settle-btn" type="button" onclick="openCashierSettleModal()"
-                class="hidden mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-done text-done rounded-lg text-sm font-medium hover:bg-done/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-done/40">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-                Tambah Pembayaran
-              </button>
             </div>
           </section>
 
@@ -1401,6 +1388,8 @@
                 </div>
               </div>
               <button id="cashier-save-btn" type="button" onclick="saveReceipt('save')" class="hidden w-full px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Perubahan</button>
+              <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
+                class="hidden w-full px-4 py-2.5 border border-line rounded-xl text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Nota</button>
               <button id="cashier-pay-btn" type="button" onclick="saveReceipt('pay')"
                 class="hidden w-full justify-center inline-flex items-center gap-2 px-6 py-2.5 bg-accent text-bg rounded-xl text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
                 <span id="cashier-pay-label">Lanjut ke Pembayaran</span>
@@ -8903,8 +8892,8 @@ function applyCashierVoidLock(tab) {
     "hidden", !(tab.receiptId && tab.locked && !isVoid && !isPaid)
   );
   // Only Cetak Nota is left on a paid nota; the bottom bar's Pembayaran has nothing to do.
-  document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId || tab.status === "done");
-  document.getElementById("cashier-copy-btn").classList.toggle("hidden", !tab.receiptId);
+  // Hapus erases the nota with no trace: only a Draft nobody has paid on. Anything else is cancelled by Void.
+  document.getElementById("cashier-delete-btn").classList.toggle("hidden", !tab.receiptId || tab.workStatus !== "draft" || Number(tab.amountPaid) > 0);
 
   // Void itself can't be undone, and there's nothing left to void once a
   // receipt has no persisted id yet — hide the button in both cases.
@@ -8913,8 +8902,6 @@ function applyCashierVoidLock(tab) {
   // K-22: void is admin work; staff may only cancel a Draft nota nobody has paid on yet.
   const staffMayVoid = tab.workStatus === "draft" && !(Number(tab.amountPaid) > 0);
   document.getElementById("cashier-void-btn").classList.toggle("hidden", !tab.receiptId || isVoid || isClosedNota || (currentUser?.role !== "admin" && !staffMayVoid));
-  // Reprint any saved nota; a void one is no longer a sale to hand to a customer.
-  document.getElementById("cashier-print-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
   document.getElementById("cashier-print-setup-btn").classList.toggle("hidden", !tab.receiptId || isVoid);
 
   updateCashierSettleButtons();
@@ -9547,20 +9534,12 @@ function updateCashierSettleButtons() {
   document.getElementById("cashier-refund-btn")?.classList.toggle("hidden", !(over > 0 && isAdmin()));
   {
     const t = getActiveTab();
-    const returnable = !!t && !!t.receiptId && t.status !== "void" && t.workStatus !== "draft" && !t.dirty
+    // Retur Barang only on a closed nota: Pengerjaan Selesai and Lunas.
+    const returnable = !!t && !!t.receiptId && t.status === "done" && t.workStatus === "selesai" && !t.dirty
       && (t.items || []).some(i => i.itemType !== "jasa" && (Number(i.qty) || 0) > (Number(i.returnedQty) || 0));
     document.getElementById("cashier-return-btn")?.classList.toggle("hidden", !(returnable && isAdmin()));
   }
   document.getElementById("cashier-reopen-btn")?.classList.toggle("hidden", !(tab && tab.receiptId && tab.status === "done" && tab.workStatus === "selesai" && isAdmin()));
-  const show = !!(tab && tab.receiptId && tab.status === "pending" && tab.workStatus !== "draft");
-  const blocked = show && tab.dirty;
-  for (const id of ["cashier-settle-btn", "cashier-summary-settle-btn"]) {
-    const btn = document.getElementById(id);
-    if (!btn) continue;
-    btn.classList.toggle("hidden", !show);
-    btn.disabled = blocked;
-    btn.title = blocked ? "Simpan perubahan nota dulu" : "";
-  }
 }
 
 // Opens "Pembayaran Nota" for a saved, pending nota. The nota is read fresh from the server, so the

@@ -4025,6 +4025,11 @@ def delete_receipt(receipt_id: str) -> None:
             raise ValueError("Invoice ini milik Sales Order dan tidak bisa dihapus. Void saja bila pesanan batal.")
         if con.execute("SELECT 1 FROM receipt_returns WHERE receipt_id=?", (receipt_id,)).fetchone():
             raise ValueError("Nota ini sudah ada retur barang, jadi tidak bisa dihapus.")
+        # Deleting leaves no trace, so it is only for a Draft with no payment; anything else goes through Void.
+        if row["work_status"] != "draft":
+            raise ValueError("Hanya nota Draft yang bisa dihapus. Nota lain dibatalkan dengan Void.")
+        if row["amount_paid"] or con.execute("SELECT 1 FROM receipt_payments WHERE receipt_id=?", (receipt_id,)).fetchone():
+            raise ValueError("Nota ini sudah ada pembayaran, jadi tidak bisa dihapus. Batalkan dengan Void.")
         _incentives().on_receipt_deleted(con, receipt_id)
         existing = dict(row)
 

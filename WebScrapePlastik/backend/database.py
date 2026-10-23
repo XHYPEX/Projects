@@ -2646,6 +2646,9 @@ def reverse_receipt_payment(receipt_id: str, payment_id: int, reason: str, by: s
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
 
+PAYMENT_WAITING_NOTE = "Menunggu konfirmasi dana masuk"
+
+
 def confirm_receipt_payment(receipt_id: str, payment_id: int, by: str | None = None) -> dict:
     """K-18: the money has been seen in the account. Pending -> Sah: it counts as paid from this moment
     (paid_at becomes the confirmation time) and the nota's paid total and status follow."""
@@ -2663,6 +2666,8 @@ def confirm_receipt_payment(receipt_id: str, payment_id: int, by: str | None = N
         now = _now()
         new_paid = row["amount_paid"] + pay["amount"]
         new_status = _compute_receipt_status(row["total"], new_paid, None)
+        # The automatic "waiting" note is replaced once the money is seen (the cashier's own note stays).
+        con.execute("UPDATE receipt_payments SET note=NULL WHERE id=? AND state='pending' AND note=?", (payment_id, PAYMENT_WAITING_NOTE))
         cur = con.execute("UPDATE receipt_payments SET state='sah', confirmed_by=?, confirmed_at=?, paid_at=? WHERE id=? AND state='pending'",
                           (by, now, now, payment_id))
         if cur.rowcount == 0:
@@ -8283,6 +8288,7 @@ def confirm_preorder_payment(preorder_id: str, payment_id: int, by: str | None =
         if pay["state"] != "pending":
             raise ValueError("Pembayaran ini bukan lagi berstatus menunggu konfirmasi.")
         now = _now()
+        con.execute("UPDATE preorder_payments SET note=NULL WHERE id=? AND note=?", (payment_id, PAYMENT_WAITING_NOTE))
         con.execute("UPDATE preorder_payments SET state='sah', confirmed_by=?, confirmed_at=?, paid_at=? WHERE id=?", (by, now, now, payment_id))
         con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
         return dict(con.execute("SELECT * FROM preorder_payments WHERE id=?", (payment_id,)).fetchone())

@@ -1009,10 +1009,36 @@
                 <h2 class="font-serif text-[22px] sm:text-2xl font-semibold text-ink leading-tight">Kasir / <span id="kasir-head-mode">Transaksi Baru</span></h2>
                 <p class="text-sm text-muted mt-0.5">Scan barang, tambah jasa, pilih teknisi dan sales, lalu simpan transaksi.</p>
               </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <button id="kasir-f1-btn" type="button" onclick="openKasirSearch('scan')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6v12M7 6v12M10 6v12M14 6v12M17 6v12M20 6v12"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F1</kbd>Scan Barcode</button>
-                <button id="kasir-f2-btn" type="button" onclick="openKasirSearch('item')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F2</kbd>Tambah Item</button>
-                <button id="kasir-f3-btn" type="button" onclick="kasirAddService()" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F3</kbd>Tambah Jasa</button>
+              <!-- Owner, 23-10-2026: save / print / close actions sit at the top; F1-F3 moved under the item table. -->
+              <div id="kasir-head-actions" class="flex flex-wrap items-center justify-end gap-2">
+              <button id="cashier-draft-btn" type="button" onclick="kasirDraftClick()" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Draft</button>
+              <div id="kasir-main-wrap" class="relative hidden min-w-[13rem]">
+                <div class="flex">
+                  <button id="kasir-main-btn" type="button" onclick="kasirStartSave('print')"
+                    class="flex-1 px-4 py-2.5 bg-accent text-white rounded-l-xl text-sm font-semibold hover:bg-accentDark transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Simpan &amp; Cetak Nota</button>
+                  <button id="kasir-main-menu-btn" type="button" onclick="kasirToggleSaveMenu()" aria-haspopup="menu" aria-label="Pilihan simpan lain"
+                    class="px-3 bg-accent text-white rounded-r-xl border-l border-white/30 hover:bg-accentDark transition-colors disabled:opacity-40"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                </div>
+                <div id="kasir-save-menu" role="menu" class="hidden absolute right-0 top-full mt-1 w-64 bg-white border border-line rounded-xl shadow-lg py-1 z-30">
+                  <button type="button" role="menuitem" onclick="kasirStartSave('nota')" class="block text-left px-3 py-2 text-sm hover:bg-bg2">Simpan Nota<span class="block text-[11px] text-muted">Tanpa mencetak, pekerjaan belum dimulai</span></button>
+                  <button type="button" role="menuitem" onclick="kasirStartSave('start')" class="block text-left px-3 py-2 text-sm hover:bg-bg2">Simpan &amp; Mulai Pengerjaan</button>
+                  <button type="button" role="menuitem" onclick="kasirStartSave('print')" class="block text-left px-3 py-2 text-sm hover:bg-bg2">Simpan &amp; Cetak Nota</button>
+                </div>
+              </div>
+              <button id="cashier-save-btn" type="button" onclick="saveReceipt('save')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Perubahan</button>
+              <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
+                class="hidden px-4 py-2.5 border border-line rounded-xl text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Nota</button>
+              <button id="cashier-pay-btn" type="button" onclick="saveReceipt('pay')"
+                class="hidden justify-center inline-flex items-center gap-2 px-6 py-2.5 bg-accent text-bg rounded-xl text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
+                <span id="cashier-pay-label">Lanjut ke Pembayaran</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+              </button>
+              <div class="hidden"><button id="cashier-belum-btn" type="button" onclick="saveReceipt('belum')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan (Belum Dikerjakan)</button><button id="cashier-start-btn" type="button" onclick="saveReceipt('start')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-accent/60 bg-white text-ink hover:bg-accent/10">Simpan &amp; Mulai Pengerjaan</button></div>
+              <button id="cashier-close-btn" type="button" onclick="closeCashierTab(activeCashierTabId)"
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-transparent rounded-xl text-muted bg-white text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="text-muted" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              Tutup Nota
+            </button>
               </div>
             </div>
             <div class="flex items-center gap-2 mt-3">
@@ -1110,7 +1136,8 @@
                 </div>
                 <p id="cashier-customer-link-status" class="text-xs text-muted mt-1.5 min-h-[1rem]" aria-live="polite"></p>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- items-end: the phone label wraps to two lines, so both inputs line up at the bottom. -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <div>
                     <label for="customer-phone" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="normal-case font-normal">(wajib saat mulai pemasangan)</span></label>
                     <input id="customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off"
@@ -1192,16 +1219,9 @@
               </div>
               <div id="item-rows" class="divide-y divide-line"></div>
               <div class="px-4 py-3.5 border-t border-line flex flex-wrap items-center gap-2">
-                <button id="add-item-btn" type="button" onclick="focusItemEntryRow()"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 border border-accent/60 rounded-lg text-sm font-medium text-ink bg-white hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-accentDark" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                  Tambah Item
-                </button>
-                <button id="add-service-btn" type="button" onclick="kasirAddService()"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-muted" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/></svg>
-                  Tambah Jasa
-                </button>
+                <button id="kasir-f1-btn" type="button" onclick="openKasirSearch('scan')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6v12M7 6v12M10 6v12M14 6v12M17 6v12M20 6v12"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F1</kbd>Scan Barcode</button>
+                <button id="kasir-f2-btn" type="button" onclick="openKasirSearch('item')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F2</kbd>Tambah Item</button>
+                <button id="kasir-f3-btn" type="button" onclick="kasirAddService()" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F3</kbd>Tambah Jasa</button>
                 <button id="kasir-del-selected" type="button" onclick="kasirDeleteSelected()" disabled
                   class="inline-flex items-center gap-1.5 px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Hapus Item Terpilih</button>
@@ -1368,40 +1388,11 @@
             <div class="block text-xs text-muted mb-1">Status Pembayaran</div>
             <div id="kasir-pay-status" class="border border-line rounded-lg px-3 py-2 text-sm bg-bg2/50 text-ink">Belum Bayar</div>
             <p class="text-[11px] text-muted mt-1">Dihitung dari pembayaran sah, tidak dipilih manual.</p>
+            <button id="kasir-paynow-btn" type="button" onclick="kasirPayNow()" class="hidden mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-accent rounded-lg text-sm font-semibold text-accentDark bg-white hover:bg-accent/10 transition-colors">Pembayaran (Tunai / Transfer / QRIS) <span aria-hidden="true">→</span></button>
             <label for="remarks-input" class="block text-xs text-muted mt-3 mb-1">Keterangan <span class="text-muted/70">(Opsional)</span></label>
             <textarea id="remarks-input" rows="2" maxlength="500" data-no-uppercase placeholder="Catatan tambahan untuk transaksi ini…" oninput="markActiveTabDirty()"
               class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40"></textarea>
 
-            <div class="mt-3 grid gap-2">
-              <button id="cashier-draft-btn" type="button" onclick="kasirDraftClick()" class="hidden w-full px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Draft</button>
-              <div id="kasir-main-wrap" class="relative hidden">
-                <div class="flex">
-                  <button id="kasir-main-btn" type="button" onclick="kasirStartSave('print')"
-                    class="flex-1 px-4 py-2.5 bg-accent text-white rounded-l-xl text-sm font-semibold hover:bg-accentDark transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Simpan &amp; Cetak Nota</button>
-                  <button id="kasir-main-menu-btn" type="button" onclick="kasirToggleSaveMenu()" aria-haspopup="menu" aria-label="Pilihan simpan lain"
-                    class="px-3 bg-accent text-white rounded-r-xl border-l border-white/30 hover:bg-accentDark transition-colors disabled:opacity-40"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-                </div>
-                <div id="kasir-save-menu" role="menu" class="hidden absolute right-0 bottom-full mb-1 w-64 bg-white border border-line rounded-xl shadow-lg py-1 z-30">
-                  <button type="button" role="menuitem" onclick="kasirStartSave('nota')" class="block w-full text-left px-3 py-2 text-sm hover:bg-bg2">Simpan Nota<span class="block text-[11px] text-muted">Tanpa mencetak, pekerjaan belum dimulai</span></button>
-                  <button type="button" role="menuitem" onclick="kasirStartSave('start')" class="block w-full text-left px-3 py-2 text-sm hover:bg-bg2">Simpan &amp; Mulai Pengerjaan</button>
-                  <button type="button" role="menuitem" onclick="kasirStartSave('print')" class="block w-full text-left px-3 py-2 text-sm hover:bg-bg2">Simpan &amp; Cetak Nota</button>
-                </div>
-              </div>
-              <button id="cashier-save-btn" type="button" onclick="saveReceipt('save')" class="hidden w-full px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Perubahan</button>
-              <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
-                class="hidden w-full px-4 py-2.5 border border-line rounded-xl text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Nota</button>
-              <button id="cashier-pay-btn" type="button" onclick="saveReceipt('pay')"
-                class="hidden w-full justify-center inline-flex items-center gap-2 px-6 py-2.5 bg-accent text-bg rounded-xl text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
-                <span id="cashier-pay-label">Lanjut ke Pembayaran</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
-              </button>
-              <div class="hidden"><button id="cashier-belum-btn" type="button" onclick="saveReceipt('belum')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan (Belum Dikerjakan)</button><button id="cashier-start-btn" type="button" onclick="saveReceipt('start')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-accent/60 bg-white text-ink hover:bg-accent/10">Simpan &amp; Mulai Pengerjaan</button></div>
-              <button id="cashier-close-btn" type="button" onclick="closeCashierTab(activeCashierTabId)"
-              class="inline-flex items-center justify-center gap-2 w-full px-4 py-2 border border-transparent rounded-xl text-muted bg-white text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="text-muted" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-              Tutup Nota
-            </button>
-            </div>
           </section>
 
           <section id="cashier-pay-card" class="hidden bg-white border border-line rounded-xl" aria-labelledby="cashier-pay-title">
@@ -6557,12 +6548,17 @@ function kasirPayHint() {
   const m = kasirMethod(), amt = priceValue(document.getElementById("amount-paid-input"));
   const el = document.getElementById("kasir-pay-hint");
   if (!el) return;
+  const tab = getActiveTab(), st = document.getElementById("kasir-pay-status");
+  if (st && tab && tab.status !== "void" && (!tab.receiptId || tab.workStatus === "draft")) {
+    st.textContent = m === "piutang" || !amt || amt > cashierLastTotal ? "Belum Bayar"
+      : amt >= cashierLastTotal ? "Lunas (setelah disimpan)" : `Sebagian · DP ${formatIDR(amt)} (setelah disimpan)`;
+  }
   el.textContent = m === "piutang" ? "Nota disimpan tanpa pembayaran (piutang). Pelunasan dicatat nanti lewat Tambah Pembayaran."
     : !amt ? "Kosong = belum bayar. Isi nominal DP atau pembayaran penuh."
     : amt > cashierLastTotal ? "Jumlah bayar melebihi total."
     : ["transfer", "qris"].includes(m) ? "Setelah disimpan, detail rekening / konfirmasi dana diisi di jendela pembayaran."
     : (amt < cashierLastTotal ? `DP ${formatIDR(amt)}, sisa ${formatIDR(cashierLastTotal - amt)}.` : "Dibayar penuh.")
-      + " Dicatat saat Simpan Nota (Draft tidak menerima pembayaran).";
+      + " Dicatat saat nota disimpan (Simpan Draft dengan DP otomatis jadi Nota Belum Lunas).";
 }
 function kasirToggleSaveMenu(force) {
   const m = document.getElementById("kasir-save-menu");
@@ -6582,6 +6578,23 @@ function kasirDraftClick() {
   if (amt > cashierLastTotal) { showToast("Jumlah bayar tidak boleh melebihi total."); return; }
   kasirSaveCtx = { choice: "nota", action: "nota", amount: amt, method: m, print: false, fromDraft: true };
   kasirDoSave();
+}
+
+// Pembayaran on a new / Draft nota: save it as a Nota (walk-in: work already done) and open the payment window
+// (Tunai / Transfer / QRIS / Debit), prefilled with Metode & Jumlah Bayar when they were typed.
+async function kasirPayNow() {
+  const tab = getActiveTab();
+  if (!tab || !validateReceiptForm(collectReceiptPayload())) return;
+  const amt = priceValue(document.getElementById("amount-paid-input")), m = kasirMethod();
+  if (amt > cashierLastTotal) { showToast("Jumlah bayar tidak boleh melebihi total."); return; }
+  const ok = await saveReceipt(kasirHasJob(tab) ? "belum" : "selesai", { quiet: true });
+  if (!ok || !tab.receiptId) return;
+  if (tab.status !== "pending") { showToast("Nota disimpan.", "success"); return; }
+  await openReceiptPaymentModal(tab.receiptId);
+  if (amt > 0 && m !== "piutang" && document.getElementById("rp-amount")) {
+    setReceiptPayAmount(amt);
+    document.querySelector(`input[name="rp-method"][value="${m}"]`)?.click();
+  }
 }
 
 // Review (06) -> Konfirmasi (07) -> save, then payment and print as chosen. Printing never moves stock or money.
@@ -6669,13 +6682,14 @@ async function kasirDoSave() {
   // A walk-in purchase has no work: it is saved with its Pengerjaan already done, so paying closes it.
   const mode = c.action === "nota" && !kasirHasJob(tab) ? "selesai" : { draft: "draft", nota: "belum", start: "start" }[c.action];
   const paying = c.action !== "draft" && c.method !== "piutang" && c.amount > 0;
-  const direct = paying && ["cash", "debit"].includes(c.method);
+  // Owner, 23-10-2026: the first payment also goes through the Pembayaran Nota window (any method), prefilled.
+  const direct = false;
   const creating = !tab.receiptId;
   closeModal();
   const ok = await saveReceipt(mode, { quiet: true, payNow: direct && creating ? { amount_paid: c.amount, payment_method: c.method } : null });
   if (!ok) return;
   let msg = { draft: "Draft disimpan.", belum: "Nota disimpan.", start: "Nota disimpan, pengerjaan dimulai.", selesai: "Nota disimpan." }[mode];
-  if (c.fromDraft) msg = `Ada DP ${formatIDR(c.amount)}: disimpan sebagai Nota Belum Lunas (DP tercatat, nota masih bisa diubah).`;
+  if (c.fromDraft) msg = `Ada DP ${formatIDR(c.amount)}: disimpan sebagai Nota; catat DP-nya di jendela Pembayaran Nota.`;
   if (direct && !creating) {
     const r = await fetch(`/api/receipts/${encodeURIComponent(tab.receiptId)}/payments`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: c.amount, method: c.method, note: c.amount < tab.total ? "DP" : null }) });
@@ -6684,8 +6698,8 @@ async function kasirDoSave() {
   }
   setPriceInput(document.getElementById("amount-paid-input"), Number(getActiveTab()?.amountPaid) || 0);
   if (paying && !direct) {
-    // Transfer / QRIS: the existing payment window asks for the account, sender and "dana sudah masuk".
-    showToast(msg + " Lengkapi detail pembayaran.", "success");
+    // The payment window records the money (Transfer / QRIS also ask for the account, sender and "dana sudah masuk").
+    showToast(msg + " Konfirmasi pembayaran di jendela Pembayaran Nota.", "success");
     await openReceiptPaymentModal(tab.receiptId);
     const amt = document.getElementById("rp-amount");
     if (amt) { setReceiptPayAmount(c.amount); document.querySelector(`input[name="rp-method"][value="${c.method}"]`)?.click(); const pr = document.getElementById("rp-print"); if (pr) pr.checked = c.print; }
@@ -7622,6 +7636,7 @@ function renderCashierWorkUi() {
   // New / Draft notas are paid from Metode & Jumlah Bayar when saved; a running nota through Pembayaran.
   show("cashier-pay-btn", saved && !draftish && !isVoid && !isDone && tab.status !== "done");
   show("cashier-belum-btn", false);
+  show("kasir-paynow-btn", editable && draftish);
   document.getElementById("cashier-pay-label").textContent = saved && !draftish ? "Pembayaran" : "Lanjut ke Pembayaran";
   document.getElementById("cashier-save-btn").disabled = !tab.dirty;
   document.getElementById("cashier-status-btn").disabled = tab.dirty;
@@ -8446,7 +8461,9 @@ function renderCashierTimeline() {
         .map(evRow(e => e.kind === "created" ? "Nota dibuat" : e.kind === "item_changed" ? "Item diubah" : "Item ditambahkan")));
   } else if (cashierTlTab === "bayar") {
     html = table(["Waktu", "Metode", "Nominal", "Catatan", "Dilakukan Oleh"],
-      [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : "") + (pay.state && pay.state !== "sah" ? " " + payStateBadge(pay) : ""), "tabular-nums font-medium")}${td(esc(pay.note || "") + (pay.proof_ref ? ` <span class="text-muted">· bukti: ${esc(pay.proof_ref)}</span>` : "") + (pay.state === "pending" ? " " + payActionButtons("nota", tab.receiptId, pay) : "") + (pay.state === "gagal" && pay.fail_reason ? ` <span class="text-failed">· ${esc(pay.fail_reason)}</span>` : ""))}${td(esc(pay.created_by || "-"))}</tr>`));
+      [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : "") + (pay.state && pay.state !== "sah" ? " " + payStateBadge(pay) : ""), "tabular-nums font-medium")}${td(esc(pay.state === "sah" && pay.note === "Menunggu konfirmasi dana masuk" ? "" : (pay.note || "")) + (pay.proof_ref ? ` <span class="text-muted">· bukti: ${esc(pay.proof_ref)}</span>` : "")
+        + (pay.state === "sah" && pay.confirmed_by && ["transfer", "qris"].includes(pay.method) ? ` <span class="text-done">✓ Dana masuk dikonfirmasi ${esc(pay.confirmed_by)}${pay.confirmed_at ? ", " + esc(formatReceiptWhen(pay.confirmed_at, true)) : ""}</span>` : "")
+        + (pay.state === "pending" ? " " + payActionButtons("nota", tab.receiptId, pay) : "") + (pay.state === "gagal" && pay.fail_reason ? ` <span class="text-failed">· ${esc(pay.fail_reason)}</span>` : ""), "min-w-[20rem] whitespace-normal break-words leading-relaxed")}${td(esc(pay.created_by || "-"))}</tr>`));
   } else if (cashierTlTab === "status") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
       events.filter(e => ["status", "stage", "handover", "void", "reopen", "refund", "overpaid", "override"].includes(e.kind)).sort(byTimeDesc)
@@ -8483,7 +8500,7 @@ function renderCashierRailExtras() {
   q("cashier-quick-print").disabled = false;
   // K-08: Serah Terima is offered once the work is Selesai; it also shows who took the vehicle and when.
   const hb = q("cashier-quick-handover");
-  hb.classList.toggle("hidden", !(tab.workStatus === "selesai" && tab.status !== "void"));
+  hb.classList.toggle("hidden", !(tab.workStatus === "selesai" && tab.status !== "void" && kasirHasJob(tab)));   // walk-in: no vehicle to hand over
   q("cashier-quick-handover-label").textContent = tab.handedOverAt ? "Lihat Serah Terima" : "Serah Terima Kendaraan";
 }
 
@@ -8856,7 +8873,7 @@ function applyCashierVoidLock(tab) {
   const lockIds = [
     "plate-region", "plate-number", "plate-suffix", "customer-phone", "customer-name",
     "cashier-customer-search", "cashier-customer-new-btn",
-    "add-item-btn", "add-service-btn", "discount-input", "discount-reason", "discount-pct", "discount-below", "discount-stack", "amount-paid-input",
+    "kasir-f1-btn", "kasir-f2-btn", "kasir-f3-btn", "discount-input", "discount-reason", "discount-pct", "discount-below", "discount-stack", "amount-paid-input",
     "payment-method-select", "cashier-name-input", "est-finish-input", "work-notes-input", "remarks-input", "kasir-del-selected",
     "veh-make-input", "veh-model-input", "veh-color-input", "veh-year-input",
   ];

@@ -1097,6 +1097,9 @@
                   aria-label="Atur cetak nota" class="hidden w-10 shrink-0 grid place-items-center border border-line rounded-lg text-muted bg-white hover:bg-bg2 hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
                   </div>
                   <span id="cashier-form-title" class="hidden"></span>
+            <label for="remarks-input" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mt-3 mb-1.5">Keterangan <span class="text-muted/70">(Opsional)</span></label>
+            <textarea id="remarks-input" rows="2" maxlength="500" data-no-uppercase placeholder="Catatan tambahan untuk transaksi ini…" oninput="markActiveTabDirty()"
+              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40"></textarea>
                 </div>
                 <div id="kasir-nota-actions" class="col-span-full flex flex-wrap items-center gap-2 empty:hidden">
 <button id="cashier-reopen-btn" type="button" onclick="openReopenReceiptModal()"
@@ -1387,11 +1390,8 @@
             </div>
             <div class="block text-xs text-muted mb-1">Status Pembayaran</div>
             <div id="kasir-pay-status" class="border border-line rounded-lg px-3 py-2 text-sm bg-bg2/50 text-ink">Belum Bayar</div>
-            <p class="text-[11px] text-muted mt-1">Dihitung dari pembayaran sah, tidak dipilih manual.</p>
-            <button id="kasir-paynow-btn" type="button" onclick="kasirPayNow()" class="hidden mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-accent rounded-lg text-sm font-semibold text-accentDark bg-white hover:bg-accent/10 transition-colors">Pembayaran (Tunai / Transfer / QRIS) <span aria-hidden="true">→</span></button>
-            <label for="remarks-input" class="block text-xs text-muted mt-3 mb-1">Keterangan <span class="text-muted/70">(Opsional)</span></label>
-            <textarea id="remarks-input" rows="2" maxlength="500" data-no-uppercase placeholder="Catatan tambahan untuk transaksi ini…" oninput="markActiveTabDirty()"
-              class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40"></textarea>
+            <button id="kasir-paynow-btn" type="button" onclick="kasirPayNow()" class="hidden mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-accent rounded-lg text-sm font-semibold text-accentDark bg-white hover:bg-accent/10 transition-colors" title="Tunai, Transfer, QRIS, Kartu Debit/Kredit">Pembayaran <span aria-hidden="true">→</span></button>
+
 
           </section>
 
@@ -6755,7 +6755,9 @@ function renderKasirRail(tab) {
   const editable = !isVoid && !(saved && tab.status === "done" && ws === "selesai") && !tab.locked;
   document.getElementById("kasir-head-mode").textContent = !saved ? "Transaksi Baru" : ws === "draft" ? "Draft Transaksi" : isVoid ? "Nota Void" : "Nota Berjalan";
   document.getElementById("kasir-no-box").textContent = tab.receiptNo || cashierNextNo || "—";
-  document.getElementById("kasir-pay-section").classList.toggle("hidden", !(draftish && !isVoid));
+  // Owner, 23-10-2026: no Metode / Jumlah Bayar fields; money is taken only in the Pembayaran Nota window.
+  document.getElementById("kasir-pay-section").classList.add("hidden");
+  setPriceInput(document.getElementById("amount-paid-input"), 0);
   document.getElementById("kasir-paid-rows").classList.toggle("hidden", draftish);
   const choice = tab.payMethodChoice || (PAYMENT_METHOD_LABELS[tab.paymentMethod] ? tab.paymentMethod : "cash");
   const radio = document.querySelector(`input[name="kasir-method"][value="${choice}"]`);
@@ -19693,18 +19695,28 @@ function saveNotaPrintSettings(thenTest) {
   showToast("Pengaturan cetak nota disimpan.", "success");
 }
 
+// Owner, 23-10-2026: at most 7 lines per sheet; a longer nota continues on a new sheet with the same header,
+// and the totals, terbilang and signatures are printed once, on the last sheet.
+const NOTA_ITEMS_PER_PAGE = 7;
 function receiptNotaHtml(r, customer, opts = {}) {
+  const items = r.items || [];
+  const pages = Math.max(Math.ceil(items.length / NOTA_ITEMS_PER_PAGE), 1);
+  return Array.from({ length: pages }, (_, i) => receiptNotaPageHtml(r, customer, opts,
+    items.slice(i * NOTA_ITEMS_PER_PAGE, (i + 1) * NOTA_ITEMS_PER_PAGE), i * NOTA_ITEMS_PER_PAGE, i + 1, pages)).join("");
+}
+function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
+  const last = page === pages;
   const minHeightMm = opts.minHeightMm || 132;
   const vehicle = [r.vehicle_make, r.vehicle_model, r.vehicle_year].filter(Boolean).join(" ");
-  const cell = "padding:3px 6px;";
+  const cell = "padding:1.5px 6px;";
   const name = r.customer_full_name || r.customer_name || "";
   const addressBits = [customer && customer.address, r.customer_phone].filter(Boolean);
   const shopContact = [SHOP_PROFILE.phone && `Telp. ${SHOP_PROFILE.phone}`, SHOP_PROFILE.address].filter(Boolean);
   const remaining = Math.max(r.total - r.amount_paid, 0);
 
-  const rows = r.items.map((item, idx) => `
+  const rows = pageItems.map((item, idx) => `
     <tr>
-      <td style="${cell}text-align:center;">${idx + 1}</td>
+      <td style="${cell}text-align:center;">${start + idx + 1}</td>
       <td style="${cell}">${esc(item.product_name)}</td>
       <td style="${cell}text-align:center;">${item.quantity}</td>
       <td style="${cell}text-align:center;">${esc(item.unit || "")}</td>
@@ -19714,9 +19726,9 @@ function receiptNotaHtml(r, customer, opts = {}) {
 
   const totalRow = (label, value, extra = "") => `
     <tr>
-      <td style="padding:2px 0;">${label}</td>
-      <td style="padding:2px 6px;">:</td>
-      <td style="padding:2px 0;text-align:right;${extra}">${value}</td>
+      <td style="padding:1px 0;">${label}</td>
+      <td style="padding:1px 6px;">:</td>
+      <td style="padding:1px 0;text-align:right;${extra}">${value}</td>
     </tr>`;
 
   const kv = (label, value) => `
@@ -19727,7 +19739,7 @@ function receiptNotaHtml(r, customer, opts = {}) {
     </tr>`;
 
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:${minHeightMm}mm;display:flex;flex-direction:column;position:relative;">
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:${minHeightMm}mm;display:flex;flex-direction:column;position:relative;${last ? "" : "break-after:page;page-break-after:always;"}">
     ${r.status !== "void" && r.work_status === "draft" ? `<div aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:64pt;font-weight:bold;letter-spacing:0.15em;color:rgba(0,0,0,0.12);transform:rotate(-22deg);">DRAFT</span></div>` : ""}
     <div style="display:flex;justify-content:space-between;gap:16px;">
       <div style="display:flex;gap:12px;align-items:center;">
@@ -19751,8 +19763,9 @@ function receiptNotaHtml(r, customer, opts = {}) {
       </table>
     </div>
 
-    <div style="margin-top:8px;display:flex;gap:28px;">
+    <div style="margin-top:4px;display:flex;gap:28px;">
       <span>No. Nota&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.receipt_no || "")}</span>
+      ${pages > 1 ? `<span style="margin-left:auto;font-weight:bold;">Hal. ${page} / ${pages}</span>` : ""}
       ${r.po_number ? `<span>Ref. SO&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.po_number)}${(r.invoice_count || 1) > 1 ? ` (Invoice ${r.invoice_seq || 1})` : ""}</span>` : ""}
       <span>Pembayaran&nbsp;&nbsp;:&nbsp;&nbsp;${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_account ? ` ke ${esc(r.transfer_account)}` : ""}${r.payment_method === "transfer" && r.transfer_sender ? ` (dari ${esc(r.transfer_sender)})` : ""}</span>
     </div>
@@ -19773,7 +19786,7 @@ function receiptNotaHtml(r, customer, opts = {}) {
     </table>
     </div>
 
-    <div style="border-top:1px solid #000;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;gap:16px;">
+    ${last ? `    <div style="border-top:1px solid #000;margin-top:3px;padding-top:3px;display:flex;justify-content:space-between;gap:16px;">
       <div style="flex:1;min-width:0;">
         <table style="border-collapse:collapse;">
           ${kv("Terbilang", esc(terbilangRupiah(r.total)))}
@@ -19792,10 +19805,11 @@ function receiptNotaHtml(r, customer, opts = {}) {
       </table>
     </div>
 
-    <div style="display:flex;justify-content:space-between;margin-top:10px;padding:0 20mm 0 12mm;">
-      <div style="text-align:center;">Penerima<div style="margin-top:14mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
-      <div style="text-align:center;">Hormat kami,<div style="margin-top:14mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;padding:0 20mm 0 12mm;">
+      <div style="text-align:center;">Penerima<div style="margin-top:9mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
+      <div style="text-align:center;">Hormat kami,<div style="margin-top:9mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
     </div>
+` : `<div style="border-top:1px solid #000;margin-top:6px;padding-top:6px;text-align:right;font-style:italic;">Bersambung ke halaman ${page + 1} &rarr;</div>`}
   </div>`;
 }
 

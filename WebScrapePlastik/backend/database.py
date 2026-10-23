@@ -3579,7 +3579,7 @@ def return_receipt_item(
     receipt_id: str, item_id: int, quantity: int, destination: str | None, refund_amount: int,
     method: str, reason: str, by: str | None = None, *, kind: str = "retur", reason_code: str | None = None,
     restock_qty: int | None = None, supplier_qty: int | None = None, damaged_qty: int | None = None,
-    proof_ref: str | None = None,
+    proof_ref: str | None = None, owner_ok: bool = False,
 ) -> dict:
     """Retur Barang (admin): the customer brings back `quantity` of one barang line, also on a closed nota.
     The line keeps its quantity and is marked returned; the nota's total drops by `refund_amount` (at most
@@ -3639,6 +3639,24 @@ def return_receipt_item(
         left = item["quantity"] - (item["returned_qty"] or 0)
         if quantity <= 0 or quantity > left:
             raise ValueError(f"Jumlah retur harus 1 sampai {left}.")
+        if kind == "retur":
+            # GAR-BR-016: a unit is either refunded or replaced under warranty, never both without the Owner.
+            claims = con.execute(
+                """SELECT o.service_no, o.qty, o.stage,
+                          EXISTS(SELECT 1 FROM service_replacements x WHERE x.order_id=o.id AND x.status='diterima') AS replaced
+                   FROM service_orders o WHERE o.receipt_item_id=? AND o.service_no IS NOT NULL AND o.stage<>'dibatalkan'""",
+                (item_id,)).fetchall()
+            busy = [c for c in claims if c["stage"] in SVC_OPEN and not c["replaced"]]
+            busy_qty = sum(c["qty"] for c in busy)
+            if busy and quantity > left - busy_qty:
+                raise ValueError(f"{busy_qty} unit di baris ini sedang dalam service / klaim garansi "
+                                 f"({', '.join(c['service_no'] for c in busy)}). Selesaikan atau hentikan servicenya dulu.")
+            replaced = [c["service_no"] for c in claims if c["replaced"]]
+            if replaced and not owner_ok:
+                raise ValueError(f"Barang ini sudah pernah diganti garansi ({', '.join(replaced)}). "
+                                 "Retur / refund unit yang sudah diganti hanya boleh disetujui Owner.")
+            if replaced:
+                reason_text += f" [Owner: unit sudah diganti garansi {', '.join(replaced)}]"
         # What those units were sold for, line discount spread over the line.
         value = _line_total(item) * quantity // item["quantity"]
         if kind == "void_item":
@@ -13292,6 +13310,13 @@ def _svc_init(con: sqlite3.Connection) -> None:
         ("service_profiles", (("install_warranty_months", "INTEGER NOT NULL DEFAULT 0"),)),
         ("service_profile_overrides", (("install_warranty_months", "INTEGER"), ("after_warranty_days", "INTEGER"))),
         ("service_orders", (("install_warranty_months", "INTEGER"), ("install_warranty_until", "TEXT"), ("install_warranty_status", "TEXT"))),
+        # Swap from shop stock in three steps (blueprint garansi 22-10, owner 23-10): staff request, admin approves
+        # (Owner when the warranty is not active), then staff hands the unit out of stock.
+        ("service_replacements", (("request_note", "TEXT"), ("requested_by", "TEXT"), ("requested_at", "TEXT"),
+                                  ("decided_by", "TEXT"), ("decided_at", "TEXT"), ("decision_note", "TEXT"),
+                                  ("owner_override", "INTEGER NOT NULL DEFAULT 0"), ("price_diff", "INTEGER NOT NULL DEFAULT 0"),
+                                  ("diff_cost", "INTEGER NOT NULL DEFAULT 0"), ("diff_medium", "TEXT"), ("diff_note", "TEXT"),
+                                  ("posted_by", "TEXT"))),
     ):
         have = {r["name"] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
         for col, ddl in cols:
@@ -13513,6 +13538,69 @@ def _svc_check_version(o: dict, data: dict) -> None:
     v = data.get("version")
     if v is not None and int(v) != o["version"]:
         raise ValueError("Dokumen ini baru saja diubah orang lain. Muat ulang lalu ulangi.")
+
+
+def _svc_check_line_qty(con, order_id: int, item_id: int, qty: int) -> None:
+    """GAR-BR-003: the units claimed on one nota line, across every open service, never exceed what was
+    bought minus what was returned."""
+    line = con.execute("SELECT quantity, returned_qty FROM receipt_items WHERE id=?", (item_id,)).fetchone()
+    if line is None:
+        return
+    eligible = line["quantity"] - (line["returned_qty"] or 0)
+    open_rows = con.execute(f"""SELECT service_no, qty FROM service_orders WHERE receipt_item_id=? AND id<>?
+                                AND stage IN ({_placeholders(SVC_OPEN)})""", (item_id, order_id, *SVC_OPEN)).fetchall()
+    used = sum(r["qty"] for r in open_rows)
+    if used + qty > eligible:
+        left = max(eligible - used, 0)
+        docs = ", ".join(r["service_no"] for r in open_rows if r["service_no"])
+        raise ValueError(f"Baris nota ini {eligible} unit" + (f", {used} sedang diklaim di {docs}" if used else "")
+                         + f". Sisa yang bisa diklaim: {left}.")
+
+
+def _svc_swap(con, order_id: int) -> dict | None:
+    """The open swap-from-stock request (diajukan / disetujui), with the replacement's stock on hand."""
+    r = con.execute("""SELECT r.*, mi.stock_qty, mi.name AS item_name, mi.sku FROM service_replacements r
+                       LEFT JOIN master_items mi ON mi.id=r.master_item_id
+                       WHERE r.order_id=? AND r.mode='stok_toko' AND r.status IN ('diajukan','disetujui') ORDER BY r.id DESC LIMIT 1""",
+                    (order_id,)).fetchone()
+    return dict(r) if r else None
+
+
+SVC_SUPPLIER_TRACK = {"belum_diajukan": "Belum diajukan ke supplier", "draft": "Retur Supplier draft",
+                      "menunggu_kirim": "Menunggu dikirim ke supplier", "menunggu_keputusan": "Menunggu keputusan supplier",
+                      "diputuskan": "Supplier sudah memutuskan", "selesai": "Selesai", "dihapus": "Dihapus dari karantina"}
+_SVC_SUPPLIER_FINAL = ("selesai", "dihapus")
+
+
+def _svc_supplier_track(con, order_id: int) -> dict | None:
+    """Blueprint §7: the supplier side of a swap from stock, tracked apart from the customer. The broken unit
+    sits in Stok Karantina (service_klaim) and goes on a Retur Supplier; None when there was no swap."""
+    lots = con.execute("SELECT id, qty_left, created_at FROM quarantine_lots WHERE source_type='service_klaim' AND source_id=?",
+                       (str(order_id),)).fetchall()
+    if not lots:
+        return None
+    ids = tuple(l["id"] for l in lots)
+    rts = con.execute(f"""SELECT r.id, r.return_number, r.doc_status, r.handover_status,
+                                 SUM(CASE WHEN i.settlement IS NOT NULL OR i.qty_rejected>0 THEN 1 ELSE 0 END) AS decided
+                          FROM supplier_return_items i JOIN supplier_returns r ON r.id=i.return_id
+                          WHERE i.source_lot_id IN ({_placeholders(ids)}) AND r.doc_status<>'dibatalkan'
+                          GROUP BY r.id ORDER BY r.id DESC LIMIT 1""", ids).fetchone()
+    if rts is None:
+        code = "belum_diajukan" if any(l["qty_left"] for l in lots) else "dihapus"
+    elif rts["doc_status"] == "selesai":
+        code = "selesai"
+    elif rts["doc_status"] in ("draft", "menunggu_persetujuan"):
+        code = "draft"
+    elif rts["decided"]:
+        code = "diputuskan"
+    elif rts["handover_status"] in SR_OUT:
+        code = "menunggu_keputusan"
+    else:
+        code = "menunggu_kirim"
+    since = _svc_local_date(min(l["created_at"] for l in lots))
+    return {"code": code, "label": SVC_SUPPLIER_TRACK[code], "final": code in _SVC_SUPPLIER_FINAL,
+            "return_id": rts["id"] if rts else None, "return_number": rts["return_number"] if rts else None,
+            "since": since, "age_days": (shop_today() - date.fromisoformat(since)).days if since else None}
 
 
 # ---- Master Service ----
@@ -13807,6 +13895,7 @@ def save_service_order(order_id: int | None, data: dict, user: dict) -> dict:
                    LEFT JOIN brands b ON b.id=mi.brand_id WHERE ri.id=?""", (item_id,)).fetchone()
             if line is None:
                 raise ValueError("Baris nota tidak ditemukan.")
+            _svc_check_line_qty(con, order_id, line["id"], f["qty"])
             f.update(receipt_item_id=line["id"], receipt_id=line["receipt_id"], receipt_no=line["receipt_no"],
                      purchase_date=_svc_local_date(line["r_created"]), master_item_id=line["master_item_id"])
             f["product_name"] = f["product_name"] or line["product_name"]
@@ -13913,6 +14002,8 @@ def receive_service_order(order_id: int, data: dict, user: dict) -> dict:
             miss.append("nota asal atau alasan tanpa nota")
         if miss:
             raise ValueError("Lengkapi dulu: " + ", ".join(miss) + ".")
+        if o["receipt_item_id"]:
+            _svc_check_line_qty(con, order_id, o["receipt_item_id"], o["qty"])
         prof = _svc_profile_row(con, o["profile_id"])
         if prof["require_serial"] and not o["serial_no"]:
             raise ValueError(f"Serial number wajib untuk {prof['name']}.")
@@ -14281,16 +14372,29 @@ def record_service_approval(order_id: int, data: dict, user: dict) -> dict:
     return get_service_order(order_id)
 
 
+def _svc_add_diff_line(con, order_id: int, diff: int, cost: int, medium: str | None, note: str | None, by: str | None) -> None:
+    """A price difference for another model, already agreed by the customer, billed on the Nota Jasa."""
+    con.execute("""INSERT INTO service_cost_lines (order_id, kind, description, qty, factory_cost, customer_price, status, created_by, created_at)
+                   VALUES (?, 'penggantian', ?, 1, ?, ?, 'disetujui', ?, ?)""",
+                (order_id, (note or "Selisih harga ganti model").strip()[:160], cost, diff, by, _now()))
+    con.execute("INSERT INTO service_approvals (order_id, status, contacted_at, medium, note, total, created_by, created_at) VALUES (?, 'setuju', ?, ?, ?, ?, ?, ?)",
+                (order_id, _svc_local_now(), medium, "Selisih harga ganti model", diff, by, _now()))
+
+
 def record_service_replacement(order_id: int, data: dict, user: dict) -> dict:
-    """Cara A: the factory sends a replacement (custody, no stock). Cara B: the shop swaps from its own stock
-    right away (admin, Garansi Aktif, unit at the shop): stock OUT for the new unit and the broken unit into
-    Stok Karantina as 'service_klaim', ready to go to the supplier on a Retur Supplier. A price difference
-    (another model) is billed as an approved cost line."""
+    """Cara A: the factory sends a replacement (custody, no stock). Cara B: a swap from the shop's own stock,
+    which is only a request here: an admin approves it (decide_service_swap) and staff then hand the unit out
+    of stock (post_service_swap). The broken unit must already be at the shop. A price difference (another
+    model) is billed as an approved cost line."""
     by = user.get("username")
     mode = data.get("mode")
     if mode not in SVC_REPLACE_MODES:
         raise ValueError("Pilih cara penggantian.")
     diff = _svc_int(data.get("price_diff"), "Selisih harga")
+    diff_cost = _svc_int(data.get("diff_cost"), "Modal selisih")
+    medium = data.get("diff_medium") or None
+    if diff and medium not in SVC_MEDIA:
+        raise ValueError("Selisih harga harus sudah disetujui customer: pilih medianya.")
     with _conn() as con:
         con.execute("BEGIN IMMEDIATE")
         o = _svc_get(con, order_id)
@@ -14298,17 +14402,9 @@ def record_service_replacement(order_id: int, data: dict, user: dict) -> dict:
             raise ValueError("Penggantian tidak bisa dicatat di tahap ini.")
         _svc_fee_locked(con, o) if diff else None
         new_item = data.get("master_item_id") or o["master_item_id"]
-        if diff:
-            medium = data.get("diff_medium")
-            if medium not in SVC_MEDIA:
-                raise ValueError("Selisih harga harus sudah disetujui customer: pilih medianya.")
-            con.execute("""INSERT INTO service_cost_lines (order_id, kind, description, qty, factory_cost, customer_price, status, created_by, created_at)
-                           VALUES (?, 'penggantian', ?, 1, ?, ?, 'disetujui', ?, ?)""",
-                        (order_id, (data.get("diff_note") or "Selisih harga ganti model").strip()[:160],
-                         _svc_int(data.get("diff_cost"), "Modal selisih"), diff, by, _now()))
-            con.execute("INSERT INTO service_approvals (order_id, status, contacted_at, medium, note, total, created_by, created_at) VALUES (?, 'setuju', ?, ?, ?, ?, ?, ?)",
-                        (order_id, _svc_local_now(), medium, "Selisih harga ganti model", diff, by, _now()))
         if mode == "pabrik":
+            if diff:
+                _svc_add_diff_line(con, order_id, diff, diff_cost, medium, data.get("diff_note"), by)
             cur = con.execute("SELECT id FROM service_replacements WHERE order_id=? AND status='menunggu'", (order_id,)).fetchone()
             name = (data.get("product_name") or "").strip()[:160] or None
             if cur:
@@ -14318,36 +14414,124 @@ def record_service_replacement(order_id: int, data: dict, user: dict) -> dict:
                                VALUES (?, 'pabrik', 'menunggu', ?, ?, ?, ?, ?)""", (order_id, o["serial_no"], new_item, name or o["product_name"], by, _now()))
             _svc_event(con, order_id, "pengganti", "Penggantian: pabrik mengirim unit pengganti" + (f"; selisih harga Rp {_sr_rupiah(diff)}" if diff else ""), by)
         else:
-            _svc_require_admin(user, "menukar unit dari stok toko")
-            if o["warranty_status"] != "aktif":
-                raise ValueError("Tukar dari stok toko hanya untuk unit dengan Garansi Aktif (K-S6).")
             if o["location"] not in _SVC_AT_SHOP:
-                raise ValueError("Unit customer masih di luar toko. Tukar dari stok hanya bisa saat unit rusaknya ada di toko.")
+                raise ValueError("Unit rusak customer harus ada di toko sebelum ditukar dari stok.")
+            if _svc_swap(con, order_id):
+                raise ValueError("Sudah ada pengajuan tukar dari stok untuk service ini.")
+            if con.execute("SELECT 1 FROM service_replacements WHERE order_id=? AND mode='stok_toko' AND status='diterima'", (order_id,)).fetchone():
+                raise ValueError("Unit ini sudah ditukar dari stok toko.")
+            if o["receipt_item_id"]:
+                ln = con.execute("SELECT quantity, returned_qty FROM receipt_items WHERE id=?", (o["receipt_item_id"],)).fetchone()
+                if ln and (ln["returned_qty"] or 0) >= ln["quantity"]:
+                    raise ValueError("Barang di nota ini sudah diretur / di-refund, jadi tidak bisa diganti lagi.")
             mi = con.execute("SELECT * FROM master_items WHERE id=?", (new_item,)).fetchone() if new_item else None
             if mi is None:
                 raise ValueError("Pilih barang pengganti dari Master Barang.")
-            if mi["stock_qty"] < o["qty"]:
-                raise ValueError(f"Stok {mi['name']} tinggal {mi['stock_qty']}.")
-            new_qty = mi["stock_qty"] - o["qty"]
-            con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_qty, mi["id"]))
-            lid = con.execute("""INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at, created_by)
-                                 VALUES (?, 'SERVICE_TUKAR', ?, ?, 'service_order', ?, ?, ?, ?)""",
-                              (mi["id"], -o["qty"], new_qty, order_id, f"Unit pengganti untuk customer, service {o['service_no']}", _now(), by)).lastrowid
-            cost = mi["avg_cost_price"] or mi["last_cost_price"] or 0
-            lot = _quarantine_in(con, master_item_id=o["master_item_id"], product_name=o["product_name"], qty=o["qty"], condition="rusak",
-                                 source_type="service_klaim", source_ref=o["service_no"], source_id=str(order_id),
-                                 supplier_id=o["supplier_id"] or mi["supplier_id"], unit_cost=cost, candidate=True,
-                                 note=f"Unit customer {o['customer_name']} SN {o['serial_no'] or '-'}, klaim garansi ke supplier", by=by)
-            serial = (data.get("new_serial") or "").strip()[:80] or None
-            con.execute("""INSERT INTO service_replacements (order_id, mode, status, old_serial, new_serial, master_item_id, product_name, received_at,
-                               ledger_id, quarantine_lot_id, created_by, created_at) VALUES (?, 'stok_toko', 'diterima', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (order_id, o["serial_no"], serial, mi["id"], mi["name"], _now(), lid, lot, by, _now()))
-            con.execute("UPDATE service_replacements SET status='batal' WHERE order_id=? AND status='menunggu'", (order_id,))
-            con.execute("UPDATE service_cost_lines SET status='batal' WHERE order_id=? AND status='usulan'", (order_id,))
-            con.execute("""UPDATE service_orders SET result='diganti', serial_new=?, stage='siap_diambil', ready_at=?, location='di_toko' WHERE id=?""",
-                        (serial, _now(), order_id))
-            _svc_event(con, order_id, "pengganti", f"Ditukar dari stok toko: {mi['name']} (stok {mi['stock_qty']} → {new_qty}); "
-                       f"unit rusak masuk Stok Karantina untuk klaim ke supplier", by)
+            note = (data.get("request_note") or "").strip()[:300] or None
+            if o["warranty_status"] != "aktif" and not note:
+                raise ValueError(f"Status garansi unit ini {SVC_WARRANTY[o['warranty_status']]}: tulis alasan pengajuan. "
+                                 "Penggantian gratisnya perlu persetujuan Owner.")
+            rid = con.execute("""INSERT INTO service_replacements (order_id, mode, status, old_serial, master_item_id, product_name, request_note,
+                                     requested_by, requested_at, price_diff, diff_cost, diff_medium, diff_note, created_by, created_at)
+                                 VALUES (?, 'stok_toko', 'diajukan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                              (order_id, o["serial_no"], mi["id"], mi["name"], note, by, _now(), diff, diff_cost, medium,
+                               (data.get("diff_note") or "").strip()[:160] or None, by, _now())).lastrowid
+            short = f"; stok sekarang {mi['stock_qty']}, menunggu pengganti" if mi["stock_qty"] < o["qty"] else ""
+            _svc_event(con, order_id, "pengganti", f"Diajukan tukar dari stok toko: {mi['name']}" + (f" — {note}" if note else "")
+                       + (f"; selisih harga Rp {_sr_rupiah(diff)}" if diff else "") + short, by)
+            if user.get("role") == "admin" and (o["warranty_status"] == "aktif" or user.get("is_owner")):
+                _svc_decide_swap(con, o, rid, "setuju", "Diajukan admin, langsung disetujui", user)
+        _svc_refresh(con, order_id)
+    return get_service_order(order_id)
+
+
+def _svc_decide_swap(con, o: dict, swap_id: int, decision: str, note: str | None, user: dict) -> None:
+    by = user.get("username")
+    sw = dict(con.execute("SELECT * FROM service_replacements WHERE id=?", (swap_id,)).fetchone())
+    if decision == "setuju":
+        override = o["warranty_status"] != "aktif"
+        if override and not user.get("is_owner"):
+            raise PermissionError(f"Status garansi unit ini {SVC_WARRANTY[o['warranty_status']]}. "
+                                  "Hanya Owner yang boleh menyetujui penggantian gratisnya.")
+        if sw["price_diff"]:
+            _svc_fee_locked(con, o)
+        n = con.execute("""UPDATE service_replacements SET status='disetujui', decided_by=?, decided_at=?, decision_note=?, owner_override=?
+                           WHERE id=? AND status='diajukan'""", (by, _now(), note, 1 if override else 0, swap_id)).rowcount
+        if n != 1:
+            raise ValueError("Pengajuan ini sudah diputuskan.")
+        if sw["price_diff"]:
+            _svc_add_diff_line(con, o["id"], sw["price_diff"], sw["diff_cost"], sw["diff_medium"], sw["diff_note"], by)
+        _svc_event(con, o["id"], "pengganti", "Tukar dari stok disetujui" + (" Owner (garansi tidak aktif)" if override else "")
+                   + (f": {note}" if note else "") + ". Unit pengganti boleh dikeluarkan dari stok", by)
+    else:
+        if not note:
+            raise ValueError("Tulis alasan penolakan.")
+        n = con.execute("""UPDATE service_replacements SET status='ditolak', decided_by=?, decided_at=?, decision_note=?
+                           WHERE id=? AND status='diajukan'""", (by, _now(), note, swap_id)).rowcount
+        if n != 1:
+            raise ValueError("Pengajuan ini sudah diputuskan.")
+        _svc_event(con, o["id"], "pengganti", f"Tukar dari stok ditolak: {note}", by)
+
+
+def decide_service_swap(order_id: int, data: dict, user: dict) -> dict:
+    """Admin approves or rejects a staff request to swap from stock; an inactive warranty needs the Owner."""
+    _svc_require_admin(user, "menyetujui tukar dari stok")
+    decision = data.get("decision")
+    if decision not in ("setuju", "tolak"):
+        raise ValueError("Pilih Setujui atau Tolak.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        o = _svc_get(con, order_id)
+        sw = _svc_swap(con, order_id)
+        if sw is None or sw["status"] != "diajukan":
+            raise ValueError("Tidak ada pengajuan tukar dari stok yang menunggu persetujuan.")
+        _svc_decide_swap(con, o, sw["id"], decision, (data.get("note") or "").strip()[:300] or None, user)
+        _svc_refresh(con, order_id)
+    return get_service_order(order_id)
+
+
+def post_service_swap(order_id: int, data: dict, user: dict) -> dict:
+    """Hands an approved swap out of stock, exactly once: stock OUT for the new unit (no sale, no revenue,
+    no incentive) and the broken unit into Stok Karantina as 'service_klaim', ready for a Retur Supplier.
+    With too little stock the swap stays approved (Menunggu Pengganti) and nothing moves."""
+    by = user.get("username")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        o = _svc_get(con, order_id)
+        sw = _svc_swap(con, order_id)
+        if sw is None or sw["status"] != "disetujui":
+            raise ValueError("Belum ada tukar dari stok yang disetujui admin.")
+        if o["stage"] in ("draft", "selesai", "dibatalkan", "siap_diambil") or o["location"] not in _SVC_AT_SHOP:
+            raise ValueError("Unit pengganti hanya bisa dikeluarkan selagi unit rusaknya ada di toko.")
+        mi = con.execute("SELECT * FROM master_items WHERE id=?", (sw["master_item_id"],)).fetchone()
+        if mi is None:
+            raise ValueError("Barang pengganti tidak ditemukan di Master Barang.")
+        if mi["stock_qty"] < o["qty"]:
+            raise ValueError(f"Stok {mi['name']} tinggal {mi['stock_qty']}. Status tetap Menunggu Pengganti sampai stok masuk.")
+        serial = (data.get("new_serial") or "").strip()[:80] or None
+        if serial and serial == o["serial_no"]:
+            raise ValueError("Serial unit pengganti tidak boleh sama dengan serial unit rusak.")
+        n = con.execute("UPDATE service_replacements SET status='diterima', new_serial=?, received_at=?, posted_by=? WHERE id=? AND status='disetujui'",
+                        (serial, _now(), by, sw["id"])).rowcount
+        if n != 1:
+            raise ValueError("Unit pengganti ini sudah dikeluarkan.")
+        new_qty = mi["stock_qty"] - o["qty"]
+        con.execute("UPDATE master_items SET stock_qty=? WHERE id=?", (new_qty, mi["id"]))
+        lid = con.execute("""INSERT INTO stock_ledger (master_item_id, type, qty, balance_after, ref_type, ref_id, note, created_at, created_by)
+                             VALUES (?, 'SERVICE_TUKAR', ?, ?, 'service_order', ?, ?, ?, ?)""",
+                          (mi["id"], -o["qty"], new_qty, order_id, f"Unit pengganti untuk customer, service {o['service_no']}", _now(), by)).lastrowid
+        cost = mi["avg_cost_price"] or mi["last_cost_price"] or 0
+        lot = _quarantine_in(con, master_item_id=o["master_item_id"], product_name=o["product_name"], qty=o["qty"], condition="rusak",
+                             source_type="service_klaim", source_ref=o["service_no"], source_id=str(order_id),
+                             supplier_id=o["supplier_id"] or mi["supplier_id"], unit_cost=cost, candidate=True,
+                             note=f"Unit customer {o['customer_name']} SN {o['serial_no'] or '-'}, klaim garansi ke supplier", by=by)
+        con.execute("UPDATE service_replacements SET ledger_id=?, quarantine_lot_id=? WHERE id=?", (lid, lot, sw["id"]))
+        con.execute("UPDATE service_replacements SET status='batal' WHERE order_id=? AND status='menunggu'", (order_id,))
+        con.execute("UPDATE service_cost_lines SET status='batal' WHERE order_id=? AND status='usulan'", (order_id,))
+        con.execute("""UPDATE service_orders SET result='diganti', serial_new=?, stage='siap_diambil', ready_at=?, location='di_toko' WHERE id=?""",
+                    (serial, _now(), order_id))
+        _svc_event(con, order_id, "pengganti", f"Ditukar dari stok toko: {mi['name']} (stok {mi['stock_qty']} → {new_qty}); "
+                   f"unit rusak masuk Stok Karantina untuk klaim ke supplier", by)
         _svc_refresh(con, order_id)
     return get_service_order(order_id)
 
@@ -14454,6 +14638,8 @@ def stop_service_order(order_id: int, data: dict, user: dict) -> dict:
             raise ValueError("Draft dibatalkan dengan jenis Salah input.")
         if con.execute("SELECT 1 FROM service_replacements WHERE order_id=? AND mode='stok_toko' AND status='diterima'", (order_id,)).fetchone():
             raise ValueError("Unit sudah ditukar dari stok toko. Serahkan unit penggantinya ke customer.")
+        if con.execute("UPDATE service_replacements SET status='batal' WHERE order_id=? AND status IN ('diajukan','disetujui')", (order_id,)).rowcount:
+            _svc_event(con, order_id, "pengganti", "Pengajuan tukar dari stok dibatalkan karena service dihentikan", by)
         shipped = con.execute("SELECT 1 FROM service_shipments WHERE order_id=? AND direction='keluar' AND status<>'draft'", (order_id,)).fetchone()
         stop = (kind, source, reason, _now())
         if follow == "batal_sebelum_kirim":
@@ -14619,6 +14805,14 @@ def _svc_flags(o: dict, extra: dict) -> list[str]:
         flags.append("Siap diambil lebih dari 30 hari")
     if o["stage"] == "kembali" and days(o["stop_at"]) > 14 and o["location"] != "perjalanan_balik":
         flags.append("Unit belum dikirim balik lebih dari 14 hari")
+    sw = extra.get("swap")
+    if sw and sw["status"] == "disetujui" and (sw["stock_qty"] or 0) < o["qty"]:
+        flags.append("Menunggu stok pengganti")
+    if sw and sw["status"] == "diajukan" and days(_svc_local_date(sw["requested_at"])) > 1:
+        flags.append("Pengajuan tukar dari stok belum diputuskan lebih dari 1 hari")
+    tr = extra.get("supplier_track")
+    if tr and not tr["final"] and (tr["age_days"] or 0) > 30:
+        flags.append("Klaim ke supplier belum tuntas lebih dari 30 hari")
     return flags
 
 
@@ -14634,11 +14828,18 @@ def _svc_extra(con, order_id: int) -> dict:
                     (order_id, order_id)).fetchone()
     d = con.execute("SELECT created_at FROM service_diagnoses WHERE order_id=? AND is_current=1", (order_id,)).fetchone()
     e["asked_at"] = (a["t"] if a and a["t"] else None) or (d["created_at"] if d else None)
+    e["swap"] = _svc_swap(con, order_id)
+    e["supplier_track"] = _svc_supplier_track(con, order_id)
     return e
 
 
-def _svc_next_step(o: dict, m: dict, repl: dict | None) -> str:
+def _svc_next_step(o: dict, m: dict, repl: dict | None, swap: dict | None = None) -> str:
     st, loc = o["stage"], o["location"]
+    if swap and swap["status"] == "diajukan":
+        return "Menunggu persetujuan admin untuk tukar dari stok" + (" (garansi tidak aktif: Owner)" if o["warranty_status"] != "aktif" else "")
+    if swap and swap["status"] == "disetujui":
+        return ("Keluarkan unit pengganti dari stok" if (swap["stock_qty"] or 0) >= o["qty"]
+                else f"Menunggu stok pengganti {swap['item_name'] or ''} (stok {swap['stock_qty'] or 0})")
     if st == "draft":
         return "Lengkapi data lalu Simpan & Terima"
     if st == "diterima":
@@ -14707,7 +14908,9 @@ def get_service_order(order_id: int) -> dict:
         e = _svc_extra(con, order_id)
         o["_has_diag"] = e["has_current_diag"]
         cur_repl = next((r for r in o["replacements"] if r["status"] == "menunggu"), None)
-        o["next_step"] = _svc_next_step(o, m, cur_repl)
+        o["swap"] = e["swap"]
+        o["supplier_track"] = e["supplier_track"]
+        o["next_step"] = _svc_next_step(o, m, cur_repl, e["swap"])
         o["flags"] = _svc_flags(o, e)
         o["rma_no"] = next((d["rma_no"] for d in reversed(o["diagnoses"]) if d["rma_no"]), None) or o["rma_no"]
         o["age_days"] = (shop_today() - date.fromisoformat(_svc_local_date(o["received_at"]))).days if o["received_at"] else None
@@ -14734,7 +14937,9 @@ def list_service_orders(tab: str = "semua", query: str | None = None, stage: str
             r["flags"] = _svc_flags(r, e)
             sh = con.execute("SELECT courier, awb, sales_name FROM service_shipments WHERE order_id=? AND status<>'draft' ORDER BY id DESC LIMIT 1", (r["id"],)).fetchone()
             r["last_ship"] = dict(sh) if sh else None
-        kpi = {"dalam_proses": 0, "menunggu_kirim": 0, "di_supplier": 0, "menunggu_customer": 0, "siap_diambil": 0, "bermasalah": 0,
+            r["swap"] = e["swap"]
+            r["supplier_track"] = e["supplier_track"]
+        kpi = {"aftersales": 0, "menunggu_tukar": 0, "dalam_proses": 0, "menunggu_kirim": 0, "di_supplier": 0, "menunggu_customer": 0, "siap_diambil": 0, "bermasalah": 0,
                "draft": 0, "total": 0}
         for r in rows:
             kpi["total"] += 1
@@ -14752,6 +14957,10 @@ def list_service_orders(tab: str = "semua", query: str | None = None, stage: str
                 kpi["siap_diambil"] += 1
             if r["flags"]:
                 kpi["bermasalah"] += 1
+            if r["supplier_track"] and not r["supplier_track"]["final"]:
+                kpi["aftersales"] += 1
+            if r["swap"]:
+                kpi["menunggu_tukar"] += 1
         q = (query or "").strip().lower()
         if q:
             hits = set()
@@ -14771,13 +14980,17 @@ def list_service_orders(tab: str = "semua", query: str | None = None, stage: str
             rows = [r for r in rows if match(r)]
         if tab == "perlu_tindakan":
             rows = [r for r in rows if r["flags"] or r["stage"] in ("diterima", "pengecekan", "menunggu_kirim", "menunggu_customer", "siap_diambil")
-                    or (r["stage"] == "di_supplier" and r["result"] == "ditolak") or (r["stage"] == "dibatalkan" and r["location"] in _SVC_AT_SHOP)]
+                    or (r["stage"] == "di_supplier" and r["result"] == "ditolak") or (r["stage"] == "dibatalkan" and r["location"] in _SVC_AT_SHOP)
+            or r["swap"]]
         elif tab == "aktif":
             rows = [r for r in rows if r["stage"] in SVC_OPEN or r["stage"] == "draft"]
         elif tab == "selesai":
             rows = [r for r in rows if r["stage"] == "selesai"]
         elif tab == "dibatalkan":
             rows = [r for r in rows if r["stage"] == "dibatalkan"]
+        elif tab == "aftersales":
+            # Customer side may be done while the supplier claim for the swapped unit is still open (GAR-BR-017).
+            rows = [r for r in rows if (r["supplier_track"] and not r["supplier_track"]["final"]) or r["swap"]]
         if stage:
             rows = [r for r in rows if r["stage"] == stage]
         if warranty:
@@ -14987,14 +15200,40 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
             if until:
                 L.append(f"Garansi service: {o['after_warranty_days']} hari untuk kerusakan yang sama, s/d {d(until)}.")
         elif o["result"] == "diganti":
-            L.append("Garansi unit pengganti mengikuti ketentuan pabrik.")
+            # Owner 23-10-2026: the replacement keeps the original nota's warranty end date, no reset.
+            L.append(f"Garansi unit pengganti mengikuti nota asli, s/d {d(o['warranty_until'])}." if o["warranty_until"]
+                     else "Garansi unit pengganti mengikuti nota asli.")
         L += ["", "   Diserahkan (toko),                          Diterima (customer),", "", "",
               f"  ( {(o['picked_up_by'] or '')[:16]:^16} )                         ( {(o['picker_name'] or o['customer_name'] or '')[:18]:^18} )"]
+    elif doc == "ganti":
+        # Blueprint §2: proof of a free warranty replacement. Not a sales invoice: no revenue, nothing to pay.
+        sw = next((r for r in reversed(o["replacements"]) if r["mode"] == "stok_toko" and r["status"] == "diterima"), None)
+        if sw is None:
+            raise ValueError("Bukti penggantian dicetak setelah unit pengganti dikeluarkan dari stok.")
+        L += [_sr_line(shop, "BUKTI PENGGANTIAN GARANSI"), _sr_line("", f"No.  : {o['service_no']}"),
+              _sr_line("", f"Tgl. : {local(sw['received_at'])}"),
+              _sr_line(f"Customer : {o['customer_name']}", f"Nota asal: {o['receipt_no'] or 'tanpa nota'}"),
+              _sr_line(f"HP       : {o['customer_phone']}", f"Tgl beli : {d(o['purchase_date']) or '-'}"),
+              _sr_line(f"Mobil    : {(o['vehicle'] or '')[:24]}  {o['plate'] or ''}", ""), rule,
+              f"Unit lama : {o['product_name'][:46]}  SN {o['serial_no'] or '-'}"[:80],
+              f"Pengganti : {(sw['product_name'] or o['product_name'])[:46]}  SN {sw['new_serial'] or '-'}"[:80],
+              f"Qty       : {o['qty']} {o['unit'] or 'PCS'}"]
+        L += _svc_wrap("Keluhan   : ", o["complaint"])
+        basis = ("Disetujui Owner (garansi " + SVC_WARRANTY[o["warranty_status"]].lower() + ")") if sw["owner_override"] \
+            else f"Garansi aktif s/d {d(o['warranty_until'])}"
+        L += [f"Dasar     : {basis}"[:80], rule, f"{'Dibayar customer untuk penggantian':<64}{'Rp 0':>16}"]
+        if sw["price_diff"]:
+            L.append(f"{'Selisih harga ganti model (ditagih di Nota Jasa)':<64}{'Rp ' + _sr_rupiah(sw['price_diff']):>16}")
+        L += [rule, "* Dokumen ini bukan nota penjualan baru. Nota asal tidak berubah.",
+              f"* Garansi unit pengganti mengikuti nota asal" + (f", s/d {d(o['warranty_until'])}." if o["warranty_until"] else "."),
+              "* Unit lama menjadi milik toko untuk diklaim ke supplier.",
+              "", "   Disetujui,              Diserahkan (toko),            Diterima (customer),", "", "",
+              f"  ( {(sw['decided_by'] or '')[:14]:^14} )      ( {(sw['posted_by'] or '')[:14]:^14} )            ( {(o['customer_name'] or '')[:18]:^18} )"]
     else:
-        raise ValueError("Dokumen cetak harus terima, label, surat_jalan, atau hasil.")
+        raise ValueError("Dokumen cetak harus terima, label, surat_jalan, hasil, atau ganti.")
     with _conn() as con:
         _svc_event(con, order_id, "cetak", "Dicetak: " + {"terima": "Tanda Terima", "label": "Label Unit", "surat_jalan": "Surat Jalan Service",
-                                                         "hasil": "Nota Hasil Service"}[doc], user.get("username"))
+                                                         "hasil": "Nota Hasil Service", "ganti": "Bukti Penggantian Garansi"}[doc], user.get("username"))
     return {"text": "\n".join(x[:80] for x in L), "copies": copies}
 
 

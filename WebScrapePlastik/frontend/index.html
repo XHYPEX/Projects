@@ -1418,7 +1418,6 @@
           <section id="cashier-pay-card" class="hidden bg-white border border-line rounded-xl" aria-labelledby="cashier-pay-title">
             <div class="flex items-center gap-2 px-4 pt-4 pb-3">
               <h2 id="cashier-pay-title" class="font-serif text-base font-semibold text-ink">Pembayaran</h2>
-              <button id="cashier-pay-add-btn" type="button" onclick="openCashierSettleModal()" class="ml-auto whitespace-nowrap px-3 py-1.5 bg-accent text-bg rounded-lg text-xs font-medium hover:bg-accentDark transition-colors">+ Tambah</button>
             </div>
             <div id="cashier-pay-list" class="px-4 pb-4"></div>
           </section>
@@ -1426,8 +1425,6 @@
           <section id="cashier-quick-card" class="hidden bg-white border border-line rounded-xl" aria-labelledby="cashier-quick-title">
             <div class="px-4 pt-4 pb-3"><h2 id="cashier-quick-title" class="font-serif text-base font-semibold text-ink">Aksi Cepat</h2></div>
             <div class="px-4 pb-4 grid gap-2">
-              <button id="cashier-quick-save" type="button" onclick="document.getElementById('cashier-save-btn').click()" class="px-3 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 text-left disabled:bg-bg2 disabled:text-[#6B6B66] disabled:border-line disabled:cursor-not-allowed transition-colors">Simpan Perubahan</button>
-              <button id="cashier-quick-pay" type="button" onclick="openCashierSettleModal()" class="px-3 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 text-left disabled:bg-bg2 disabled:text-[#6B6B66] disabled:border-line disabled:cursor-not-allowed transition-colors">Tambah Pembayaran</button>
               <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-3 py-2 border border-blue-700 rounded-lg text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 text-left leading-tight disabled:bg-blue-50 disabled:text-blue-900 disabled:border-blue-200 disabled:cursor-not-allowed transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ubah Status Pengerjaan</button>
               <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden inline-flex items-center gap-2 px-3 py-2 border border-yellow-500 rounded-lg text-sm font-semibold text-black bg-yellow-400 hover:bg-yellow-500 text-left leading-tight transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17H3v-5l2-5h11l3 5h2v5h-2"/><path d="M5 12h14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/></svg><span id="cashier-quick-handover-label">Serah Terima Kendaraan</span></button>
               <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-3 py-2 border border-green-700 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 text-left leading-tight transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>Cetak Nota</button>
@@ -8491,11 +8488,7 @@ function renderCashierRailExtras() {
           <td class="px-1 py-1.5 text-right">${p.amount > 0 && !p.reversed && p.state === "sah" && tab.status !== "void" && !(tab.status === "done" && tab.workStatus === "selesai") ? `<button type="button" class="admin-only text-failed hover:bg-failed/10 rounded p-1" title="Batalkan pembayaran" aria-label="Batalkan pembayaran" onclick="openReversePaymentModal(${p.id})">${trash}</button>` : ""}</td></tr>`).join("")
       }</tbody></table>`
     : `<p class="text-xs text-muted">Belum ada pembayaran.</p>`;
-  const canPay = tab.status === "pending" && !isDraft;
-  document.getElementById("cashier-pay-add-btn").classList.toggle("hidden", !canPay);
   const q = (id) => document.getElementById(id);
-  q("cashier-quick-save").disabled = !!q("cashier-save-btn")?.disabled || q("cashier-save-btn")?.classList.contains("hidden");
-  q("cashier-quick-pay").disabled = !canPay;
   q("cashier-quick-status").disabled = !!q("cashier-status-btn")?.classList.contains("hidden");
   q("cashier-quick-status").classList.toggle("hidden", !kasirHasJob(tab));
   q("cashier-quick-print").disabled = false;
@@ -9568,9 +9561,6 @@ function updateCashierSettleButtons() {
     btn.disabled = blocked;
     btn.title = blocked ? "Simpan perubahan nota dulu" : "";
   }
-  // Aksi Cepat's Simpan Perubahan follows the main one as the cashier types (it was only refreshed on load).
-  const qs = document.getElementById("cashier-quick-save"), sb = document.getElementById("cashier-save-btn");
-  if (qs && sb) qs.disabled = sb.disabled || sb.classList.contains("hidden");
 }
 
 // Opens "Pembayaran Nota" for a saved, pending nota. The nota is read fresh from the server, so the
@@ -10262,7 +10252,7 @@ function openHistoryRowMenu(event, receiptId) {
     r.status === "pending" ? historyMenuItem("pay", "Tambah Pembayaran", `settleHistoryRow('${id}')`) : "",
     r.status !== "void" ? historyMenuItem("history", "Riwayat Pembayaran", `historyRowPayments('${id}')`) : "",
     historyMenuItem("print", "Cetak Nota", `printHistoryRow('${id}')`),
-    r.status !== "void" && r.work_status !== "draft" && !r.service_order_id ? historyMenuItem("service", "Buat Service", `serviceFromHistoryRow('${id}')`) : "",
+    r.status !== "void" && r.work_status !== "draft" && !r.service_order_id ? historyMenuItem("service", "Ajukan Klaim / Service", `serviceFromHistoryRow('${id}')`) : "",
     r.service_order_id ? historyMenuItem("service", `Buka ${r.service_no || "Service"}`, `closeHistoryRowMenu(); svcOpen(${Number(r.service_order_id)})`) : "",
     r.status !== "void" && !(r.status === "done" && r.work_status === "selesai") ? `<div class="admin-only my-1 border-t border-line"></div>
       <div class="admin-only">${historyMenuItem("void", "Void Nota", `confirmVoidHistoryRow('${id}')`, "text-failed")}</div>` : "",
@@ -26191,7 +26181,7 @@ function svcRenderListShell() {
     <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
       <div><h2 class="font-serif text-2xl font-semibold text-ink">Daftar Service / Garansi</h2><p class="text-sm text-muted mt-0.5">Barang customer yang dititip untuk diperiksa, diperbaiki, atau diklaim ke pabrik</p></div>
       <button type="button" onclick="svcNew()" class="${RTS_BTN}">+ Terima Barang Service</button></div>
-    <div id="svc-kpis" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4"></div>
+    <div id="svc-kpis" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-4"></div>
     ${rtsCard("Cari &amp; Filter", `
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         <div class="md:col-span-2 xl:col-span-3">${rtsField("Pencarian", `<input id="svc-f-q" type="text" value="${esc(s.query)}" placeholder="No. service / nama / HP / plat / nota / SN / resi / RMA" data-no-uppercase class="${RTS_IN}" onkeydown="if(event.key==='Enter')svcApplyFilter()">`)}</div>
@@ -26239,8 +26229,9 @@ async function svcLoad() {
     kpi("Menunggu Customer", k.menunggu_customer, "Persetujuan biaya", "svcKpiFilter('aktif','menunggu_customer')"),
     kpi("Siap Diambil", k.siap_diambil, "Hubungi customer", "svcKpiFilter('perlu_tindakan','siap_diambil')"),
     kpi("Bermasalah", k.bermasalah, "Lewat batas waktu", "svcKpiFilter('perlu_tindakan')"),
+    kpi("Aftersales", k.aftersales + k.menunggu_tukar, k.menunggu_tukar ? `${k.menunggu_tukar} tukar stok menunggu` : "Klaim supplier belum tuntas", "svcKpiFilter('aftersales')"),
   ].join("");
-  const tabs = [["semua", "Semua"], ["perlu_tindakan", "Perlu tindakan"], ["aktif", "Aktif"], ["selesai", "Selesai"], ["dibatalkan", "Dibatalkan"]];
+  const tabs = [["semua", "Semua"], ["perlu_tindakan", "Perlu tindakan"], ["aktif", "Aktif"], ["aftersales", "Aftersales"], ["selesai", "Selesai"], ["dibatalkan", "Dibatalkan"]];
   document.getElementById("svc-tabs").innerHTML = tabs.map(([key, label]) => `<button type="button" onclick="svcSetTab('${key}')"
     class="po-status-btn ${key === s.tab ? "is-active" : ""} px-3 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">${label}</button>`).join("");
   const rows = data.items;
@@ -26262,7 +26253,9 @@ async function svcLoad() {
         ${r.flags.length ? `<div class="text-[11px] text-failed truncate" title="${esc(r.flags.join("; "))}">${esc(r.flags[0])}</div>` : ""}</td>
       <td class="px-3 py-2.5 tabular-nums text-ink whitespace-nowrap">${esc(r.receipt_no || (r.no_invoice_reason ? "Tanpa nota" : "—"))}</td>
       <td class="px-3 py-2.5"><div class="text-ink">${esc(r.handling ? svcLabel("handling", r.handling) : "—")}</div><div class="text-[11px] text-muted">${esc([r.supplier_name, ship].filter(Boolean).join(" · "))}</div></td>
-      <td class="px-3 py-2.5"><div class="flex flex-col items-start gap-1">${svcPill("stage", r.stage, r.stage_label)}<span class="text-[11px] text-muted">${esc(r.location_label)}</span></div></td>
+      <td class="px-3 py-2.5"><div class="flex flex-col items-start gap-1">${svcPill("stage", r.stage, r.stage_label)}<span class="text-[11px] text-muted">${esc(r.location_label)}</span>
+        ${r.swap ? `<span class="text-[11px] text-pending">Tukar stok: ${r.swap.status === "diajukan" ? "menunggu persetujuan" : "disetujui, belum dikeluarkan"}</span>` : ""}
+        ${r.supplier_track ? `<span class="text-[11px] ${r.supplier_track.final ? "text-muted" : "text-pending"}">Supplier: ${esc(r.supplier_track.label)}${r.supplier_track.final ? "" : ` · ${r.supplier_track.age_days} hr`}</span>` : ""}</div></td>
       <td class="px-3 py-2.5">${svcPill("warranty", r.warranty_status, r.warranty_label)}</td>
       <td class="px-3 py-2.5">${svcPill("fee", r.fee_status, r.fee_label)}</td>
       <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap ${r.age_days > 30 ? "text-failed font-medium" : "text-ink"}">${r.age_days == null ? "—" : r.age_days + " hr"}</td>
@@ -26786,7 +26779,11 @@ function svcActions(o) {
   if (["di_supplier", "kembali"].includes(o.stage) && ["di_pabrik", "dibawa_sales"].includes(o.location)) B("Dikirim Balik", "svcReturnShipModal()");
   if (o.stage !== "menunggu_customer" && ["di_supplier", "kembali"].includes(o.stage) && svcAway(o) && o.location !== "di_ekspedisi" && (hasDiag || o.result !== "belum"))
     B("Terima di Toko", "svcBackPage()", o.location === "perjalanan_balik" ? RTS_BTN : RTS_BTN2);
-  if (admin && !svcClosed(o) && o.stage !== "siap_diambil" && o.warranty_status === "aktif" && svcAtShop(o)) B("Tukar dari Stok", "svcReplacePage('stok_toko')");
+  // Tukar dari stok (owner 23-10): staff request, admin approves (Owner if the warranty is not active), staff hand it out.
+  const swapped = o.replacements.some(r => r.mode === "stok_toko" && r.status === "diterima");
+  if (o.swap?.status === "diajukan" && admin) { B("Setujui Tukar dari Stok", "svcSwapDecide('setuju')", RTS_BTN); B("Tolak Tukar", "svcSwapDecide('tolak')", RTS_BTND); }
+  if (o.swap?.status === "disetujui") B("Keluarkan Unit Pengganti", "svcSwapPost()", RTS_BTN);
+  if (!o.swap && !swapped && !svcClosed(o) && o.stage !== "siap_diambil" && svcAtShop(o)) B("Ajukan Tukar dari Stok", "svcReplacePage('stok_toko')");
   if (admin && ["di_supplier", "menunggu_customer"].includes(o.stage) && o.replacements.some(r => r.status === "menunggu")) B("Atur Unit Pengganti", "svcReplacePage('pabrik')");
   if (o.stage === "siap_diambil" && o.billable > 0 && !o.fee_receipt) B("Buat Nota Jasa", "svcFeeReceipt()", RTS_BTN);
   if (o.stage === "siap_diambil" || (o.stage === "dibatalkan" && svcAtShop(o) && o.location !== "diserahkan")) B("Serah ke Customer", "svcHandoverPage()", o.billable > 0 && !o.fee_receipt ? RTS_BTN2 : RTS_BTN);
@@ -26812,6 +26809,7 @@ function svcRenderDetail() {
     <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
       ${box("Tahap", "stage", o.stage, o.stage_label)}${box("Lokasi Unit", "location", o.location, o.location_label)}${box("Hasil", "result", o.result, o.result_label)}
       ${box("Garansi", "warranty", o.warranty_status, o.warranty_label)}${box("Biaya", "fee", o.fee_status, o.fee_label)}</div>
+    ${svcAftersalesPanel(o)}
     ${o.flags.length ? `<div class="mb-3">${rtsNote("red", "Perlu perhatian", o.flags.map(esc).join("<br>"))}</div>` : ""}
     ${o.next_step ? `<div class="mb-4">${rtsNote("blue", "Langkah berikutnya", esc(o.next_step))}</div>` : ""}
     <div class="flex flex-wrap gap-2 mb-4">${svcActions(o)}</div>
@@ -26852,8 +26850,11 @@ function svcRenderDetail() {
             ${o.proposed ? `<p class="text-xs text-pending mt-2">Estimasi menunggu persetujuan: ${formatIDR(o.proposed)}</p>` : ""}
             ${o.fee_receipt ? `<p class="text-xs text-ink mt-2">Nota Jasa Service: <b class="tabular-nums">${esc(o.fee_receipt.receipt_no)}</b> (${o.fee_receipt.status === "done" ? "lunas" : "belum lunas"}) — bayar di Kasir / Riwayat Invoice.</p>` : ""}`) : ""}
         ${o.replacements.length ? rtsCard("Penggantian", o.replacements.map(r => `<div class="rounded-lg border border-line px-3 py-2 text-xs mb-2">
-            <div class="flex flex-wrap justify-between gap-2"><b class="text-ink">${esc(svcLabel("replace_modes", r.mode))}</b>${rtsPill(RTS_TINT[{ menunggu: "amber", diterima: "green", batal: "gray" }[r.status] || "gray"], r.status)}</div>
-            <div class="text-muted mt-0.5">${esc([r.product_name, r.old_serial ? "SN lama " + r.old_serial : "", r.new_serial ? "SN baru " + r.new_serial : "", r.return_awb ? "resi balik " + r.return_awb : ""].filter(Boolean).join(" · "))}</div></div>`).join("")
+            <div class="flex flex-wrap justify-between gap-2"><b class="text-ink">${esc(svcLabel("replace_modes", r.mode))}</b>${rtsPill(RTS_TINT[{ menunggu: "amber", diajukan: "amber", disetujui: "blue", diterima: "green", ditolak: "red", batal: "gray" }[r.status] || "gray"], r.mode === "stok_toko" && r.status === "diterima" ? "dikeluarkan" : r.status)}</div>
+            <div class="text-muted mt-0.5">${esc([r.product_name, r.old_serial ? "SN lama " + r.old_serial : "", r.new_serial ? "SN baru " + r.new_serial : "", r.return_awb ? "resi balik " + r.return_awb : ""].filter(Boolean).join(" · "))}</div>
+            ${r.requested_by ? `<div class="text-muted mt-0.5">${esc(`Diajukan ${r.requested_by}, ${svcWhen(r.requested_at)}` + (r.request_note ? `: ${r.request_note}` : ""))}</div>` : ""}
+            ${r.decided_by ? `<div class="text-muted mt-0.5">${esc(`${r.status === "ditolak" ? "Ditolak" : "Disetujui"} ${r.decided_by}${r.owner_override ? " (Owner, garansi tidak aktif)" : ""}, ${svcWhen(r.decided_at)}` + (r.decision_note ? `: ${r.decision_note}` : ""))}</div>` : ""}
+            ${r.posted_by ? `<div class="text-muted mt-0.5">${esc(`Dikeluarkan dari stok oleh ${r.posted_by}, ${svcWhen(r.received_at)}`)}</div>` : ""}</div>`).join("")
           + (o.quarantine_lots.length ? rtsNote("amber", "Unit rusak di Stok Karantina", `${o.quarantine_lots.map(l => `Lot #${l.id}: sisa ${l.qty_left} dari ${l.quantity}`).join("<br>")}<br>Klaim ke supplier lewat Retur Supplier.`
             + (o.supplier_returns.length ? `<br>Retur: ${o.supplier_returns.map(r => `<button type="button" onclick="rtsOpen(${r.id})" class="underline">${esc(r.return_number)}</button>`).join(", ")}` : "")) : "")) : ""}
         ${rtsCard("Dokumen &amp; Foto", photoStages.map(([k, l]) => `<div class="mb-3"><div class="text-xs font-medium text-ink mb-1">${esc(l)}</div>${svcPhotoZone(k, photoLock(k) ? "Terkunci" : "Boleh beberapa foto", photoLock(k))}</div>`).join(""))}
@@ -27136,18 +27137,20 @@ function svcApprovalSubmit(status) {
 let svcReplItem = null;
 function svcReplacePage(mode) {
   const o = svcCur, stock = mode === "stok_toko";
-  const keep = svcKeep(["svc-r-sn", "svc-r-name", "svc-r-diff", "svc-r-dcost", "svc-r-dmed", "svc-r-dnote"]);
+  const keep = svcKeep(["svc-r-note", "svc-r-name", "svc-r-diff", "svc-r-dcost", "svc-r-dmed", "svc-r-dnote"]);
   if (svcReplacePage.mode !== mode) { svcReplacePage.mode = mode; svcReplItem = o.master_item_id ? { id: o.master_item_id, name: o.product_name, stock_qty: null } : null; }
   const it = svcReplItem;
   const html = `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] gap-4 items-start">
     <div class="space-y-4">
-    ${rtsCard(stock ? "Tukar dari Stok Toko (K-S6)" : "Unit Pengganti dari Pabrik", `
-      ${stock ? `<div class="mb-3">${rtsNote("amber", "Mengurangi stok", "Unit baru keluar dari stok jual sekarang. Unit rusak customer masuk Stok Karantina (sumber: Unit klaim service) dan bisa diklaim ke supplier lewat Retur Supplier.")}</div>` : ""}
+    ${rtsCard(stock ? "Ajukan Tukar dari Stok Toko" : "Unit Pengganti dari Pabrik", `
+      ${stock ? `<div class="mb-3 space-y-2">${rtsNote("blue", "Alur", "Diajukan → disetujui admin → unit pengganti dikeluarkan dari stok. Stok baru berkurang saat dikeluarkan; unit rusak customer lalu masuk Stok Karantina untuk diklaim ke supplier lewat Retur Supplier.")}
+        ${o.warranty_status !== "aktif" ? rtsNote("red", esc(o.warranty_label || "Garansi tidak aktif"), "Penggantian gratis untuk unit ini hanya bisa disetujui Owner. Tulis alasannya.") : ""}</div>` : ""}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="sm:col-span-2">${rtsField("Barang pengganti", `<div class="relative"><input id="svc-r-search" type="text" placeholder="Cari nama / SKU di Master Barang" autocomplete="off" data-no-uppercase class="${RTS_IN}" oninput="svcReplSearch(this.value)">
           <div id="svc-r-results" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-sm max-h-64 overflow-auto"></div></div>
           <div class="text-xs text-ink mt-1.5">${it ? `Dipilih: <b>${esc(it.name)}</b>${it.sku ? " · " + esc(it.sku) : ""}${it.stock_qty != null ? ` · stok ${it.stock_qty}` : ""}` : '<span class="text-muted">Belum dipilih (default: barang yang sama)</span>'}</div>`, stock)}</div>
-        ${!stock ? rtsField("Nama di dokumen (opsional)", `<input id="svc-r-name" type="text" maxlength="160" class="${RTS_IN}">`) : rtsField("SN unit pengganti", `<input id="svc-r-sn" type="text" maxlength="80" class="${RTS_IN}">`)}
+        ${!stock ? rtsField("Nama di dokumen (opsional)", `<input id="svc-r-name" type="text" maxlength="160" class="${RTS_IN}">`)
+          : `<div class="sm:col-span-2">${rtsField("Alasan / catatan pengajuan", `<textarea id="svc-r-note" rows="2" maxlength="300" data-no-uppercase class="${RTS_IN}"></textarea>`, o.warranty_status !== "aktif")}</div>`}
       </div>`)}
     ${rtsCard("Selisih Harga (ganti model)", `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         ${rtsField("Selisih ke customer", `<input id="svc-r-diff" type="text" inputmode="numeric" value="0" class="price-input ${RTS_IN} text-right">`)}
@@ -27156,8 +27159,8 @@ function svcReplacePage(mode) {
         ${rtsField("Keterangan", `<input id="svc-r-dnote" type="text" maxlength="160" data-no-uppercase class="${RTS_IN}">`)}</div>
       <p class="text-[11px] text-muted mt-2">Kosongkan bila model sama. Selisih masuk Nota Jasa Service.</p>`)}
     </div>
-    <div class="space-y-4">${svcSummaryCard(o)}<button type="button" onclick="svcReplaceSubmit('${mode}')" class="${RTS_BTN} w-full">${stock ? "Tukar Sekarang" : "Simpan Unit Pengganti"}</button></div></div>`;
-  svcActionPage(stock ? "Tukar Unit dari Stok" : "Atur Unit Pengganti", stock ? "Customer langsung menerima unit baru dari stok toko" : "Pabrik mengirim unit pengganti", html, () => svcReplacePage(mode));
+    <div class="space-y-4">${svcSummaryCard(o)}<button type="button" onclick="svcReplaceSubmit('${mode}')" class="${RTS_BTN} w-full">${stock ? "Ajukan Tukar" : "Simpan Unit Pengganti"}</button></div></div>`;
+  svcActionPage(stock ? "Ajukan Tukar dari Stok" : "Atur Unit Pengganti", stock ? "Customer menerima unit baru dari stok toko setelah disetujui admin" : "Pabrik mengirim unit pengganti", html, () => svcReplacePage(mode));
   svcRestore(keep);
 }
 let svcReplTimer = null;
@@ -27176,9 +27179,42 @@ function svcReplSearch(q) {
 }
 function svcReplPick(i) { const m = svcReplSearch.items[i]; svcReplItem = { id: m.id, name: m.name, sku: m.sku, stock_qty: m.stock_qty }; svcRerender(); }
 async function svcReplaceSubmit(mode) {
-  const body = { mode, master_item_id: svcReplItem?.id || null, new_serial: svcVal("svc-r-sn"), product_name: svcVal("svc-r-name"),
+  const body = { mode, master_item_id: svcReplItem?.id || null, request_note: svcVal("svc-r-note"), product_name: svcVal("svc-r-name"),
     price_diff: priceValue(document.getElementById("svc-r-diff")), diff_cost: priceValue(document.getElementById("svc-r-dcost")), diff_medium: svcVal("svc-r-dmed") || null, diff_note: svcVal("svc-r-dnote") };
-  if (await svcAct("replacement", body, mode === "stok_toko" ? "Unit ditukar dari stok." : "Unit pengganti dicatat.")) { svcReplacePage.mode = null; svcReplItem = null; }
+  if (await svcAct("replacement", body, mode === "stok_toko" ? "Tukar dari stok diajukan." : "Unit pengganti dicatat.")) { svcReplacePage.mode = null; svcReplItem = null; }
+}
+function svcSwapDecide(decision) {
+  const o = svcCur, sw = o.swap;
+  const info = `${esc(sw.item_name || sw.product_name || "")} · stok ${sw.stock_qty ?? "-"}${sw.request_note ? `<br>Alasan: ${esc(sw.request_note)}` : ""}${sw.price_diff ? `<br>Selisih harga ${formatIDR(sw.price_diff)} masuk Nota Jasa` : ""}`;
+  if (decision === "setuju") rtsTextModal("Setujui Tukar dari Stok", `Diajukan ${esc(sw.requested_by || "-")}: ${info}`, "Catatan (opsional)", false,
+    "svcAct('swap-decide', { decision: 'setuju', note: rtsModalText() }, 'Tukar dari stok disetujui.')",
+    o.warranty_status !== "aktif" ? rtsNote("red", esc(o.warranty_label || "Garansi tidak aktif"), "Hanya Owner yang bisa menyetujui penggantian gratis ini.") : "");
+  else rtsTextModal("Tolak Tukar dari Stok", `Diajukan ${esc(sw.requested_by || "-")}: ${info}`, "Alasan penolakan", true,
+    "svcAct('swap-decide', { decision: 'tolak', note: rtsModalText() }, 'Pengajuan ditolak.')");
+}
+function svcSwapPost() {
+  const o = svcCur, sw = o.swap, short = (sw.stock_qty ?? 0) < o.qty;
+  openModal("Keluarkan Unit Pengganti", `<div class="space-y-3">
+    <p class="text-sm text-muted">Stok jual <b class="text-ink">${esc(sw.item_name || sw.product_name || "")}</b> berkurang ${o.qty} (stok sekarang ${sw.stock_qty ?? "-"}). Ini bukan penjualan: tidak ada omzet dan insentif. Unit rusak customer masuk Stok Karantina.</p>
+    ${short ? rtsNote("red", "Stok kurang", "Status tetap Menunggu Pengganti sampai stok masuk.") : ""}
+    ${rtsField("SN unit pengganti", `<input id="svc-sp-sn" type="text" maxlength="80" class="${RTS_IN}">`)}
+    <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button>
+      <button type="button" onclick="svcSwapPostSubmit()" class="${RTS_BTN}" ${short ? "disabled" : ""}>Keluarkan dari Stok</button></div></div>`);
+}
+async function svcSwapPostSubmit() {
+  if (await svcAct("swap-post", { new_serial: svcVal("svc-sp-sn") }, "Unit pengganti dikeluarkan dari stok.")) svcPrintPage("ganti");
+}
+// Blueprint §7: the customer side and the supplier side of a swap are tracked apart (GAR-BR-017).
+function svcAftersalesPanel(o) {
+  const tr = o.supplier_track;
+  if (!tr && !o.swap) return "";
+  const cust = o.swap ? (o.swap.status === "diajukan" ? "Menunggu persetujuan tukar" : "Menunggu unit pengganti dikeluarkan")
+    : o.stage === "selesai" ? "Selesai — unit pengganti diterima customer" : o.stage === "siap_diambil" ? "Unit pengganti siap diserahkan" : o.stage_label;
+  const sup = tr ? `${esc(tr.label)}${tr.return_number ? ` · <button type="button" onclick="rtsOpen(${tr.return_id})" class="underline">${esc(tr.return_number)}</button>` : ""}${tr.final ? "" : ` · ${tr.age_days} hari`}`
+    : "Belum ada (unit rusak masuk karantina saat pengganti dikeluarkan)";
+  const box = (label, body, tone) => `<div class="rounded-xl border border-line bg-white px-3 py-2.5"><div class="text-[10px] uppercase tracking-wider text-muted mb-1">${label}</div><div class="text-sm ${tone}">${body}</div></div>`;
+  return `<div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">${box("Penyelesaian customer", esc(cust), o.stage === "selesai" ? "text-green-800" : "text-ink")}
+    ${box("Klaim ke supplier", sup, tr && tr.final ? "text-green-800" : "text-pending")}</div>`;
 }
 
 // Terima kembali di toko + QC
@@ -27280,6 +27316,7 @@ function svcPrintDocs(o) {
   const d = [["terima", "Tanda Terima Service"], ["label", "Label Unit"]];
   if (o.shipments.some(s => s.direction === "keluar" && s.status !== "draft")) d.push(["surat_jalan", "Surat Jalan ke Pabrik"]);
   if (["siap_diambil", "selesai"].includes(o.stage) || (o.stage === "dibatalkan" && o.ready_at)) d.push(["hasil", "Nota Hasil Service"]);
+  if (o.replacements.some(r => r.mode === "stok_toko" && r.status === "diterima")) d.push(["ganti", "Bukti Penggantian Garansi"]);
   return d;
 }
 function svcPrintPage(doc) {

@@ -894,6 +894,7 @@ async def return_receipt_item_route(receipt_id: str, req: ReceiptReturnRequest, 
                 req.refund_amount, req.method, req.reason, user["username"],
                 kind=req.kind, reason_code=req.reason_code, restock_qty=req.restock_qty,
                 supplier_qty=req.supplier_qty, damaged_qty=req.damaged_qty, proof_ref=req.proof_ref,
+                owner_ok=bool(user.get("is_owner")),
             ),
         )
     except ValueError as e:

@@ -13,7 +13,8 @@ from backend.database import (
     SVC_COST_BEARERS, SVC_COST_KINDS, SVC_DECISIONS, SVC_FEE, SVC_HANDLING, SVC_LOCATIONS, SVC_MEDIA, SVC_NO_INVOICE_REASONS,
     SVC_PHOTO_STAGES, SVC_REPLACE_MODES, SVC_RESULTS, SVC_SHIP_MODES, SVC_STAGES, SVC_STOP_KINDS, SVC_STOP_SOURCES, SVC_WARRANTY,
     SVC_WARRANTY_BASIS,
-    add_service_note, add_service_photo, confirm_service_out, create_service_fee_receipt, delete_service_override, delete_service_photo,
+    add_service_note, add_service_photo, confirm_service_out, create_service_fee_receipt, decide_service_swap, delete_service_override,
+    delete_service_photo, post_service_swap,
     get_service_order, get_service_photo, handover_service, list_service_orders, list_service_profiles, mark_service_at_factory,
     receive_service_back, receive_service_order, record_internal_result, record_service_approval, record_service_diagnosis,
     record_service_replacement, record_service_return_shipment, save_service_order, save_service_override, save_service_profile,
@@ -49,7 +50,7 @@ async def svc_meta():
 @router.get("/services")
 async def svc_list(tab: str = "semua", query: str | None = None, stage: str | None = None, warranty: str | None = None,
                    fee: str | None = None, handling: str | None = None, supplier_id: int | None = None, page: int = 1):
-    if tab not in ("semua", "perlu_tindakan", "aktif", "selesai", "dibatalkan"):
+    if tab not in ("semua", "perlu_tindakan", "aktif", "selesai", "dibatalkan", "aftersales"):
         raise HTTPException(status_code=422, detail="Tab tidak dikenal.")
     return await _run(list_service_orders, tab, query, stage or None, warranty or None, fee or None, handling or None, supplier_id, page)
 
@@ -163,6 +164,8 @@ _ACTIONS = {
     "diagnosis": record_service_diagnosis,
     "approval": record_service_approval,
     "replacement": record_service_replacement,
+    "swap-decide": decide_service_swap,
+    "swap-post": post_service_swap,
     "return-shipment": record_service_return_shipment,
     "back": receive_service_back,
     "stop": stop_service_order,

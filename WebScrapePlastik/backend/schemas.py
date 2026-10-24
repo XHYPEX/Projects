@@ -77,6 +77,8 @@ class ReceiptExtra(BaseModel):
 
 
 class ReceiptRequest(ReceiptExtra):
+    # Penawaran Harga this nota was made from (accepted, not converted yet); linked once the nota is saved.
+    quotation_id: int | None = None
     # Admin only: why this sale may use stock reserved for a Sales Order customer (K-02).
     stock_override_reason: str | None = None
     plate_region: str = ""  # empty for a walk-in purchase (no installation)
@@ -634,6 +636,8 @@ class MasterItemUpdateRequest(BaseModel):
     min_stock: int | None = None
     location: str | None = None
     price_note: str | None = None
+    # Admin only, and only while the product holds no stock (otherwise the cost is the Barang Masuk average).
+    cost_price: int | None = None
     # Send null to clear the category; leave the field out to keep it.
     category_id: int | None = None
 
@@ -1130,6 +1134,9 @@ class PreorderRequest(BaseModel):
     notes: str | None = None
     # Buy every barang of this order from this supplier; null = each follows its Master Barang supplier.
     supplier_id: int | None = None
+    # Penawaran Harga this order was made from (accepted, not converted yet); linked once the order is saved.
+    quotation_id: int | None = None
+    order_source: str = "walk_in"  # walk_in | whatsapp: where the order came in
 
 
 class PreorderUpdateRequest(BaseModel):
@@ -1146,6 +1153,7 @@ class PreorderUpdateRequest(BaseModel):
     is_draft: bool | None = None
     # Omitted = keep; null = clear (follow each barang's supplier).
     supplier_id: int | None = None
+    order_source: str | None = None  # omitted = keep
 
 
 class PreorderItemStatusRequest(BaseModel):
@@ -1310,6 +1318,7 @@ class PreorderOut(BaseModel):
     id: str
     po_number: str
     po_date: str
+    order_source: str = "walk_in"  # walk_in | whatsapp
     supplier_id: int | None = None
     supplier_name: str | None = None
     # Empty for orders created before the plate was captured.
@@ -1575,6 +1584,7 @@ class SupplierPoItemOut(BaseModel):
     customer_po_number: str | None = None
     customer_name: str | None = None
     plate_full: str | None = None
+    so_ship_route: str | None = None  # Jalur Kirim chosen on that Sales Order line
     # From the linked Master Barang: the shelf price and product code printed on the stock label.
     sell_price: int | None = None
     barcode: str | None = None
@@ -1635,6 +1645,7 @@ class SupplierPoReceiptOut(BaseModel):
     created_at: str
     gr_number: str | None = None
     officer: str | None = None
+    inbound_status: str | None = None  # status of the Barang Masuk document (draft / posted / void)
     lines: list[SupplierPoReceiptLineOut]
 
 

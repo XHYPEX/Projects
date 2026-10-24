@@ -109,8 +109,8 @@ async def update_employee(employee_id: int, req: EmployeeIn, user: dict = Depend
 # ── Proses Pengerjaan ─────────────────────────────────────────────────────────
 
 @work_router.get("/work-orders")
-async def work_orders(scope: str = "aktif", q: str | None = None):
-    return await _run(inc.work_orders, scope, q)
+async def work_orders(scope: str = "aktif", q: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    return await _run(inc.work_orders, scope, q, date_from, date_to)
 
 
 @work_router.get("/work-orders/{receipt_id}")

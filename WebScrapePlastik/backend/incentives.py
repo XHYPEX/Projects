@@ -1490,9 +1490,28 @@ def _work_rows(con, receipt_ids: list[str]) -> dict[str, list]:
     return out
 
 
-def work_orders(scope: str = "aktif", q: str | None = None) -> dict:
+def work_orders(scope: str = "aktif", q: str | None = None, date_from: str | None = None, date_to: str | None = None) -> dict:
+    """`date_from` / `date_to` (shop dates): notas being worked on in that period, from the day they came in to the
+    day the work was finished, so a car that stays overnight shows on every day it was in the shop."""
     sql = db._RECEIPT_SELECT + " WHERE r.status<>'void' AND r.work_status<>'draft'"
     args: list = []
+    shift = f"{db.SHOP_UTC_OFFSET_MINUTES:+d} minutes"
+    for d in (date_from, date_to):
+        if d:
+            try:
+                date.fromisoformat(d)
+            except ValueError:
+                raise ValueError("Tanggal harus berformat YYYY-MM-DD.")
+    if date_from and date_to and date_from > date_to:
+        raise ValueError("Tanggal awal tidak boleh setelah tanggal akhir.")
+    if date_from:
+        # finished = the last status change of a nota whose work is Selesai
+        sql += (" AND (r.work_status<>'selesai' OR date(COALESCE((SELECT MAX(e.at) FROM receipt_events e"
+                " WHERE e.receipt_id=r.id AND e.kind='status'), r.created_at), ?) >= ?)")
+        args += [shift, date_from]
+    if date_to:
+        sql += " AND date(r.created_at, ?) <= ?"
+        args += [shift, date_to]
     if scope == "aktif":
         sql += " AND NOT (r.status='done' AND r.work_status='selesai')"
     elif scope == "selesai":

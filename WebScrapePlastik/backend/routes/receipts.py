@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from backend.auth import get_current_user, require_admin
 from backend.product_images import matches_content_type
+from backend.routes.quotations import guard_conversion, record_conversion
 from backend.database import (
     merge_followup_invoice,
     confirm_receipt_payment,
@@ -306,6 +307,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     if req.payment_method == "transfer" and takes_money_now and not transfer_account:
         raise HTTPException(status_code=422, detail="Rekening penerima transfer wajib dipilih.")
 
+    await guard_conversion(req.quotation_id)
     receipt_id = str(uuid4())
     try:
         result = await loop.run_in_executor(
@@ -318,6 +320,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     except ValueError as e:
         # The customer was deleted between the check above and the save.
         raise HTTPException(status_code=422, detail=str(e))
+    await record_conversion(req.quotation_id, "kasir", receipt_id, result.get("receipt_no"), user)
     return ReceiptResponse(receipt_id=receipt_id, **result)
 
 
@@ -513,12 +516,15 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     transfer_sender = _clean_sender(req.transfer_sender) if update_transfer_sender else None
     effective_method = req.payment_method or existing["payment_method"]
     effective_sender = transfer_sender if update_transfer_sender else existing.get("transfer_sender")
-    if effective_method == "transfer" and req.status != "void" and not effective_sender:
+    # Sender / account are asked only when this save records money; editing items of a nota paid by a confirmed
+    # transfer (Pembayaran Nota) must not trip over the nota's stored payment fields.
+    changes_payment = req.payment_method is not None or (req.amount_paid is not None and req.amount_paid != (existing["amount_paid"] or 0))
+    if effective_method == "transfer" and req.status != "void" and changes_payment and not effective_sender:
         raise HTTPException(status_code=422, detail="Nama pengirim transfer wajib diisi.")
     update_transfer_account = "transfer_account" in req.model_fields_set
     transfer_account = _clean_sender(req.transfer_account) if update_transfer_account else None
     effective_account = transfer_account if update_transfer_account else existing.get("transfer_account")
-    if effective_method == "transfer" and req.status != "void" and not effective_account:
+    if effective_method == "transfer" and req.status != "void" and changes_payment and not effective_account:
         raise HTTPException(status_code=422, detail="Rekening penerima transfer wajib dipilih.")
 
     try:

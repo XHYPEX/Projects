@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import get_current_user, require_admin
+from backend.routes.quotations import guard_conversion, record_conversion
 from backend.database import (
     decide_price_request,
     price_actor,
@@ -255,17 +256,20 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
     preorder_id = str(uuid4())
     loop = asyncio.get_event_loop()
     await _require_supplier(loop, req.supplier_id)
+    await guard_conversion(req.quotation_id)
     try:
         await loop.run_in_executor(
             None, lambda: create_preorder(
                 preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
                 plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
-                deposit_confirmed=req.deposit_confirmed, price_actor=price_actor(user),
+                deposit_confirmed=req.deposit_confirmed, price_actor=price_actor(user), order_source=req.order_source,
             ),
         )
     except ValueError as e:
         raise _po_error(e)
-    return await _detail(preorder_id)
+    detail = await _detail(preorder_id)
+    await record_conversion(req.quotation_id, "so", preorder_id, detail.po_number, user)
+    return detail
 
 
 @router.get("/preorders", response_model=list[PreorderOut])
@@ -338,6 +342,7 @@ async def update_preorder_route(
                 notes=notes, update_notes=update_notes, changed_by=user["username"],
                 is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
                 set_supplier=set_supplier, supplier_id=req.supplier_id, price_actor=price_actor(user),
+                order_source=req.order_source,
             ),
         )
     except ValueError as e:

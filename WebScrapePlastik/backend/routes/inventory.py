@@ -63,6 +63,7 @@ from backend.database import (
     set_master_item_image_path,
     update_brand,
     update_master_item,
+    set_master_item_cost,
     update_supplier,
     update_unit,
     void_inbound_document,
@@ -595,10 +596,12 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
         raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     if not req.unit.strip():
         raise HTTPException(status_code=422, detail="Satuan wajib diisi.")
-    if req.sell_price < 0:
-        raise HTTPException(status_code=422, detail="Harga jual tidak boleh negatif.")
+    if req.sell_price <= 0:
+        raise HTTPException(status_code=422, detail="Harga jual wajib diisi (lebih dari 0).")
     if req.cost_price < 0:
         raise HTTPException(status_code=422, detail="Harga modal tidak boleh negatif.")
+    if user["role"] == "admin" and req.stock_qty > 0 and req.cost_price <= 0:
+        raise HTTPException(status_code=422, detail="Harga modal awal wajib diisi bila ada stok awal.")
     if req.stock_qty < 0:
         raise HTTPException(status_code=422, detail="Stok tidak boleh negatif.")
     if req.min_stock < 0:
@@ -718,10 +721,12 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
         raise HTTPException(status_code=422, detail="Nama wajib diisi.")
     if req.unit is not None and not req.unit.strip():
         raise HTTPException(status_code=422, detail="Satuan wajib diisi.")
-    if req.sell_price is not None and req.sell_price < 0:
-        raise HTTPException(status_code=422, detail="Harga jual tidak boleh negatif.")
+    if req.sell_price is not None and req.sell_price <= 0:
+        raise HTTPException(status_code=422, detail="Harga jual wajib diisi (lebih dari 0).")
     if req.min_stock is not None and req.min_stock < 0:
         raise HTTPException(status_code=422, detail="Stok minimum tidak boleh negatif.")
+    if req.cost_price is not None and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Hanya admin yang dapat mengubah harga modal.")
 
     loop = asyncio.get_event_loop()
     current = await loop.run_in_executor(None, get_master_item, master_item_id)
@@ -741,6 +746,11 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
     set_category = "category_id" in req.model_fields_set
     if set_category and req.category_id != current.get("category_id"):
         await _require_assignable_category(loop, req.category_id)
+    if req.cost_price is not None:
+        try:
+            await loop.run_in_executor(None, set_master_item_cost, master_item_id, req.cost_price, user["username"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     try:
         row = await loop.run_in_executor(
             None, lambda: update_master_item(

@@ -275,6 +275,32 @@
       color: #FAF9F5;
     }
 
+    /* Kasir buttons (owner, 24-10-2026): the colour says what a button does, the layout stays.
+       Coral = transaction, blue = operations / status, green = print, red = void / delete, slate = standard.
+       Scoped by the page id so these win over the utility classes without !important. */
+    #page-cashier .kb { --kb: #334155; --kb-h: #1E293B; --kb-tint: rgba(51,65,85,0.07); --kb-press: rgba(51,65,85,0.14);
+      transition: background-color .15s, border-color .15s, color .15s; }
+    #page-cashier .kb-primary { --kb: #BE5638; --kb-h: #A2462B; --kb-tint: rgba(190,86,56,0.08); --kb-press: rgba(190,86,56,0.16); }
+    #page-cashier .kb-ops { --kb: #1D4ED8; --kb-h: #1E40AF; --kb-tint: rgba(29,78,216,0.07); --kb-press: rgba(29,78,216,0.14); }
+    #page-cashier .kb-print { --kb: #15803D; --kb-h: #166534; --kb-tint: rgba(21,128,61,0.07); --kb-press: rgba(21,128,61,0.14); }
+    #page-cashier .kb-danger { --kb: #DC2626; --kb-h: #B91C1C; --kb-tint: rgba(220,38,38,0.07); --kb-press: rgba(220,38,38,0.14); }
+    #page-cashier .kb-solid { background-color: var(--kb); border-color: var(--kb); color: #FFFFFF; }
+    #page-cashier .kb-solid:hover { background-color: var(--kb-h); border-color: var(--kb-h); }
+    #page-cashier .kb-solid:active { background-color: var(--kb-h); box-shadow: inset 0 2px 3px rgba(0,0,0,0.18); }
+    #page-cashier .kb-outline { background-color: #FFFFFF; border-color: color-mix(in srgb, var(--kb) 45%, #FFFFFF); color: var(--kb); }
+    #page-cashier .kb-outline:hover { background-color: var(--kb-tint); border-color: var(--kb); }
+    #page-cashier .kb-outline:active, #page-cashier .kb-ghost:active { background-color: var(--kb-press); }
+    #page-cashier .kb-ghost { background-color: transparent; border-color: transparent; color: var(--kb); }
+    #page-cashier .kb-ghost:hover { background-color: var(--kb-tint); }
+    #page-cashier .kb:focus-visible { outline: 2px solid var(--kb); outline-offset: 2px; box-shadow: none; }
+    #page-cashier .kb kbd { color: inherit; opacity: .75; }
+    /* Disabled really is disabled (no click, no hover); busy = the save it started is running. */
+    #page-cashier .kb:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; box-shadow: none; }
+    #page-cashier .kb[aria-busy="true"] { opacity: .75; cursor: progress; pointer-events: none; }
+    #page-cashier .kb[aria-busy="true"]::after { content: ""; width: 12px; height: 12px; margin-left: 2px; border: 2px solid currentColor;
+      border-right-color: transparent; border-radius: 9999px; animation: kb-spin .8s linear infinite; }
+    @keyframes kb-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #page-cashier .kb[aria-busy="true"]::after { animation: none; } }
     /* Cashier workspace. Source order is strip, form, action bar, rail (so Tab reaches Simpan Nota
        before the long history list); `order` puts the rail above the bar when stacked.
        Below 1360px everything stacks in one scroll column, the strip pinned to the top and the
@@ -289,6 +315,11 @@
     .cashier-inner { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: 1rem; }
     @media (min-width: 640px) { .cashier-inner { padding-inline: 1.5rem; } }
     #receipt-list { max-height: 24rem; overflow-y: auto; }
+    /* Riwayat Nota is not part of the rail: it opens as a floating panel from "Riwayat Hari Ini". */
+    #cashier-history-card:not(.is-open) { display: none !important; }
+    #cashier-history-card.is-open { position: fixed; top: 4.5rem; right: 1rem; bottom: 1rem; width: min(24rem, calc(100vw - 2rem)); z-index: 45;
+      display: flex !important; flex-direction: column; box-shadow: 0 12px 32px rgba(20,20,19,0.14); }
+    #cashier-history-card.is-open #receipt-list { max-height: none; flex: 1 1 0%; min-height: 0; overflow-y: auto; }
     @media (min-width: 1280px) {
       .cashier-split { display: grid; overflow: hidden; width: 100%;
         grid-template-columns: minmax(0, 1fr) 17.5rem; grid-template-rows: auto minmax(0, 1fr) auto; }
@@ -302,8 +333,6 @@
       .cashier-bar > .cashier-inner { padding-right: 0.75rem; }
       .cashier-rail > * { flex: none; }
       /* The history card takes whatever height the summary leaves and scrolls inside itself. */
-      #cashier-history-card { flex: 1 1 0%; min-height: 12rem; display: flex; flex-direction: column; }
-      #receipt-list { max-height: none; flex: 1 1 0%; min-height: 0; }
     }
 
     /* Kasir item table (Gambar 01): header and rows share one template. Every cell has an explicit column per
@@ -669,6 +698,18 @@
         Sales Order
       </a>
       <div>
+        <button type="button" onclick="toggleNavGroup('quote')" data-route="/quote-group"
+          class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/></svg>
+          <span class="flex-1 text-left">Penawaran Harga</span>
+          <svg id="nav-quote-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted shrink-0 transition-transform duration-200 motion-reduce:transition-none"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div id="nav-quote-submenu" class="hidden ml-[21px] pl-3 mt-0.5 py-0.5 border-l border-line space-y-0.5">
+          <a href="#/quotations" data-route="/quotations" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Daftar Penawaran</a>
+          <a href="#/quotation-new" data-route="/quotation-new" class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Buat Penawaran Baru</a>
+        </div>
+      </div>
+      <div>
         <button type="button" onclick="toggleNavGroup('purchase')" data-route="/purchase-group"
           class="nav-link w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>
@@ -767,6 +808,10 @@
           <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9v6M9.5 12.5 12 15l2.5-2.5"/>
         </svg>
         Kas Keluar
+      </a>
+      <a href="#/company-settings" data-route="/company-settings" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/></svg>
+        Pengaturan Perusahaan
       </a>
       <a href="#/users" data-route="/users" class="admin-only nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
@@ -1011,13 +1056,13 @@
               </div>
               <!-- Owner, 23-10-2026: save / print / close actions sit at the top; F1-F3 moved under the item table. -->
               <div id="kasir-head-actions" class="flex flex-wrap items-center justify-end gap-2">
-              <button id="cashier-draft-btn" type="button" onclick="kasirDraftClick()" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Draft</button>
+              <button id="cashier-draft-btn" type="button" onclick="kasirDraftClick()" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium inline-flex items-center gap-2 kb kb-std kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>Simpan Draft</button>
               <div id="kasir-main-wrap" class="relative hidden min-w-[13rem]">
                 <div class="flex">
                   <button id="kasir-main-btn" type="button" onclick="kasirStartSave('print')"
-                    class="flex-1 px-4 py-2.5 bg-accent text-white rounded-l-xl text-sm font-semibold hover:bg-accentDark transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Simpan &amp; Cetak Nota</button>
+                    class="flex-1 px-4 py-2.5 rounded-l-xl text-sm font-semibold border kb kb-primary kb-solid">Simpan &amp; Cetak Nota</button>
                   <button id="kasir-main-menu-btn" type="button" onclick="kasirToggleSaveMenu()" aria-haspopup="menu" aria-label="Pilihan simpan lain"
-                    class="px-3 bg-accent text-white rounded-r-xl border-l border-white/30 hover:bg-accentDark transition-colors disabled:opacity-40"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                    class="px-3 rounded-r-xl border-l border kb kb-primary kb-solid"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
                 </div>
                 <div id="kasir-save-menu" role="menu" class="hidden absolute right-0 top-full mt-1 w-64 bg-white border border-line rounded-xl shadow-lg py-1 z-30">
                   <button type="button" role="menuitem" onclick="kasirStartSave('nota')" class="block text-left px-3 py-2 text-sm hover:bg-bg2">Simpan Nota<span class="block text-[11px] text-muted">Tanpa mencetak, pekerjaan belum dimulai</span></button>
@@ -1025,34 +1070,38 @@
                   <button type="button" role="menuitem" onclick="kasirStartSave('print')" class="block text-left px-3 py-2 text-sm hover:bg-bg2">Simpan &amp; Cetak Nota</button>
                 </div>
               </div>
-              <button id="cashier-save-btn" type="button" onclick="saveReceipt('save')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan Perubahan</button>
+              <!-- Owner, 24-10-2026: Aksi Cepat sits in the top bar beside Pembayaran (shown once the nota is saved). -->
+              <div id="cashier-quick-card" class="hidden flex flex-wrap items-center gap-2">
+              <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold whitespace-nowrap leading-tight kb kb-ops kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>Ubah Status Pengerjaan</button>
+              <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden inline-flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold whitespace-nowrap leading-tight kb kb-ops kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><span id="cashier-quick-handover-label">Serah Terima Kendaraan</span></button>
+              <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold whitespace-nowrap leading-tight kb kb-print kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>Cetak Nota</button>
+              </div>
+              <button id="cashier-save-btn" type="button" onclick="saveReceipt('save')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium inline-flex items-center gap-2 kb kb-primary kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>Simpan Perubahan</button>
               <button id="cashier-edit-btn" type="button" onclick="unlockActiveReceipt()"
-                class="hidden px-4 py-2.5 border border-line rounded-xl text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Ubah Nota</button>
+                class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium inline-flex items-center gap-2 kb kb-std kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>Ubah Nota</button>
               <button id="cashier-pay-btn" type="button" onclick="saveReceipt('pay')"
-                class="hidden justify-center inline-flex items-center gap-2 px-6 py-2.5 bg-accent text-bg rounded-xl text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
+                class="hidden justify-center inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium border kb kb-primary kb-solid">
                 <span id="cashier-pay-label">Lanjut ke Pembayaran</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </button>
               <div class="hidden"><button id="cashier-belum-btn" type="button" onclick="saveReceipt('belum')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Simpan (Belum Dikerjakan)</button><button id="cashier-start-btn" type="button" onclick="saveReceipt('start')" class="hidden px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-accent/60 bg-white text-ink hover:bg-accent/10">Simpan &amp; Mulai Pengerjaan</button></div>
               <button id="cashier-close-btn" type="button" onclick="closeCashierTab(activeCashierTabId)"
-              class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-transparent rounded-xl text-muted bg-white text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="text-muted" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 border rounded-xl text-sm kb kb-std kb-ghost">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               Tutup Nota
             </button>
               </div>
             </div>
             <div class="flex items-center gap-2 mt-3">
             <button id="cashier-new-btn" type="button" onclick="openNewReceiptTab()"
-              class="shrink-0 inline-flex items-center gap-2 pl-2.5 pr-4 py-2 bg-accent text-bg rounded-xl text-sm font-medium hover:bg-accentDark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
-              <span class="w-5 h-5 rounded-full bg-bg/20 grid place-items-center" aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              </span>
+              class="shrink-0 inline-flex items-center gap-2 pl-2.5 pr-4 py-2 rounded-xl text-sm font-medium border kb kb-primary kb-solid">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
               Pesanan Baru
             </button>
             <div id="cashier-tabbar" class="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto p-1"></div>
             <button id="cashier-history-btn" type="button" onclick="showCashierHistory()" aria-label="Riwayat Hari Ini" title="Riwayat Hari Ini"
-              class="shrink-0 inline-flex items-center gap-2 px-3 sm:px-4 py-2 border border-line rounded-xl bg-white text-sm text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="text-muted" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              class="shrink-0 inline-flex items-center gap-2 px-3 sm:px-4 py-2 border rounded-xl text-sm kb kb-std kb-outline">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
               <span class="hidden sm:inline">Riwayat Hari Ini</span>
             </button>
             </div>
@@ -1103,11 +1152,11 @@
                 </div>
                 <div id="kasir-nota-actions" class="col-span-full flex flex-wrap items-center gap-2 empty:hidden">
 <button id="cashier-reopen-btn" type="button" onclick="openReopenReceiptModal()"
-                  class="hidden admin-only px-4 py-1.5 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Buka Kembali (Revisi)</button>
+                  class="hidden admin-only px-4 py-1.5 border rounded-lg text-sm font-medium inline-flex items-center gap-2 kb kb-std kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Buka Kembali (Revisi)</button>
 <button id="cashier-void-btn" type="button" onclick="confirmVoidActiveReceipt()"
-                  class="hidden px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-failed/40">Void</button>
+                  class="hidden px-4 py-1.5 border rounded-lg text-sm font-medium inline-flex items-center gap-2 kb kb-danger kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>Void</button>
 <button id="cashier-delete-btn" type="button" onclick="confirmDeleteActiveReceipt()"
-                  class="hidden admin-only px-4 py-1.5 border border-failed text-failed rounded-lg text-sm font-medium hover:bg-failed/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-failed/40">Hapus</button>
+                  class="hidden admin-only px-4 py-1.5 border rounded-lg text-sm font-medium inline-flex items-center gap-2 kb kb-danger kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Hapus</button>
                 </div>
               </div>
             </section>
@@ -1132,8 +1181,8 @@
                       class="hidden absolute left-0 right-0 top-full mt-1 z-30 max-h-72 overflow-y-auto bg-white border border-line rounded-lg shadow-sm"></div>
                   </div>
                   <button id="cashier-customer-new-btn" type="button" onclick="goAddCustomerFromCashier()"
-                    class="shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 border border-accent/60 rounded-lg text-sm font-medium text-ink bg-white hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-accentDark" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    class="shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 border rounded-lg text-sm font-medium kb kb-std kb-outline">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
                     <span class="sm:hidden" aria-hidden="true">Baru</span><span class="hidden sm:inline">Pelanggan baru</span><span class="sr-only sm:hidden">Pelanggan baru</span>
                   </button>
                 </div>
@@ -1222,12 +1271,12 @@
               </div>
               <div id="item-rows" class="divide-y divide-line"></div>
               <div class="px-4 py-3.5 border-t border-line flex flex-wrap items-center gap-2">
-                <button id="kasir-f1-btn" type="button" onclick="openKasirSearch('scan')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6v12M7 6v12M10 6v12M14 6v12M17 6v12M20 6v12"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F1</kbd>Scan Barcode</button>
-                <button id="kasir-f2-btn" type="button" onclick="openKasirSearch('item')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F2</kbd>Tambah Item</button>
-                <button id="kasir-f3-btn" type="button" onclick="kasirAddService()" class="inline-flex items-center gap-2 px-3.5 py-2.5 border border-line rounded-xl bg-white text-sm font-semibold text-ink hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F3</kbd>Tambah Jasa</button>
+                <button id="kasir-f1-btn" type="button" onclick="openKasirSearch('scan')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border rounded-xl text-sm font-semibold kb kb-ops kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7v10"/><path d="M12 7v10"/><path d="M17 7v10"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F1</kbd>Scan Barcode</button>
+                <button id="kasir-f2-btn" type="button" onclick="openKasirSearch('item')" class="inline-flex items-center gap-2 px-3.5 py-2.5 border rounded-xl text-sm font-semibold kb kb-ops kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F2</kbd>Tambah Item</button>
+                <button id="kasir-f3-btn" type="button" onclick="kasirAddService()" class="inline-flex items-center gap-2 px-3.5 py-2.5 border rounded-xl text-sm font-semibold kb kb-ops kb-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><kbd class="text-[10px] font-semibold text-muted bg-bg2 border border-line rounded px-1.5 py-0.5">F3</kbd>Tambah Jasa</button>
                 <button id="kasir-del-selected" type="button" onclick="kasirDeleteSelected()" disabled
-                  class="inline-flex items-center gap-1.5 px-4 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Hapus Item Terpilih</button>
+                  class="inline-flex items-center gap-1.5 px-4 py-2 border rounded-lg text-sm font-medium kb kb-danger kb-outline">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg> Hapus Item Terpilih</button>
                 <span class="ml-auto text-xs text-muted hidden sm:inline">Enter di kolom scan menambah barang; scan ulang barang yang sama menambah Qty.</span>
               </div>
               <!-- Totals the cashier JS keeps writing; the visible copy is the Ringkasan Transaksi in the rail. -->
@@ -1385,12 +1434,11 @@
                 <option value="belum">Belum Dikerjakan</option>
                 <option value="pengerjaan">Dalam Pengerjaan</option>
               </select>
-              <button id="cashier-status-btn" type="button" onclick="openWorkStatusModal()" class="hidden px-3 py-2 border rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 border-line bg-white text-ink hover:bg-bg2">Ubah</button>
             </div>
             </div>
             <div class="block text-xs text-muted mb-1">Status Pembayaran</div>
             <div id="kasir-pay-status" class="border border-line rounded-lg px-3 py-2 text-sm bg-bg2/50 text-ink">Belum Bayar</div>
-            <button id="kasir-paynow-btn" type="button" onclick="kasirPayNow()" class="hidden mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-accent rounded-lg text-sm font-semibold text-accentDark bg-white hover:bg-accent/10 transition-colors" title="Tunai, Transfer, QRIS, Kartu Debit/Kredit">Pembayaran <span aria-hidden="true">→</span></button>
+            <button id="kasir-paynow-btn" type="button" onclick="kasirPayNow()" class="hidden mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2 border rounded-lg text-sm font-semibold kb kb-primary kb-outline" title="Tunai, Transfer, QRIS, Kartu Debit/Kredit">Pembayaran <span aria-hidden="true">→</span></button>
 
 
           </section>
@@ -1402,18 +1450,11 @@
             <div id="cashier-pay-list" class="px-4 pb-4"></div>
           </section>
 
-          <section id="cashier-quick-card" class="hidden bg-white border border-line rounded-xl" aria-labelledby="cashier-quick-title">
-            <div class="px-4 pt-4 pb-3"><h2 id="cashier-quick-title" class="font-serif text-base font-semibold text-ink">Aksi Cepat</h2></div>
-            <div class="px-4 pb-4 grid gap-2">
-              <button id="cashier-quick-status" type="button" onclick="openWorkStatusModal()" class="inline-flex items-center gap-2 px-3 py-2 border border-blue-700 rounded-lg text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 text-left leading-tight disabled:bg-blue-50 disabled:text-blue-900 disabled:border-blue-200 disabled:cursor-not-allowed transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Ubah Status Pengerjaan</button>
-              <button id="cashier-quick-handover" type="button" onclick="openHandoverModal()" class="hidden inline-flex items-center gap-2 px-3 py-2 border border-yellow-500 rounded-lg text-sm font-semibold text-black bg-yellow-400 hover:bg-yellow-500 text-left leading-tight transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17H3v-5l2-5h11l3 5h2v5h-2"/><path d="M5 12h14"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/></svg><span id="cashier-quick-handover-label">Serah Terima Kendaraan</span></button>
-              <button id="cashier-quick-print" type="button" onclick="printActiveReceiptNota()" class="inline-flex items-center gap-2 px-3 py-2 border border-green-700 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 text-left leading-tight transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>Cetak Nota</button>
-            </div>
-          </section>
 
           <section id="cashier-history-card" class="bg-white border border-line rounded-xl" aria-labelledby="cashier-history-title">
             <div class="flex items-center gap-3 px-4 pt-4 pb-3">
               <h2 id="cashier-history-title" class="font-serif text-base font-semibold text-ink">Riwayat Nota</h2>
+              <button type="button" onclick="closeCashierHistory()" class="ml-auto p-1 rounded-md text-muted hover:text-ink hover:bg-bg2" aria-label="Tutup riwayat nota">&times;</button>
             </div>
             <div class="mx-4 mb-2 grid grid-cols-2 rounded-lg bg-bg2 p-0.5 text-xs font-medium" role="group" aria-label="Rentang riwayat">
               <button type="button" data-scope="today" aria-pressed="true" onclick="setReceiptHistoryScope('today')"
@@ -2090,6 +2131,13 @@
                 <label for="po-date">Tanggal SO <span class="text-failed">*</span></label>
                 <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><input id="po-date" type="date" data-no-uppercase onchange="refreshPoNumberPreview()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
               </div>
+              <div class="po-frow">
+                <label for="po-source">Sumber Order <span class="text-failed">*</span></label>
+                <select id="po-source" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                  <option value="walk_in">Walk-in (datang ke toko)</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </div>
               <div class="po-frow items-start">
                 <label for="po-notes" class="pt-2">Catatan Pesanan</label>
                 <textarea id="po-notes" rows="3" placeholder="opsional, mis. warna, ukuran, janji pemasangan" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea>
@@ -2674,7 +2722,6 @@
         </div>
 
         <div data-spo-tab="pengiriman">
-          <div id="spo-plan-section" class="mb-4"></div>
           <div id="spo-pkg-section" class="mb-4"></div>
           <div id="spo-ship-cards" class="mb-4"></div>
           <div id="spo-ship-history-card" class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
@@ -3469,6 +3516,8 @@
     </div>
   </div>
 
+  <div id="page-quotations" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="qt-root" class="max-w-none mx-auto"></div></div>
+  <div id="page-company" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="co-root" class="max-w-none mx-auto"></div></div>
   <div id="page-credit-notes" class="hidden flex-1 overflow-auto p-4 sm:p-6">
     <div class="max-w-none mx-auto">
       <div id="cn-list-panel"></div>
@@ -4209,7 +4258,7 @@
                     <label for="new-item-cost-price" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5"><span id="new-item-cost-label">Harga Modal</span></label>
                     <div class="flex rounded-lg border border-line bg-white focus-within:ring-2 focus-within:ring-accent/30 focus-within:border-accent transition-colors">
                       <span class="px-3 grid place-items-center rounded-l-lg bg-bg2 border-r border-line text-sm text-muted select-none" aria-hidden="true">Rp</span>
-                      <input id="new-item-cost-price" type="text" inputmode="numeric" placeholder="0" oninput="updateNewItemMarginHint()"
+                      <input id="new-item-cost-price" type="text" inputmode="numeric" placeholder="0" onfocus="this.select()" oninput="updateNewItemMarginHint()"
                         class="price-input flex-1 min-w-0 px-3 py-2 text-sm bg-transparent text-ink text-right placeholder:text-muted/70 rounded-r-lg focus:outline-none" />
                     </div>
                   </div>
@@ -4217,7 +4266,7 @@
                     <label for="new-item-sell-price" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual</label>
                     <div class="flex rounded-lg border border-line bg-white focus-within:ring-2 focus-within:ring-accent/30 focus-within:border-accent transition-colors">
                       <span class="px-3 grid place-items-center rounded-l-lg bg-bg2 border-r border-line text-sm text-muted select-none" aria-hidden="true">Rp</span>
-                      <input id="new-item-sell-price" type="text" inputmode="numeric" placeholder="0" oninput="updateNewItemMarginHint()"
+                      <input id="new-item-sell-price" type="text" inputmode="numeric" placeholder="0" onfocus="this.select()" oninput="updateNewItemMarginHint()"
                         class="price-input flex-1 min-w-0 px-3 py-2 text-sm bg-transparent text-ink text-right placeholder:text-muted/70 rounded-r-lg focus:outline-none" />
                     </div>
                   </div>
@@ -5092,6 +5141,9 @@ const ROUTES = {
   "/dashboard-po": { title: "Dashboard Purchase Order", page: "page-dashboard-po" },
   "/account-payable": { title: "Aging Payable", page: "page-account-payable" },
   "/credit-notes": { title: "Credit Note Supplier", page: "page-credit-notes" },
+  "/quotations": { title: "Penawaran Harga", page: "page-quotations" },
+  "/quotation-new": { title: "Penawaran Harga", page: "page-quotations" },
+  "/company-settings": { title: "Pengaturan Perusahaan", page: "page-company" },
   "/cash-receipt": { title: "Cash Receipt / Laporan Penerimaan", page: "page-cash-receipt" },
   "/kas-keluar": { title: "Kas Keluar", page: "page-kas-keluar" },
   "/users": { title: "Pengguna", page: "page-users" },
@@ -5107,7 +5159,7 @@ const INVENTORY_ROUTES = new Set(
 // being immediately undone by it.
 let pendingInventoryAction = null;
 
-const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/kas-keluar", "/cash-receipt", "/account-payable", "/credit-notes", "/master-karyawan",
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/company-settings", "/kas-keluar", "/cash-receipt", "/account-payable", "/credit-notes", "/master-karyawan",
   "/insentif-master", "/insentif-monitoring", "/insentif-koreksi"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
@@ -5182,6 +5234,9 @@ function renderRoute() {
   if (route === "/karantina") qrLoad();
   if (route === "/retur-supplier") rtsInit();
   if (route === "/credit-notes") cnInit();
+  if (route === "/quotations") qtInit();
+  if (route === "/quotation-new") qtNew();
+  if (route === "/company-settings") coInit();
   if (route === "/service") svcInit();
   if (route === "/master-service") msvInit();
   if (route === "/sales-order") { backToPreorderList(); }
@@ -5211,6 +5266,7 @@ const DASHBOARD_ROUTES = new Set(["/dashboard", "/dashboard-so", "/dashboard-po"
 const NAV_GROUPS = {
   kasir: new Set(["/cashier", "/invoices", "/pengerjaan"]),
   purchase: new Set(["/supplier-po", "/inventory", "/purchase-invoices", "/account-payable", "/retur-supplier", "/credit-notes"]),
+  quote: new Set(["/quotations", "/quotation-new"]),
   insentif: new Set(["/insentif-master", "/insentif-monitoring", "/insentif-koreksi"]),
 };
 // Clicking the sidebar entry of the page you are already on (e.g. Monitoring Harian while a Detail Invoice is open
@@ -5223,6 +5279,8 @@ document.addEventListener("click", e => {
   else if (r === "/pengerjaan") woBack();
   else if (r === "/master-karyawan") empInit();
   else if (r === "/credit-notes") cnInit(true);
+  else if (r === "/quotations") qtInit(true);
+  else if (r === "/quotation-new") qtNew();
 });
 function toggleNavGroup(key) {
   document.getElementById(`nav-${key}-submenu`).classList.toggle("hidden");
@@ -5360,6 +5418,18 @@ const ROUTE_META = {
   "/credit-notes": {
     subtitle: "Draft dari retur → verifikasi → posting → alokasi ke faktur atau refund. Reversal disetujui Owner.",
     icon: '<path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><path d="M9 9h6M9 13h6"/><path d="m14 16-2 2-2-2"/>',
+  },
+  "/quotations": {
+    subtitle: "Surat penawaran harga untuk perorangan dan perusahaan; tidak mengubah stok, omzet, atau pembayaran.",
+    icon: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/>',
+  },
+  "/quotation-new": {
+    subtitle: "Isi penerima, pilih produk & jasa, atur naskah, lalu preview dan terbitkan PDF.",
+    icon: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>',
+  },
+  "/company-settings": {
+    subtitle: "Identitas resmi toko dan rekening yang boleh dicetak pada surat untuk customer.",
+    icon: '<path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>',
   },
   "/cash-receipt": {
     subtitle: "Laporan uang masuk dari customer: siapa membayar, untuk invoice atau SO mana, lewat apa, dan masuk ke mana.",
@@ -7634,23 +7704,35 @@ function renderCashierWorkUi() {
   show("kasir-main-wrap", editable && draftish);
   show("cashier-start-btn", false);
   show("cashier-save-btn", editable && !draftish);
-  show("cashier-status-btn", saved && !isVoid && !isDone && !draftish);
+  // Status Pengerjaan is changed only from Aksi Cepat; it waits until the nota changes are saved.
+  cashierStatusAllowed = saved && !isVoid && !isDone && !draftish;
+  syncCashierQuickStatus(tab);
   // New / Draft notas are paid from Metode & Jumlah Bayar when saved; a running nota through Pembayaran.
   show("cashier-pay-btn", saved && !draftish && !isVoid && !isDone && tab.status !== "done");
   show("cashier-belum-btn", false);
   show("kasir-paynow-btn", editable && draftish);
   document.getElementById("cashier-pay-label").textContent = saved && !draftish ? "Pembayaran" : "Lanjut ke Pembayaran";
   document.getElementById("cashier-save-btn").disabled = !tab.dirty;
-  document.getElementById("cashier-status-btn").disabled = tab.dirty;
-  document.getElementById("cashier-status-btn").title = tab.dirty ? "Simpan perubahan nota dulu" : "";
   document.getElementById("kasir-main-btn").disabled = document.getElementById("kasir-main-menu-btn").disabled = !editable;
   renderKasirRail(tab);
+}
+
+let cashierStatusAllowed = false;
+
+function syncCashierQuickStatus(tab) {
+  const btn = document.getElementById("cashier-quick-status");
+  if (!btn) return;
+  btn.disabled = !cashierStatusAllowed || !!(tab && tab.dirty);
+  btn.title = cashierStatusAllowed && tab && tab.dirty ? "Simpan perubahan nota dulu" : "";
 }
 
 const SAVE_MODE_TARGET = { draft: "draft", belum: "belum", start: "pengerjaan", pay: "belum", selesai: "selesai" };
 
 function setCashierBarDisabled(on) {
-  ["cashier-draft-btn", "cashier-belum-btn", "cashier-start-btn", "cashier-save-btn", "cashier-status-btn", "cashier-pay-btn"].forEach(id => {
+  const started = document.activeElement;
+  if (on && started && started.matches && started.matches("#page-cashier .kb")) started.setAttribute("aria-busy", "true");
+  if (!on) document.querySelectorAll('#page-cashier .kb[aria-busy="true"]').forEach(b => b.removeAttribute("aria-busy"));
+  ["cashier-draft-btn", "cashier-belum-btn", "cashier-start-btn", "cashier-save-btn", "cashier-quick-status", "cashier-pay-btn"].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.disabled = on;
   });
@@ -7734,9 +7816,11 @@ async function saveReceipt(mode = "save", opts = {}) {
   try {
     if (!isUpdate) {
       payload.work_status = target || "draft";
+      if (tab.quotationId) payload.quotation_id = tab.quotationId;   // made from an accepted Penawaran Harga: linked once on this save
       const resp = await fetchWithStockOverride("/api/receipts", { method: "POST", headers, body: JSON.stringify(payload) });
       if (!resp.ok) { const m = await responseErrorDetail(resp, "Nota tidak bisa disimpan."); revealDiscountChoice(m); showToast(m); return false; }
       tab.receiptId = (await resp.json()).receipt_id;
+      tab.quotationId = null;
     } else {
       if (tab.dirty) {
         if (tab.revision) payload.expected_revision = tab.revision;   // refused (409) if someone else changed the nota meanwhile
@@ -8067,7 +8151,9 @@ async function submitRefund() {
 // the new total is handed back at once (a negative payment on today's date).
 let returnCtx = null;
 // Only "stok" goes back on the sellable shelf; the other two wait in Stok Karantina.
-const RETURN_DEST_LABELS = { stok: "Kembali ke stok", supplier: "Diretur ke supplier", rusak: "Rusak (karantina)" };
+// Owner, 24-10-2026: a returned item goes back to stock or into quarantine; "Diretur ke supplier" is not offered here
+// (a supplier return starts from Stok Karantina / Retur Supplier).
+const RETURN_DEST_LABELS = { stok: "Kembali ke stok", rusak: "Rusak (karantina)" };
 const RETURN_REASON_LABELS = {
   salah_input: "Salah input kasir", pelanggan_batal: "Pelanggan batal", tidak_cocok: "Barang tidak cocok",
   cacat: "Barang cacat / rusak", salah_kirim: "Salah kirim / salah barang", lainnya: "Lainnya",
@@ -8101,7 +8187,7 @@ async function openReturnModal(receiptId, onDone) {
       </div>
       <p id="rt-value" class="text-xs text-muted -mt-1"></p>
       <div id="rt-dest-wrap"><div class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Barang yang dibatalkan, berapa ke mana?</div>
-        <div class="grid grid-cols-3 gap-2">${Object.entries(RETURN_DEST_LABELS).map(([k, v]) => `
+        <div class="grid grid-cols-2 gap-2">${Object.entries(RETURN_DEST_LABELS).map(([k, v]) => `
           <div><label for="rt-d-${k}" class="block text-[11px] text-muted mb-1">${v}</label>
             <input id="rt-d-${k}" type="text" inputmode="numeric" value="0" oninput="this.value=this.value.replace(/[^0-9]/g,''); updateReturnModal(false)" class="${input} text-right tabular-nums"></div>`).join("")}</div>
         <p id="rt-dest-hint" class="text-[11px] text-muted mt-1"></p></div>
@@ -8135,7 +8221,7 @@ function returnLineValue() {
 
 function returnDestSplit() {
   const n = id => parseInt(document.getElementById(id).value, 10) || 0;
-  return { stok: n("rt-d-stok"), supplier: n("rt-d-supplier"), rusak: n("rt-d-rusak") };
+  return { stok: n("rt-d-stok"), supplier: 0, rusak: n("rt-d-rusak") };
 }
 
 function updateReturnModal(resetRefund) {
@@ -8148,11 +8234,11 @@ function updateReturnModal(resetRefund) {
   document.getElementById("rt-dest-wrap").classList.toggle("hidden", voidItem);
   if (resetRefund && !voidItem) {  // new quantity or item: everything defaults back to stock
     document.getElementById("rt-d-stok").value = String(qty);
-    document.getElementById("rt-d-supplier").value = "0"; document.getElementById("rt-d-rusak").value = "0";
+    document.getElementById("rt-d-rusak").value = "0";
   }
   const sp = returnDestSplit(), sum = sp.stok + sp.supplier + sp.rusak;
   const hint = document.getElementById("rt-dest-hint");
-  hint.textContent = sum === qty ? `Total ${qty} sesuai. Hanya "Kembali ke stok" yang menambah stok jual. "Diretur ke supplier" masuk Stok Karantina sebagai kandidat Retur Supplier (lanjut dibuatkan dokumen retur); "Rusak" masuk karantina tanpa diretur.` : `Total ${sum} dari ${qty}: jumlahnya harus sama.`;
+  hint.textContent = sum === qty ? `Total ${qty} sesuai. "Kembali ke stok" menambah stok jual; "Rusak" masuk Stok Karantina (dari sana bisa diretur ke supplier).` : `Total ${sum} dari ${qty}: jumlahnya harus sama.`;
   hint.classList.toggle("text-failed", sum !== qty);
   hint.classList.toggle("text-muted", sum === qty);
   const reasonSel = document.getElementById("rt-reason-code");
@@ -8188,7 +8274,7 @@ async function submitReturn() {
   if (refund > value) return fail(`Refund maksimal ${formatIDR(value)}.`);
   if (!reasonCode) return fail("Pilih alasan pembatalan.");
   if (reasonCode === "lainnya" && reason.length < 3) return fail("Isi catatan untuk alasan Lainnya (minimal 3 karakter).");
-  if (sp.stok + sp.supplier + sp.rusak !== quantity) return fail(`Jumlah stok + supplier + rusak harus sama dengan ${quantity}.`);
+  if (sp.stok + sp.supplier + sp.rusak !== quantity) return fail(`Jumlah kembali ke stok + rusak harus sama dengan ${quantity}.`);
   const cashOut = Math.max(Math.min(ctx.paid - (ctx.total - refund), refund), 0);
   const proof = document.getElementById("rt-proof").value.trim();
   if (cashOut > 0 && !proof) return fail("Bukti refund wajib diisi (no. referensi transfer, atau nama penerima tunai).");
@@ -8463,8 +8549,8 @@ function renderCashierTimeline() {
         .map(evRow(e => e.kind === "created" ? "Nota dibuat" : e.kind === "item_changed" ? "Item diubah" : "Item ditambahkan")));
   } else if (cashierTlTab === "bayar") {
     html = table(["Waktu", "Metode", "Nominal", "Catatan", "Dilakukan Oleh"],
-      [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : "") + (pay.state && pay.state !== "sah" ? " " + payStateBadge(pay) : ""), "tabular-nums font-medium")}${td(esc(pay.state === "sah" && pay.note === "Menunggu konfirmasi dana masuk" ? "" : (pay.note || "")) + (pay.proof_ref ? ` <span class="text-muted">· bukti: ${esc(pay.proof_ref)}</span>` : "")
-        + (pay.state === "sah" && pay.confirmed_by && ["transfer", "qris"].includes(pay.method) ? ` <span class="text-done">✓ Dana masuk dikonfirmasi ${esc(pay.confirmed_by)}${pay.confirmed_at ? ", " + esc(formatReceiptWhen(pay.confirmed_at, true)) : ""}</span>` : "")
+      [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : "") + (pay.state && pay.state !== "sah" ? " " + payStateBadge(pay) : ""), "tabular-nums font-medium")}${td(esc(pay.note === "Menunggu konfirmasi dana masuk" ? "" : (pay.note || "")) + (pay.proof_ref ? ` <span class="text-muted">· bukti: ${esc(pay.proof_ref)}</span>` : "")
+        + cashierPayFundsNote(pay)
         + (pay.state === "pending" ? " " + payActionButtons("nota", tab.receiptId, pay) : "") + (pay.state === "gagal" && pay.fail_reason ? ` <span class="text-failed">· ${esc(pay.fail_reason)}</span>` : ""), "min-w-[20rem] whitespace-normal break-words leading-relaxed")}${td(esc(pay.created_by || "-"))}</tr>`));
   } else if (cashierTlTab === "status") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
@@ -8475,6 +8561,20 @@ function renderCashierTimeline() {
       preorders.map(po => `<tr class="border-b border-line last:border-b-0">${td(`<span class="font-mono">${esc(po.po_number || po.id)}</span>`)}${td(esc(po.customer_name || "-"))}${td(String(po.item_count))}${td(esc(formatIDR(po.dp_allocated)), "tabular-nums")}${td(`<a href="#/sales-order" onclick="openPreorderFromDashboard('${esc(po.id)}'); return false;" class="text-accentDark hover:underline">Buka</a>`)}</tr>`));
   }
   document.getElementById("cashier-timeline").innerHTML = html;
+}
+
+// Riwayat Pembayaran: where a transfer / QRIS went, who sent it and who checked the money arrived.
+function cashierPayFundsNote(pay) {
+  if (!["transfer", "qris"].includes(pay.method) || pay.amount <= 0) return "";
+  const dest = pay.method === "transfer" ? (pay.transfer_account ? `ke rekening ${pay.transfer_account}` : "") : "via QRIS";
+  const from = pay.method === "transfer" && pay.transfer_sender ? `dari ${pay.transfer_sender}` : "";
+  const where = [dest, from].filter(Boolean).join(" ");
+  if (pay.state === "sah") {
+    const by = pay.confirmed_by ? `, dikonfirmasi oleh ${pay.confirmed_by}${pay.confirmed_at ? " (" + formatReceiptWhen(pay.confirmed_at, true) + ")" : ""}` : "";
+    return ` <span class="text-done">✓ Dana masuk${where ? " " + esc(where) : ""}${esc(by)}</span>`;
+  }
+  if (pay.state === "pending") return ` <span class="text-pending">Menunggu dana masuk${where ? " " + esc(where) : ""}.</span>`;
+  return where ? ` <span class="text-muted">${esc(where)}</span>` : "";
 }
 
 // Right rail extras for a saved nota: the payment list and Aksi Cepat.
@@ -8491,13 +8591,13 @@ function renderCashierRailExtras() {
   const list = cashierTlData.payments;
   const trash = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
   document.getElementById("cashier-pay-list").innerHTML = list.length
-    ? `<table class="w-full text-xs"><thead><tr class="bg-bg2 text-[10px] uppercase tracking-wider text-muted"><th class="text-left font-medium px-2 py-1.5">Tanggal</th><th class="text-left font-medium px-2 py-1.5">Metode</th><th class="text-right font-medium px-2 py-1.5">Nominal</th><th class="px-1 py-1.5"></th></tr></thead><tbody>${
-        list.map(p => `<tr class="border-b border-line last:border-b-0 ${p.reversed || p.state === "gagal" ? "text-muted line-through" : ""}"><td class="px-2 py-1.5 tabular-nums">${esc(formatReceiptWhen(p.paid_at, true))}</td><td class="px-2 py-1.5">${esc(PAYMENT_METHOD_LABELS[p.method] || p.method)}${p.reversed_of ? ' <span class="no-underline text-[10px] text-failed">batal</span>' : ""}${p.state && p.state !== "sah" ? " " + payStateBadge(p) : ""}${p.state === "pending" ? `<div>${payActionButtons("nota", tab.receiptId, p)}</div>` : ""}</td><td class="px-2 py-1.5 text-right tabular-nums font-medium">${esc((p.amount < 0 ? "-" : "") + formatIDR(Math.abs(p.amount)))}</td>
+    ? `<table class="w-full text-xs"><thead><tr class="bg-bg2 text-[10px] uppercase tracking-wider text-muted"><th class="text-left font-medium px-2 py-1.5">Tanggal</th><th class="text-right font-medium px-2 py-1.5">Nominal</th><th class="px-1 py-1.5"></th></tr></thead><tbody>${
+        list.map(p => `<tr class="border-b border-line last:border-b-0 ${p.reversed || p.state === "gagal" ? "text-muted line-through" : ""}"><td class="px-2 py-1.5 tabular-nums whitespace-nowrap">${esc(formatReceiptWhen(p.paid_at, true))}</td><td class="px-2 py-1.5 text-right tabular-nums font-medium whitespace-nowrap">${esc((p.amount < 0 ? "-" : "") + formatIDR(Math.abs(p.amount)))}${p.reversed_of ? '<div class="no-underline text-[10px] text-failed">batal</div>' : ""}${p.state && p.state !== "sah" ? "<div>" + payStateBadge(p) + "</div>" : ""}</td>
           <td class="px-1 py-1.5 text-right">${p.amount > 0 && !p.reversed && p.state === "sah" && tab.status !== "void" && !(tab.status === "done" && tab.workStatus === "selesai") ? `<button type="button" class="admin-only text-failed hover:bg-failed/10 rounded p-1" title="Batalkan pembayaran" aria-label="Batalkan pembayaran" onclick="openReversePaymentModal(${p.id})">${trash}</button>` : ""}</td></tr>`).join("")
       }</tbody></table>`
     : `<p class="text-xs text-muted">Belum ada pembayaran.</p>`;
   const q = (id) => document.getElementById(id);
-  q("cashier-quick-status").disabled = !!q("cashier-status-btn")?.classList.contains("hidden");
+  syncCashierQuickStatus(tab);
   q("cashier-quick-status").classList.toggle("hidden", !kasirHasJob(tab));
   q("cashier-quick-print").disabled = false;
   // K-08: Serah Terima is offered once the work is Selesai; it also shows who took the vehicle and when.
@@ -9085,14 +9185,26 @@ function setReceiptHistoryScope(scope) {
   renderReceiptHistory();
 }
 
-// The strip's "Riwayat Hari Ini": jump to the history card on today's scope. On the two-column
-// layout the card is already in view, so this mostly just resets the scope and moves focus in.
+// The strip's "Riwayat Hari Ini": opens Riwayat Nota as a floating panel on today's scope (a second click closes it).
 function showCashierHistory() {
+  const card = document.getElementById("cashier-history-card");
+  if (card.classList.contains("is-open")) { closeCashierHistory(); return; }
   setReceiptHistoryScope("today");
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  document.getElementById("cashier-history-card").scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  card.classList.add("is-open");
   (document.querySelector("#receipt-list button") || document.querySelector(".cashier-scope-btn.is-active"))?.focus({ preventScroll: true });
 }
+
+function closeCashierHistory() {
+  document.getElementById("cashier-history-card")?.classList.remove("is-open");
+}
+
+// Picking a nota, clicking outside the panel or pressing Escape closes it.
+document.addEventListener("click", (e) => {
+  const card = document.getElementById("cashier-history-card");
+  if (!card || !card.classList.contains("is-open") || e.target.closest("#cashier-history-btn")) return;
+  if (!card.contains(e.target) || e.target.closest('#receipt-list button[onclick^="viewReceipt"], #receipt-list button[onclick^="setActiveCashierTab"]')) setTimeout(closeCashierHistory, 0);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCashierHistory(); });
 
 // Unsaved tabs (no receiptId yet) shown at the top of Riwayat Nota as drafts. The active tab is
 // read from the form, since its tab state is only written back on a switch or close.
@@ -14797,12 +14909,15 @@ function openMasterForm(mode, item, prefillName) {
   g("new-item-name").value = (item ? item.name : (prefillName || "")).toUpperCase();
   if (item) setUnitSelectValue(g("new-item-unit"), item.unit); else g("new-item-unit").value = "";
   const costEl = g("new-item-cost-price"), sellEl = g("new-item-sell-price");
+  // 0 shows as an empty field (placeholder "0"), so typing a price never ends up in front of a leftover zero.
   if (item) {
-    setPriceInput(costEl, isEdit ? item.avg_cost_price : item.last_cost_price);
-    setPriceInput(sellEl, item.sell_price);
+    setPriceInput(costEl, (isEdit ? item.avg_cost_price : item.last_cost_price) || "");
+    setPriceInput(sellEl, item.sell_price || "");
   } else { costEl.value = ""; sellEl.value = ""; }
-  costEl.disabled = isEdit;
-  g("new-item-cost-label").textContent = isEdit ? "Harga Modal Rata-rata" : "Harga Modal Awal";
+  // With stock on hand the cost is the Barang Masuk average; while the product holds none an admin may fill it in.
+  const costOpen = !isEdit || (isAdmin() && !item.stock_qty && !item.quarantine_qty);
+  costEl.disabled = !costOpen;
+  g("new-item-cost-label").textContent = !isEdit ? "Harga Modal Awal" : costOpen ? "Harga Modal (stok 0, boleh diisi)" : "Harga Modal Rata-rata";
   const stockEl = g("new-item-stock-initial");
   stockEl.value = isEdit ? String(item.stock_qty) : "0";
   stockEl.disabled = isEdit || isDup;
@@ -14826,7 +14941,7 @@ function openMasterForm(mode, item, prefillName) {
     : isDup ? `Salin data master dari barang yang sudah ada untuk membuat produk baru. Sumber: ${item.name} — ${item.sku}`
     : "Tambahkan produk baru ke master barang inventori.";
   const banner = g("mf-banner");
-  const bannerText = isEdit ? "SKU dan merek tidak dapat diubah karena membentuk kode SKU barang. Supplier hanya dapat diganti oleh admin; SKU tetap sama. Harga modal dihitung otomatis dari barang masuk."
+  const bannerText = isEdit ? "SKU dan merek tidak dapat diubah karena membentuk kode SKU barang. Supplier hanya dapat diganti oleh admin; SKU tetap sama. Harga modal dihitung otomatis dari barang masuk; selama stok 0, Admin boleh mengisinya."
     : isDup ? "Hanya data master yang disalin. Stok, riwayat transaksi, dan data pergerakan barang tidak ikut disalin. Ubah nama sebelum menyimpan: nama yang sama untuk supplier dan merek ini sudah ada."
     : "";
   banner.textContent = bannerText;
@@ -14965,18 +15080,21 @@ async function submitMasterFormEdit() {
   if (!unit) { showToast("Satuan tidak boleh kosong."); return; }
   if (minStock === null) { showToast("Stok minimum wajib diisi."); return; }
   if (!selectedItemCategoryId()) { showToast("Kategori wajib dipilih."); return; }
+  const sellPrice = priceValue(document.getElementById("new-item-sell-price"));
+  if (sellPrice <= 0) { showToast("Harga jual wajib diisi."); document.getElementById("new-item-sell-price").focus(); return; }
+  const costEl = document.getElementById("new-item-cost-price");
+  const costPrice = !costEl.disabled && priceValue(costEl) !== (item.avg_cost_price || 0) ? priceValue(costEl) : undefined;
   if (newItemImageBusy) { showToast("Foto masih diproses. Coba lagi sebentar."); return; }
   const saveBtn = document.getElementById("new-item-save-btn");
   const saveLabel = document.getElementById("new-item-save-label");
   saveBtn.disabled = true;
   saveLabel.textContent = "Menyimpan…";
   try {
-    const sellPrice = priceValue(document.getElementById("new-item-sell-price"));
     const resp = await fetch(`/api/inventory/master-items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name, unit, sell_price: sellPrice, min_stock: minStock, expected_updated_at: item.updated_at || undefined,
+        name, unit, sell_price: sellPrice, cost_price: costPrice, min_stock: minStock, expected_updated_at: item.updated_at || undefined,
         supplier_id: isAdmin() ? (Number(document.getElementById("new-item-supplier").dataset.selectedId) || undefined) : undefined,
         description: document.getElementById("new-item-description").value,
         location: document.getElementById("new-item-location").value,
@@ -15028,6 +15146,8 @@ async function submitNewMasterItem(keepAdding) {
   if (!name) { showToast("Nama barang tidak boleh kosong."); return; }
   if (!unit) { showToast("Satuan tidak boleh kosong."); return; }
   if (!selectedItemCategoryId()) { showToast("Kategori wajib dipilih."); return; }
+  if (sellPrice <= 0) { showToast("Harga jual wajib diisi."); document.getElementById("new-item-sell-price").focus(); return; }
+  if (isAdmin() && stockQty > 0 && costPrice <= 0) { showToast("Harga modal awal wajib diisi bila ada stok awal."); document.getElementById("new-item-cost-price").focus(); return; }
   if (newItemImageBusy) { showToast("Foto masih diproses. Coba lagi sebentar."); return; }
 
   // The save can now take two requests, so the button is held until both are done.
@@ -16022,7 +16142,8 @@ async function empToggle(id, on) {
 }
 
 // ── Proses Pengerjaan (mockups 08 / 09) ───────────────────────────────────────
-let woState = { scope: "aktif", q: "", openId: null };
+// Owner, 24-10-2026: monitoring only. Work status, items and payments are changed in the Kasir, never here.
+let woState = { scope: "aktif", q: "", from: "", to: "", openId: null };
 let woSeq = 0;
 function woInit() { woState.openId ? woOpen(woState.openId) : woList(); }
 function woBack() { woState.openId = null; woList(); }
@@ -16030,13 +16151,20 @@ async function woList() {
   const seq = ++woSeq;
   pgLoading("wo-root");
   try {
-    const d = await grApi(`/api/work-orders?scope=${woState.scope}&q=${encodeURIComponent(woState.q)}`);
+    const d = await grApi(`/api/work-orders?scope=${woState.scope}&q=${encodeURIComponent(woState.q)}`
+      + (woState.from ? `&date_from=${woState.from}` : "") + (woState.to ? `&date_to=${woState.to}` : ""));
     if (seq !== woSeq) return;
     const tab = (k, l) => `<button type="button" onclick="woState.scope='${k}'; woList()" class="px-3 py-1.5 rounded-lg text-sm ${woState.scope === k ? "bg-accent/10 text-accentDark font-semibold border border-accent/40" : "border border-line text-ink bg-white hover:bg-bg2"}">${l}</button>`;
     document.getElementById("wo-root").innerHTML = pgHead("Kasir", "Proses Pengerjaan", "Nota berjalan: progres pemasangan per item dan pembayaran dicatat terpisah. Nota lunas belum tentu selesai, dan sebaliknya.")
       + `<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">${grStat("amber", "Antrian", d.counts.antrian, "Pekerjaan menunggu teknisi")}
          ${grStat("blue", "Sedang dikerjakan", d.counts.dikerjakan, "Pekerjaan berjalan")}${grStat("green", "Selesai", d.counts.selesai, "Pekerjaan item selesai")}</div>`
       + grCard("Daftar Nota", `<div class="flex flex-wrap items-center gap-2 mb-3">${tab("aktif", "Berjalan")}${tab("selesai", "Pengerjaan selesai")}${tab("semua", "Semua")}
+          <span class="flex flex-wrap items-center gap-1.5 text-sm text-muted" title="Nota yang dikerjakan pada tanggal ini, termasuk mobil yang menginap">Tanggal
+            <input type="date" aria-label="Dari tanggal" value="${esc(woState.from)}" data-no-uppercase onchange="woSetDates(this.value, woState.to)" class="${GR_IN} !w-auto">
+            <span>s/d</span>
+            <input type="date" aria-label="Sampai tanggal" value="${esc(woState.to)}" data-no-uppercase onchange="woSetDates(woState.from, this.value)" class="${GR_IN} !w-auto">
+            <button type="button" onclick="woSetDates(toDateInputValue(new Date()), toDateInputValue(new Date()))" class="px-3 py-1.5 rounded-lg text-sm border border-line text-ink bg-white hover:bg-bg2">Hari ini</button>
+            ${woState.from || woState.to ? `<button type="button" onclick="woSetDates('', '')" class="px-2 py-1.5 rounded-lg text-sm text-muted hover:text-ink" aria-label="Hapus filter tanggal">&times; Semua tanggal</button>` : ""}</span>
           <input type="search" placeholder="Cari plat, nomor nota, pelanggan…" value="${esc(woState.q)}" onkeydown="if(event.key==='Enter'){woState.q=this.value; woList()}" class="${GR_IN} sm:max-w-xs ml-auto"></div>`
         + pgTable(["Nota", "Kendaraan", "Pelanggan", "Teknisi", { label: "Progres" }, "Pengerjaan", "Pembayaran", { label: "Total", right: true }, ""], d.rows.map(r => {
           const pay = PG_PAY(r), work = PG_WORK[r.work_status] || ["gray", r.work_status];
@@ -16047,9 +16175,15 @@ async function woList() {
             <td class="${GR_TD} tabular-nums">${r.job_count ? `${r.jobs_done}/${r.job_count} selesai` : '<span class="text-muted">Tanpa pemasangan</span>'}</td>
             <td class="${GR_TD}">${grPill(work[0], work[1])}</td><td class="${GR_TD}">${grPill(pay[0], pay[1])}</td>
             <td class="${GR_TD} text-right tabular-nums">${formatIDR(r.total)}</td>
-            <td class="${GR_TD}"><button type="button" class="${GR_BTN3} !py-1.5">Buka</button></td></tr>`;
+            <td class="${GR_TD}"><button type="button" class="${GR_BTN3} !py-1.5">Lihat</button></td></tr>`;
         }), "Tidak ada nota pada filter ini."));
   } catch (e) { if (seq === woSeq) pgError("wo-root", e.message, "woList()"); }
+}
+function woSetDates(from, to) {
+  // Picking only one end, or ends in the wrong order, still gives a sensible range.
+  if (from && to && from > to) [from, to] = [to, from];
+  woState.from = from || ""; woState.to = to || "";
+  woList();
 }
 async function woOpen(id) {
   woState.openId = id;
@@ -16066,28 +16200,17 @@ function woRenderDetail(d) {
   const jobs = items.filter(i => i.technicians.length);
   const sah = d.payments.filter(p => p.state === "sah");
   const paid = Number(r.amount_paid) || 0, total = Number(r.total) || 0, sisa = Math.max(total - paid, 0);
-  const allJobsDone = jobs.length > 0 && jobs.every(j => ["selesai", "batal"].includes(j.work_status));
-  const workDone = r.work_status === "selesai", lunas = r.status === "done", closed = workDone && lunas;
+  const workDone = r.work_status === "selesai", lunas = r.status === "done";
   const work = PG_WORK[r.work_status] || ["gray", r.work_status], pay = PG_PAY(r);
   const title = workDone ? "Pekerjaan Selesai & Pelunasan" : "Nota Aktif, DP & Pengerjaan";
   const sub = workDone ? "Status pekerjaan dan pembayaran diverifikasi secara terpisah." : "Invoice tetap berjalan selama pemasangan; DP tidak mengubah status kerja.";
   const lastPay = [...sah].reverse().find(p => p.amount > 0);
   const kindOf = (p, i) => p.kind === "refund" || p.amount < 0 ? "Refund" : p.kind === "pindah" ? "Pindah DP" : i === 0 && p.amount < total ? "DP" : (sah.slice(0, i + 1).reduce((a, x) => a + x.amount, 0) >= total ? "Pelunasan" : "Pembayaran");
-  const jobBtns = it => {
-    if (closed || r.status === "void" || !it.technicians.length) return "";
-    const b = (st, label, cls = GR_BTN3) => `<button type="button" class="${cls} !py-1 !px-2.5 text-xs" onclick="woSetJob('${r.id}', ${it.id}, '${st}')">${label}</button>`;
-    const s = it.work_status || "antrian";
-    return `<div class="flex flex-wrap gap-1.5 mt-1">${s === "antrian" ? b("dikerjakan", "Mulai") : ""}${s !== "selesai" && s !== "batal" ? b("selesai", "Selesai", GR_BTN2) : ""}
-      ${s === "selesai" ? b("dikerjakan", "Buka lagi") : ""}${isAdmin() && s !== "batal" && s !== "selesai" ? b("batal", "Batalkan", GR_BTND) : ""}</div>`;
-  };
   const statusCell = it => it.technicians.length ? (PG_JOB[it.work_status || "antrian"] ? grPill(...PG_JOB[it.work_status || "antrian"]) : "")
     + (it.work_done_at ? `<div class="text-[11px] text-muted mt-0.5">${pgDateTime(it.work_done_at)}${it.work_done_by ? " · " + esc(it.work_done_by) : ""}</div>` : "")
     : it.item_type === "jasa" ? grPill("gray", "Jasa tanpa teknisi") : grPill("green", "Siap diserahkan");
   document.getElementById("wo-root").innerHTML = pgHead("Kasir / Proses Pengerjaan", title, sub,
-    `<button type="button" class="${GR_BTN3}" onclick="woBack()">&larr; Daftar</button>
-     <button type="button" class="${GR_BTN3}" onclick="woOpenInCashier('${r.id}', 'print')">${workDone ? "Lihat Invoice" : "Cetak Nota"}</button>
-     ${!closed && r.status !== "void" ? `<button type="button" class="${GR_BTN}" onclick="woOpenInCashier('${r.id}', 'edit')">+ Tambah Item</button>` : ""}
-     ${!workDone && r.status !== "void" ? `<button type="button" class="${GR_BTN}" onclick="woFinish('${r.id}', ${allJobsDone})">Selesai &amp; Tutup Nota</button>` : ""}`)
+    `<button type="button" class="${GR_BTN3}" onclick="woBack()">&larr; Daftar</button>`)
     + `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         ${grStat(workDone ? "green" : "rose", workDone ? "Pekerjaan" : "Total Nota", workDone ? "Selesai" : formatIDR(total), workDone ? `${jobs.length} pekerjaan` : `${items.length} item • ${jobs.length} pekerjaan`)}
         ${grStat(workDone ? "rose" : "blue", workDone ? "Total Transaksi" : "DP / Dibayar", formatIDR(workDone ? total : paid), workDone ? "Nota terbaru" : (sah.length ? `${sah.length} pembayaran sah` : "Belum ada pembayaran"))}
@@ -16100,13 +16223,11 @@ function woRenderDetail(d) {
           <td class="${GR_TD} tabular-nums">${it.quantity}${it.returned_qty ? `<div class="text-[11px] text-failed">retur ${it.returned_qty}</div>` : ""}</td>
           <td class="${GR_TD}">${esc(it.technicians.map(t => t.name).join(" + ") || "—")}</td>
           <td class="${GR_TD}">${esc(it.sales_name || r.sales_name || "—")}</td>
-          <td class="${GR_TD}">${statusCell(it)}${jobBtns(it)}</td></tr>`))
-        + `<div class="mt-3">${grNote("blue", "Nota boleh mendapat tambahan item tanpa menghilangkan DP yang sudah tercatat. Tambahan item dibuat di Kasir sebagai baris baru.")}</div>`)}
+          <td class="${GR_TD}">${statusCell(it)}</td></tr>`))
+        + `<div class="mt-3">${grNote("blue", "Halaman ini hanya untuk memantau. Status pengerjaan, tambahan item, dan pembayaran diubah di Kasir.")}</div>`)}
       ${grCard("Riwayat Pengerjaan", d.events.length ? `<ul class="space-y-2 text-sm">${d.events.map(e => `<li class="flex gap-3"><span class="text-[11px] text-muted tabular-nums w-24 shrink-0">${pgDateTime(e.at)}</span><span class="text-ink">${esc(e.note || "")}${e.by_user ? ` <span class="text-muted">· ${esc(e.by_user)}</span>` : ""}</span></li>`).join("")}</ul>` : `<p class="text-sm text-muted">Belum ada catatan.</p>`)}</div>
-      <div>${grCard("Pembayaran & Tindakan", `<div class="space-y-3">${pgField("Metode pembayaran terakhir", lastPay ? `${esc(payMethodLabel(lastPay.method))} • ${formatIDR(lastPay.amount)}` : "")}
+      <div>${grCard("Pembayaran", `<div class="space-y-3">${pgField("Metode pembayaran terakhir", lastPay ? `${esc(payMethodLabel(lastPay.method))} • ${formatIDR(lastPay.amount)}` : "")}
           ${pgField("Status pembayaran", pay[1])}
-          <div class="flex flex-wrap gap-2">${!closed && r.status !== "void" ? `<button type="button" class="${GR_BTN3}" onclick="woOpenInCashier('${r.id}', 'edit')">+ Tambah Item</button>` : ""}
-            ${!lunas && r.status !== "void" ? `<button type="button" class="${GR_BTN}" onclick="woOpenInCashier('${r.id}', 'pay')">${paid ? "Terima Pelunasan" : "Terima Pembayaran"}</button>` : ""}</div>
           ${grNote("blue", "Saldo dihitung dari total nota terbaru dikurangi pembayaran sah.")}</div>`)}
       ${grCard("Riwayat Pembayaran", pgTable(["Jenis", { label: "Nominal", right: true }, "Waktu", "Status"], d.payments.map((p, i) => `<tr>
           <td class="${GR_TD}">${kindOf(p, sah.indexOf(p))}<div class="text-[11px] text-muted">${esc(payMethodLabel(p.method))}</div></td>
@@ -16116,33 +16237,6 @@ function woRenderDetail(d) {
         + `<div class="mt-3">${grNote("green", "Pelunasan tidak mengubah status pengerjaan, dan pekerjaan selesai tidak mengubah status bayar.")}</div>`)}</div></div>`;
 }
 function payMethodLabel(m) { return { cash: "Tunai", transfer: "Transfer", qris: "QRIS", debit: "Kartu Debit/Kredit" }[m] || m || "-"; }
-async function woSetJob(rid, itemId, status) {
-  try { woRenderDetail(await grApi(`/api/receipts/${encodeURIComponent(rid)}/items/${itemId}/work`, "POST", { status })); showToast("Status pekerjaan disimpan.", "success"); }
-  catch (e) { showToast(e.message); }
-}
-function woFinish(rid, allDone) {
-  openModal("Selesai & Tutup Nota", `<div class="space-y-3 text-sm">
-    <p class="text-ink">Tandai pengerjaan nota ini <strong>Selesai</strong>.${allDone ? "" : " Pekerjaan item yang belum ditandai selesai akan ikut ditandai selesai."}</p>
-    ${grNote("amber", "Status pembayaran tidak berubah. Nota baru tertutup bila sudah Lunas dan Pengerjaan Selesai.")}
-    <div class="flex justify-end gap-2"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Kembali</button>
-      <button type="button" class="${GR_BTN}" onclick="woFinishSend('${rid}')">Tandai Selesai</button></div></div>`);
-}
-async function woFinishSend(rid) {
-  try {
-    const resp = await fetchWithStockOverride(`/api/receipts/${encodeURIComponent(rid)}/work-status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: "selesai" }) });
-    if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Status nota tidak bisa diubah."));
-    closeModal(); showToast("Pengerjaan selesai.", "success"); woOpen(rid);
-  } catch (e) { showToast(e.message); }
-}
-// Adding items and taking payments stay in the Kasir, which owns those flows (stock, Harga Khusus, payment rules).
-async function woOpenInCashier(rid, what) {
-  location.hash = "/cashier";
-  await viewReceipt(rid);
-  if (what === "edit") { const t = getActiveTab(); if (t && t.locked) unlockActiveReceipt(); focusItemEntryRow(); }
-  if (what === "pay") openCashierSettleModal();
-  if (what === "print") printActiveReceiptNota();
-}
-
 // ── Insentif (admin; mockups 10-19) ──────────────────────────────────────────
 const INS_PILL = { estimasi: "blue", belum_syarat: "gray", menunggu: "amber", disetujui: "green", ditolak: "red", batal: "gray" };
 const INS_RULE_PILL = { aktif: "green", nonaktif: "gray", terjadwal: "blue", belum_ada: "gray" };
@@ -19950,6 +20044,7 @@ let poProductSearchState = new WeakMap(); // row product input -> { results, tim
 let pendingPreorderId = null;
 // Where the form's / print preview's back link returns to.
 let poFormOrigin = "list";
+let poQuotationId = null;   // a new Sales Order being made from an accepted Penawaran Harga (linked once on save)
 let poPrintOrigin = "list";
 
 function showPreorderPanel(id) {
@@ -20124,7 +20219,8 @@ function renderPreorderList(rows) {
     tr.innerHTML = `
       <td class="px-3 py-2.5 whitespace-nowrap">
         <div class="font-medium text-ink tabular-nums">${esc(r.po_number)}</div>
-        ${r.receipt_no ? `<div class="text-[11px] text-muted tabular-nums">${esc(r.receipt_no)}</div>` : ""}</td>
+        ${r.receipt_no ? `<div class="text-[11px] text-muted tabular-nums">${esc(r.receipt_no)}</div>` : ""}
+        <div class="mt-1">${soSourceBadge(r.order_source)}</div></td>
       <td class="px-3 py-2.5">
         <div class="text-ink">${esc(r.customer_name)}</div>
         <div class="text-[11px] text-muted whitespace-nowrap tabular-nums">${esc(r.plate_full || "—")} · ${esc(r.customer_phone)}</div></td>
@@ -20195,6 +20291,7 @@ async function openPreorderEdit(preorderId) {
 
 // ── Preorder: new / edit form ────────────────────────────────────────────────
 function newPreorderForm() {
+  poQuotationId = null;
   renderPreorderForm(null);
 }
 
@@ -20227,6 +20324,7 @@ async function renderPreorderForm(detail) {
   document.getElementById("po-number").value = editing ? detail.po_number : "";
   if (!editing) refreshPoNumberPreview();
   document.getElementById("po-notes").value = editing ? (detail.notes || "") : "";
+  document.getElementById("po-source").value = editing ? (detail.order_source || "walk_in") : "walk_in";
   document.getElementById("po-item-rows").innerHTML = "";
   if (editing) for (const item of detail.items) addPreorderRow(item);
   else addPreorderRow();
@@ -20716,10 +20814,12 @@ function collectPreorderPayload(asDraft) {
     plate_full: getPoPlate(),
     po_date: document.getElementById("po-date").value || null,
     notes: document.getElementById("po-notes").value.trim() || null,
+    order_source: document.getElementById("po-source").value,
     is_draft: asDraft,
     items,
   };
   if (!currentPreorder) {
+    if (poQuotationId) payload.quotation_id = poQuotationId;
     payload.deposit = priceValue(document.getElementById("po-deposit"));
     payload.deposit_method = document.getElementById("po-deposit-method").value;
     payload.deposit_confirmed = ["transfer", "qris"].includes(payload.deposit_method) ? document.getElementById("po-deposit-confirmed").checked : null;
@@ -20728,6 +20828,11 @@ function collectPreorderPayload(asDraft) {
 }
 
 const SO_MIN_DP_PERCENT = 30;   // mirrors backend database.SO_MIN_DP_PERCENT
+function soSourceBadge(source) {
+  return source === "whatsapp"
+    ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-green-50 text-green-800 border border-green-200">WhatsApp</span>'
+    : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-bg2 text-ink border border-line">Walk-in</span>';
+}
 function soMinDp(total) { return Math.ceil(total * SO_MIN_DP_PERCENT / 100); }
 
 function validatePreorderPayload(payload) {
@@ -20785,6 +20890,7 @@ async function savePreorder(asDraft = false) {
       throw new Error(typeof err.detail === "string" ? err.detail : "Gagal menyimpan sales order");
     }
     const detail = await resp.json();
+    if (!editing) poQuotationId = null;
     if (asDraft) {
       showToast("Draft tersimpan.", "success");
       await backToPreorderList();
@@ -21011,6 +21117,7 @@ function renderPreorderDetail(detail) {
     poInfoRow("Nomor Sales Order", `<span class="font-medium tabular-nums">${esc(detail.po_number)}</span>${detail.is_draft
       ? ' <span class="ml-1.5 align-middle text-[10px] uppercase tracking-wider text-muted border border-line rounded px-1.5 py-0.5">Draft</span>' : ""}`),
     poInfoRow("Tanggal", `<span class="tabular-nums">${esc(poDateTimeLabel(detail))}</span>`),
+    poInfoRow("Sumber Order", soSourceBadge(detail.order_source)),
     poInfoRow("Nama Customer", esc(detail.customer_name)),
     poInfoRow("Plat Mobil", esc(detail.plate_full) || '<span class="text-muted">—</span>'),
     ...(detail.supplier_name ? [poInfoRow("Supplier", esc(detail.supplier_name))] : []),
@@ -23328,17 +23435,9 @@ function spoShipMethodPill(m) {
   return m ? `<span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-medium ${SPO_SHIP_METHOD_CLS[m] || "bg-bg2 text-ink"}">${esc(SPO_SHIP_METHODS[m] || m)}</span>` : '<span class="text-muted">&mdash;</span>';
 }
 
-// Rencana Pengiriman (owner, 22-10-2026): the route of every unit is set here, in one table per PO. Each route is
-// a package; forwarder, resi, ETA and status are filled on the package card, never per item.
-let spoPlanExtra = new Set();
-const SPO_PLAN_DEFAULT = ["udara", "laut"];
-function spoPlanMethods(plan) {
-  const order = Object.keys(plan.methods);
-  const on = new Set([...SPO_PLAN_DEFAULT, ...plan.used_methods, ...spoPlanExtra]);
-  return order.filter(m => on.has(m));
-}
+// Rencana Pengiriman (owner, 24-10-2026): the packages themselves. Each package carries its route (Udara / Laut ...),
+// forwarder, resi, ETA and status; units are split over routes by adding packages (+ Paket), never per item.
 function renderSpoShippingTab(po) {
-  renderSpoPlan(po);
   renderSpoPackages(po);
   const plan = po.shipping_plan || { rows: [] };
   const live = po.items.filter(i => i.item_status !== "dibatalkan");
@@ -23353,9 +23452,9 @@ function renderSpoShippingTab(po) {
         ? `<div class="text-[11px] text-muted mt-1">Data per item (lama): ${esc([SPO_SHIP_METHODS[i.ship_method] || i.ship_method, i.courier, i.tracking_no ? "resi " + i.tracking_no : ""].filter(Boolean).join(" · "))} — ${esc((SPO_ITEM_STATUS[i.item_status] || [i.item_status])[0])}</div>` : "";
       return `<div class="py-2.5 flex flex-wrap items-start gap-x-4 gap-y-1.5">
         <div class="min-w-[220px] flex-1"><div class="font-medium text-ink">${esc(i.product_name)}</div>
-          <div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}${i.customer_name ? " · " + esc(i.customer_name) : ""} · ${r ? r.ordered : i.quantity} pcs${r && r.received ? ` · diterima ${r.received}` : ""}</div>${legacy}</div>
+          <div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}${i.customer_name ? " · " + esc(i.customer_name) : ""} · ${r ? r.ordered : i.quantity} pcs${r && r.received ? ` · diterima ${r.received}` : ""}${i.so_ship_route ? ` · Jalur SO: ${esc(SPO_SHIP_METHODS[i.so_ship_route] || i.so_ship_route)}` : ""}</div>${legacy}</div>
         <div class="flex flex-wrap items-center gap-1.5">${chips}${r && r.other ? `<span class="text-xs text-muted">paket tanpa jalur ${r.other}</span>` : ""}
-          ${r && r.unassigned > 0 ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">belum diatur ${r.unassigned}</span>` : ""}</div></div>`;
+          ${r && r.unassigned > 0 ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">belum masuk paket ${r.unassigned}</span>` : ""}</div></div>`;
     }).join("")}</div></div>` : '<p class="text-sm text-muted">Belum ada item.</p>';
   const names = Object.fromEntries(po.items.map(i => [i.id, i.product_name]));
   const rows = [...(po.shipments || [])].reverse();
@@ -23367,84 +23466,6 @@ function renderSpoShippingTab(po) {
     <td class="px-3 py-2 text-ink">${esc([h.forwarder, h.tracking_no].filter(Boolean).join(" · ") || "—")}</td>
     <td class="px-3 py-2 tabular-nums text-ink">${h.eta_date ? esc(formatPoDate(h.eta_date)) : "—"}</td>
     <td class="px-3 py-2 text-muted">${esc(h.by_user || "—")}</td></tr>`).join("");
-}
-
-function renderSpoPlan(po) {
-  const box = document.getElementById("spo-plan-section");
-  const plan = po.shipping_plan;
-  if (!plan || !plan.rows.length) { box.innerHTML = ""; return; }
-  const methods = spoPlanMethods(plan), edit = plan.editable;
-  const anyOther = plan.rows.some(r => r.other > 0);
-  const addable = Object.keys(plan.methods).filter(m => !methods.includes(m));
-  const cell = (r, m) => {
-    const e = r.lanes[m] || { qty: 0, floor: 0 };
-    if (!edit) return `<td class="px-3 py-2 text-center tabular-nums">${e.qty || '<span class="text-muted">—</span>'}</td>`;
-    return `<td class="px-2 py-1.5 text-center"><input type="number" min="${e.floor}" max="${r.capacity}" value="${e.qty || ""}" placeholder="0" data-plan-item="${r.item_id}" data-plan-m="${m}" data-floor="${e.floor}"
-        oninput="spoPlanRecalc()" class="w-20 border border-line rounded-lg px-2 py-1.5 text-sm text-center tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
-      ${e.floor ? `<div class="text-[10px] text-muted mt-0.5" title="Sudah dalam perjalanan / sudah diterima">min ${e.floor}</div>` : ""}</td>`;
-  };
-  box.innerHTML = `<div class="bg-white border border-line rounded-xl p-4 sm:p-5">
-    <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
-      <div><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Rencana Pengiriman</div>
-        <div class="text-xs text-muted">Isi berapa unit tiap barang dikirim lewat jalur apa. Simpan membuat satu paket per jalur; ekspedisi, resi, ETA, dan status diisi di kartu paket.</div></div>
-      ${edit ? `<div class="flex flex-wrap items-center gap-2">${methods.slice(0, 2).map(m => spoActionButton(`Semua via ${plan.methods[m]}`, `spoPlanAll('${m}')`)).join("")}
-        ${addable.length ? `<select onchange="if(this.value){spoPlanExtra.add(this.value); renderSpoPlan(currentSpo);}" class="border border-line rounded-lg px-2 py-1.5 text-xs bg-white text-ink"><option value="">+ Jalur</option>${addable.map(m => `<option value="${m}">${esc(plan.methods[m])}</option>`).join("")}</select>` : ""}</div>` : ""}</div>
-    <div class="overflow-x-auto border border-line rounded-xl"><table class="w-full min-w-[640px] text-sm">
-      <thead class="bg-bg2"><tr><th class="${SPO_TH}">Barang</th><th class="${SPO_THR}">Pesan</th>${methods.map(m => `<th class="text-center px-3 py-2 border-b border-line">${spoShipMethodPill(m)}</th>`).join("")}
-        ${anyOther ? `<th class="${SPO_THR}">Paket tanpa jalur</th>` : ""}<th class="${SPO_THR}">Belum diatur</th></tr></thead>
-      <tbody>${plan.rows.map(r => `<tr class="border-b border-line last:border-b-0">
-        <td class="px-3 py-2"><div class="font-medium text-ink">${esc(r.product_name)}</div><div class="text-[11px] text-muted">${esc(r.customer_po_number || "Stok toko")}${r.received_outside ? ` · ${r.received_outside} diterima tanpa paket` : ""}</div></td>
-        <td class="px-3 py-2 text-right tabular-nums">${r.capacity}</td>${methods.map(m => cell(r, m)).join("")}
-        ${anyOther ? `<td class="px-3 py-2 text-right tabular-nums text-muted">${r.other || "—"}</td>` : ""}
-        <td class="px-3 py-2 text-right tabular-nums font-medium" data-plan-left="${r.item_id}" data-cap="${r.capacity}" data-other="${r.other}">${r.unassigned}</td></tr>`).join("")}</tbody>
-      <tfoot class="bg-bg2/60"><tr><td class="px-3 py-2 text-xs font-semibold text-ink">Total</td><td class="px-3 py-2 text-right tabular-nums font-semibold">${plan.rows.reduce((a, r) => a + r.capacity, 0)}</td>
-        ${methods.map(m => `<td class="px-3 py-2 text-center tabular-nums font-semibold" data-plan-total="${m}"></td>`).join("")}${anyOther ? "<td></td>" : ""}<td class="px-3 py-2 text-right tabular-nums font-semibold" data-plan-total="left"></td></tr></tfoot></table></div>
-    ${edit ? `<div class="flex flex-wrap items-center justify-between gap-2 mt-3"><p id="spo-plan-msg" class="text-xs text-muted"></p>
-      <div class="flex gap-2">${spoActionButton("Reset", "renderSpoPlan(currentSpo)")}<button type="button" id="spo-plan-save" onclick="spoPlanSave()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 transition-colors">Simpan Rencana</button></div></div>`
-      : `<p class="text-xs text-muted mt-3">${po.status === "draft" ? "Rencana pengiriman diisi setelah PO diterbitkan." : "PO ini sudah selesai; rencana tidak bisa diubah."}</p>`}</div>`;
-  spoPlanRecalc();
-}
-function spoPlanInputs() { return [...document.querySelectorAll("#spo-plan-section [data-plan-item]")]; }
-function spoPlanRecalc() {
-  const plan = currentSpo?.shipping_plan; if (!plan) return;
-  const inputs = spoPlanInputs(), totals = {};
-  let bad = 0, open = 0;
-  for (const r of plan.rows) {
-    const mine = inputs.filter(x => Number(x.dataset.planItem) === r.item_id);
-    const sum = mine.length ? mine.reduce((a, x) => a + (parseInt(x.value, 10) || 0), 0) : Object.values(r.lanes).reduce((a, e) => a + e.qty, 0);
-    mine.forEach(x => { const v = parseInt(x.value, 10) || 0; totals[x.dataset.planM] = (totals[x.dataset.planM] || 0) + v; x.classList.toggle("border-failed", v < Number(x.dataset.floor)); if (v < Number(x.dataset.floor)) bad++; });
-    if (!mine.length) for (const [m, e] of Object.entries(r.lanes)) totals[m] = (totals[m] || 0) + e.qty;
-    const left = r.capacity - r.other - sum;
-    const cell = document.querySelector(`#spo-plan-section [data-plan-left="${r.item_id}"]`);
-    if (cell) { cell.textContent = left === 0 ? "0 ✓" : String(left); cell.className = `px-3 py-2 text-right tabular-nums font-medium ${left < 0 ? "text-failed" : left > 0 ? "text-amber-700" : "text-green-700"}`; }
-    if (left < 0) bad++;
-    open += Math.max(left, 0);
-  }
-  document.querySelectorAll("#spo-plan-section [data-plan-total]").forEach(td => { const k = td.dataset.planTotal; td.textContent = k === "left" ? open : (totals[k] || 0); });
-  const msg = document.getElementById("spo-plan-msg"), btn = document.getElementById("spo-plan-save");
-  if (msg) { msg.textContent = bad ? "Ada isian melebihi jumlah pesan atau di bawah yang sudah dikirim (merah)." : open ? `${open} unit belum punya jalur; boleh disimpan dan diatur nanti.` : "Semua unit sudah punya jalur."; msg.className = `text-xs ${bad ? "text-failed" : "text-muted"}`; }
-  if (btn) btn.disabled = bad > 0;
-}
-function spoPlanAll(method) {
-  const plan = currentSpo?.shipping_plan; if (!plan) return;
-  for (const r of plan.rows) {
-    const mine = spoPlanInputs().filter(x => Number(x.dataset.planItem) === r.item_id);
-    let room = r.capacity - r.other;
-    for (const x of mine) if (x.dataset.planM !== method) { x.value = x.dataset.floor > 0 ? x.dataset.floor : ""; room -= Number(x.dataset.floor); }
-    const target = mine.find(x => x.dataset.planM === method);
-    if (target) target.value = Math.max(room, Number(target.dataset.floor)) || "";
-  }
-  spoPlanRecalc();
-}
-async function spoPlanSave() {
-  const plan = currentSpo?.shipping_plan; if (!plan) return;
-  const items = plan.rows.map(r => ({ item_id: r.item_id, lanes: Object.fromEntries(spoPlanInputs().filter(x => Number(x.dataset.planItem) === r.item_id).map(x => [x.dataset.planM, parseInt(x.value, 10) || 0])) }));
-  const btn = document.getElementById("spo-plan-save"); if (btn) btn.disabled = true;
-  const resp = await fetch(`/api/supplier-pos/${encodeURIComponent(currentSpo.id)}/shipping-plan`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
-  if (!resp.ok) { showToast(await responseErrorDetail(resp, "Rencana pengiriman gagal disimpan.")); if (btn) btn.disabled = false; return; }
-  spoPlanExtra = new Set();
-  renderSupplierPoDetail(await resp.json());
-  showToast("Rencana pengiriman disimpan. Lengkapi ekspedisi, resi, dan ETA di kartu paket.", "success");
 }
 
 // ── Batal PO dengan persetujuan supplier, Piutang Refund / Kredit Supplier ─────────────────────────
@@ -23578,6 +23599,8 @@ function renderSpoPackages(po) {
   const issued = spoPkgIssued(po);
   const pkgs = po.packages || [];
   const unpacked = po.items.reduce((a, i) => a + (i.pkg_free || 0), 0);
+  // Units still outside a package whose Sales Order line already names a route (Jalur Kirim).
+  const soRouted = po.items.some(i => i.so_ship_route && i.pkg_free > 0 && i.item_status !== "dibatalkan");
   const soOf = Object.fromEntries(po.items.map(i => [i.id, i.customer_po_number]));
   const cards = pkgs.map(p => {
     const dead = p.cancelled;
@@ -23601,10 +23624,10 @@ function renderSpoPackages(po) {
   const hist = [...(po.package_history || [])].reverse();
   const pkgNo = Object.fromEntries(pkgs.map(p => [p.id, p.package_no.split("-").pop()]));
   box.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <div><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Paket Pengiriman</div>
-        <div class="text-xs text-muted">Satu PO bisa dikirim dalam beberapa paket; satu barang bisa dibagi ke beberapa paket.${issued && unpacked > 0 ? ` <b class="text-ink">${unpacked} pcs belum masuk paket.</b>` : ""}</div></div>
-      <div class="flex gap-2">${spoActionButton("Master Ekspedisi", "openForwarderMaster()")}${issued && unpacked > 0 ? spoActionButton("+ Paket Manual", "openSpoPackageModal(null)") : ""}</div></div>
-    ${cards ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">${cards}</div>` : `<div class="text-sm text-muted bg-white border border-dashed border-line rounded-xl p-4 mb-3">Belum ada paket. Isi Rencana Pengiriman di atas lalu Simpan Rencana; paket per jalur dibuat otomatis.</div>`}
+      <div><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">Rencana Pengiriman</div>
+        <div class="text-xs text-muted">Satu paket = satu jalur (Udara, Laut, ...). Barang yang dikirim lewat jalur berbeda dibagi ke beberapa paket.${issued && unpacked > 0 ? ` <b class="text-amber-800">${unpacked} pcs belum masuk paket.</b>` : ""}</div></div>
+      <div class="flex gap-2">${spoActionButton("Master Ekspedisi", "openForwarderMaster()")}${issued && soRouted ? spoActionButton("Ikuti Jalur SO", "spoPackagesFromSo()") : ""}${issued && unpacked > 0 ? spoActionButton("+ Paket", "openSpoPackageModal(null)", true) : ""}</div></div>
+    ${cards ? `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">${cards}</div>` : `<div class="text-sm text-muted bg-white border border-dashed border-line rounded-xl p-4 mb-3">${issued ? "Belum ada paket. Klik + Paket, pilih jalur dan ekspedisi, lalu isi qty barang yang dikirim." : po.status === "draft" ? "Rencana pengiriman diisi setelah PO diterbitkan." : "Belum ada paket."}</div>`}
     ${hist.length ? `<details class="bg-white border border-line rounded-xl p-3 mb-3"><summary class="text-xs font-medium text-ink cursor-pointer">Riwayat paket (${hist.length})</summary>
       <div class="overflow-x-auto mt-2"><table class="w-full text-xs"><tbody>${hist.map(h => `<tr class="border-b border-line last:border-b-0"><td class="px-2 py-1.5 tabular-nums text-muted whitespace-nowrap">${esc(formatReceiptWhen(h.at, true))}</td><td class="px-2 py-1.5">${esc(pkgNo[h.package_id] || "")}</td><td class="px-2 py-1.5">${spoItemStatusPill(h.status)}</td><td class="px-2 py-1.5 text-ink">${esc([h.forwarder_name, h.tracking_no].filter(Boolean).join(" · ") || "—")}</td><td class="px-2 py-1.5 text-muted">${esc(h.by_user || "")}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`;
 }
@@ -23622,7 +23645,7 @@ async function openSpoPackageModal(pkgId) {
     const max = (own ? own.quantity : 0) + (i.pkg_free || 0);
     if (max <= 0) return "";
     const val = own ? own.quantity : (i.pkg_free || 0);
-    return `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2"><div class="font-medium text-ink">${esc(i.product_name)}</div><div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}</div></td>
+    return `<tr class="border-b border-line last:border-b-0"><td class="px-3 py-2"><div class="font-medium text-ink">${esc(i.product_name)}</div><div class="text-[11px] text-muted">${esc(i.customer_po_number || "Stok toko")}${i.so_ship_route ? ` · Jalur SO: ${esc(SPO_SHIP_METHODS[i.so_ship_route] || i.so_ship_route)}` : ""}</div></td>
       <td class="px-3 py-2 text-right tabular-nums">${i.pkg_free || 0}</td>
       <td class="px-3 py-2 text-right"><input type="number" min="${own ? own.received : 0}" max="${max}" step="1" value="${val}" data-pk-item="${i.id}" class="w-20 border border-line rounded-lg px-2 py-1.5 text-sm text-right bg-white text-ink tabular-nums" /></td></tr>`;
   }).join("");
@@ -23632,7 +23655,7 @@ async function openSpoPackageModal(pkgId) {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         ${fld("pk-fwd", "Ekspedisi (Master Ekspedisi)", `<select id="pk-fwd" class="${SPO_INPUT}"><option value="">Pilih ekspedisi</option>${spoForwarders.filter(f => f.is_active || (pkg && pkg.forwarder_id === f.id)).map(f => `<option value="${f.id}" ${pkg && pkg.forwarder_id === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>`)}
         ${fld("pk-fwd-new", "Ekspedisi belum ada? Tambah", `<div class="flex gap-2"><input id="pk-fwd-new" type="text" maxlength="60" placeholder="Nama ekspedisi baru" class="${SPO_INPUT}" /><button type="button" onclick="addForwarderInline()" class="px-3 py-2 border border-line rounded-lg text-sm bg-white hover:bg-bg2 whitespace-nowrap">Tambah</button></div>`)}
-        ${fld("pk-method", "Jalur Pengiriman", `<select id="pk-method" class="${SPO_INPUT}"><option value="">Pilih jalur</option>${mOpts}</select>`)}
+        ${fld("pk-method", "Jalur Pengiriman", `<select id="pk-method" class="${SPO_INPUT}"><option value="">Pilih jalur</option>${mOpts}</select>`, true)}
         ${fld("pk-status", "Status Paket", `<select id="pk-status" class="${SPO_INPUT}">${stOpts}</select>`, true)}
         ${fld("pk-awb", "Nomor Resi / AWB / BL", `<input id="pk-awb" type="text" maxlength="80" value="${esc(pkg ? pkg.tracking_no || "" : "")}" data-no-uppercase class="${SPO_INPUT}" />`)}
         ${fld("pk-sent", "Tanggal Kirim", `<input id="pk-sent" type="date" value="${esc(pkg ? pkg.shipped_date || "" : "")}" data-no-uppercase class="${SPO_INPUT}" />`)}
@@ -23644,7 +23667,12 @@ async function openSpoPackageModal(pkgId) {
         <button type="button" onclick="submitSpoPackage(${pkgId || "null"})" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark">${pkg ? "Simpan Perubahan" : "Simpan Paket"}</button></div>
     </div>`, { wide: true });
   if (pkg && pkg.note) document.getElementById("pk-note").value = pkg.note;
-  if (!pkg) document.getElementById("pk-sent").value = "";
+  if (!pkg) {
+    document.getElementById("pk-sent").value = "";
+    // A new package starts on the route the Sales Order lines picked, when they all agree.
+    const routes = new Set(po.items.filter(i => i.pkg_free > 0).map(i => i.so_ship_route || ""));
+    if (routes.size === 1 && [...routes][0]) document.getElementById("pk-method").value = [...routes][0];
+  }
 }
 
 async function addForwarderInline() {
@@ -23667,9 +23695,14 @@ async function submitSpoPackage(pkgId) {
   const lines = [...document.querySelectorAll("#modal-body [data-pk-item]")]
     .map(el => ({ item_id: parseInt(el.dataset.pkItem, 10), quantity: parseInt(el.value, 10) || 0 })).filter(l => l.quantity > 0);
   if (!lines.length) { showToast("Isi jumlah barang yang ada di paket ini."); return; }
+  if (!v("pk-method")) { showToast("Pilih jalur pengiriman paket ini."); return; }
   const body = { forwarder_id: g("pk-fwd").value ? parseInt(g("pk-fwd").value, 10) : null, ship_method: v("pk-method"), status: g("pk-status").value,
     tracking_no: v("pk-awb"), shipped_date: v("pk-sent"), eta_date: v("pk-eta"), transit_location: v("pk-transit"), note: v("pk-note"), lines };
   await spoSend(pkgId ? `packages/${pkgId}` : "packages", body, pkgId ? "Paket diperbarui." : "Paket pengiriman dibuat.", pkgId ? "PUT" : "POST");
+}
+
+async function spoPackagesFromSo() {
+  await spoSend("packages/from-so", null, "Paket dibuat mengikuti jalur Sales Order.");
 }
 
 function openSpoPackageCancel(pkgId) {
@@ -23933,7 +23966,7 @@ function renderSupplierPoDetail(po) {
     const lanes = pr ? Object.entries(pr.lanes).filter(([, e]) => e.qty > 0) : [];
     const mine = livePkgs.filter(p => p.lines.some(l => l.item_id === item.id));
     const routeCell = lanes.length ? lanes.map(([m, e]) => `<div class="flex items-center gap-1 mb-0.5">${spoShipMethodPill(m)}<span class="text-xs tabular-nums">${e.qty}</span></div>`).join("")
-      + (pr.unassigned > 0 ? `<div class="text-[11px] text-amber-700">belum diatur ${pr.unassigned}</div>` : "") : spoShipMethodPill(item.ship_method);
+      + (pr.unassigned > 0 ? `<div class="text-[11px] text-amber-700">belum masuk paket ${pr.unassigned}</div>` : "") : spoShipMethodPill(item.ship_method);
     const detailShip = mine.length ? mine.map(p => esc([p.package_no.split("-").pop(), p.forwarder_name, p.tracking_no].filter(Boolean).join(" · "))).join("<br>")
       : [item.courier, item.tracking_no].filter(Boolean).map(esc).join(" · ");
     const eta = mine.map(p => p.eta_date).filter(Boolean).sort()[0] || item.eta_date;
@@ -24006,12 +24039,16 @@ function renderSupplierPoDetail(po) {
   document.getElementById("spo-detail-receipts").innerHTML = po.receipts.length
     ? po.receipts.map(r => `<div class="border border-line rounded-lg px-3 py-2">
         <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-          <span>${esc(formatPoDate(r.received_date))}${r.surat_jalan_no ? " &middot; Surat jalan " + esc(r.surat_jalan_no) : ""}${r.warehouse_location ? " &middot; " + esc(r.warehouse_location) : ""}</span>
+          <span>${r.gr_number ? (r.inbound_document_id
+              ? `<a href="#" onclick="jumpToInboundDocument(${r.inbound_document_id}); return false;" class="font-mono font-semibold text-accentDark underline underline-offset-2">${esc(r.gr_number)}</a>`
+              : `<span class="font-mono font-semibold text-ink">${esc(r.gr_number)}</span>`) + " &middot; " : ""}${esc(formatPoDate(r.received_date))}${r.surat_jalan_no ? " &middot; Surat jalan " + esc(r.surat_jalan_no) : ""}${r.warehouse_location ? " &middot; " + esc(r.warehouse_location) : ""}</span>
           <span>${r.created_by ? esc(r.created_by) : ""}</span>
         </div>
         <ul class="mt-1 text-sm text-ink">${r.lines.map(l => `<li>${esc(l.product_name)} <span class="tabular-nums text-muted">&times; ${l.quantity}</span></li>`).join("")}</ul>
         ${r.note ? `<div class="text-xs text-muted mt-1">${esc(r.note)}</div>` : ""}
-        ${r.inbound_document_id ? `<div class="text-xs text-done mt-1">Draft Barang Masuk dibuat. Posting di menu Barang Masuk agar stok bertambah.</div>` : ""}
+        ${!r.inbound_document_id ? "" : r.inbound_status === "posted" ? `<div class="text-xs text-done mt-1">Barang Masuk sudah diposting; stok sudah bertambah.</div>`
+          : r.inbound_status === "void" ? `<div class="text-xs text-failed mt-1">Barang Masuk dibatalkan.</div>`
+          : `<div class="text-xs text-pending mt-1">Draft Barang Masuk dibuat. Posting di menu Barang Masuk agar stok bertambah.</div>`}
       </div>`).join("")
     : '<p class="text-muted">Belum ada penerimaan.</p>';
 
@@ -28800,6 +28837,854 @@ function cnAuditExport() {
 }
 
 checkAuth();
+
+// ── Penawaran Harga (Blueprint Surat Penawaran Harga, 23-10-2026) ────────────
+// Sales → Penawaran Harga. One editor page (mockup 02/03) with a product picker modal (04), a special-price modal
+// (05), the letter text view (06), the preview (07/08) and the A4 letter (09/10) rendered from the snapshot the
+// backend builds, so preview, print and re-print show the same numbers. Detail & Riwayat (11), Duplikat (12) and the
+// Kasir / Sales Order hand-off (13). A quotation never moves stock or money: those happen only when the nota / SO
+// made from it is saved, and that save is linked back here once.
+const QT = { f: { q: "", recipient_type: "", status: "", month: "" }, page: 1, list: null, draft: null, cur: null, view: "list",
+  settings: null, accounts: null, dirty: false, textsEdited: false, showErrors: false, issueToken: null, pick: null, previewTheme: null };
+const QT_PAGE = 10;
+const QT_TINT = { draft: RTS_TINT.amber, revisi: RTS_TINT.amber, terbit: RTS_TINT.blue, dikirim: RTS_TINT.blue, disetujui: RTS_TINT.green,
+  dikonversi: RTS_TINT.violet, ditolak: RTS_TINT.red, kedaluwarsa: RTS_TINT.gray, dibatalkan: RTS_TINT.gray };
+const QT_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const qtApi = rtsApi;
+const qtM = n => "Rp" + Math.round(Number(n) || 0).toLocaleString("id-ID");
+function qtTgl(ymd) {
+  if (!ymd) return "—";
+  const [y, m, d] = String(ymd).slice(0, 10).split("-").map(Number);
+  return `${d} ${QT_MONTHS[m - 1]} ${y}`;
+}
+const qtTglShort = ymd => ymd ? formatPoDate(String(ymd).slice(0, 10)) : "—";
+const qtPill = (key, label) => rtsPill(QT_TINT[key] || RTS_TINT.gray, label);
+const qtTodayYmd = () => toDateInputValue(new Date());
+function qtCard(title, body, right = "", cls = "") {
+  return `<section class="bg-white border border-line rounded-xl min-w-0 ${cls}"><div class="flex flex-wrap items-center justify-between gap-2 px-5 pt-4 pb-3">
+    <h3 class="text-[15px] font-semibold text-ink">${title}</h3>${right}</div><div class="px-5 pb-5">${body}</div></section>`;
+}
+function qtHead(crumb, title, sub, buttons) {
+  return `<nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb"><span>Sales</span><span aria-hidden="true">›</span>
+      <a href="#/quotations" onclick="qtInit(true); return false;" class="hover:text-ink">Penawaran Harga</a><span aria-hidden="true">›</span><span class="text-accentDark font-medium">${esc(crumb)}</span></nav>
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5"><div class="min-w-0"><h2 class="font-serif text-[26px] font-semibold text-ink leading-tight">${title}</h2>
+      <p class="text-sm text-muted mt-1">${sub}</p></div><div class="flex flex-wrap items-center gap-2">${buttons}</div></div>`;
+}
+function qtRender(html) {
+  document.getElementById("qt-root").innerHTML = html;
+  document.getElementById("page-quotations").scrollTop = 0;
+}
+const qtIn = (attrs, val = "") => `<input ${attrs} value="${esc(val ?? "")}" class="${RTS_IN}">`;
+const qtLbl = (text, req) => `<label class="block text-xs text-muted mb-1.5">${text}${req ? ' <span class="text-failed">*</span>' : ""}</label>`;
+async function qtEnsureMeta(force) {
+  if (!QT.settings || force) QT.settings = await qtApi("/api/company-settings");
+  if (!QT.accounts || force) QT.accounts = await qtApi("/api/company-bank-accounts");
+}
+async function qtInit(reset) {
+  if (reset) { QT.f = { q: "", recipient_type: "", status: "", month: "" }; QT.page = 1; }
+  if (currentRoute() !== "/quotations") { location.hash = "/quotations"; return; }
+  if (QT.pendingOpen) { const id = QT.pendingOpen; QT.pendingOpen = null; qtOpen(id); return; }
+  QT.view = "list";
+  document.getElementById("topbar-title").textContent = "Penawaran Harga";
+  await qtLoad();
+}
+
+// ── Daftar Penawaran (Gambar 01) ─────────────────────────────────────────────
+async function qtLoad() {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(QT.f)) if (v) qs.set(k, v);
+  try { QT.list = await qtApi(`/api/quotations?${qs}`); } catch (e) { showToast(e.message); return; }
+  qtRenderList();
+}
+function qtFilter(key, value) { QT.f[key] = value; QT.page = 1; clearTimeout(QT.ft); QT.ft = setTimeout(qtLoad, key === "q" ? 250 : 0); }
+function qtTile(label, value, sub, icon, onclick) {
+  return `<button type="button" onclick="${onclick}" class="text-left bg-white border border-line rounded-xl px-5 py-4 hover:border-accent/50 transition-colors min-w-0">
+    <div class="flex items-start justify-between gap-3"><div class="text-[13px] text-muted">${label}</div>
+      <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></span></div>
+    <div class="font-sans text-2xl font-semibold tabular-nums text-ink mt-1">${value}</div><div class="text-xs text-muted mt-1">${sub}</div></button>`;
+}
+function qtRenderList() {
+  const d = QT.list, k = d.kpi, f = QT.f;
+  const pages = Math.max(1, Math.ceil(d.items.length / QT_PAGE));
+  QT.page = Math.min(QT.page, pages);
+  const rows = d.items.slice((QT.page - 1) * QT_PAGE, QT.page * QT_PAGE).map(r => `<tr class="border-t border-line hover:bg-bg2/50 cursor-pointer" onclick="qtOpen(${r.id})">
+      <td class="px-3 py-3 font-mono text-[13px] font-semibold text-ink whitespace-nowrap">${esc(r.quote_number)}${r.revision_no ? `<span class="ml-1 text-[11px] text-muted font-sans">R${String(r.revision_no).padStart(2, "0")}</span>` : ""}</td>
+      <td class="px-3 py-3 whitespace-nowrap text-ink">${qtTglShort(r.issue_date || r.created_at)}</td>
+      <td class="px-3 py-3"><div class="font-semibold text-ink">${esc(r.recipient_label || "—")}</div><div class="text-[11px] text-muted">${r.recipient_type === "company" ? "Perusahaan" : "Perorangan"}</div></td>
+      <td class="px-3 py-3 text-ink">${esc(r.subject || "—")}${r.approvals_pending ? `<div class="mt-1">${rtsPill(RTS_TINT.amber, "Harga khusus menunggu Admin")}</div>` : ""}</td>
+      <td class="px-3 py-3 text-right tabular-nums font-semibold whitespace-nowrap">${qtM(r.total)}</td>
+      <td class="px-3 py-3">${qtPill(r.display_status, r.display_label)}${r.target_no ? `<div class="text-[11px] text-muted mt-0.5 font-mono">${esc(r.target_no)}</div>` : ""}</td>
+      <td class="px-3 py-3 text-right whitespace-nowrap"><button type="button" onclick="event.stopPropagation(); qtOpen(${r.id})" class="text-accentDark text-sm font-medium hover:underline">Lihat</button></td></tr>`).join("");
+  const months = [];
+  for (let i = 0; i < 12; i++) { const dt = new Date(); dt.setDate(1); dt.setMonth(dt.getMonth() - i); months.push([`${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}`, `${QT_MONTHS[dt.getMonth()]} ${dt.getFullYear()}`]); }
+  const opt = (pairs, cur) => pairs.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`).join("");
+  const statuses = [["", "Status: Semua"], ["draft", "Draft"], ["revisi", "Draft Revisi"], ["approval", "Menunggu persetujuan harga"], ["terbit", "Diterbitkan"], ["dikirim", "Dikirim"],
+    ["disetujui", "Disetujui"], ["dikonversi", "Dikonversi"], ["ditolak", "Ditolak"], ["kedaluwarsa", "Kedaluwarsa"], ["dibatalkan", "Dibatalkan"]];
+  const sel = (key, pairs) => `<select onchange="qtFilter('${key}', this.value)" class="${RTS_IN} sm:w-52">${opt(pairs, f[key])}</select>`;
+  qtRender(`
+    <nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb"><span>Sales</span><span aria-hidden="true">›</span><span>Penawaran Harga</span><span aria-hidden="true">›</span><span class="text-accentDark font-medium">Daftar Penawaran</span></nav>
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5"><div><h2 class="font-serif text-[26px] font-semibold text-ink leading-tight">Penawaran Harga</h2>
+      <p class="text-sm text-muted mt-1">Daftar penawaran untuk customer perorangan dan perusahaan; bukan invoice atau penjualan.</p></div>
+      <button type="button" onclick="qtNew()" class="${RTS_BTN}">+ Buat Penawaran Baru</button></div>
+    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+      ${qtTile("Total Penawaran", k.total, "Dokumen penawaran", '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>', "qtFilter('status', '')")}
+      ${qtTile("Draft", k.draft, k.approvals ? `${k.approvals} menunggu persetujuan harga` : "Belum diterbitkan", '<path d="M4 20h4L19 9l-4-4L4 16z"/>', "qtFilter('status', 'draft')")}
+      ${qtTile("Diterbitkan / Dikirim", k.open, "Menunggu keputusan", '<path d="M7 17 17 7M9 7h8v8"/>', "qtFilter('status', 'dikirim')")}
+      ${qtTile("Disetujui", k.accepted, "Siap dilanjutkan", '<path d="m5 12 5 5L20 7"/>', "qtFilter('status', 'disetujui')")}</div>
+    <section class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[15px] font-semibold text-ink mb-3">Daftar Surat Penawaran</h3>
+      <div class="flex flex-col sm:flex-row gap-2 mb-4"><input type="search" data-keep-case value="${esc(f.q)}" oninput="qtFilter('q', this.value)" placeholder="Cari nomor, nama, atau perihal penawaran…" class="${RTS_IN} flex-1">
+        ${sel("recipient_type", [["", "Jenis: Semua"], ["person", "Perorangan"], ["company", "Perusahaan"]])}${sel("status", statuses)}${sel("month", [["", "Semua bulan"], ...months])}</div>
+      <div class="overflow-x-auto"><table class="w-full text-sm min-w-[860px]"><thead><tr class="bg-bg2/70 text-left text-[11px] uppercase tracking-wider text-muted">
+        <th class="px-3 py-2.5 font-semibold">Nomor Penawaran</th><th class="px-3 py-2.5 font-semibold">Tanggal</th><th class="px-3 py-2.5 font-semibold">Penerima</th><th class="px-3 py-2.5 font-semibold">Perihal</th>
+        <th class="px-3 py-2.5 font-semibold text-right">Total</th><th class="px-3 py-2.5 font-semibold">Status</th><th class="px-3 py-2.5 font-semibold text-right">Aksi</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="7" class="px-3 py-10 text-center text-muted">Belum ada penawaran${Object.values(f).some(Boolean) ? " yang cocok dengan filter" : ""}.</td></tr>`}</tbody></table></div>
+      <div class="flex flex-wrap items-center justify-between gap-2 mt-4 text-xs text-muted"><span>Menampilkan ${Math.min(d.items.length, QT_PAGE * QT.page) - Math.min(d.items.length, QT_PAGE * (QT.page - 1))} dari ${d.items.length} dokumen</span>
+        ${pages > 1 ? `<div class="flex items-center gap-1">${Array.from({ length: pages }, (_, i) => `<button type="button" onclick="QT.page=${i + 1}; qtRenderList()" class="w-8 h-8 rounded-lg border ${QT.page === i + 1 ? "border-accent bg-accent/10 text-accentDark font-semibold" : "border-line bg-white text-ink hover:bg-bg2"}">${i + 1}</button>`).join("")}</div>` : ""}</div>
+    </section>`);
+}
+
+// ── Editor (Gambar 02 / 03 / 05 / 14) ────────────────────────────────────────
+function qtBlankDraft(texts, number) {
+  const st = QT.settings, valid = new Date(); valid.setDate(valid.getDate() + (st.quote_valid_days || 7));
+  return { id: null, quote_number: number, recipient_type: "person", recipient_name: "", company_name: "", pic_name: "", pic_title: "", office_address: "",
+    whatsapp: "", email: "", vehicle: "", subject: "Penawaran Aksesori Kendaraan", valid_until: toDateInputValue(valid), officer: currentUser?.username || "",
+    template: "ramah", pdf_theme: "modern", ...texts, signer_name: st.signer_name, signer_title: st.signer_title || "", show_bank: false, bank_account_id: null,
+    discount: 0, discount_reason: "", discount_state: null, lines: [], status: "draft", latest_version_id: null, revision_no: 0, checks: [] };
+}
+async function qtNew() {
+  if (currentRoute() !== "/quotations" && currentRoute() !== "/quotation-new") { location.hash = "/quotation-new"; return; }
+  try {
+    await qtEnsureMeta(true);
+    const [texts, num] = await Promise.all([qtApi("/api/quotations/templates?template=ramah"), qtApi("/api/quotations/next-number")]);
+    QT.draft = qtBlankDraft(texts, num.quote_number);
+  } catch (e) { showToast(e.message); return; }
+  Object.assign(QT, { dirty: false, textsEdited: false, showErrors: false, issueToken: null, cur: null });
+  qtEditor();
+}
+async function qtOpen(id) {
+  if (currentRoute() !== "/quotations") { QT.pendingOpen = id; location.hash = "/quotations"; return; }
+  try { await qtEnsureMeta(); QT.cur = await qtApi(`/api/quotations/${id}`); } catch (e) { showToast(e.message); return; }
+  if (QT.cur.status === "draft") { qtLoadDraft(QT.cur); qtEditor(); } else qtDetail();
+}
+function qtLoadDraft(d) {
+  QT.draft = JSON.parse(JSON.stringify(d));
+  QT.draft.discount_reason = d.discount_reason || "";
+  Object.assign(QT, { dirty: false, textsEdited: true, issueToken: null });
+}
+const qtIsCompany = () => QT.draft.recipient_type === "company";
+function qtF(key, value) { QT.draft[key] = value; QT.dirty = true; if (["opening_text", "table_text", "closing_text", "terms_text"].includes(key)) QT.textsEdited = true; }
+function qtLineTotal(l) { return (Number(l.quantity) || 0) * (Number(l.unit_price) || 0) - (Number(l.line_discount) || 0); }
+function qtSums() {
+  const L = QT.draft.lines, goods = L.filter(l => l.item_type === "barang"), jasa = L.filter(l => l.item_type === "jasa");
+  const sum = arr => arr.reduce((s, l) => s + qtLineTotal(l), 0);
+  const subtotal = sum(L), disc = Math.min(Number(QT.draft.discount) || 0, subtotal);
+  return { goods, jasa, gSum: sum(goods), jSum: sum(jasa), subtotal, disc, total: subtotal - disc };
+}
+function qtEditorHeader() {
+  const d = QT.draft, rev = d.latest_version_id;
+  const title = rev ? `Revisi Penawaran ${esc(d.quote_number)}` : d.id ? `Draft ${esc(d.quote_number)}` : "Buat Penawaran Harga";
+  const sub = `${rev ? `Draft revisi R${String(d.revision_no).padStart(2, "0")} — versi terbit sebelumnya tetap tersimpan. ` : ""}Mode ${qtIsCompany() ? "Perusahaan" : "Perorangan"} · Field penerima menyesuaikan otomatis.`;
+  const btns = `${d.id ? `<button type="button" onclick="qtDetailFromEditor()" class="${RTS_BTN3}">Riwayat</button>` : `<button type="button" onclick="qtInit()" class="${RTS_BTN3}">Kembali</button>`}
+    <button type="button" onclick="qtSave()" class="${RTS_BTN3} font-semibold">Simpan Draft</button>
+    <button type="button" onclick="qtPreview()" class="${RTS_BTN3} font-semibold">Preview PDF</button>
+    <button type="button" onclick="qtIssue()" class="${RTS_BTN} font-semibold">Terbitkan PDF</button>`;
+  return qtHead(rev ? "Revisi Penawaran" : "Buat Penawaran Harga", title, sub, btns);
+}
+function qtErrorsPanel() {
+  const bad = (QT.draft.checks || []).filter(c => !c.ok);
+  if (!QT.showErrors || !bad.length) return "";
+  const tag = c => c.level === "approval" ? rtsPill(RTS_TINT.amber, "Approval") : c.level === "action" ? rtsPill(RTS_TINT.amber, "Perlu aksi") : rtsPill(RTS_TINT.red, "Blokir terbit");
+  return `<section class="bg-white border border-failed/30 rounded-xl px-5 py-4 mb-4"><h3 class="text-[15px] font-semibold text-ink mb-2">Pemeriksaan Sebelum Penerbitan</h3>
+    ${bad.map(c => `<div class="flex items-center justify-between gap-3 py-2.5 border-t border-line first:border-t-0"><div><div class="text-sm font-semibold text-ink">${esc(c.label)}</div><div class="text-xs text-muted">${esc(c.hint)}</div></div>${tag(c)}</div>`).join("")}</section>`;
+}
+function qtFieldErr(key) {
+  if (!QT.showErrors) return "";
+  const d = QT.draft;
+  if (key === "recipient_name" && !qtIsCompany() && !(d.recipient_name || "").trim()) return '<p class="text-xs text-failed mt-1">Nama customer wajib diisi.</p>';
+  if (key === "company_name" && qtIsCompany() && !(d.company_name || "").trim()) return '<p class="text-xs text-failed mt-1">Nama perusahaan wajib diisi.</p>';
+  if (key === "subject" && !(d.subject || "").trim()) return '<p class="text-xs text-failed mt-1">Perihal wajib diisi.</p>';
+  return "";
+}
+const qtErrCls = key => qtFieldErr(key) ? " !border-failed bg-red-50/40" : "";
+function qtRecipientFields() {
+  const d = QT.draft, inp = (key, ph = "", extra = "") => `<input value="${esc(d[key] || "")}" oninput="qtF('${key}', this.value)" placeholder="${ph}" ${extra} class="${RTS_IN}${qtErrCls(key)}">`;
+  if (qtIsCompany()) return `<div class="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+      <div>${qtLbl("Nama PT / Perusahaan", true)}${inp("company_name", "Nama PT / CV / instansi")}${qtFieldErr("company_name")}</div>
+      <div>${qtLbl("PIC (opsional)")}${inp("pic_name", "Tidak diisi")}</div>
+      <div>${qtLbl("Jabatan PIC (opsional)")}${inp("pic_title", "Tidak diisi")}</div>
+      <div>${qtLbl("Kontak / WhatsApp (opsional)")}${inp("whatsapp", "Tidak diisi", 'inputmode="tel"')}</div>
+      <div class="sm:col-span-2">${qtLbl("Alamat Kantor (opsional)")}${inp("office_address", "Tidak diisi — blok alamat tidak dicetak")}</div></div>`;
+  return `<div class="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+      <div>${qtLbl("Nama Customer", true)}${inp("recipient_name", "Nama customer")}${qtFieldErr("recipient_name")}</div>
+      <div>${qtLbl("WhatsApp (opsional)")}${inp("whatsapp", "Tidak diisi", 'inputmode="tel"')}</div>
+      <div class="sm:col-span-2">${qtLbl("Kendaraan (opsional)")}${inp("vehicle", "Mis. Mitsubishi Xpander")}</div></div>`;
+}
+function qtEditor() {
+  QT.view = "editor";
+  const d = QT.draft;
+  document.getElementById("topbar-title").textContent = "Penawaran Harga";
+  const seg = (t, label) => `<button type="button" onclick="qtSetType('${t}')" class="flex-1 px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${d.recipient_type === t ? "bg-accent text-white shadow-sm" : "text-muted hover:text-ink"}">${label}</button>`;
+  const info = `<div class="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+      <div>${qtLbl("Nomor Penawaran (otomatis)")}${rtsRO(`<span class="font-mono">${esc(d.quote_number)}${d.revision_no ? `-R${String(d.revision_no).padStart(2, "0")}` : ""}</span>`)}</div>
+      <div>${qtLbl("Kota &amp; Tanggal Surat")}${rtsRO(`${esc(QT.settings.city)}, ${qtTgl(qtTodayYmd())}`)}</div>
+      <div>${qtLbl("Masa Berlaku")}<input type="date" value="${esc(d.valid_until || "")}" min="${qtTodayYmd()}" onchange="qtF('valid_until', this.value)" class="${RTS_IN}"></div>
+      <div>${qtLbl("Petugas")}<input value="${esc(d.officer || "")}" oninput="qtF('officer', this.value)" class="${RTS_IN}"></div>
+      <div class="sm:col-span-2">${qtLbl("Perihal", true)}<input data-keep-case value="${esc(d.subject || "")}" oninput="qtF('subject', this.value)" class="${RTS_IN}${qtErrCls("subject")}">${qtFieldErr("subject")}</div></div>`;
+  const recip = `<div class="inline-flex w-full sm:w-auto bg-bg2 rounded-xl p-1 mb-4">${seg("person", "Perorangan")}${seg("company", "Perusahaan")}</div>${qtRecipientFields()}`;
+  qtRender(`${qtEditorHeader()}${qtErrorsPanel()}
+    <div class="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_360px] gap-4 items-start">
+      ${qtCard("Informasi Penawaran", info)}
+      ${qtCard("Informasi Penerima Surat", recip)}
+      <div class="xl:row-span-2 space-y-4 min-w-0"><div id="qt-summary">${qtSummaryCard()}</div>${qtNaskahCard()}</div>
+      <div class="xl:col-span-2 min-w-0">${qtCard("Daftar Produk &amp; Jasa", `<div id="qt-lines">${qtLinesTable()}</div>`,
+        `<div class="flex gap-2"><button type="button" onclick="qtPick()" class="${RTS_BTN} font-semibold">+ Tambah Produk</button><button type="button" onclick="qtLineModal(-1)" class="${RTS_BTN3} font-semibold">+ Tambah Jasa</button></div>`)}</div>
+    </div>`);
+}
+function qtSetType(t) {
+  if (QT.draft.recipient_type === t) return;
+  QT.draft.recipient_type = t; QT.dirty = true;
+  if (!QT.textsEdited) {   // untouched letter text follows the recipient type (ramah ↔ formal); typed data of both modes is kept
+    QT.draft.template = t === "company" ? "formal" : "ramah";
+    QT.draft.pdf_theme = t === "company" ? "formal" : "modern";
+    qtApi(`/api/quotations/templates?template=${QT.draft.template}&recipient=${encodeURIComponent(QT.draft.company_name || "")}`)
+      .then(x => { Object.assign(QT.draft, x); if (QT.view === "editor") qtEditor(); }).catch(() => {});
+  }
+  qtEditor();
+}
+function qtSummaryCard() {
+  const s = qtSums(), d = QT.draft;
+  const row = (l, v) => `<div class="flex items-center justify-between gap-3 py-2.5 border-b border-line text-sm"><span class="text-muted">${l}</span><span class="font-semibold tabular-nums text-ink">${v}</span></div>`;
+  const discState = d.discount_state === "pending" ? ` ${rtsPill(RTS_TINT.amber, "Menunggu Admin")}` : "";
+  return qtCard("Ringkasan Penawaran", `
+    ${row(`${s.goods.length} produk barang`, qtM(s.gSum))}${row(`${s.jasa.length} jasa`, qtM(s.jSum))}
+    <div class="flex items-center justify-between gap-3 py-2.5 border-b border-line text-sm"><button type="button" onclick="qtDiscountModal()" class="text-muted hover:text-accentDark underline decoration-dotted underline-offset-2">Diskon keseluruhan</button><span class="font-semibold tabular-nums text-ink">${s.disc ? "−" + qtM(s.disc) : "Rp0"}${discState}</span></div>
+    <div class="rounded-xl bg-accent/10 px-4 py-4 mt-4 flex items-center justify-between gap-3"><span class="text-sm font-semibold text-ink">Total Penawaran</span><span class="font-sans text-2xl font-bold tabular-nums text-accentDark">${qtM(s.total)}</span></div>
+    <div class="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 mt-3 text-xs text-accentDark leading-relaxed">Dokumen penawaran tidak mengurangi stok dan bukan faktur penjualan. Pajak tidak dihitung di surat ini.</div>`);
+}
+function qtNaskahCard() {
+  const d = QT.draft, tpl = d.template === "formal" ? "Formal Profesional" : "Profesional Ramah";
+  const tick = (on, label) => `<div class="flex items-center gap-3 py-1.5 text-sm text-ink"><span class="w-4 h-4 rounded ${on ? "bg-accent" : "border border-accent/60"} grid place-items-center shrink-0">${on ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg>' : ""}</span>${label}</div>`;
+  return qtCard("Naskah &amp; Ketentuan", `
+    <div class="flex gap-5 border-b border-line mb-3 text-sm"><span class="pb-2 border-b-2 border-accent text-accentDark font-semibold">Otomatis</span><button type="button" onclick="qtNaskah()" class="pb-2 text-muted hover:text-ink">Edit Naskah</button></div>
+    <p class="text-xs text-muted mb-2">Template ${tpl} terisi otomatis, tetap bisa diedit sebelum terbit.</p>
+    ${tick(Boolean(d.opening_text), "Salam dan paragraf pembuka formal")}${tick(Boolean(d.closing_text && d.valid_until), `Penutup &amp; masa berlaku sampai ${qtTgl(d.valid_until)}`)}
+    <label class="flex items-center gap-3 py-1.5 text-sm text-ink cursor-pointer"><input type="checkbox" ${d.show_bank ? "checked" : ""} onchange="qtF('show_bank', this.checked); qtEditor()" class="accent-[#D97757] w-4 h-4">Tampilkan rekening resmi (opsional)</label>
+    ${d.show_bank ? qtBankSelect() : ""}
+    <div class="flex flex-wrap gap-2 mt-3"><button type="button" onclick="qtNaskah()" class="${RTS_BTN3} font-semibold">Atur Naskah Surat</button><button type="button" onclick="qtPreview()" class="${RTS_BTN} font-semibold">Preview Surat</button></div>`);
+}
+function qtBankSelect() {
+  const d = QT.draft, acc = QT.accounts || [];
+  if (!acc.length) return `<div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-1">Belum ada rekening resmi aktif. ${isAdmin() ? `<a href="#/company-settings" class="underline font-semibold">Kelola di Pengaturan Perusahaan</a>` : "Minta Admin menambahkannya di Pengaturan Perusahaan"}, atau matikan opsi rekening.</div>`;
+  return `<select onchange="qtF('bank_account_id', this.value ? Number(this.value) : null)" class="${RTS_IN} mt-1"><option value="">Pilih rekening resmi…</option>
+    ${acc.map(a => `<option value="${a.id}" ${a.id === d.bank_account_id ? "selected" : ""}>${esc(a.label)}</option>`).join("")}</select>`;
+}
+function qtLinesTable() {
+  const L = QT.draft.lines;
+  if (!L.length) return `<div class="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">Belum ada produk atau jasa. Klik <b>+ Tambah Produk</b> untuk memilih dari Master Barang.</div>`;
+  const rows = L.map((l, i) => {
+    const badge = l.item_type === "jasa" ? rtsPill(RTS_TINT.blue, "Jasa") : rtsPill(RTS_TINT.amber, "Barang");
+    const special = l.price_state === "pending" ? rtsPill(RTS_TINT.amber, "Menunggu Admin") : l.price_state === "approved" ? rtsPill(RTS_TINT.green, "Harga khusus disetujui") : "";
+    const listP = l.list_price || l.master_price;
+    const strike = l.item_type === "barang" && listP && Number(l.unit_price) < listP ? `<div class="text-[11px] text-muted line-through">${qtM(listP)}</div>` : "";
+    const stock = l.item_type === "barang" && l.stock_qty != null ? `<span class="text-[11px] ${l.stock_qty >= l.quantity ? "text-muted" : "text-pending"}">stok ${l.stock_qty}</span>` : "";
+    const inactive = l.master_active === false ? rtsPill(RTS_TINT.red, "Nonaktif") : "";
+    const disc = Number(l.line_discount) || 0, pct = disc && l.quantity * l.unit_price ? Math.round(disc * 1000 / (l.quantity * l.unit_price)) / 10 : 0;
+    return `<tr class="border-t border-line align-middle ${i % 2 ? "bg-bg2/30" : ""}">
+      <td class="px-3 py-3 text-center text-muted tabular-nums">${i + 1}</td>
+      <td class="px-3 py-3"><div class="font-semibold text-ink">${esc(l.product_name)}</div><div class="flex flex-wrap items-center gap-1.5 mt-1"><span class="text-[11px] text-muted font-mono">${esc(l.sku || (l.item_type === "jasa" ? "JASA" : ""))}</span>${badge}${special}${inactive}${stock}</div></td>
+      <td class="px-3 py-3"><div class="flex items-center justify-center gap-1.5"><input type="text" inputmode="numeric" value="${esc(l.quantity)}" aria-label="Qty" oninput="this.value=this.value.replace(/[^0-9]/g,''); qtLineQty(${i}, this.value)" class="w-14 text-center border border-line rounded-lg px-1 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"><span class="text-xs text-muted">${esc(l.unit || "")}</span></div></td>
+      <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap">${strike}${qtM(l.unit_price)}</td>
+      <td class="px-3 py-3 text-center tabular-nums whitespace-nowrap">${disc ? `${pct}%<div class="text-[11px] text-muted">${qtM(disc)}</div>` : "0%"}</td>
+      <td class="px-3 py-3 text-right tabular-nums font-semibold whitespace-nowrap" data-qt-total="${i}">${qtM(qtLineTotal(l))}</td>
+      <td class="px-3 py-3 whitespace-nowrap text-center"><button type="button" onclick="qtLineModal(${i})" title="Atur harga / diskon" aria-label="Atur harga" class="w-8 h-8 rounded-lg text-accentDark hover:bg-accent/10 inline-grid place-items-center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button><button type="button" onclick="qtRemoveLine(${i})" title="Hapus baris" aria-label="Hapus baris" class="w-8 h-8 rounded-lg text-failed hover:bg-failed/10 inline-grid place-items-center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></td></tr>`;
+  }).join("");
+  return `<div class="overflow-x-auto -mx-1"><table class="w-full text-sm min-w-[720px]"><thead><tr class="bg-bg2/70 text-[11px] uppercase tracking-wider text-muted">
+    <th class="px-3 py-2.5 font-semibold w-12">No.</th><th class="px-3 py-2.5 font-semibold text-left">Produk / Jasa</th><th class="px-3 py-2.5 font-semibold">Qty</th><th class="px-3 py-2.5 font-semibold text-right">Harga</th>
+    <th class="px-3 py-2.5 font-semibold">Diskon</th><th class="px-3 py-2.5 font-semibold text-right">Jumlah</th><th class="px-3 py-2.5 font-semibold">Aksi</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function qtLineQty(i, v) {
+  const l = QT.draft.lines[i];
+  l.quantity = Math.max(0, parseInt(v, 10) || 0);
+  if (l.line_discount > l.quantity * l.unit_price) l.line_discount = 0;
+  QT.dirty = true;
+  const cell = document.querySelector(`[data-qt-total="${i}"]`);
+  if (cell) cell.textContent = qtM(qtLineTotal(l));
+  document.getElementById("qt-summary").innerHTML = qtSummaryCard();
+}
+function qtRemoveLine(i) { QT.draft.lines.splice(i, 1); QT.dirty = true; qtRefreshLines(); }
+function qtRefreshLines() {
+  if (QT.view !== "editor") return;
+  document.getElementById("qt-lines").innerHTML = qtLinesTable();
+  document.getElementById("qt-summary").innerHTML = qtSummaryCard();
+}
+
+// Pilih Produk dari Master Barang (Gambar 04): several at once; picking reserves nothing.
+async function qtPick() {
+  QT.pick = { q: "", category: "", inactive: false, rows: [], chosen: new Map() };
+  if (!categoriesCache.length) { try { const r = await fetch("/api/categories"); if (r.ok) categoriesCache = await r.json(); } catch (_) {} }
+  const cats = (categoriesCache || []).filter(c => !c.parent_id && c.status !== "arsip");
+  openModal("Pilih Produk dari Master Barang", `
+    <p class="text-xs text-muted -mt-1 mb-3">Pencarian nama, SKU, kode manual, atau barcode. Memilih barang tidak mengubah stok.</p>
+    <input id="qt-pick-q" type="search" placeholder="Cari: Headlamp, SKU, atau kode manual…" oninput="QT.pick.q=this.value; clearTimeout(QT.pt); QT.pt=setTimeout(qtPickSearch, 250)" class="${RTS_IN} mb-2">
+    <div class="flex gap-2 mb-3"><select onchange="QT.pick.category=this.value; qtPickSearch()" class="${RTS_IN}"><option value="">Kategori: Semua kategori</option>${cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select>
+      <select onchange="QT.pick.inactive=this.value==='1'; qtPickSearch()" class="${RTS_IN} w-40"><option value="0">Hanya aktif</option><option value="1">Termasuk nonaktif</option></select></div>
+    <div id="qt-pick-rows" class="max-h-[46vh] overflow-auto border border-line rounded-lg"></div>
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-3"><span id="qt-pick-count" class="text-sm font-semibold text-ink">0 produk dipilih</span>
+      <div class="flex gap-2"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Tutup</button><button type="button" onclick="qtPickInsert()" class="${RTS_BTN} font-semibold">Masukkan ke Penawaran</button></div></div>
+    <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">Harga awal otomatis berasal dari Master Barang. Harga khusus hanya memengaruhi dokumen penawaran.</div>`, { wide: true });
+  qtPickSearch();
+  setTimeout(() => document.getElementById("qt-pick-q")?.focus(), 30);
+}
+async function qtPickSearch() {
+  const p = QT.pick, qs = new URLSearchParams();
+  if (p.q.trim()) qs.set("q", p.q.trim());
+  if (p.category) qs.set("category_id", p.category);
+  if (p.inactive) qs.set("inactive", "true");
+  try { p.rows = await qtApi(`/api/quotations/products?${qs}`); } catch (e) { showToast(e.message); return; }
+  qtPickRender();
+}
+function qtPickRender() {
+  const p = QT.pick, inQuote = new Set(QT.draft.lines.map(l => l.master_item_id).filter(Boolean));
+  const el = document.getElementById("qt-pick-rows");
+  if (!el) return;
+  el.innerHTML = `<table class="w-full text-sm"><thead class="sticky top-0 bg-bg2"><tr class="text-[11px] uppercase tracking-wider text-muted"><th class="px-3 py-2 text-left font-semibold">Produk / SKU</th><th class="px-3 py-2 text-right font-semibold">Harga</th><th class="px-3 py-2 font-semibold">Stok</th><th class="px-3 py-2 font-semibold">Aksi</th></tr></thead><tbody>
+    ${p.rows.map(r => {
+      const act = inQuote.has(r.id) ? `<span class="text-xs text-muted">Sudah di penawaran</span>`
+        : !r.is_active ? `<span class="text-xs text-failed">Nonaktif</span>`
+        : p.chosen.has(r.id) ? `<button type="button" onclick="qtPickToggle(${r.id})" class="px-2.5 py-1 rounded-full bg-green-50 text-green-800 text-xs font-semibold">Dipilih ✓</button>`
+        : `<button type="button" onclick="qtPickToggle(${r.id})" class="px-2.5 py-1 rounded-md border border-line text-accentDark text-xs font-semibold hover:bg-accent/10">+ Pilih</button>`;
+      return `<tr class="border-t border-line"><td class="px-3 py-2.5"><div class="font-semibold text-ink">${esc(r.name)}</div><div class="text-[11px] text-muted">${esc(r.sku)} · ${esc(r.unit)}${r.brand_name ? ` · ${esc(r.brand_name)}` : ""}${r.item_condition === "bekas" ? " · BEKAS" : ""}</div></td>
+        <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">${qtM(r.sell_price)}</td><td class="px-3 py-2.5 text-center tabular-nums ${r.stock_qty > 0 ? "" : "text-muted"}">${r.stock_qty}</td><td class="px-3 py-2.5 text-center">${act}</td></tr>`;
+    }).join("") || `<tr><td colspan="4" class="px-3 py-8 text-center text-muted">Tidak ada barang yang cocok.</td></tr>`}</tbody></table>`;
+  document.getElementById("qt-pick-count").textContent = `${p.chosen.size} produk dipilih`;
+}
+function qtPickToggle(id) {
+  const p = QT.pick;
+  if (p.chosen.has(id)) p.chosen.delete(id); else p.chosen.set(id, p.rows.find(r => r.id === id));
+  qtPickRender();
+}
+function qtPickInsert() {
+  const chosen = [...QT.pick.chosen.values()];
+  if (!chosen.length) { showToast("Pilih minimal satu produk."); return; }
+  for (const r of chosen) QT.draft.lines.push({ id: null, item_type: "barang", master_item_id: r.id, sku: r.sku, product_name: r.name, unit: r.unit, quantity: 1,
+    unit_price: r.sell_price, line_discount: 0, list_price: null, master_price: r.sell_price, stock_qty: r.stock_qty, price_state: null });
+  QT.dirty = true;
+  closeModal();
+  qtRefreshLines();
+  showToast(`${chosen.length} produk dimasukkan ke penawaran.`, "success");
+}
+
+// Pengaturan Harga Khusus (Gambar 05) — also adds / edits a free-typed Jasa line.
+function qtLineModal(i) {
+  const isNew = i < 0, l = isNew ? { item_type: "jasa", product_name: "", unit: "JASA", quantity: 1, unit_price: 0, line_discount: 0 } : QT.draft.lines[i];
+  const jasa = l.item_type === "jasa", listP = l.list_price || l.master_price || 0;
+  const pending = l.price_state === "pending" && l.id && QT.draft.id;
+  openModal(jasa ? (isNew ? "Tambah Jasa" : "Ubah Jasa") : "Pengaturan Harga Khusus", `
+    <div class="grid sm:grid-cols-2 gap-3">
+      ${jasa ? `<div class="sm:col-span-2">${qtLbl("Nama jasa", true)}<input id="qtl-name" value="${esc(l.product_name)}" placeholder="Mis. Jasa Pemasangan Aksesori" class="${RTS_IN}"></div>
+        <div>${qtLbl("Satuan")}<input id="qtl-unit" value="${esc(l.unit || "JASA")}" class="${RTS_IN}"></div>`
+        : `<div class="sm:col-span-2">${qtLbl("Produk dipilih")}${rtsRO(esc(l.product_name))}</div><div>${qtLbl("Harga awal Master Barang")}${rtsRO(qtM(listP))}</div>`}
+      <div>${qtLbl("Qty")}<input id="qtl-qty" inputmode="numeric" value="${esc(l.quantity)}" oninput="this.value=this.value.replace(/[^0-9]/g,''); qtLineCalc(${listP})" class="${RTS_IN}"></div>
+      <div>${qtLbl("Harga penawaran")}<input id="qtl-price" inputmode="numeric" value="${groupDigits(l.unit_price)}" oninput="qtLineCalc(${listP})" class="${RTS_IN} price-input text-right"></div>
+      <div>${qtLbl("Diskon per baris (Rp)")}<input id="qtl-disc" inputmode="numeric" value="${groupDigits(l.line_discount || 0)}" oninput="qtLineCalc(${listP})" class="${RTS_IN} price-input text-right"></div>
+      ${jasa ? "" : `<div id="qtl-reason-wrap" class="sm:col-span-2">${qtLbl("Alasan harga khusus")}<input id="qtl-reason" data-keep-case value="${esc(l._reason || "")}" placeholder="Mis. hasil negosiasi, pelanggan langganan" class="${RTS_IN}"></div>
+        ${isAdmin() ? `<label class="sm:col-span-2 flex items-center gap-2 text-xs text-ink"><input id="qtl-below" type="checkbox" ${l._allow_below ? "checked" : ""} class="accent-[#D97757]"> Izinkan di bawah modal (khusus Admin)</label>` : ""}`}
+    </div>
+    <div id="qtl-calc" class="mt-3 text-sm"></div>
+    <div class="rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">${jasa ? "Jasa tidak memakai stok dan tidak memotong persediaan." : "Perubahan harga atau diskon di luar kewenangan staf memerlukan persetujuan Admin; Master Harga Jual tetap tidak berubah."}</div>
+    ${pending && isAdmin() ? `<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 mt-3 text-xs text-amber-900"><b>Menunggu persetujuan:</b> ${esc(l.price_reason || "")} — diajukan ${esc(l.price_requested_by || "")}
+      <div class="flex flex-wrap gap-2 mt-2"><input id="qtl-decide-note" data-keep-case placeholder="Catatan (wajib jika menolak)" class="${RTS_IN} flex-1 min-w-[160px]"><button type="button" onclick="qtDecidePrice(${l.id}, false)" class="${RTS_BTND}">Tolak</button><button type="button" onclick="qtDecidePrice(${l.id}, true)" class="${RTS_BTN}">Setujui</button></div></div>` : ""}
+    <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button id="qtl-apply" type="button" onclick="qtLineApply(${i})" class="${RTS_BTN} font-semibold">Terapkan ke Baris</button></div>`, { lg: true });
+  qtLineCalc(listP);
+}
+function qtLineCalc(listP) {
+  const qty = parseInt(document.getElementById("qtl-qty").value, 10) || 0, price = priceValue(document.getElementById("qtl-price")), disc = priceValue(document.getElementById("qtl-disc"));
+  const total = qty * price - disc, special = listP > 0 && total < qty * listP;
+  const wrap = document.getElementById("qtl-reason-wrap");
+  if (wrap) wrap.classList.toggle("hidden", !special);
+  const btn = document.getElementById("qtl-apply");
+  if (btn) btn.textContent = special && !isAdmin() ? "Minta Persetujuan" : "Terapkan ke Baris";
+  document.getElementById("qtl-calc").innerHTML = `<div class="flex justify-between"><span class="text-muted">Jumlah baris</span><b class="tabular-nums ${total < 0 ? "text-failed" : ""}">${qtM(total)}</b></div>
+    ${special ? `<div class="flex justify-between text-xs mt-1"><span class="text-muted">Di bawah harga Master Barang</span><span class="tabular-nums text-pending">−${qtM(qty * listP - total)}</span></div>` : ""}`;
+}
+async function qtLineApply(i) {
+  const isNew = i < 0, l = isNew ? { id: null, item_type: "jasa", master_item_id: null, sku: null } : QT.draft.lines[i];
+  const qty = parseInt(document.getElementById("qtl-qty").value, 10) || 0, price = priceValue(document.getElementById("qtl-price")), disc = priceValue(document.getElementById("qtl-disc"));
+  if (qty < 1) { showToast("Qty minimal 1."); return; }
+  if (disc > qty * price) { showToast("Diskon tidak boleh melebihi jumlah baris."); return; }
+  if (l.item_type === "jasa") {
+    const name = document.getElementById("qtl-name").value.trim();
+    if (!name) { showToast("Nama jasa wajib diisi."); return; }
+    Object.assign(l, { product_name: name, unit: document.getElementById("qtl-unit").value.trim() || "JASA" });
+  } else {
+    const listP = l.list_price || l.master_price || 0, special = listP > 0 && qty * price - disc < qty * listP;
+    const reason = document.getElementById("qtl-reason")?.value.trim() || "";
+    const changed = Number(l.quantity) * Number(l.unit_price) - Number(l.line_discount || 0) !== qty * price - disc || Number(l.quantity) !== qty;
+    if (special && changed && reason.length < 3) { showToast("Isi alasan harga khusus (minimal 3 huruf)."); document.getElementById("qtl-reason")?.focus(); return; }
+    l._reason = reason; l._allow_below = Boolean(document.getElementById("qtl-below")?.checked);
+  }
+  Object.assign(l, { quantity: qty, unit_price: price, line_discount: disc });
+  if (isNew) QT.draft.lines.push(l);
+  QT.dirty = true;
+  closeModal();
+  // A special price is reviewed by the server: save at once so the line shows its real state (pending / approved).
+  if (l.item_type === "barang" && (l._reason || l.price_state)) await qtSave(true); else qtRefreshLines();
+}
+async function qtDecidePrice(lineId, approve) {
+  const note = document.getElementById("qtl-decide-note")?.value.trim() || "";
+  if (QT.dirty && !(await qtSave(true))) return;
+  try { qtLoadDraft(await qtApi(`/api/quotations/${QT.draft.id}/lines/${lineId}/price-decision`, "POST", { approve, note })); } catch (e) { showToast(e.message); return; }
+  closeModal(); qtEditor(); showToast(approve ? "Harga khusus disetujui." : "Harga khusus ditolak; kembali ke harga Master Barang.", "success");
+}
+function qtDiscountModal() {
+  const d = QT.draft, s = qtSums(), pending = d.discount_state === "pending" && d.id;
+  openModal("Diskon Keseluruhan", `
+    <p class="text-xs text-muted -mt-1 mb-3">Dihitung setelah diskon per baris, dari subtotal ${qtM(s.subtotal)}. Diskon perlu alasan; diskon dari staf disetujui Admin.</p>
+    <div class="grid sm:grid-cols-2 gap-3"><div>${qtLbl("Diskon (Rp)")}<input id="qtd-amt" inputmode="numeric" value="${groupDigits(d.discount || 0)}" class="${RTS_IN} price-input text-right"></div>
+      <div>${qtLbl("Alasan")}<input id="qtd-reason" data-keep-case value="${esc(d.discount_reason || "")}" class="${RTS_IN}"></div></div>
+    ${pending && isAdmin() ? `<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 mt-3 text-xs text-amber-900"><b>Menunggu persetujuan</b> — diajukan ${esc(d.discount_requested_by || "")}
+      <div class="flex flex-wrap gap-2 mt-2"><input id="qtd-note" data-keep-case placeholder="Catatan (wajib jika menolak)" class="${RTS_IN} flex-1 min-w-[160px]"><button type="button" onclick="qtDecideDiscount(false)" class="${RTS_BTND}">Tolak</button><button type="button" onclick="qtDecideDiscount(true)" class="${RTS_BTN}">Setujui</button></div></div>` : ""}
+    <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="qtDiscountApply()" class="${RTS_BTN} font-semibold">Terapkan</button></div>`);
+}
+async function qtDiscountApply() {
+  const amt = priceValue(document.getElementById("qtd-amt")), reason = document.getElementById("qtd-reason").value.trim();
+  if (amt > qtSums().subtotal) { showToast("Diskon tidak boleh melebihi subtotal."); return; }
+  if (amt > 0 && amt !== Number(QT.draft.discount) && reason.length < 3) { showToast("Isi alasan diskon."); return; }
+  Object.assign(QT.draft, { discount: amt, discount_reason: reason });
+  QT.dirty = true; closeModal();
+  await qtSave(true);
+}
+async function qtDecideDiscount(approve) {
+  const note = document.getElementById("qtd-note")?.value.trim() || "";
+  try { qtLoadDraft(await qtApi(`/api/quotations/${QT.draft.id}/discount-decision`, "POST", { approve, note })); } catch (e) { showToast(e.message); return; }
+  closeModal(); qtEditor();
+}
+function qtPayload() {
+  const d = QT.draft, keys = ["recipient_type", "recipient_name", "company_name", "pic_name", "pic_title", "office_address", "whatsapp", "email", "vehicle", "subject",
+    "valid_until", "officer", "template", "pdf_theme", "opening_text", "table_text", "closing_text", "terms_text", "signer_name", "signer_title", "show_bank",
+    "bank_account_id", "discount", "discount_reason"];
+  const out = Object.fromEntries(keys.map(k => [k, d[k] ?? null]));
+  out.lines = d.lines.map(l => ({ id: l.id || null, item_type: l.item_type, master_item_id: l.master_item_id || null, product_name: l.product_name, unit: l.unit,
+    quantity: Number(l.quantity) || 0, unit_price: Number(l.unit_price) || 0, line_discount: Number(l.line_discount) || 0,
+    price_reason: l._reason || null, allow_below_cost: Boolean(l._allow_below) }));
+  return out;
+}
+async function qtSave(quiet = false) {
+  if (QT.draft.lines.some(l => !(Number(l.quantity) >= 1))) { showToast("Qty setiap baris minimal 1."); return false; }
+  try {
+    const d = QT.draft.id ? await qtApi(`/api/quotations/${QT.draft.id}`, "PUT", qtPayload()) : await qtApi("/api/quotations", "POST", qtPayload());
+    const view = QT.view, edited = QT.textsEdited;
+    qtLoadDraft(d); QT.cur = d; QT.textsEdited = edited || QT.textsEdited;
+    if (!quiet) showToast(`Draft ${d.quote_number} tersimpan.`, "success");
+    if (view === "editor") qtEditor(); else if (view === "naskah") qtNaskah();
+    return true;
+  } catch (e) {
+    showToast(e.message);
+    if (QT.view === "editor") qtRefreshLines();
+    return false;
+  }
+}
+async function qtIssue(theme) {
+  if (!(await qtSave(true))) return;
+  QT.issueToken = QT.issueToken || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+  try {
+    const d = await qtApi(`/api/quotations/${QT.draft.id}/issue`, "POST", { token: QT.issueToken, theme: theme || QT.previewTheme || null });
+    QT.issueToken = null; QT.cur = d; QT.showErrors = false;
+    showToast(`${d.issued_snapshot.label} ${d.issued_snapshot.doc_number} terbit. Snapshot terkunci.`, "success");
+    qtDetail();
+    qtPrintSnapshot(d.issued_snapshot, d.id, d.latest_version_id);
+  } catch (e) {
+    QT.issueToken = null;
+    showToast(e.message);
+    try { qtLoadDraft(await qtApi(`/api/quotations/${QT.draft.id}`)); } catch (_) {}
+    QT.showErrors = true;
+    qtEditor();
+  }
+}
+
+// ── Naskah Surat & Ketentuan (Gambar 06) ─────────────────────────────────────
+function qtNaskah() {
+  QT.view = "naskah";
+  const d = QT.draft, ta = (key, rows) => `<textarea data-keep-case rows="${rows}" oninput="qtF('${key}', this.value)" class="${RTS_IN} leading-relaxed">${esc(d[key] || "")}</textarea>`;
+  const to = qtIsCompany() ? `Yth. ${d.pic_name ? `${d.company_name || "—"} · Up. ${d.pic_name}` : `Manajemen ${d.company_name || "—"}`} · Di Tempat` : `Yth. ${d.recipient_name || "—"} · Di Tempat`;
+  const tab = (t, label) => `<button type="button" onclick="qtSetTemplate('${t}')" class="pb-2 text-sm ${d.template === t ? "border-b-2 border-accent text-accentDark font-semibold" : "text-muted hover:text-ink"}">${label}</button>`;
+  qtRender(`${qtHead("Naskah Surat & Ketentuan", "Naskah Surat &amp; Ketentuan", "Template otomatis yang bisa disesuaikan khusus untuk penawaran ini; template global tidak berubah.",
+      `<button type="button" onclick="qtEditor()" class="${RTS_BTN3}">&larr; Kembali ke Editor</button><button type="button" onclick="qtSetTemplate('${d.template}', true)" class="${RTS_BTN3} font-semibold">Gunakan Template Default</button><button type="button" onclick="qtPreview()" class="${RTS_BTN} font-semibold">Preview PDF</button>`)}
+    <div class="grid xl:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start">
+      ${qtCard("Naskah Surat", `<div class="flex gap-6 border-b border-line mb-4">${tab("ramah", "Profesional Ramah")}${tab("formal", "Formal Profesional")}</div>
+        <div class="space-y-3"><div>${qtLbl("Perihal")}<input data-keep-case value="${esc(d.subject || "")}" oninput="qtF('subject', this.value)" class="${RTS_IN}"></div>
+          <div>${qtLbl("Tujuan Surat (otomatis dari penerima)")}${rtsRO(esc(to))}</div>
+          <div><label class="block text-xs font-semibold text-ink mb-1.5">Salam &amp; Paragraf Pembuka</label>${ta("opening_text", 6)}</div>
+          <div><label class="block text-xs font-semibold text-ink mb-1.5">Kalimat Sebelum Tabel</label>${ta("table_text", 2)}</div>
+          <div><label class="block text-xs font-semibold text-ink mb-1.5">Paragraf Penutup</label>${ta("closing_text", 4)}</div></div>`)}
+      <div class="space-y-4 min-w-0">
+        ${qtCard("Ketentuan Pembayaran &amp; Rekening", `<p class="text-xs text-muted mb-3">Ketentuan standar boleh diedit sesuai penawaran, tanpa mengubah template global.</p>
+          <div class="flex items-center gap-3 text-sm text-ink mb-2"><span class="w-4 h-4 rounded bg-accent grid place-items-center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></span>Masa berlaku: ${qtTgl(d.valid_until)}</div>
+          ${qtLbl("Ketentuan lain (satu per baris)")}${ta("terms_text", 4)}
+          <div class="border-t border-line my-3"></div>
+          <label class="flex items-center gap-3 text-sm text-ink cursor-pointer mb-2"><input type="checkbox" ${d.show_bank ? "checked" : ""} onchange="qtF('show_bank', this.checked); qtNaskah()" class="accent-[#D97757] w-4 h-4">Tampilkan rekening dalam PDF</label>
+          ${d.show_bank ? qtLbl("Rekening Resmi") + qtBankSelect() : ""}
+          <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">Tidak ada nomor rekening yang diisi otomatis. Hanya rekening resmi aktif dari Pengaturan Perusahaan yang boleh dicetak pada PDF.</div>`)}
+        ${qtCard("Penanggung Jawab", `<div class="space-y-3"><div>${qtLbl("Nama / Penanda Tangan")}<input value="${esc(d.signer_name || "")}" oninput="qtF('signer_name', this.value)" class="${RTS_IN}"></div>
+          <div>${qtLbl("Jabatan (opsional)")}<input data-keep-case value="${esc(d.signer_title || "")}" oninput="qtF('signer_title', this.value)" placeholder="Tidak diisi" class="${RTS_IN}"></div>
+          <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark">Kota surat: ${esc(QT.settings.city)} · Tanggal penerbitan otomatis dari waktu lokal toko.</div></div>`)}
+      </div></div>`);
+}
+async function qtSetTemplate(t, force) {
+  const d = QT.draft;
+  if (!force && d.template === t) return;
+  if (QT.textsEdited && !confirm("Ganti naskah dengan template default? Teks yang sudah diedit pada penawaran ini akan diganti.")) return;
+  try {
+    Object.assign(d, await qtApi(`/api/quotations/templates?template=${t}&recipient=${encodeURIComponent(qtIsCompany() ? d.company_name || "" : "")}`), { template: t });
+  } catch (e) { showToast(e.message); return; }
+  QT.dirty = true; QT.textsEdited = false;
+  qtNaskah();
+}
+
+// ── Preview (Gambar 07 / 08) ─────────────────────────────────────────────────
+async function qtPreview(theme) {
+  if (!(await qtSave(true))) return;
+  QT.previewTheme = theme || QT.previewTheme || QT.draft.pdf_theme;
+  let pv;
+  try { pv = await qtApi(`/api/quotations/${QT.draft.id}/preview?theme=${QT.previewTheme}`); } catch (e) { showToast(e.message); return; }
+  QT.view = "preview";
+  const s = pv.snapshot, bad = pv.checks.filter(c => !c.ok), company = s.recipient.type === "company";
+  const check = c => `<li class="flex items-start gap-2 py-1 text-sm ${c.ok ? "text-ink" : "text-failed"}"><span class="shrink-0 font-bold">${c.ok ? "✓" : "✕"}</span><span>${esc(c.label)}${c.ok ? "" : `<span class="block text-xs text-muted">${esc(c.hint)}</span>`}</span></li>`;
+  qtRender(`${qtHead(`Preview PDF ${company ? "Perusahaan" : "Perorangan"}`, `Preview PDF ${company ? "Perusahaan" : "Perorangan"}`, "Lihat surat lengkap, bukan hanya tabel harga. Pastikan penerima, naskah, dan total sesuai.",
+      `<button type="button" onclick="qtEditor()" class="${RTS_BTN3} font-semibold">Kembali Edit</button><button type="button" onclick="qtIssue('${QT.previewTheme}')" ${bad.length ? "disabled" : ""} class="${RTS_BTN} font-semibold">Terbitkan &amp; Unduh PDF</button>`)}
+    <div class="grid xl:grid-cols-[260px_minmax(0,1fr)_300px] gap-4 items-start">
+      ${qtCard("Informasi Preview", `<div class="space-y-3"><div>${qtLbl("Nomor Penawaran")}${rtsRO(`<span class="font-mono">${esc(s.doc_number)}</span>`)}</div><div>${qtLbl("Penerima")}${rtsRO(esc(s.recipient.name))}</div>
+        <div>${qtLbl("Jenis")}${rtsRO(esc(s.recipient.type_label))}</div>
+        <div>${qtLbl("Template PDF")}<select onchange="qtPreview(this.value)" class="${RTS_IN}"><option value="modern" ${s.theme === "modern" ? "selected" : ""}>Modern Minimal</option><option value="formal" ${s.theme === "formal" ? "selected" : ""}>Professional Formal</option></select></div>
+        <div>${qtLbl("Tanggal Terbit")}${rtsRO(qtTgl(s.issue_date))}</div>
+        <div class="rounded-xl border border-accent/20 bg-accent/5 px-3 py-3 text-xs text-accentDark leading-relaxed">Preview menggunakan data naskah dan harga yang sama dengan PDF final.</div></div>`)}
+      <div class="bg-[#E9EBEF] border border-line rounded-xl p-4 min-w-0 overflow-hidden"><div id="qt-paper-fit">${qtLetterHtml(s, true)}</div></div>
+      ${qtCard("Pemeriksaan Dokumen", `<ul>${pv.checks.map(check).join("")}</ul>
+        <div class="border-t border-line mt-3 pt-3"><div class="text-xs text-muted">Ringkasan</div><div class="font-sans text-2xl font-bold tabular-nums text-accentDark">${qtM(s.total)}</div></div>
+        <div class="rounded-xl border border-accent/20 bg-accent/5 px-3 py-3 text-xs text-accentDark leading-relaxed mt-3">Menerbitkan PDF akan mengunci snapshot versi ini. Revisi dilakukan melalui versi baru.</div>
+        <button type="button" onclick="qtIssue('${QT.previewTheme}')" ${bad.length ? "disabled" : ""} class="${RTS_BTN} font-semibold mt-3">Terbitkan PDF</button>
+        ${bad.length ? `<p class="text-xs text-failed mt-2">Perbaiki ${bad.length} pemeriksaan di atas sebelum terbit.</p>` : ""}`)}
+    </div>`);
+  qtFitPaper();
+}
+function qtFitPaper() {
+  const box = document.getElementById("qt-paper-fit");
+  if (!box) return;
+  const paper = box.firstElementChild;
+  paper.style.zoom = Math.min(1, (box.clientWidth - 4) / 794).toFixed(3);
+}
+window.addEventListener("resize", () => { if (QT.view === "preview" || QT.view === "detail") qtFitPaper(); });
+
+// The A4 letter (Gambar 09 Professional Formal / 10 Modern Minimal), built only from a snapshot.
+function qtLetterHtml(s, screen) {
+  const formal = s.theme === "formal", co = s.company, hasDisc = s.lines.some(l => l.discount);
+  const head = formal ? "#262F3D" : "#E5643F";
+  const P = t => esc(t).replace(/\n/g, "<br>");
+  const paras = txt => String(txt || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+    .map((p, i) => i === 0 && /^dengan hormat,?$/i.test(p) ? `<p style="margin:0 0 6px;font-weight:700">${esc(p)}</p>` : `<p style="margin:0 0 8px;text-align:justify">${P(p)}</p>`).join("");
+  const band = formal
+    ? `<div style="position:relative;height:30px;background:#C8302A;margin:${screen ? "-40px -48px 18px" : "0 0 14px"};overflow:hidden"><div style="position:absolute;right:0;top:0;width:36%;height:100%;background:#F3A93B;border-bottom-left-radius:100% 70%"></div></div>`
+    : `<div style="position:absolute;inset:0 0 auto 0;height:${screen ? "96px" : "84px"};background:#FDEEE8;overflow:hidden;z-index:0"><div style="position:absolute;right:0;top:0;width:40%;height:100%;background:#F8BE9F;clip-path:polygon(0 0,100% 0,100% 30%,22% 100%)"></div></div>`;
+  const right = [`${co.city}${co.region ? ", " + co.region : ""}`.toUpperCase(), co.tagline, co.address, [co.phone, co.email].filter(Boolean).join(" · ")].filter(Boolean)
+    .map((t, i) => `<div style="font-size:${i ? 8.5 : 9}px;${i ? "color:#6B6B66" : "font-weight:600;letter-spacing:.3px"}">${esc(t)}</div>`).join("");
+  const td = "padding:6px 8px;border-bottom:1px solid #ECEAE4;vertical-align:top";
+  const rows = s.lines.map((l, i) => `<tr style="background:${i % 2 ? "#F7F7F9" : "#fff"};break-inside:avoid">
+      <td style="${td};text-align:center">${l.no}</td><td style="${td}"><div style="font-weight:600">${esc(l.name)}</div>${l.sku ? `<div style="font-size:8.5px;color:#6B6B66">${esc(l.sku)}</div>` : ""}</td>
+      <td style="${td};text-align:center;white-space:nowrap">${l.qty} ${esc(l.unit)}</td><td style="${td};text-align:right;white-space:nowrap">${qtM(l.price).replace("Rp", "Rp ")}</td>
+      ${hasDisc ? `<td style="${td};text-align:right;white-space:nowrap">${l.discount ? qtM(l.discount).replace("Rp", "Rp ") : "-"}</td>` : ""}
+      <td style="${td};text-align:right;white-space:nowrap">${qtM(l.total).replace("Rp", "Rp ")}</td></tr>`).join("");
+  const span = hasDisc ? 5 : 4, money = n => qtM(n).replace("Rp", "Rp ");
+  const totals = (s.discount ? `<tr style="break-inside:avoid"><td colspan="${span}" style="padding:6px 8px;text-align:right">Subtotal</td><td style="padding:6px 8px;text-align:right;white-space:nowrap">${money(s.subtotal)}</td></tr>
+      <tr style="break-inside:avoid"><td colspan="${span}" style="padding:6px 8px;text-align:right">Diskon</td><td style="padding:6px 8px;text-align:right;white-space:nowrap">−${money(s.discount)}</td></tr>` : "")
+    + `<tr style="background:#FDEEE8;break-inside:avoid"><td colspan="${span}" style="padding:9px 8px;font-weight:700;color:#C4633F;letter-spacing:.3px">TOTAL PENAWARAN</td><td style="padding:9px 8px;text-align:right;font-weight:700;color:#C4633F;white-space:nowrap">${money(s.total)}</td></tr>`;
+  const meta = [["Nomor", s.doc_number], ["Tanggal", `${s.issue_city}, ${qtTgl(s.issue_date)}`], ["Perihal", s.subject]]
+    .map(([k, v]) => `<tr><td style="width:62px;font-weight:600;padding:1px 0">${k}</td><td style="padding:1px 6px">:</td><td style="padding:1px 0">${esc(v)}</td></tr>`).join("");
+  const bank = s.bank ? `<div style="margin:10px 0 0;padding:8px 10px;border:1px solid #ECEAE4;border-radius:6px;break-inside:avoid"><div style="font-weight:700;margin-bottom:2px">Rekening Resmi Pembayaran</div>
+      ${esc(s.bank.bank_name)} · <b>${esc(s.bank.account_number)}</b> · a.n. ${esc(s.bank.account_name)}<div style="font-size:8.5px;color:#6B6B66;margin-top:2px">Penyebutan rekening bukan tagihan atau bukti pembayaran.</div></div>` : "";
+  const outer = screen ? "width:794px;min-height:1123px;padding:40px 48px 56px;box-shadow:0 2px 14px rgba(20,20,19,.12);margin:0 auto;"
+                       : "width:100%;";
+  return `<div class="qt-letter" style="${outer}position:relative;background:#fff;color:#1F1F1E;font-family:Inter,Arial,Helvetica,sans-serif;font-size:10.5px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden">
+    ${formal ? band : band}
+    <div style="position:relative;z-index:1">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+        <div style="display:flex;align-items:center;gap:10px"><img src="assets/logo-nota.png" alt="" style="height:40px;width:auto" onerror="this.style.display='none'">
+          <div><div style="font-size:13px;font-weight:800;letter-spacing:.4px">${esc(co.name)}</div></div></div>
+        <div style="text-align:right">${right}</div></div>
+      <div style="text-align:center;font-size:15px;font-weight:800;letter-spacing:1px;margin:14px 0 6px">SURAT PENAWARAN HARGA</div>
+      <div style="height:2px;background:${formal ? "#C8302A" : "#E5643F"};opacity:.55;margin-bottom:12px"></div>
+      <table style="font-size:10px;margin-bottom:12px;border-collapse:collapse">${meta}</table>
+      <div style="margin-bottom:10px"><div style="font-weight:700">Kepada Yth.</div>${s.recipient.to_lines.map((t, i) => `<div style="${i === 0 ? "font-weight:700" : ""}">${esc(t)}</div>`).join("")}</div>
+      ${paras(s.texts.opening)}
+      ${s.texts.table ? `<p style="margin:4px 0 8px">${P(s.texts.table)}</p>` : ""}
+      <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:12px"><thead style="display:table-header-group"><tr style="background:${head};color:#fff">
+        <th style="padding:7px 8px;width:30px;border-top-left-radius:5px">NO.</th><th style="padding:7px 8px;text-align:left">PRODUK / JASA</th><th style="padding:7px 8px">QTY</th><th style="padding:7px 8px;text-align:right">HARGA</th>
+        ${hasDisc ? '<th style="padding:7px 8px;text-align:right">DISKON</th>' : ""}<th style="padding:7px 8px;text-align:right;border-top-right-radius:5px">JUMLAH</th></tr></thead>
+        <tbody>${rows}${totals}</tbody></table>
+      <div style="break-inside:avoid"><div style="font-weight:700;margin-bottom:3px">Ketentuan Penawaran</div>
+        <ol style="margin:0 0 8px;padding-left:18px;list-style:decimal">${s.terms.map(t => `<li style="margin:1px 0">${esc(t)}</li>`).join("")}</ol>${bank}</div>
+      <div style="break-inside:avoid;margin-top:10px">${paras(s.texts.closing)}
+        <div style="margin-top:12px">Hormat kami,</div><div style="font-weight:700;margin-top:2px">${esc(co.name)}</div>
+        <div style="height:46px"></div><div style="font-weight:700;text-decoration:underline">${esc(s.signer.name)}</div>${s.signer.title ? `<div style="color:#6B6B66">${esc(s.signer.title)}</div>` : ""}</div>
+      ${screen ? `<div style="position:absolute;left:0;right:0;bottom:-36px;display:flex;justify-content:space-between;border-top:1px solid #F0C9BA;padding-top:5px;font-size:8px;color:#6B6B66"><span>Surat penawaran harga · Bukan faktur atau bukti pembayaran</span><span>${esc(s.doc_number)}</span></div>` : ""}
+    </div></div>`;
+}
+// Prints / saves as PDF from the snapshot. The footer and page numbers ride in the @page margin boxes (A4).
+function qtPrintSnapshot(s, qid, vid) {
+  const rule = document.getElementById("print-page-rule"), before = rule.textContent, title = document.title;
+  rule.textContent = `@page { size: A4 portrait; margin: 14mm 15mm 16mm;
+    @bottom-left { content: "Surat penawaran harga · Bukan faktur atau bukti pembayaran · ${s.doc_number}"; font: 7.5pt Arial, sans-serif; color: #6B6B66; }
+    @bottom-right { content: "Halaman " counter(page) " / " counter(pages); font: 7.5pt Arial, sans-serif; color: #6B6B66; } }`;
+  const root = document.createElement("div");
+  root.id = "cr-print-root";
+  root.innerHTML = qtLetterHtml(s, false);
+  document.body.appendChild(root);
+  document.body.classList.add("printing-cr");
+  document.title = `Penawaran ${s.doc_number.replace(/\//g, "-")}`;
+  const done = () => { document.body.classList.remove("printing-cr"); root.remove(); rule.textContent = before; document.title = title; window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  if (qid && vid) qtApi(`/api/quotations/${qid}/versions/${vid}/printed`, "POST", {}).catch(() => {});
+  setTimeout(() => window.print(), 50);
+}
+async function qtPrintVersion(vid) {
+  const d = QT.cur;
+  try { const v = await qtApi(`/api/quotations/${d.id}/versions/${vid}`); qtPrintSnapshot(v.snapshot, d.id, vid); } catch (e) { showToast(e.message); }
+}
+async function qtShowVersion(vid) {
+  const d = QT.cur;
+  try {
+    const v = await qtApi(`/api/quotations/${d.id}/versions/${vid}`);
+    openModal(`${v.label} — ${v.doc_number}`, `<div class="bg-[#E9EBEF] rounded-xl p-3 max-h-[70vh] overflow-auto"><div id="qt-paper-fit">${qtLetterHtml(v.snapshot, true)}</div></div>
+      <div class="flex justify-end gap-2 mt-3"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Tutup</button><button type="button" onclick="closeModal(); qtPrintVersion(${vid})" class="${RTS_BTN}">Download PDF</button></div>`, { wide: true });
+    qtFitPaper();
+  } catch (e) { showToast(e.message); }
+}
+
+// ── Detail & Riwayat (Gambar 11) ─────────────────────────────────────────────
+async function qtDetailFromEditor() {
+  if (QT.dirty && !(await qtSave(true))) return;
+  QT.cur = await qtApi(`/api/quotations/${QT.draft.id}`).catch(e => { showToast(e.message); return null; });
+  if (QT.cur) qtDetail();
+}
+async function qtReload() { QT.cur = await qtApi(`/api/quotations/${QT.cur.id}`); qtDetail(); }
+const QT_EVENT_LABEL = { create: "Draft dibuat", edit: "Draft diubah", issue: "Surat terbit", print: "Dicetak / PDF", send: "Pengiriman", follow_up: "Tindak lanjut",
+  decision: "Keputusan customer", revise: "Revisi", revise_cancel: "Revisi dibatalkan", duplicate: "Duplikat", cancel: "Dibatalkan", convert: "Konversi", price: "Harga khusus" };
+function qtDetail() {
+  QT.view = "detail";
+  const d = QT.cur, issued = d.status === "issued", conv = d.conversion, snap = d.issued_snapshot;
+  const row = (l, v) => `<div class="flex items-start justify-between gap-3 py-2.5 border-b border-line text-sm"><span class="text-muted">${l}</span><span class="font-semibold text-ink text-right">${v}</span></div>`;
+  const sent = d.events.find(e => e.kind === "send");
+  const canAct = !conv && d.status !== "cancelled";
+  const btns = `${d.latest_version_id ? `<button type="button" onclick="qtPrintVersion(${d.latest_version_id})" class="${RTS_BTN3} font-semibold">Download PDF</button>` : ""}
+    ${d.status !== "draft" ? `<button type="button" onclick="qtDuplicateView()" class="${RTS_BTN3} font-semibold">Duplikat Penawaran</button>` : ""}
+    ${issued && !conv ? `<button type="button" onclick="qtRevise()" class="${RTS_BTN} font-semibold">Buat Revisi</button>` : ""}
+    ${d.status === "draft" ? `<button type="button" onclick="qtOpen(${d.id})" class="${RTS_BTN} font-semibold">Lanjutkan Edit Draft</button>` : ""}
+    <button type="button" onclick="qtInit()" class="${RTS_BTN3}">Kembali ke Daftar</button>`;
+  const versions = d.versions.map(v => `<div class="flex items-center justify-between gap-3 py-3 border-b border-line"><div><div class="font-semibold text-ink">${esc(v.label)} — ${v.superseded_at ? "Digantikan revisi" : "Surat terbit"} <span class="font-mono text-xs text-muted">${esc(v.doc_number)}</span></div>
+      <div class="text-xs text-muted">${rtsWhen(v.issued_at)} · ${esc(v.issued_by || "")} · ${qtM(v.total)} · snapshot harga dan naskah${v.print_count ? ` · dicetak ${v.print_count}×` : ""}</div></div>
+      <div class="flex gap-1.5 shrink-0"><button type="button" onclick="qtShowVersion(${v.id})" class="px-2.5 py-1 border border-line rounded-md text-xs font-semibold hover:bg-bg2">Lihat PDF</button></div></div>`).join("");
+  const events = d.events.slice(0, QT.allEvents ? 999 : 6).map(e => `<li class="py-2 border-b border-line last:border-b-0 text-sm"><div class="flex justify-between gap-3"><span class="font-medium text-ink">${esc(QT_EVENT_LABEL[e.kind] || e.kind)}</span><span class="text-xs text-muted whitespace-nowrap">${rtsWhen(e.at)}</span></div>
+      <div class="text-xs text-muted">${esc(e.note || "")}${e.actor ? ` · ${esc(e.actor)}` : ""}</div></li>`).join("");
+  const follow = d.status === "cancelled" ? `<p class="text-sm text-muted">Penawaran dibatalkan: ${esc(d.cancel_reason || "")}</p>` : `
+    <div class="space-y-3"><div>${qtLbl("Catatan tindak lanjut")}<input id="qt-fu-note" data-keep-case value="${esc(d.follow_up_note || "")}" placeholder="Mis. Menunggu jawaban customer" class="${RTS_IN}"></div>
+      <div>${qtLbl("Rencana follow-up (opsional)")}<input id="qt-fu-date" type="date" value="${esc(d.follow_up_date || "")}" class="${RTS_IN}"></div>
+      <button type="button" onclick="qtFollowSave()" class="${RTS_BTN3} text-xs">Simpan Catatan</button></div>
+    ${issued && !conv ? `<div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-line">
+      ${d.decision === "accepted" ? `<button type="button" onclick="qtConvertModal()" class="${RTS_BTN} font-semibold">Lanjutkan ke Kasir / SO →</button><button type="button" onclick="qtDecide('pending')" class="${RTS_BTN3}">Batalkan Status Diterima</button>`
+        : `<button type="button" onclick="qtDecide('accepted')" class="${RTS_BTN} font-semibold">Diterima Customer</button><button type="button" onclick="qtDeclineModal()" class="${RTS_BTN3} font-semibold">Ditolak</button>`}
+      <button type="button" onclick="qtDuplicateView()" class="${RTS_BTN3} font-semibold">Duplikat Alternatif</button></div>` : ""}
+    ${conv ? `<div class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 mt-4 text-sm text-violet-900">Dikonversi ke <b>${conv.target_type === "kasir" ? "Transaksi Kasir" : "Sales Order"} ${esc(conv.target_no || "")}</b> oleh ${esc(conv.created_by || "")}.
+      <button type="button" onclick="${conv.target_type === "kasir" ? `openReceiptFromHistory('${esc(conv.target_id)}')` : `openPreorderFromDashboard('${esc(conv.target_id)}')`}" class="ml-1 underline font-semibold">Buka dokumen</button></div>` : ""}`;
+  qtRender(`${qtHead("Detail & Riwayat Penawaran", `Detail &amp; Riwayat Penawaran <span class="font-mono text-lg text-muted">${esc(d.quote_number)}</span>`, "Penawaran terbit tidak berubah; revisi menciptakan versi dokumen baru.", btns)}
+    ${d.status === "draft" && d.latest_version_id ? `<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-4 text-sm text-amber-900 flex flex-wrap items-center gap-3">Draft revisi R${String(d.revision_no).padStart(2, "0")} sedang disusun; versi terbit sebelumnya tetap berlaku sampai revisi diterbitkan.
+      <button type="button" onclick="qtOpen(${d.id})" class="${RTS_BTN} text-xs">Lanjutkan Edit</button><button type="button" onclick="qtCancelRevision()" class="${RTS_BTN3} text-xs">Batalkan Revisi</button></div>` : ""}
+    <div class="grid lg:grid-cols-3 gap-4 mb-4">
+      ${qtCard("Informasi Penawaran", `${row("Nomor", `<span class="font-mono">${esc(snap?.doc_number || d.quote_number)}</span>`)}${row("Customer", `${esc(d.recipient_label || "—")} · ${d.recipient_type === "company" ? "Perusahaan" : "Perorangan"}`)}
+        ${row("Tanggal Terbit", qtTglShort(d.issue_date))}${row("Masa Berlaku", qtTglShort(d.valid_until))}${row("Perihal", esc(d.subject || "—"))}${row("Petugas", esc(d.officer || "—"))}
+        ${d.source ? row("Duplikat dari", `<button type="button" onclick="qtOpen(${d.source.id})" class="font-mono text-accentDark underline">${esc(d.source.quote_number)}</button>`) : ""}
+        ${d.duplicates.length ? row("Alternatif", d.duplicates.map(x => `<button type="button" onclick="qtOpen(${x.id})" class="font-mono text-accentDark underline">${esc(x.quote_number)}</button>`).join(", ")) : ""}`)}
+      ${qtCard("Status &amp; Dokumen", `<div class="mb-3">${qtPill(d.display_status, d.display_label)}</div>
+        ${qtLbl("Versi Terbit")}${rtsRO(snap ? `${esc(snap.label)} · PDF tersimpan` : "Belum terbit")}
+        <div class="mt-3">${qtLbl("Pengiriman")}${rtsRO(d.delivery_status === "sent" && sent ? esc(sent.note) + ` · ${rtsWhen(sent.at)}` : "Belum dicatat")}</div>
+        ${issued && canAct ? `<button type="button" onclick="qtSentModal()" class="mt-3 px-4 py-2 rounded-lg text-sm font-semibold bg-accent/10 text-accentDark border border-accent/20 hover:bg-accent/15">${d.delivery_status === "sent" ? "Catat Pengiriman Lagi" : "Tandai Sudah Dikirim"}</button>` : ""}
+        ${canAct && d.status !== "draft" ? `<button type="button" onclick="qtCancelModal()" class="mt-3 ml-1 px-3 py-2 text-xs text-failed hover:underline">Batalkan penawaran</button>` : ""}`)}
+      ${qtCard("Ringkasan Harga", `<div class="text-xs text-muted">Nilai penawaran</div><div class="font-sans text-3xl font-bold tabular-nums text-accentDark mt-1">${qtM(d.total)}</div>
+        <div class="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 mt-4 text-xs text-accentDark">Potensi transaksi, bukan omzet atau pembayaran.</div>
+        ${snap ? `<div class="text-xs text-muted mt-3">${snap.lines.length} baris · ${esc(snap.theme_label)}${snap.bank ? ` · rekening ${esc(snap.bank.bank_name)}` : ""}</div>` : ""}`)}
+    </div>
+    <div class="grid lg:grid-cols-2 gap-4">
+      ${qtCard("Histori Dokumen", `${versions || '<p class="text-sm text-muted">Belum ada versi terbit.</p>'}
+        <div class="mt-3"><div class="flex items-center justify-between mb-1"><span class="text-xs font-semibold uppercase tracking-wider text-muted">Audit</span>${d.events.length > 6 ? `<button type="button" onclick="QT.allEvents=!QT.allEvents; qtDetail()" class="text-xs text-accentDark font-semibold">${QT.allEvents ? "Ringkas" : `Lihat semua (${d.events.length})`}</button>` : ""}</div><ul>${events}</ul></div>
+        <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">Jika pelanggan meminta harga baru, pilih Buat Revisi. Jika meminta alternatif lain, pilih Duplikat Penawaran.</div>`)}
+      ${qtCard("Tindak Lanjut Penawaran", follow)}
+    </div>`);
+}
+async function qtAct(url, body, msg) {
+  try { QT.cur = await qtApi(`/api/quotations/${QT.cur.id}${url}`, "POST", body || {}); } catch (e) { showToast(e.message); return false; }
+  closeModal(); if (msg) showToast(msg, "success"); qtDetail(); return true;
+}
+function qtSentModal() {
+  const d = QT.cur;
+  openModal("Tandai Sudah Dikirim", `<p class="text-xs text-muted -mt-1 mb-3">Mencatat bahwa surat sudah dikirim. Sistem tidak mengirim WhatsApp atau email otomatis.</p>
+    <div class="space-y-3"><div>${qtLbl("Kanal")}<select id="qt-sent-ch" class="${RTS_IN}"><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="langsung">Diserahkan langsung</option><option value="lainnya">Lainnya</option></select></div>
+      <div>${qtLbl("Dikirim ke (opsional)")}<input id="qt-sent-to" data-keep-case value="${esc(d.whatsapp || d.email || "")}" class="${RTS_IN}"></div>
+      <div>${qtLbl("Catatan (opsional)")}<input id="qt-sent-note" data-keep-case class="${RTS_IN}"></div></div>
+    <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="qtAct('/sent', {channel: document.getElementById('qt-sent-ch').value, recipient: document.getElementById('qt-sent-to').value, note: document.getElementById('qt-sent-note').value}, 'Pengiriman dicatat.')" class="${RTS_BTN}">Simpan</button></div>`);
+}
+async function qtFollowSave() {
+  try { QT.cur = await qtApi(`/api/quotations/${QT.cur.id}/follow-up`, "PUT", { note: document.getElementById("qt-fu-note").value, date: document.getElementById("qt-fu-date").value }); }
+  catch (e) { showToast(e.message); return; }
+  showToast("Tindak lanjut disimpan.", "success"); qtDetail();
+}
+function qtDecide(result) { qtAct("/decision", { result }, result === "accepted" ? "Ditandai diterima customer. Lanjutkan ke Kasir atau Sales Order." : "Status keputusan diperbarui."); }
+function qtDeclineModal() {
+  openModal("Penawaran Ditolak", `<div>${qtLbl("Alasan customer menolak", true)}<input id="qt-dec-note" data-keep-case placeholder="Mis. harga, memilih toko lain, ditunda" class="${RTS_IN}"></div>
+    <p class="text-xs text-muted mt-2">Histori tetap tersimpan; tidak ada penjualan yang dibuat.</p>
+    <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="qtAct('/decision', {result: 'declined', note: document.getElementById('qt-dec-note').value}, 'Ditandai ditolak customer.')" class="${RTS_BTND}">Tandai Ditolak</button></div>`);
+}
+function qtCancelModal() {
+  openModal("Batalkan Penawaran", `<div>${qtLbl("Alasan pembatalan", true)}<input id="qt-cancel-reason" data-keep-case class="${RTS_IN}"></div><p class="text-xs text-muted mt-2">Dokumen dan PDF yang sudah terbit tetap tersimpan sebagai histori.</p>
+    <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Kembali</button><button type="button" onclick="qtAct('/cancel', {reason: document.getElementById('qt-cancel-reason').value}, 'Penawaran dibatalkan.')" class="${RTS_BTND}">Batalkan Penawaran</button></div>`);
+}
+async function qtRevise() {
+  if (!confirm("Buat draft revisi? Versi yang sudah terbit tetap tersimpan, dan revisi akan mendapat nomor -R berikutnya saat diterbitkan.")) return;
+  try { QT.cur = await qtApi(`/api/quotations/${QT.cur.id}/revisions`, "POST", {}); } catch (e) { showToast(e.message); return; }
+  qtLoadDraft(QT.cur); qtEditor();
+}
+async function qtCancelRevision() {
+  if (!confirm("Batalkan draft revisi? Isi kembali ke versi terbit terakhir.")) return;
+  await qtAct("/revisions/cancel", {}, "Draft revisi dibatalkan.");
+}
+
+// ── Duplikat sebagai Penawaran Baru (Gambar 12) ──────────────────────────────
+async function qtDuplicateView() {
+  const d = QT.cur;
+  let num = "";
+  try { num = (await qtApi("/api/quotations/next-number")).quote_number; } catch (_) {}
+  QT.view = "duplicate";
+  const main = [...(d.issued_snapshot?.lines || d.lines)].sort((a, b) => (b.total ?? 0) - (a.total ?? 0))[0];
+  qtRender(`${qtHead("Duplikat sebagai Penawaran Baru", "Duplikat sebagai Penawaran Baru", "Membuat alternatif baru, bukan mengubah versi penawaran yang telah diterbitkan.",
+      `<button type="button" onclick="qtDetail()" class="${RTS_BTN3} font-semibold">Kembali</button><button type="button" onclick="qtDuplicateSave()" class="${RTS_BTN} font-semibold">Simpan Penawaran Baru</button>`)}
+    <div class="grid lg:grid-cols-2 gap-4">
+      ${qtCard("Penawaran Sumber", `<div class="mb-3">${rtsPill(RTS_TINT.blue, `${d.display_label} · Tidak Diubah`)}</div><div class="space-y-3">
+        <div>${qtLbl("Nomor Asli")}${rtsRO(`<span class="font-mono">${esc(d.issued_snapshot?.doc_number || d.quote_number)}</span>`)}</div><div>${qtLbl("Penerima")}${rtsRO(esc(d.recipient_label))}</div>
+        <div>${qtLbl("Produk Utama")}${rtsRO(esc(main?.name || main?.product_name || "—"))}</div><div>${qtLbl("Total Asli")}${rtsRO(qtM(d.total))}</div>
+        <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark">Penawaran awal tidak diubah; PDF sebelumnya tetap dapat diakses.</div></div>`)}
+      ${qtCard("Penawaran Alternatif Baru", `<div class="space-y-3"><div>${qtLbl("Nomor Baru (otomatis)")}${rtsRO(`<span class="font-mono">${esc(num || "otomatis saat disimpan")}</span>`)}</div>
+        <div>${qtLbl("Penerima")}${rtsRO(esc(d.recipient_label))}</div>
+        <div>${qtLbl("Perihal")}<input id="qt-dup-subject" data-keep-case value="${esc(("Alternatif " + (d.subject || "").replace(/^Penawaran\s+/i, "")).trim())}" class="${RTS_IN}"></div>
+        <div class="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-xs text-accentDark leading-relaxed">Ini surat baru dengan nomor baru, bukan revisi nomor lama. Barang memakai harga Master Barang hari ini; harga khusus diajukan ulang. Ganti produk atau harga di editor sesudah disimpan.</div></div>`)}
+    </div>`);
+}
+async function qtDuplicateSave() {
+  let d;
+  try { d = await qtApi(`/api/quotations/${QT.cur.id}/duplicate`, "POST", { subject: document.getElementById("qt-dup-subject").value }); } catch (e) { showToast(e.message); return; }
+  showToast(`Penawaran baru ${d.quote_number} dibuat${d.skipped_inactive ? `; ${d.skipped_inactive} barang nonaktif tidak disalin` : ""}.`, "success");
+  QT.cur = d; qtLoadDraft(d); qtEditor();
+}
+
+// ── Lanjutkan ke Kasir / Sales Order (Gambar 13) ─────────────────────────────
+function qtConvertModal() {
+  const d = QT.cur, s = d.issued_snapshot;
+  const row = (l, v) => `<div class="flex justify-between gap-3 py-2 border-b border-line text-sm"><span class="text-muted">${l}</span><span class="font-semibold text-ink">${v}</span></div>`;
+  const card = (icon, title, sub, rows, btn) => `<div class="border border-line rounded-xl p-4 min-w-0"><div class="font-semibold text-ink text-[15px] flex items-center gap-2">${icon}${title}</div><p class="text-xs text-muted mt-1 mb-3">${sub}</p>${rows}<div class="mt-3">${btn}</div></div>`;
+  openModal("Lanjutkan Penawaran yang Disetujui", `<p class="text-xs text-muted -mt-1 mb-4">Penawaran bukan penjualan. Pilih tindakan berikut dan lakukan pengecekan ulang. ${esc(s.doc_number)} · ${qtM(s.total)}</p>
+    <div class="grid sm:grid-cols-2 gap-3">
+      ${card("▣", "Buat Transaksi Kasir", "Untuk customer yang langsung membeli atau melakukan pemasangan di toko.", row("Produk/jasa", "Terisi dari penawaran") + row("Stok", "Cek ulang saat simpan") + row("Pembayaran", "Belum dibuat"), `<button type="button" onclick="qtToKasir()" class="${RTS_BTN} font-semibold">Lanjutkan ke Kasir</button>`)}
+      ${card("◷", "Buat Sales Order / PO Customer", "Untuk pemesanan yang menunggu barang, jadwal pemasangan, atau DP.", row("Item dan harga", "Terisi dari penawaran") + row("Reservasi stok", "Aturan SO terpisah") + row("Status", "Belum dibuat"), `<button type="button" onclick="qtToSo()" class="${RTS_BTN2} font-semibold">Buat Sales Order</button>`)}
+    </div>
+    ${s.discount ? `<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 mt-3">Diskon keseluruhan ${qtM(s.discount)} ikut ke Kasir sebagai diskon nota. Sales Order tidak punya diskon nota: atur di harga baris bila perlu.</div>` : ""}
+    <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">Pencegahan konversi ganda: sistem menyimpan link penawaran → nota / SO saat dokumen itu disimpan, dan memvalidasi ulang ketersediaan serta harga. Harga di bawah Master Barang tetap melewati persetujuan Admin di Kasir / SO.</div>`, { wide: true });
+}
+function qtReasonFor(s, l) { return `Harga Penawaran ${s.doc_number}${l.price_reason ? ": " + l.price_reason : ""}`.slice(0, 300); }
+function qtToKasir() {
+  const d = QT.cur, s = d.issued_snapshot;
+  closeModal();
+  pendingInventoryAction = () => {
+    const tab = blankCashierTabState(nextCashierTabId());
+    Object.assign(tab, {
+      customerName: s.recipient.type === "company" ? (s.recipient.company_name || "") : (s.recipient.person_name || ""),
+      customerPhone: s.recipient.whatsapp || "", remarks: `Dari Penawaran ${s.doc_number}`,
+      items: s.lines.map(l => ({ sku: l.item_type === "barang" ? l.sku : null, name: l.name, qty: String(l.qty), price: String(l.price), itemType: l.item_type,
+        discount: String(l.discount || 0), listPrice: l.list_price ? String(l.list_price) : "", priceReason: l.item_type === "barang" ? qtReasonFor(s, l) : "", warranty: "" })),
+      discount: String(s.discount || 0), discountReason: s.discount ? `Diskon Penawaran ${s.doc_number}` : "",
+      quotationId: d.id, quotationNo: s.doc_number, dirty: true,
+    });
+    cashierTabs.push(tab);
+    setActiveCashierTab(tab.tabId);
+    showToast(`Kasir diisi dari ${s.doc_number}. Periksa stok & harga, lalu simpan — penawaran tertaut saat nota disimpan.`, "success");
+  };
+  location.hash = "/cashier";
+}
+function qtToSo() {
+  const d = QT.cur, s = d.issued_snapshot;
+  closeModal();
+  pendingInventoryAction = async () => {
+    await renderPreorderForm(null);
+    poQuotationId = d.id;
+    document.getElementById("po-customer-name").value = s.recipient.type === "company" ? (s.recipient.company_name || "") : (s.recipient.person_name || "");
+    document.getElementById("po-customer-phone").value = s.recipient.whatsapp || "";
+    document.getElementById("po-notes").value = `Dari Penawaran ${s.doc_number}`;
+    document.getElementById("po-item-rows").innerHTML = "";
+    for (const l of s.lines) {
+      const unitNet = l.qty ? Math.round(l.total / l.qty) : l.price;
+      const row = addPreorderRow({ master_item_id: l.item_type === "barang" ? l.master_item_id : null, product_name: l.name, unit: l.unit, quantity: l.qty, unit_price: unitNet,
+        source: l.item_type === "jasa" ? "jasa" : "supplier", status: "pesanan_dibuat", master_price: l.list_price || null, sku: l.sku });
+      if (l.item_type === "barang") row.dataset.priceReason = qtReasonFor(s, l);
+    }
+    updatePreorderTotals();
+    showToast(`Sales Order diisi dari ${s.doc_number}. Lengkapi plat & nomor HP, cek stok/harga, lalu simpan.`, "success");
+  };
+  location.hash = "/sales-order";
+}
+
+// ── Pengaturan Perusahaan (identitas toko & rekening resmi) ──────────────────
+const CO = { s: null, accounts: [] };
+async function coInit() {
+  try { [CO.s, CO.accounts] = await Promise.all([qtApi("/api/company-settings"), qtApi("/api/company-bank-accounts?all=true")]); } catch (e) { showToast(e.message); return; }
+  coRender();
+}
+function coRender() {
+  const s = CO.s, f = (key, label, req, attrs = "") => `<div>${qtLbl(label, req)}<input id="co-${key}" ${attrs} value="${esc(s[key] ?? "")}" class="${RTS_IN}"></div>`;
+  const accRows = CO.accounts.map(a => `<tr class="border-t border-line"><td class="px-3 py-2.5 font-semibold">${esc(a.bank_name)}</td><td class="px-3 py-2.5 font-mono">${esc(a.account_number)}</td><td class="px-3 py-2.5">${esc(a.account_name)}</td>
+      <td class="px-3 py-2.5">${a.is_active ? rtsPill(RTS_TINT.green, "Aktif") : rtsPill(RTS_TINT.gray, "Nonaktif")}</td>
+      <td class="px-3 py-2.5 text-right whitespace-nowrap"><button type="button" onclick="coAccountModal(${a.id})" class="text-accentDark text-sm font-medium hover:underline">Ubah</button></td></tr>`).join("");
+  document.getElementById("co-root").innerHTML = `
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5"><div><h2 class="font-serif text-[26px] font-semibold text-ink leading-tight">Pengaturan Perusahaan</h2>
+      <p class="text-sm text-muted mt-1">Identitas resmi toko dan rekening yang boleh dicetak pada Surat Penawaran Harga. Hanya Admin yang dapat mengubah.</p></div></div>
+    <div class="grid xl:grid-cols-2 gap-4 items-start">
+      ${qtCard("Identitas Toko", `<div class="grid sm:grid-cols-2 gap-3">${f("name", "Nama toko", true)}${f("tagline", "Bidang usaha")}${f("city", "Kota surat", true)}${f("region", "Provinsi")}
+        <div class="sm:col-span-2">${f("address", "Alamat")}</div>${f("phone", "Telepon / WhatsApp")}${f("email", "Email", false, 'type="email"')}
+        ${f("signer_name", "Penanda tangan default", true)}${f("signer_title", "Jabatan penanda tangan", false, "data-keep-case")}${f("quote_valid_days", "Masa berlaku penawaran (hari)", true, 'inputmode="numeric"')}</div>
+        <div class="flex justify-end mt-4"><button type="button" onclick="coSave()" class="${RTS_BTN} font-semibold">Simpan Identitas</button></div>`)}
+      ${qtCard("Rekening Resmi", `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-bg2/70 text-left text-[11px] uppercase tracking-wider text-muted"><th class="px-3 py-2">Bank</th><th class="px-3 py-2">Nomor</th><th class="px-3 py-2">Atas nama</th><th class="px-3 py-2">Status</th><th></th></tr></thead>
+        <tbody>${accRows || '<tr><td colspan="5" class="px-3 py-8 text-center text-muted">Belum ada rekening resmi.</td></tr>'}</tbody></table></div>
+        <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">Rekening tidak dihapus, hanya dinonaktifkan. Surat yang sudah terbit tetap menyimpan rekening saat diterbitkan.</div>`,
+        `<button type="button" onclick="coAccountModal(null)" class="${RTS_BTN} font-semibold">+ Tambah Rekening</button>`)}
+    </div>`;
+}
+async function coSave() {
+  const body = {};
+  for (const k of ["name", "tagline", "city", "region", "address", "phone", "email", "signer_name", "signer_title", "quote_valid_days"]) body[k] = document.getElementById(`co-${k}`).value;
+  try { CO.s = await qtApi("/api/company-settings", "PUT", body); } catch (e) { showToast(e.message); return; }
+  QT.settings = null;
+  showToast("Pengaturan Perusahaan disimpan.", "success"); coRender();
+}
+function coAccountModal(id) {
+  const a = CO.accounts.find(x => x.id === id) || { bank_name: "", account_number: "", account_name: CO.s.name, is_active: true };
+  openModal(id ? "Ubah Rekening Resmi" : "Tambah Rekening Resmi", `<div class="space-y-3">
+      <div>${qtLbl("Nama bank", true)}<input id="coa-bank" value="${esc(a.bank_name)}" placeholder="Mis. BCA" class="${RTS_IN}"></div>
+      <div>${qtLbl("Nomor rekening", true)}<input id="coa-num" inputmode="numeric" value="${esc(a.account_number)}" class="${RTS_IN} font-mono"></div>
+      <div>${qtLbl("Atas nama", true)}<input id="coa-name" value="${esc(a.account_name)}" class="${RTS_IN}"></div>
+      <label class="flex items-center gap-2 text-sm"><input id="coa-active" type="checkbox" ${a.is_active ? "checked" : ""} class="accent-[#D97757]"> Aktif (boleh dipilih di surat)</label></div>
+    <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="coAccountSave(${id || "null"})" class="${RTS_BTN}">Simpan</button></div>`);
+}
+async function coAccountSave(id) {
+  const body = { bank_name: document.getElementById("coa-bank").value, account_number: document.getElementById("coa-num").value,
+    account_name: document.getElementById("coa-name").value, is_active: document.getElementById("coa-active").checked };
+  try { await qtApi(id ? `/api/company-bank-accounts/${id}` : "/api/company-bank-accounts", id ? "PUT" : "POST", body); } catch (e) { showToast(e.message); return; }
+  closeModal(); QT.accounts = null; showToast("Rekening disimpan.", "success"); coInit();
+}
 </script>
 
 <div id="barcode-print-area">

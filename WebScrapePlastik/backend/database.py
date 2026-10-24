@@ -1353,6 +1353,9 @@ def init_db() -> None:
         # The supplier a Sales Order is bought from. Null = each barang follows its Master Barang supplier.
         if "supplier_id" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
             con.execute("ALTER TABLE preorders ADD COLUMN supplier_id INTEGER REFERENCES suppliers(id)")
+        # Owner, 24-10-2026: where the order came in (walk-in at the shop or by WhatsApp).
+        if "order_source" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
+            con.execute("ALTER TABLE preorders ADD COLUMN order_source TEXT NOT NULL DEFAULT 'walk_in'")
         if "preorder_item_id" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
             con.execute("ALTER TABLE receipt_items ADD COLUMN preorder_item_id INTEGER")
         # --- Additive migration: Retur Barang ---
@@ -1447,6 +1450,9 @@ def init_db() -> None:
         incentives.migrate(con)
         from backend import credit_notes
         credit_notes.migrate(con)
+        from backend import company, quotations
+        company.migrate(con)
+        quotations.migrate(con)
         sr_cols = {r["name"] for r in con.execute("PRAGMA table_info(supplier_returns)").fetchall()}
         if "origin" not in sr_cols:  # 'barang_masuk' = made from a posted Goods Receipt (potong tagihan)
             con.execute("ALTER TABLE supplier_returns ADD COLUMN origin TEXT")
@@ -2672,8 +2678,8 @@ def confirm_receipt_payment(receipt_id: str, payment_id: int, by: str | None = N
                           (by, now, now, payment_id))
         if cur.rowcount == 0:
             raise ValueError("Pembayaran ini baru saja diproses orang lain. Muat ulang.")
-        con.execute("UPDATE receipts SET amount_paid=?, status=?, payment_method=? WHERE id=?",
-                    (new_paid, new_status, pay["method"], receipt_id))
+        con.execute("UPDATE receipts SET amount_paid=?, status=?, payment_method=?, transfer_sender=?, transfer_account=? WHERE id=?",
+                    (new_paid, new_status, pay["method"], pay["transfer_sender"], pay["transfer_account"], receipt_id))
         _log_receipt_event(con, receipt_id, "payment",
                            f"Dana masuk dikonfirmasi: Rp {pay['amount']:,} ({pay['method']}).".replace(",", "."), by)
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
@@ -5003,6 +5009,29 @@ def update_master_item(
             )
         updated = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
         return dict(updated)
+
+
+def set_master_item_cost(master_item_id: int, cost_price: int, by: str | None) -> dict:
+    """Admin fills in / corrects the cost of a product that holds no stock (e.g. created without a price). With stock on
+    hand the cost stays the Barang Masuk average, so the value of the inventory never changes without a receipt."""
+    if cost_price < 0:
+        raise ValueError("Harga modal tidak boleh negatif.")
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone()
+        if row is None:
+            raise LookupError(f"Barang {master_item_id} tidak ditemukan.")
+        if cost_price == row["avg_cost_price"]:
+            return dict(row)
+        if (row["stock_qty"] or 0) != 0 or (row["quarantine_qty"] or 0) != 0:
+            raise ValueError("Harga modal hanya bisa diubah saat stok 0. Dengan stok, harga modal dihitung otomatis dari Barang Masuk.")
+        now = _now()
+        con.execute("UPDATE master_items SET avg_cost_price=?, last_cost_price=?, updated_at=?, updated_by=? WHERE id=?",
+                    (cost_price, cost_price, now, by, master_item_id))
+        con.execute("""INSERT INTO master_item_price_history (master_item_id, cost_price, sell_price, changed_by, note, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (master_item_id, cost_price, row["sell_price"], by, "Harga modal diisi Admin (stok 0)", now))
+        return dict(con.execute("SELECT * FROM master_items WHERE id=?", (master_item_id,)).fetchone())
 
 
 def set_master_item_archived(master_item_id: int, archived: bool, reason: str | None = None,
@@ -7854,6 +7883,16 @@ def _preorder_pending_by_order(con: sqlite3.Connection) -> dict[str, int]:
         "SELECT preorder_id, SUM(amount) AS n FROM preorder_payments WHERE state='pending' GROUP BY preorder_id").fetchall()}
 
 
+SO_ORDER_SOURCES = ("walk_in", "whatsapp")
+
+
+def _preorder_source(source: str | None) -> str:
+    source = source or "walk_in"
+    if source not in SO_ORDER_SOURCES:
+        raise ValueError("Sumber Sales Order harus Walk-in atau WhatsApp.")
+    return source
+
+
 def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | None = None) -> dict:
     """`paid` is the sum of the order's own payments; the legacy preorders.deposit column is ignored.
     Once the PO has its invoice, paid and remaining are the invoice's (payments are taken there)."""
@@ -8125,6 +8164,7 @@ def create_preorder(
     supplier_id: int | None = None,
     deposit_confirmed: bool | None = None,
     price_actor: dict | None = None,
+    order_source: str | None = None,
 ) -> dict:
     """A deposit given at creation is recorded as the first payment ("DP awal"); on a published PO it
     is booked straight onto the PO's invoice, which is created here too."""
@@ -8134,10 +8174,10 @@ def create_preorder(
         con.execute(
             """INSERT INTO preorders
                (id, po_number, po_date, plate_full, customer_name, customer_phone, deposit, notes,
-                created_at, updated_at, is_draft, supplier_id)
-               VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)""",
+                created_at, updated_at, is_draft, supplier_id, order_source)
+               VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)""",
             (preorder_id, _next_po_no(con, po_date), po_date, plate_full, customer_name,
-             customer_phone, notes, now, now, int(is_draft), supplier_id),
+             customer_phone, notes, now, now, int(is_draft), supplier_id, _preorder_source(order_source)),
         )
         if deposit > 0:
             con.execute(
@@ -9087,6 +9127,7 @@ def update_preorder(
     set_supplier: bool = False,
     supplier_id: int | None = None,
     price_actor: dict | None = None,
+    order_source: str | None = None,
 ) -> dict:
     """Items are matched by id rather than deleted and re-inserted (the pattern
     receipts use), because a line item owns its stage and its status history —
@@ -9108,7 +9149,7 @@ def update_preorder(
 
         con.execute(
             """UPDATE preorders SET customer_name=?, customer_phone=?, plate_full=?, po_date=?, notes=?,
-               updated_at=?, is_draft=?, supplier_id=? WHERE id=?""",
+               updated_at=?, is_draft=?, supplier_id=?, order_source=? WHERE id=?""",
             (
                 customer_name if customer_name is not None else existing["customer_name"],
                 customer_phone if customer_phone is not None else existing["customer_phone"],
@@ -9118,6 +9159,7 @@ def update_preorder(
                 now,
                 int(is_draft) if is_draft is not None else existing["is_draft"],
                 supplier_id if set_supplier else existing.get("supplier_id"),
+                _preorder_source(order_source) if order_source is not None else (existing.get("order_source") or "walk_in"),
                 preorder_id,
             ),
         )
@@ -9812,7 +9854,7 @@ def _spo_attach_faktur(con: sqlite3.Connection, pos: list[dict]) -> None:
 
 def _spo_items(con: sqlite3.Connection, supplier_po_id: str) -> list[dict]:
     rows = con.execute(
-        """SELECT spi.*, p.po_number AS customer_po_number, p.customer_name, p.plate_full,
+        """SELECT spi.*, p.po_number AS customer_po_number, p.customer_name, p.plate_full, pi.ship_route AS so_ship_route,
                   mi.sell_price AS sell_price, mi.barcode AS barcode
            FROM supplier_po_items spi
            LEFT JOIN preorder_items pi ON pi.id = spi.preorder_item_id
@@ -9873,7 +9915,9 @@ def get_supplier_po(supplier_po_id: str) -> dict | None:
             "SELECT * FROM spo_cancellations WHERE supplier_po_id=? ORDER BY cancelled_at ASC, id ASC", (supplier_po_id,))]
         receipts = []
         for r in con.execute(
-            "SELECT * FROM spo_receipts WHERE supplier_po_id=? ORDER BY created_at ASC, id ASC", (supplier_po_id,)
+            """SELECT r.*, d.status AS inbound_status FROM spo_receipts r
+               LEFT JOIN inbound_documents d ON d.id = r.inbound_document_id
+               WHERE r.supplier_po_id=? ORDER BY r.created_at ASC, r.id ASC""", (supplier_po_id,)
         ).fetchall():
             lines = [dict(l) for l in con.execute(
                 """SELECT l.item_id, l.quantity, l.condition, l.location, l.package_id, spi.product_name FROM spo_receipt_lines l
@@ -10234,7 +10278,7 @@ def create_supplier_po(
             _spo_sync_all(con, supplier_po_id, created_by, now)
         if initial_paid:
             _spo_add_payment(con, supplier_po_id, initial_paid, "transfer", "Pembayaran awal", created_by)
-    return get_supplier_po(supplier_po_id)
+    return apply_spo_so_routes(supplier_po_id, created_by) if issue else get_supplier_po(supplier_po_id)
 
 
 def update_supplier_po(
@@ -10327,7 +10371,7 @@ def issue_supplier_po(supplier_po_id: str, changed_by: str | None = None) -> dic
             (now, _next_internal_invoice_no(con, shop_today().isoformat()), supplier_po_id))
         _spo_event(con, supplier_po_id, "stage", "PO diterbitkan ke supplier", changed_by)
         _spo_sync_all(con, supplier_po_id, changed_by, now)
-    return get_supplier_po(supplier_po_id)
+    return apply_spo_so_routes(supplier_po_id, changed_by)
 
 
 _STAGE_LABELS = {
@@ -10858,9 +10902,11 @@ def _spo_shipping_plan(po: dict, items: list[dict], pkgs: list[dict]) -> dict:
             "editable": po["status"] in ("dipesan", "sebagian_diterima")}
 
 
-def save_spo_shipping_plan(supplier_po_id: str, data: dict, by: str | None = None) -> dict:
+def save_spo_shipping_plan(supplier_po_id: str, data: dict, by: str | None = None,
+                           source: str = "Rencana Pengiriman") -> dict:
     """Simpan Rencana Pengiriman: data = {"items": [{"item_id", "lanes": {route: qty}}]}. A route left out of a
-    row keeps what it has. All or nothing; stock never moves here."""
+    row keeps what it has. All or nothing; stock never moves here. `source` names where the plan came from
+    in the package note and the timeline."""
     rows_in = data.get("items") or []
     with _conn() as con:
         con.execute("BEGIN IMMEDIATE")
@@ -10927,11 +10973,11 @@ def save_spo_shipping_plan(supplier_po_id: str, data: dict, by: str | None = Non
                 pid = con.execute(
                     """INSERT INTO spo_packages (supplier_po_id, package_no, ship_method, status, note, created_by, created_at, updated_at)
                        VALUES (?,?,?,?,?,?,?,?)""",
-                    (supplier_po_id, package_no, m, "menunggu_konfirmasi", "Dari Rencana Pengiriman", by, now, now)).lastrowid
+                    (supplier_po_id, package_no, m, "menunggu_konfirmasi", f"Dari {source}", by, now, now)).lastrowid
                 con.executemany("INSERT INTO spo_package_lines (package_id, item_id, quantity) VALUES (?,?,?)",
                                 [(pid, i, q) for i, q in lines])
                 _pkg_history(con, pid, supplier_po_id, {"status": "menunggu_konfirmasi", "ship_method": m, "tracking_no": None,
-                                                        "eta_date": None, "transit_location": None, "note": "Dari Rencana Pengiriman"}, None, by)
+                                                        "eta_date": None, "transit_location": None, "note": f"Dari {source}"}, None, by)
                 notes.append(f"paket {package_no.rsplit('-', 1)[-1]} {SPO_PLAN_METHOD_LABELS[m]} dibuat ({sum(q for _, q in lines)} pcs)")
                 continue
             qty = {l["item_id"]: l["quantity"] for l in target["lines"]}
@@ -10950,12 +10996,35 @@ def save_spo_shipping_plan(supplier_po_id: str, data: dict, by: str | None = Non
             con.execute("UPDATE spo_packages SET updated_at=? WHERE id=?", (now, target["id"]))
             _pkg_history(con, target["id"], supplier_po_id, {"status": target["status"], "ship_method": m, "tracking_no": target["tracking_no"],
                                                              "eta_date": target["eta_date"], "transit_location": target["transit_location"],
-                                                             "note": "Isi paket diubah lewat Rencana Pengiriman"}, target["forwarder_name"], by)
+                                                             "note": f"Isi paket diubah lewat {source}"}, target["forwarder_name"], by)
             notes.append(f"paket {short} {SPO_PLAN_METHOD_LABELS[m]} jadi {sum(q for _, q in keep)} pcs")
         con.execute("UPDATE supplier_pos SET updated_at=? WHERE id=?", (now, supplier_po_id))
-        _spo_event(con, supplier_po_id, "package", "Rencana pengiriman: " + "; ".join(summary) + (" — " + ", ".join(notes) if notes else ""), by)
+        _spo_event(con, supplier_po_id, "package", ("Rencana pengiriman" if source == "Rencana Pengiriman" else source) + ": " + "; ".join(summary) + (" — " + ", ".join(notes) if notes else ""), by)
         _spo_sync_all(con, supplier_po_id, by, now)
     return get_supplier_po(supplier_po_id)
+
+
+def apply_spo_so_routes(supplier_po_id: str, by: str | None = None) -> dict:
+    """Owner 24-10-2026: the route picked on the Sales Order line (Jalur Kirim) carries over to the PO. Units not in
+    any package yet, of lines whose SO line has a route, go to that route's package (made or grown like a saved plan).
+    Runs when the PO is issued and from "Ikuti Jalur SO"; lines with no SO route stay for + Paket."""
+    with _conn() as con:
+        po = con.execute("SELECT * FROM supplier_pos WHERE id=?", (supplier_po_id,)).fetchone()
+        if po is None:
+            raise LookupError(f"Purchase Order {supplier_po_id} tidak ditemukan.")
+        if po["status"] not in ("dipesan", "sebagian_diterima"):
+            return get_supplier_po(supplier_po_id)
+        items = _spo_items(con, supplier_po_id)
+        plan = _spo_shipping_plan(dict(po), items, _spo_packages(con, supplier_po_id))
+    route_of = {i["id"]: i.get("so_ship_route") for i in items}
+    rows_in = []
+    for r in plan["rows"]:
+        m = route_of.get(r["item_id"])
+        if m in SPO_SHIP_METHODS and r["unassigned"] > 0:
+            rows_in.append({"item_id": r["item_id"], "lanes": {m: r["lanes"].get(m, {}).get("qty", 0) + r["unassigned"]}})
+    if not rows_in:
+        return get_supplier_po(supplier_po_id)
+    return save_spo_shipping_plan(supplier_po_id, {"items": rows_in}, by, source="Jalur Sales Order")
 
 
 def _spo_finish_if_settled(con: sqlite3.Connection, supplier_po_id: str) -> None:

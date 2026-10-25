@@ -8022,8 +8022,25 @@ def _require_stock_free(con: sqlite3.Connection, item: dict, own_line_id: int | 
             "Ubah sumbernya ke Pesan Supplier, atau kurangi jumlahnya.")
 
 
+def _forbid_supplier_when_stocked(con: sqlite3.Connection, item: dict) -> None:
+    """Owner 25-10-2026: while the warehouse can cover the whole line from free stock, it may not be set to
+    'Pesan Supplier' -- take it from stock. A line the shelf can only partly cover may still be ordered."""
+    mid = item.get("master_item_id")
+    if item.get("source") != "supplier" or not mid:
+        return
+    mi = con.execute("SELECT stock_qty, unit FROM master_items WHERE id=?", (mid,)).fetchone()
+    if mi is None:
+        return
+    free = max(max(mi["stock_qty"], 0) - _reserved_by_item(con, [mid]).get(mid, 0), 0)
+    if free >= item["quantity"]:
+        raise ValueError(
+            f"“{item['product_name']}”: stok gudang masih ada {free} {mi['unit'] or 'unit'}, cukup untuk {item['quantity']} yang dipesan. "
+            "Pilih sumber Stok Tersedia, bukan Pesan Supplier.")
+
+
 def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict, position: int, now: str) -> int:
     _require_stock_free(con, item)
+    _forbid_supplier_when_stocked(con, item)
     price = _price_review(
         con, scope="preorder", doc_id=preorder_id, master_item_id=item.get("master_item_id"), product_name=item["product_name"],
         qty=item["quantity"], unit_price=item["unit_price"], line_discount=0, prev=None, reason=item.get("price_reason"),
@@ -9281,6 +9298,8 @@ def update_preorder(
                     if source == "stok" and (prev.get("source") != "stok" or item["quantity"] > prev["quantity"]
                                              or item.get("master_item_id") != prev.get("master_item_id")):
                         _require_stock_free(con, {**item, "source": source}, item_id)
+                    if source == "supplier" and prev.get("source") != "supplier":
+                        _forbid_supplier_when_stocked(con, {**item, "source": source})
                     if (prev.get("source"), prev.get("supplier_id")) != (source, supplier_id) and prev["status"] not in PO_CLOSED_LINE_STATUSES:
                         # Draft Purchase Orders made for the old choice are dropped (an issued one refuses).
                         _release_preorder_line_from_pos(con, prev, changed_by, changing=True)

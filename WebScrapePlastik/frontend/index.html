@@ -2217,7 +2217,7 @@
                 </div>
               </div>
               <div id="po-deposit-hint" class="hidden text-right">
-                <button type="button" onclick="openPoPaymentModal()" class="px-3 py-1.5 border border-accent text-accent rounded-lg text-xs font-medium hover:bg-accent/10 transition-colors">+ Tambah DP / Pembayaran</button>
+                <button type="button" onclick="poPayClick()" class="px-3 py-1.5 border border-accent text-accent rounded-lg text-xs font-medium hover:bg-accent/10 transition-colors">+ Tambah DP / Pembayaran</button>
                 <p class="text-[11px] text-muted mt-1">Dicatat langsung ke Sales Order ini; perubahan form yang belum disimpan tidak ikut.</p>
               </div>
               <div id="po-deposit-min-box" class="hidden rounded-lg bg-bg2 px-3 py-2">
@@ -9746,6 +9746,18 @@ const PAYMENT_METHOD_ICONS = {
 };
 let receiptPayCtx = null;  // { id, remaining, ... } while "Pembayaran Nota" is open
 
+// Remembered transfer accounts and senders, offered as suggestions in the payment form.
+async function fetchTransferLists() {
+  const lists = { account: [], sender: [] };
+  await Promise.all([["account", "/api/transfer-accounts"], ["sender", "/api/transfer-senders"]].map(async ([kind, api]) => {
+    try {
+      const resp = await fetch(api);
+      if (resp.ok) lists[kind] = await resp.json();
+    } catch (_) {}
+  }));
+  return lists;
+}
+
 async function openReceiptPaymentModal(receiptId) {
   let detail;
   try {
@@ -9762,13 +9774,7 @@ async function openReceiptPaymentModal(receiptId) {
     await refreshAfterSettle();
     return;
   }
-  const lists = { account: [], sender: [] };
-  await Promise.all([["account", "/api/transfer-accounts"], ["sender", "/api/transfer-senders"]].map(async ([kind, api]) => {
-    try {
-      const resp = await fetch(api);
-      if (resp.ok) lists[kind] = await resp.json();
-    } catch (_) {}
-  }));
+  const lists = await fetchTransferLists();
   receiptPayCtx = {
     id: detail.id,
     total: detail.total,
@@ -9781,8 +9787,20 @@ async function openReceiptPaymentModal(receiptId) {
     plate: detail.plate_full,
   };
   receiptPayCtx.max = Math.max(receiptPayCtx.remaining - receiptPayCtx.pending, 0);
+  openPaymentForm({
+    title: "Pembayaran Nota", infoTitle: "Informasi Nota",
+    lead: "Input pembayaran untuk nota ini. Anda dapat melakukan pembayaran penuh atau sebagian.",
+    info: [["No. Invoice", detail.receipt_no], ["Nama Pelanggan", detail.customer_full_name || detail.customer_name || detail.customer_phone],
+           ["No. Plat Kendaraan", detail.plate_full]],
+    printLabel: "Cetak nota setelah pembayaran", printHint: "Nota dicetak lewat printer setelah pembayaran disimpan.",
+    notePlaceholder: "Contoh: Pembayaran cicilan ke-1, DP, atau catatan lainnya…",
+  }, lists);
+}
+
+// The payment form shared by Pembayaran Nota (Kasir / invoice) and a Sales Order's own DP (owner 25-10-2026:
+// "form DP seperti di Kasir"). `receiptPayCtx` holds the balance; `ctx.soId` sends the money to the Sales Order.
+function openPaymentForm(opts, lists) {
   const ctx = receiptPayCtx;
-  const who = detail.customer_full_name || detail.customer_name || detail.customer_phone || "—";
   const infoRow = (label, value) => `<div class="flex items-baseline gap-4 py-0.5"><span class="w-32 shrink-0 text-muted">${label}</span><span class="font-medium text-ink">${value}</span></div>`;
   const methods = Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => `
     <label class="rp-method flex items-center justify-between gap-2 border rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-colors">
@@ -9792,16 +9810,14 @@ async function openReceiptPaymentModal(receiptId) {
       <input type="radio" name="rp-method" value="${key}" ${key === ctx.method ? "checked" : ""} onchange="updateReceiptPayModal()" class="accent-[#EA580C]" />
     </label>`).join("");
   const row = (label, id, extra = "") => `<div class="flex items-center justify-between py-1"><span class="text-muted">${label}</span><span id="${id}" class="font-semibold tabular-nums ${extra}"></span></div>`;
-  openModal("Pembayaran Nota", `
+  openModal(opts.title, `
     <div class="space-y-4">
-      <p class="text-sm text-muted -mt-2">Input pembayaran untuk nota ini. Anda dapat melakukan pembayaran penuh atau sebagian.</p>
+      <p class="text-sm text-muted -mt-2">${esc(opts.lead)}</p>
       <div class="grid grid-cols-1 md:grid-cols-[1.35fr_1fr] gap-4">
         <div class="space-y-4">
           <div class="border border-line rounded-xl p-4 text-sm">
-            <div class="font-serif font-semibold text-ink mb-2">Informasi Nota</div>
-            ${infoRow("No. Invoice", esc(detail.receipt_no || "—"))}
-            ${infoRow("Nama Pelanggan", esc(who))}
-            ${infoRow("No. Plat Kendaraan", esc(detail.plate_full))}
+            <div class="font-serif font-semibold text-ink mb-2">${esc(opts.infoTitle)}</div>
+            ${opts.info.map(([label, value]) => infoRow(label, esc(value || "—"))).join("")}
           </div>
           <div class="border border-line rounded-xl p-4 space-y-3">
             <div class="font-serif font-semibold text-ink">Input Pembayaran</div>
@@ -9843,7 +9859,7 @@ async function openReceiptPaymentModal(receiptId) {
             </div>
             <div>
               <label for="rp-note" class="block text-xs text-muted mb-1.5">Catatan Pembayaran <span class="text-muted/70">(opsional)</span></label>
-              <textarea id="rp-note" rows="2" maxlength="200" placeholder="Contoh: Pembayaran cicilan ke-1, DP, atau catatan lainnya…"
+              <textarea id="rp-note" rows="2" maxlength="200" placeholder="${esc(opts.notePlaceholder)}"
                 oninput="document.getElementById('rp-note-count').textContent = this.value.length + '/200'"
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></textarea>
               <div id="rp-note-count" class="text-right text-[11px] text-muted">0/200</div>
@@ -9866,7 +9882,7 @@ async function openReceiptPaymentModal(receiptId) {
           </div>
           <label class="flex items-start gap-2 text-sm text-ink cursor-pointer">
             <input id="rp-print" type="checkbox" checked class="accent-[#EA580C] mt-0.5" />
-            <span>Cetak nota setelah pembayaran<span class="block text-xs text-muted">Nota dicetak lewat printer setelah pembayaran disimpan.</span></span>
+            <span>${esc(opts.printLabel)}<span class="block text-xs text-muted">${esc(opts.printHint)}</span></span>
           </label>
         </div>
       </div>
@@ -9952,7 +9968,7 @@ async function submitReceiptPayment(forcePrint) {
 
   let resp;
   try {
-    resp = await fetch(`/api/receipts/${encodeURIComponent(ctx.id)}/payments`, {
+    resp = await fetch(ctx.soId ? `/api/preorders/${encodeURIComponent(ctx.soId)}/payments` : `/api/receipts/${encodeURIComponent(ctx.id)}/payments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -9973,6 +9989,7 @@ async function submitReceiptPayment(forcePrint) {
     closeModal();
     receiptPayCtx = null;
     showToast(message);
+    if (ctx.soId) { await openPreorder(ctx.soId); return; }
     // 409: another till changed the nota first. Show what is true now, in the open tab and the lists.
     if (resp.status === 409) await reloadReceiptIntoOpenTab(ctx.id);
     if (resp.status === 409 || resp.status === 404) await refreshAfterSettle();
@@ -9981,6 +9998,14 @@ async function submitReceiptPayment(forcePrint) {
   const detail = await resp.json();
   closeModal();
   receiptPayCtx = null;
+  if (ctx.soId) {
+    renderPreorderDetail(detail);
+    showToast((method === "transfer" || method === "qris") && !confirmedIn ? `DP ${formatIDR(amount)} dicatat PENDING. Konfirmasi setelah dana masuk.`
+      : detail.remaining === 0 ? "Sales Order lunas." : `Pembayaran ${formatIDR(amount)} dicatat. Sisa ${formatIDR(detail.remaining)}.`, "success");
+    loadPreorders();
+    if (print) openPreorderPrint(detail.id, "detail");
+    return;
+  }
   applySettledReceiptToTab(detail);
   await refreshAfterSettle();
   const lunas = detail.status === "done";
@@ -10079,7 +10104,7 @@ async function refreshAfterSettle() {
   if (currentRoute() === "/sales-order") {
     // The list shows the invoice's payment status too, so it must not keep a stale "Belum lunas".
     await loadPreorders();
-    if (currentPreorder && !document.getElementById("po-detail-panel").classList.contains("hidden")) {
+    if (currentPreorder && ["po-detail-panel", "po-form-panel"].some(id => !document.getElementById(id).classList.contains("hidden"))) {
       await openPreorder(currentPreorder.id);
     }
   }
@@ -20502,6 +20527,20 @@ function poRowSupplierOptions(selectEl, chosen, chosenName) {
     + opts.map(o => `<option value="${o.id}" ${o.id === chosen ? "selected" : ""}>${esc(o.name)}</option>`).join("");
 }
 
+// Owner 25-10-2026: a new line the warehouse can cover from free stock cannot be ordered from a supplier
+// (the server refuses it too). A line the shelf only partly covers keeps both choices.
+function poRowLockSupplier(rowEl) {
+  const sourceEl = rowEl.querySelector(".po-row-source");
+  const opt = sourceEl.querySelector('option[value="supplier"]');
+  if (!opt || sourceEl.disabled) return;
+  const avail = rowEl.dataset.available;
+  const qty = parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 1;
+  const locked = !rowEl.dataset.itemId && !!rowEl.dataset.masterItemId && avail !== undefined && avail !== "" && Number(avail) >= qty;
+  opt.disabled = locked;
+  opt.textContent = locked ? `Pesan Supplier (stok masih ada ${avail})` : SO_SOURCE_LABELS.supplier;
+  if (locked && sourceEl.value === "supplier") { sourceEl.value = "stok"; applyPoRowSource(rowEl); }
+}
+
 function onPoRowSourceChange(selectEl) {
   applyPoRowSource(selectEl.closest(".po-item-row"));
   updatePreorderTotals();
@@ -20840,6 +20879,7 @@ function updatePreorderTotals() {
     total += lineTotal;
     row.rowEl.querySelector(".po-row-total").textContent = formatIDR(lineTotal);
     refreshPoSpecial(row.rowEl);
+    poRowLockSupplier(row.rowEl);
   }
   // Editing an existing order: the DP is whatever payments already exist.
   const deposit = currentPreorder ? currentPreorder.deposit : priceValue(document.getElementById("po-deposit"));
@@ -22989,81 +23029,25 @@ async function submitPoConvert() {
 }
 
 // ── Preorder: Tambah Pembayaran / Ubah Status PO ─────────────────────────────
-function openPoPaymentModal() {
+async function openPoPaymentModal() {
   if (!currentPreorder) return;
   if (currentPreorder.remaining <= 0) {
     showToast("Sales Order ini sudah lunas.", "success");
     return;
   }
-  // A draft Sales Order is published once 30% is paid: offer exactly what is still missing, no calculator needed.
-  const dpNeed = currentPreorder.is_draft ? Math.min(Math.max(soMinDp(currentPreorder.total) - (currentPreorder.deposit || 0), 0), currentPreorder.remaining) : 0;
-  openModal("Tambah Pembayaran", `
-    <div class="space-y-3">
-      <div class="flex items-center justify-between text-sm">
-        <span class="text-muted">Sisa tagihan</span>
-        <span class="font-semibold text-failed tabular-nums">${formatIDR(currentPreorder.remaining)}</span>
-      </div>
-      <div>
-        <label for="po-pay-amount" class="block text-xs text-muted mb-1.5">Nominal <span class="text-failed">*</span></label>
-        <div class="relative">
-          <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-          <input id="po-pay-amount" type="text" inputmode="numeric" placeholder="0" autocomplete="off"
-            class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-2 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-        </div>
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
-          ${dpNeed > 0 ? `<button type="button" onclick="setPriceInput(document.getElementById('po-pay-amount'), ${dpNeed})"
-            class="text-xs text-accent hover:text-accentDark font-medium">Isi DP minimal ${SO_MIN_DP_PERCENT}% (${formatIDR(dpNeed)})</button>` : ""}
-          <button type="button" onclick="setPriceInput(document.getElementById('po-pay-amount'), currentPreorder.remaining)"
-            class="text-xs text-accent hover:text-accentDark font-medium">Isi sisa tagihan</button>
-        </div>
-        ${currentPreorder.is_draft && SO_MIN_DP_PERCENT > 0 ? `<p class="text-[11px] text-muted mt-1.5">DP minimal ${SO_MIN_DP_PERCENT}% dari total ${formatIDR(currentPreorder.total)} = <b class="text-ink">${formatIDR(soMinDp(currentPreorder.total))}</b>${currentPreorder.deposit ? `; sudah dibayar ${formatIDR(currentPreorder.deposit)}` : ""}.
-          ${dpNeed > 0 ? "Hanya pembayaran yang sudah sah (bukan Pending) yang dihitung." : "DP sudah cukup untuk menerbitkan."}</p>` : ""}
-      </div>
-      <div>
-        <label for="po-pay-method" class="block text-xs text-muted mb-1.5">Metode Pembayaran</label>
-        <select id="po-pay-method" onchange="document.getElementById('po-pay-confirm-wrap').classList.toggle('hidden', !['transfer','qris'].includes(this.value))" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
-          <option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option></select>
-      </div>
-      <label id="po-pay-confirm-wrap" class="hidden flex items-start gap-2 rounded-lg border border-line bg-bg2 px-3 py-2.5 text-sm text-ink cursor-pointer">
-        <input id="po-pay-confirmed" type="checkbox" class="accent-[#EA580C] mt-0.5" />
-        <span>Dana sudah saya cek masuk<span class="block text-xs text-muted">Bila tidak dicentang, pembayaran dicatat <b>Pending</b> dan belum dihitung sebagai DP sampai dikonfirmasi.</span></span>
-      </label>
-      <div>
-        <label for="po-pay-note" class="block text-xs text-muted mb-1.5">Keterangan</label>
-        <input id="po-pay-note" type="text" placeholder="opsional — mis. DP awal, pelunasan, transfer" autocomplete="off"
-          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-      </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
-        <button type="button" onclick="submitPoPayment()" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Simpan Pembayaran</button>
-      </div>
-    </div>
-  `);
-  if (dpNeed > 0) setPriceInput(document.getElementById("po-pay-amount"), dpNeed);
-  setTimeout(() => document.getElementById("po-pay-amount")?.focus(), 0);
-}
-
-async function submitPoPayment() {
-  const amount = priceValue(document.getElementById("po-pay-amount"));
-  if (amount <= 0) { showToast("Nominal pembayaran harus lebih dari 0."); return; }
-  try {
-    const resp = await fetch(`/api/preorders/${currentPreorder.id}/payments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, method: document.getElementById("po-pay-method").value, note: document.getElementById("po-pay-note").value.trim() || null,
-        confirmed: ["transfer", "qris"].includes(document.getElementById("po-pay-method").value) ? document.getElementById("po-pay-confirmed").checked : null }),
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.detail || "Gagal mencatat pembayaran.");
-    }
-    const detail = await resp.json();
-    closeModal();
-    renderPreorderDetail(detail);
-    showToast(detail.remaining === 0 ? "Sales Order lunas." : "Pembayaran dicatat.", "success");
-  } catch (e) {
-    showToast(e.message);
-  }
+  const so = currentPreorder;
+  const lists = await fetchTransferLists();
+  const pending = so.pending_amount || 0;
+  receiptPayCtx = { soId: so.id, total: so.total, paid: so.deposit || 0, remaining: so.remaining, pending, method: "cash", plate: so.plate_full };
+  receiptPayCtx.max = Math.max(so.remaining - pending, 0);
+  openPaymentForm({
+    title: "Tambah DP / Pembayaran", infoTitle: "Informasi Sales Order",
+    lead: "Input DP atau pembayaran untuk Sales Order ini. Anda dapat membayar penuh atau sebagian.",
+    info: [["No. Sales Order", so.po_number], ["Nama Pelanggan", so.customer_name], ["No. Plat Kendaraan", so.plate_full], ["Sumber Order", so.order_source === "whatsapp" ? "WhatsApp" : "Walk-in"]],
+    printLabel: "Cetak invoice SO setelah pembayaran", printHint: "Halaman cetak invoice Sales Order dibuka setelah pembayaran disimpan.",
+    notePlaceholder: "Contoh: DP awal, pelunasan, atau catatan lainnya…",
+  }, lists);
+  document.getElementById("rp-print").checked = false;
 }
 
 function openPoStatusModal() {

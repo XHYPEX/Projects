@@ -24,9 +24,10 @@ DB_PATH=/tmp/x.db PAYMENT_PROOF_DIR=/tmp/proofs python -m uvicorn backend.main:a
 Windows shop PCs use `Start.bat` (see `HOW_TO_RUN.md`). Env: `DB_PATH`, `PAYMENT_PROOF_DIR`, `PRODUCT_IMAGE_DIR`,
 `SHOP_UTC_OFFSET_MINUTES`, `SESSION_COOKIE_SECURE`, `SCRAPER_ENABLED`.
 
-There is no automated test suite. Verify changes by running the server on a copy of a database and driving the
-page with a headless browser (Playwright / `playwright-core` with a local Chromium), checking for page errors and
-looking at screenshots; for printed documents render a PDF at the real paper size and look at it.
+There is no automated test suite. Verify changes with the project skill **`run-and-verify`** (throwaway
+database copy with a `qa` login, server on a spare port, headless-browser check of page errors / failing API
+calls, screenshots, PDFs of printed nota). Printed documents follow the **`nota-lx310`** skill. The `qa-tester`
+agent uses both.
 
 ## Architecture
 

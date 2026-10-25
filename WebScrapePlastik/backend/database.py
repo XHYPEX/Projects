@@ -13214,7 +13214,7 @@ def list_supplier_returns(tab: str = "semua", query: str | None = None, supplier
                           else "menunggu" if not (i["qty_approved"] or i["qty_rejected"]) else "sebagian") for i in items}
             settlements = sorted({i["settlement"] for i in items if i["settlement"]})
             out.append({**{k: r[k] for k in ("id", "return_number", "return_date", "supplier_id", "supplier_name", "method", "doc_status",
-                                             "handover_status", "awb", "created_by", "requested_settlement", "supplier_po_number")},
+                                             "handover_status", "awb", "created_by", "requested_settlement", "supplier_po_number", "supplier_po_id")},
                         "settlements": settlements, "rejected_qty": sum(i["qty_rejected"] for i in items),
                         "doc_status_label": SR_DOC_STATUS.get(r["doc_status"]), "handover_label": SR_HANDOVER.get(r["handover_status"]),
                         "item_count": len(items), "qty": sum(i["qty"] for i in items), "products": ", ".join(i["product_name"] for i in items[:3]),

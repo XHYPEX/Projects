@@ -4,40 +4,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Python Google Maps scraper that extracts place name, address, and phone number for a given search keyword, saves results to CSV, and renders an interactive Folium HTML map.
+POS & inventory web app for **SINAR GALAKSI VARIASI MOBIL** (car accessories and installation shop, Balikpapan).
+Modules: Kasir (nota penjualan, pembayaran, pengerjaan), Sales Order, Purchase Order, Barang Masuk / Goods Receipt,
+Account Payable (Faktur Pembelian, Aging, Debit Note), Retur Supplier, Stok Karantina, Service / Garansi,
+Penawaran Harga, Cash Receipt / Kas Keluar, Insentif, dashboards, master data.
+The UI is in Indonesian. The original Google Maps scraper (`main.py`, `scraper.py`, `mapper.py`) is legacy and
+disabled (`SCRAPER_ENABLED=false`).
 
 ## Commands
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-playwright install chromium
-
-# Run the scraper
-python main.py --query "toko plastik Jakarta"
-
-# With custom output paths
-python main.py --query "plastik supplier Surabaya" --output data.csv --map map.html
-
-# Debug with visible browser
-python main.py --query "toko plastik" --show-browser
+python run.py                          # serves backend + frontend on :8000 (HOST/PORT env override)
+docker compose up --build              # production-style; ./data is a volume, so the database survives rebuilds
+# Throwaway run against a copy of a database (never touch data/scraper.db while testing):
+DB_PATH=/tmp/x.db PAYMENT_PROOF_DIR=/tmp/proofs python -m uvicorn backend.main:app --port 8769
 ```
+
+Windows shop PCs use `Start.bat` (see `HOW_TO_RUN.md`). Env: `DB_PATH`, `PAYMENT_PROOF_DIR`, `PRODUCT_IMAGE_DIR`,
+`SHOP_UTC_OFFSET_MINUTES`, `SESSION_COOKIE_SECURE`, `SCRAPER_ENABLED`.
+
+There is no automated test suite. Verify changes by running the server on a copy of a database and driving the
+page with a headless browser (Playwright / `playwright-core` with a local Chromium), checking for page errors and
+looking at screenshots; for printed documents render a PDF at the real paper size and look at it.
 
 ## Architecture
 
-| File | Role |
+| Path | Role |
 |---|---|
-| `main.py` | CLI entry point — argparse, orchestrates scrape → CSV → map |
-| `scraper.py` | Playwright (sync) scraping of Google Maps; scrolls results sidebar, clicks each card, extracts name/address/phone/lat/lng |
-| `mapper.py` | Builds a Folium map centered on scraped places with clickable markers |
-| `models.py` | `Place` dataclass (name, address, phone, lat, lng) |
+| `backend/main.py` | FastAPI app, mounts every router under `/api`, serves `frontend/` |
+| `backend/database.py` | All SQL (stdlib `sqlite3`, no ORM) and most business rules; schema created/migrated additively at startup |
+| `backend/schemas.py` | Pydantic request/response models |
+| `backend/routes/*.py` | Thin HTTP layer per module (validation, auth, `run_in_executor` around database calls) |
+| `backend/order_dashboards.py` | Dashboard SO / PO and the Ringkasan overview (`/api/dashboards/*`) |
+| `backend/goods_receipt.py`, `credit_notes.py`, `account_payable.py`, `cash_receipts.py`, `incentives.py`, `quotations.py` | Larger modules kept out of `database.py` (`credit_notes` = **Debit Note** in the UI) |
+| `frontend/index.html` | The whole SPA in one file: Tailwind CDN config, `<style>`, markup for every `page-*`, and all JS |
+| `docs/` | Owner-approved designs (service, retur supplier, flowcharts, LX-310 print test) |
 
-## Key Details
+Frontend routing is hash based (`#/sales-order` etc.): `ROUTES`, `ROUTE_META` and the route handler near the top
+of the script decide which `page-*` div shows and which init function runs.
 
-- Lat/lng are parsed from the Google Maps URL after clicking a result (`@lat,lng,zoom`).
-- The scraper scrolls the sidebar 8 times before collecting cards to load paginated results.
-- Use `--show-browser` to run Playwright in non-headless mode for debugging selector issues.
-- Google Maps DOM selectors can change; selectors live in `scraper.py` and may need updating.
+## Conventions
+
+- **Uppercase input**: every typed field is uppercased by a global handler; add `data-keep-case` to opt out
+  (`data-no-uppercase` is legacy and does nothing).
+- **Money** is integer rupiah; dates are shown on the shop's clock (`SHOP_UTC_OFFSET_MINUTES`).
+- `esc()` escapes text nodes only, not quotes: never put user text inside an HTML attribute.
+- **Migrations are additive** (`ALTER TABLE … ADD COLUMN` in the init lists); never rename or drop columns.
+- **Payments** have a state: `sah` (counted) or `pending` (transfer/QRIS not yet confirmed, never counted).
+- **Sales Order line sources**: `supplier` (bought whole), `stok` (held from the shelf), `campur` = "Stok + Pesan
+  Supplier" (free stock held, only the shortfall drafted to a PO), `jasa`, or null (automatic). A published SO
+  may not have goods at Rp 0; drafts may.
+- **Printed documents** (Tanda Terima / Surat Jalan / Nota Hasil Service, Invoice SO, Nota Penjualan) share
+  `docHeadHtml` and the `DOC_GAP` spacing scale. They print on an Epson LX-310 dot matrix on continuous,
+  3-ply carbonless forms (white: shop archive, yellow: supplier, red: customer): black only, solid rules, no
+  grey fills, printed once. Paper is 9.5" × 5.5" (half) by default, 9.5" × 11" optional.
+- Global JS names must stay unique: the script is one scope, so a duplicate `const` breaks the whole app.
+  Syntax-check `frontend/index.html` after larger edits.
+- Owner decisions behind business rules are noted in comments with a date (e.g. "Owner 25-10-2026"); keep them.
+
+## Git
+
+The repository root is the parent folder (`/Users/0xd0kk/Projects`, several projects). Commit only
+`WebScrapePlastik/` files, never `WebScrapePlastik/data/` (live database, uploads, payment proofs).
 
 ## Theme Style
 "Navy Bengkel" (owner's choice, 24-10-2026), replacing the earlier cream/coral look:
@@ -55,3 +84,5 @@ Tokens live in the Tailwind config at the top of frontend/index.html (bg, bg2, i
 the navy sidebar is the `#drawer-panel` block in the <style>. Kasir buttons keep colour-by-role: accent = transaction,
 blue #1D4ED8 = operations/status, green #15803D = print, red #DC2626 = void/delete, slate #334155 = standard.
 Feel: soft rounded corners (~8–12px), subtle borders instead of heavy shadows, calm/minimal motion.
+The Kasir page carries the approved visual style "03 Balanced" (block "Kasir visual 03" in the <style>), scoped to
+Kasir only until the owner approves it for the other pages.

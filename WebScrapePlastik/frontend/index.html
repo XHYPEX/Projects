@@ -19974,7 +19974,6 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const cell = `padding:3px ${DOC_GAP.sm}px;vertical-align:top;`;
   const th = `padding:3px ${DOC_GAP.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;white-space:nowrap;`;
   const name = r.customer_full_name || r.customer_name || "";
-  const addressBits = [customer && customer.address, r.customer_phone].filter(Boolean);
   const remaining = Math.max(r.total - r.amount_paid, 0);
 
   const rows = pageItems.map((item, idx) => `
@@ -19982,7 +19981,7 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
       <td style="${cell}text-align:center;">${start + idx + 1}</td>
       <td style="${cell}">${esc(item.product_name)}${item.so_note ? `<div style="font-size:8pt;">Catatan: ${esc(item.so_note)}</div>` : ""}</td>
       <td style="${cell}text-align:center;">${item.quantity}</td>
-      <td style="${cell}text-align:center;">${esc(item.unit || "")}</td>
+      <td style="${cell}text-align:center;">${esc(item.unit || "-")}</td>
       <td style="${cell}text-align:right;">${groupDigits(item.unit_price) || "0"}</td>
       <td style="${cell}text-align:right;">${groupDigits(item.quantity * item.unit_price) || "0"}</td>
     </tr>`).join("");
@@ -19990,13 +19989,13 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const kv = (label, value) => docKv(label, value, W);
 
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:${minHeightMm}mm;display:flex;flex-direction:column;position:relative;${last ? "" : "break-after:page;page-break-after:always;"}">
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:${minHeightMm}mm;display:flex;flex-direction:column;position:relative;box-sizing:border-box;padding:0 3mm;${last ? "" : "break-after:page;page-break-after:always;"}">
     ${r.status !== "void" && r.work_status === "draft" ? `<div aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:64pt;font-weight:bold;letter-spacing:0.15em;color:rgba(0,0,0,0.12);transform:rotate(-22deg);">DRAFT</span></div>` : ""}
     ${docHeadHtml(`NOTA PENJUALAN${r.status === "void" ? " &middot; VOID" : r.work_status === "draft" ? " &middot; DRAFT" : ""}`,
       [`No. <b>${esc(r.receipt_no || "-")}</b>`, esc(formatNotaDate(r.created_at)), ...(pages > 1 ? [`Hal. ${page} / ${pages}`] : [])])}
     <div style="margin-top:${DOC_GAP.md}px;">${docCols(`
         ${kv("Kepada", `<b>${esc(name) || "&ndash;"}</b>`)}
-        ${addressBits.length ? kv("Alamat / HP", addressBits.map(esc).join("&nbsp;&nbsp;")) : ""}
+        ${customer && customer.address ? kv("Alamat", esc(customer.address)) : ""}${r.customer_phone ? kv("No. HP", esc(r.customer_phone)) : ""}
         ${kv("No. Plat", esc(r.plate_full) || "&ndash;")}${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}`, `
         ${r.po_number ? kv("Ref. SO", `${esc(r.po_number)}${(r.invoice_count || 1) > 1 ? ` (Invoice ${r.invoice_seq || 1})` : ""}`) : ""}
         ${kv("Pembayaran", `${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_account ? ` ke ${esc(r.transfer_account)}` : ""}${r.payment_method === "transfer" && r.transfer_sender ? ` (dari ${esc(r.transfer_sender)})` : ""}`)}
@@ -20040,7 +20039,7 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
       </table>
     </div>
 
-    ${svcSigns(["Penerima,", name], ["Hormat kami,", ""])}
+    ${svcSigns(["Penerima,", name], ["Hormat kami,", r.cashier_name || ""])}
 ` : `<div style="border-top:1px solid #000;margin-top:${DOC_GAP.md}px;padding-top:${DOC_GAP.sm}px;text-align:right;font-style:italic;">Bersambung ke halaman ${page + 1} &rarr;</div>`}
   </div>`;
 }
@@ -25617,9 +25616,9 @@ async function rtsLoad() {
   document.getElementById("rts-empty").classList.toggle("hidden", rows.length > 0);
   document.getElementById("rts-tbody").innerHTML = rows.map(r => `
     <tr class="border-b border-line last:border-b-0 hover:bg-bg2/60 cursor-pointer align-top" onclick="rtsOpen(${r.id})">
-      <td class="px-3 py-2.5"><div class="font-semibold text-ink tabular-nums">${esc(r.return_number)}</div><div class="text-[11px] text-muted">${esc(rtsDate(r.return_date))}</div></td>
+      <td class="px-3 py-2.5"><a href="#/retur-supplier" onclick="event.stopPropagation(); rtsOpen(${r.id}); return false;" class="font-semibold text-accentDark tabular-nums underline decoration-dotted underline-offset-2 hover:decoration-solid">${esc(r.return_number)}</a><div class="text-[11px] text-muted">${esc(rtsDate(r.return_date))}</div></td>
       <td class="px-3 py-2.5 text-ink">${esc(r.supplier_name)}</td>
-      <td class="px-3 py-2.5 text-ink tabular-nums">${esc(r.supplier_po_number || "—")}</td>
+      <td class="px-3 py-2.5 tabular-nums">${r.supplier_po_id ? `<a href="#/supplier-po" onclick="event.stopPropagation(); openSupplierPoFromActivity('${esc(r.supplier_po_id)}'); return false;" title="Buka detail Purchase Order" class="text-accentDark underline decoration-dotted underline-offset-2 hover:decoration-solid">${esc(r.supplier_po_number || "PO")}</a>` : '<span class="text-muted">—</span>'}</td>
       <td class="px-3 py-2.5 text-ink max-w-[16rem]"><div class="truncate">${esc(r.products || "—")}</div>${r.flags.length ? `<div class="text-[11px] text-failed truncate" title="${esc(r.flags.join("; "))}">${esc(r.flags[0])}</div>` : ""}</td>
       <td class="px-3 py-2.5 text-right tabular-nums text-ink whitespace-nowrap">${r.qty} PCS</td>
       ${isAdmin() ? `<td class="px-3 py-2.5 text-right tabular-nums text-ink whitespace-nowrap">${formatIDR(r.cost_value || 0)}</td>` : ""}

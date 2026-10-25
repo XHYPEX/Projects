@@ -26613,9 +26613,16 @@ const svcLabel = (group, key) => {
 };
 // A source reference that belongs to a service document (Stok Karantina lot, Retur Supplier line, Nota Jasa)
 // becomes a link to it; anything else stays plain text.
+// The source document of a quarantine lot (or a service claim), as a link that opens it.
 function svcRefLink(type, id, ref) {
-  if (type !== "service_klaim" || !id) return esc(ref || "");
-  return `<button type="button" onclick="event.stopPropagation(); closeModal(); svcOpen(${Number(id)})" class="text-accentDark hover:underline tabular-nums">${esc(ref || "Service")}</button>`;
+  const open = !id ? null : {
+    service_klaim: `svcOpen(${Number(id)})`,
+    retur_customer: `openReceiptFromHistory('${esc(String(id))}')`,
+    barang_masuk: `jumpToInboundDocument(${Number(id)})`,
+    retur_ditolak: `openSupplierReturnFromGr(${Number(id)})`,
+  }[type];
+  if (!open) return esc(ref || "");
+  return `<button type="button" onclick="event.stopPropagation(); closeModal(); ${open}" title="Buka dokumen" class="text-accentDark underline decoration-dotted underline-offset-2 hover:decoration-solid tabular-nums">${esc(ref || "Buka")}</button>`;
 }
 // Opening a document from another page: the route change runs svcInit, which would draw the list over it,
 // so the page to show is handed to svcInit instead of racing it.

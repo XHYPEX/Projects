@@ -19788,6 +19788,7 @@ async function printReceiptNota(receiptId) {
     const cResp = await fetch(`/api/customers/${receipt.customer_id}`);
     if (cResp.ok) customer = await cResp.json();
   }
+  await loadPoPrintCompany();
   const prefs = notaPrintPrefs();
   const area = notaContentIn(prefs);
   const zoom = prefs.scale / 100;
@@ -19797,9 +19798,9 @@ async function printReceiptNota(receiptId) {
   // Wait for the logo (or its failure) so the dialog never prints a half-loaded header.
   const logo = document.querySelector("#nota-print-area img");
   if (logo && !logo.complete) {
-    await new Promise(done => { logo.onload = done; logo.onerror = () => { logo.parentElement.remove(); done(); }; });
+    await new Promise(done => { logo.onload = done; logo.onerror = () => { logo.style.display = "none"; done(); }; });
   } else if (logo && !logo.naturalWidth) {
-    logo.parentElement.remove();  // already failed (missing file) before we started waiting
+    logo.style.display = "none";  // already failed (missing file) before we started waiting
   }
   // Paper size (9,5" × 5,5" by default) and margins come from Atur Cetak.
   printWithPageRule(notaPageRule(prefs), "print-nota");
@@ -19969,16 +19970,16 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const last = page === pages;
   const minHeightMm = opts.minHeightMm || 132;
   const vehicle = [r.vehicle_make, r.vehicle_model, r.vehicle_year].filter(Boolean).join(" ");
-  const cell = "padding:1.5px 6px;";
+  const cell = `padding:2px ${DOC_GAP.sm}px;`;
+  const th = `padding:3px ${DOC_GAP.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;white-space:nowrap;`;
   const name = r.customer_full_name || r.customer_name || "";
   const addressBits = [customer && customer.address, r.customer_phone].filter(Boolean);
-  const shopContact = [SHOP_PROFILE.phone && `Telp. ${SHOP_PROFILE.phone}`, SHOP_PROFILE.address].filter(Boolean);
   const remaining = Math.max(r.total - r.amount_paid, 0);
 
   const rows = pageItems.map((item, idx) => `
     <tr>
       <td style="${cell}text-align:center;">${start + idx + 1}</td>
-      <td style="${cell}">${esc(item.product_name)}</td>
+      <td style="${cell}">${esc(item.product_name)}${item.so_note ? `<div style="font-size:8pt;">Catatan: ${esc(item.so_note)}</div>` : ""}</td>
       <td style="${cell}text-align:center;">${item.quantity}</td>
       <td style="${cell}text-align:center;">${esc(item.unit || "")}</td>
       <td style="${cell}text-align:right;">${groupDigits(item.unit_price) || "0"}</td>
@@ -19994,60 +19995,46 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
 
   const kv = (label, value) => `
     <tr>
-      <td style="padding:1px 0;vertical-align:top;white-space:nowrap;">${label}</td>
-      <td style="padding:1px 8px;vertical-align:top;">:</td>
-      <td style="padding:1px 0;vertical-align:top;">${value}</td>
+      <td style="padding:1.5px 0;vertical-align:top;white-space:nowrap;"><div style="min-width:76px;">${label}</div></td>
+      <td style="padding:1.5px 6px 1.5px 0;vertical-align:top;">:</td>
+      <td style="padding:1.5px 0;vertical-align:top;">${value}</td>
     </tr>`;
 
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:${minHeightMm}mm;display:flex;flex-direction:column;position:relative;${last ? "" : "break-after:page;page-break-after:always;"}">
     ${r.status !== "void" && r.work_status === "draft" ? `<div aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:64pt;font-weight:bold;letter-spacing:0.15em;color:rgba(0,0,0,0.12);transform:rotate(-22deg);">DRAFT</span></div>` : ""}
-    <div style="display:flex;justify-content:space-between;gap:16px;">
-      <div style="display:flex;gap:12px;align-items:center;">
-        ${SHOP_PROFILE.logo ? `
-        <div style="width:32mm;text-align:center;">
-          <img src="${esc(SHOP_PROFILE.logo)}" alt="" onerror="this.parentElement.remove()" style="width:32mm;max-height:16mm;object-fit:contain;display:block;">
-          ${SHOP_PROFILE.tagline ? `<div style="font-size:5.5pt;font-weight:bold;letter-spacing:0.08em;margin-top:1px;">${esc(SHOP_PROFILE.tagline)}</div>` : ""}
-        </div>` : ""}
-        <div>
-          <div style="font-size:12pt;">Nota Penjualan${r.status === "void" ? " &mdash; <b>VOID</b>" : r.work_status === "draft" ? " &mdash; <b>DRAFT</b>" : r.work_status === "pengerjaan" ? " &mdash; dalam pengerjaan" : ""}</div>
-          <div style="font-size:14pt;font-weight:bold;letter-spacing:0.02em;">${esc(SHOP_PROFILE.notaName || SHOP_PROFILE.name)}</div>
-          ${shopContact.length ? `<div style="font-size:8pt;">${shopContact.map(esc).join(" &middot; ")}</div>` : ""}
-        </div>
-      </div>
+    ${docHeadHtml(`NOTA PENJUALAN${r.status === "void" ? " &middot; VOID" : r.work_status === "draft" ? " &middot; DRAFT" : ""}`,
+      [`No. <b>${esc(r.receipt_no || "-")}</b>`, esc(formatNotaDate(r.created_at)), ...(pages > 1 ? [`Hal. ${page} / ${pages}`] : [])])}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:${DOC_GAP.lg * 2}px;margin-top:${DOC_GAP.sm}px;">
       <table style="border-collapse:collapse;font-size:9pt;">
-        ${kv("Kepada", esc(name) || "&ndash;")}
-        ${addressBits.length ? kv("Alamat", addressBits.map(esc).join("&nbsp;&nbsp;")) : ""}
-        ${kv("Tgl. Order", esc(formatNotaDate(r.created_at)))}
-        ${kv("No. Plat", esc(r.plate_full))}
-        ${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}
+        ${kv("Kepada", `<b>${esc(name) || "&ndash;"}</b>`)}
+        ${addressBits.length ? kv("Alamat / HP", addressBits.map(esc).join("&nbsp;&nbsp;")) : ""}
+        ${kv("No. Plat", esc(r.plate_full) || "&ndash;")}${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}
+      </table>
+      <table style="border-collapse:collapse;font-size:9pt;">
+        ${r.po_number ? kv("Ref. SO", `${esc(r.po_number)}${(r.invoice_count || 1) > 1 ? ` (Invoice ${r.invoice_seq || 1})` : ""}`) : ""}
+        ${kv("Pembayaran", `${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_account ? ` ke ${esc(r.transfer_account)}` : ""}${r.payment_method === "transfer" && r.transfer_sender ? ` (dari ${esc(r.transfer_sender)})` : ""}`)}
+        ${r.work_status === "pengerjaan" && r.status !== "void" ? kv("Status", "Dalam pengerjaan") : ""}
       </table>
     </div>
 
-    <div style="margin-top:4px;display:flex;gap:28px;">
-      <span>No. Nota&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.receipt_no || "")}</span>
-      ${pages > 1 ? `<span style="margin-left:auto;font-weight:bold;">Hal. ${page} / ${pages}</span>` : ""}
-      ${r.po_number ? `<span>Ref. SO&nbsp;&nbsp;:&nbsp;&nbsp;${esc(r.po_number)}${(r.invoice_count || 1) > 1 ? ` (Invoice ${r.invoice_seq || 1})` : ""}</span>` : ""}
-      <span>Pembayaran&nbsp;&nbsp;:&nbsp;&nbsp;${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_account ? ` ke ${esc(r.transfer_account)}` : ""}${r.payment_method === "transfer" && r.transfer_sender ? ` (dari ${esc(r.transfer_sender)})` : ""}</span>
-    </div>
-
     <div style="flex:1 0 auto;">
-    <table style="width:100%;border-collapse:collapse;margin-top:4px;">
+    <table style="width:100%;border-collapse:collapse;margin-top:${DOC_GAP.sm}px;">
       <thead style="display:table-header-group;">
-        <tr style="border-top:1px solid #000;border-bottom:1px solid #000;">
-          <th style="${cell}width:7mm;font-weight:normal;text-align:center;">No.</th>
-          <th style="${cell}font-weight:normal;text-align:left;">Nama Barang</th>
-          <th style="${cell}width:12mm;font-weight:normal;text-align:center;">Qty</th>
-          <th style="${cell}width:16mm;font-weight:normal;text-align:center;">Satuan</th>
-          <th style="${cell}width:28mm;font-weight:normal;text-align:right;">Harga Satuan</th>
-          <th style="${cell}width:28mm;font-weight:normal;text-align:right;">Jumlah</th>
+        <tr style="border-top:1.5px solid #000;border-bottom:1.5px solid #000;">
+          <th style="${th}width:7mm;text-align:center;">NO</th>
+          <th style="${th}text-align:left;">NAMA BARANG</th>
+          <th style="${th}width:12mm;text-align:center;">QTY</th>
+          <th style="${th}width:16mm;text-align:center;">SATUAN</th>
+          <th style="${th}width:28mm;text-align:right;">HARGA SATUAN</th>
+          <th style="${th}width:28mm;text-align:right;">JUMLAH</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
     </div>
 
-    ${last ? `    <div style="border-top:1px solid #000;margin-top:3px;padding-top:3px;display:flex;justify-content:space-between;gap:16px;">
+    ${last ? `    <div style="border-top:1px solid #000;margin-top:${DOC_GAP.xs}px;padding-top:${DOC_GAP.sm}px;display:flex;justify-content:space-between;gap:${DOC_GAP.lg * 2}px;">
       <div style="flex:1;min-width:0;">
         <table style="border-collapse:collapse;">
           ${kv("Terbilang", esc(terbilangRupiah(r.total)))}
@@ -20067,10 +20054,7 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
       </table>
     </div>
 
-    <div style="display:flex;justify-content:space-between;margin-top:4px;padding:0 20mm 0 12mm;">
-      <div style="text-align:center;">Penerima<div style="margin-top:9mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
-      <div style="text-align:center;">Hormat kami,<div style="margin-top:9mm;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
-    </div>
+    ${svcSigns(["Penerima,", name], ["Hormat kami,", ""])}
 ` : `<div style="border-top:1px solid #000;margin-top:6px;padding-top:6px;text-align:right;font-style:italic;">Bersambung ke halaman ${page + 1} &rarr;</div>`}
   </div>`;
 }
@@ -21811,11 +21795,18 @@ function renderSoCancelNote(detail) {
     const lines = chk.lines || [];
     const indenOpen = lines.some(l => l.type === "inden" && l.allowed);
     const blocked = lines.filter(l => !l.allowed);
+    // One short line about cancelling; the per-item reasons only when someone opens them.
+    const open = lines.filter(l => l.allowed);
     const bits = [];
-    if (indenOpen) bits.push(`Barang inden masih boleh dibatalkan pelanggan sampai <b class="text-ink tabular-nums">${esc(soDeadlineLabel(chk.deadline))}</b> (24 jam sejak dikonfirmasi, selama Purchase Order-nya belum terbit).`);
-    if (lines.some(l => l.type === "stok")) bits.push("Barang dari stok toko boleh dibatalkan admin kapan saja selama belum terpasang/diserahkan.");
-    if (blocked.length) bits.push(`Terkunci: ${blocked.map(l => `${esc(l.product_name)} (${esc(l.reason)})`).join("; ")}. Hanya lewat Pembatalan Khusus bila toko/supplier gagal memenuhi pesanan.`);
-    html = `<span class="text-muted">${bits.join(" ")}</span>`;
+    if (open.length) bits.push(`<b class="text-ink">${open.length}</b> barang masih bisa dibatalkan`
+      + (indenOpen ? ` (inden sampai <b class="text-ink tabular-nums">${esc(soDeadlineLabel(chk.deadline))}</b>)` : ""));
+    if (blocked.length) bits.push(`<b class="text-ink">${blocked.length}</b> terkunci karena Purchase Order sudah terbit`);
+    const detail = blocked.length ? `<details class="mt-1.5">
+        <summary class="cursor-pointer text-xs font-medium text-accentDark hover:underline">Lihat barang yang terkunci</summary>
+        <ul class="mt-1.5 space-y-0.5 text-xs text-muted list-disc pl-5">${blocked.map(l => `<li><span class="text-ink">${esc(l.product_name)}</span>: ${esc(l.reason)}</li>`).join("")}</ul>
+        <p class="mt-1.5 text-xs text-muted">Barang terkunci hanya bisa dibatalkan lewat Pembatalan Khusus bila toko / supplier gagal memenuhi pesanan.</p>
+      </details>` : "";
+    html = bits.length ? `<div class="text-xs text-muted"><span class="font-semibold text-ink">Pembatalan:</span> ${bits.join(" &middot; ")}.</div>${detail}` : "";
   }
   el.innerHTML = html;
   el.classList.toggle("hidden", !html);
@@ -23354,95 +23345,73 @@ function poPayStatus(po) {
 }
 
 function poInvoiceHtml(po, settings) {
-  const co = poPrintCompany.settings || {};
+  const G = DOC_GAP;
   const money = n => groupDigits(n) || "0";
-  const rule = settings.lines ? "border-top:1.5px solid #000;" : "";
   const lines = (po.items || []).filter(it => it.status !== "dibatalkan");
   const subtotal = lines.reduce((sum, it) => sum + it.quantity * it.unit_price, 0);
   const cut = Math.max(subtotal - po.total, 0);
   const paid = Math.max(po.total - po.remaining, 0);
   const status = poPayStatus(po);
   const lastPay = [...(po.payments || [])].filter(p => p.state === "sah" && p.amount > 0).pop();
-  const shopName = co.name || SHOP_PROFILE.name;
-  const shopAddr = co.address || SHOP_PROFILE.address;
-  const shopWa = co.phone || SHOP_PROFILE.phone;
-  const kv = (label, value, bold) => `<tr><td style="padding:1px 0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:1px 8px;vertical-align:top;">:</td><td style="padding:1px 0;vertical-align:top;${bold ? "font-weight:bold;" : ""}">${value}</td></tr>`;
-  const sum = (label, value, bold) => `<tr style="${bold ? "font-weight:bold;font-size:11pt;" : ""}"><td style="padding:1px 0;">${label}</td><td style="padding:1px 0 1px 18px;">Rp</td><td style="padding:1px 0;text-align:right;min-width:24mm;">${value}</td></tr>`;
-  const cell = "padding:2px 6px;";
+  const kv = (label, value, bold) => `<tr><td style="padding:2px 0;white-space:nowrap;vertical-align:top"><div style="width:92px">${label}</div></td><td style="padding:2px 6px 2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top;${bold ? "font-weight:bold;" : ""}">${value}</td></tr>`;
+  const sum = (label, value, strong) => `<tr style="${strong ? "font-weight:bold;font-size:10.5pt;" : ""}"><td style="padding:2px 0">${label}</td><td style="padding:2px 0 2px ${G.lg}px">Rp</td><td style="padding:2px 0;text-align:right;min-width:26mm">${value}</td></tr>`;
+  const rule = settings.lines ? "border-bottom:1px solid #000;" : "";
+  const cell = `padding:3px ${G.sm}px;vertical-align:top;${rule}`;
+  const th = `padding:3px ${G.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;white-space:nowrap;border-top:1.5px solid #000;border-bottom:1.5px solid #000;`;
   const accounts = (poPrintCompany.accounts || []).filter(a => a.is_active !== false);
   return `
-  <div style="font-family:'IBM Plex Mono','Courier New',Courier,monospace;font-size:9pt;color:#000;line-height:1.35;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-      <div style="min-width:0;">
-        <div style="font-size:17pt;font-weight:bold;letter-spacing:0.01em;line-height:1.15;">${esc(shopName)}</div>
-        ${shopAddr ? `<div>${esc(shopAddr)}</div>` : ""}
-        ${shopWa ? `<div>WA ${esc(shopWa)}</div>` : ""}
-      </div>
-      <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
-        <div style="font-size:24pt;font-weight:bold;letter-spacing:0.02em;">INVOICE</div>
-        <div style="border:1.5px solid #000;border-radius:4px;text-align:center;min-width:44mm;">
-          <div style="border-bottom:1.5px solid #000;padding:1px 8px;letter-spacing:0.08em;">STATUS PEMBAYARAN</div>
-          <div style="padding:2px 8px;font-size:17pt;font-weight:bold;letter-spacing:0.03em;">${status}</div>
-        </div>
-      </div>
-    </div>
-    <div style="${rule}margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;gap:14px;">
-      <table style="border-collapse:collapse;">
-        ${kv("No. Invoice", esc(po.receipt_no || po.po_number), true)}
-        ${kv("Tanggal", esc(poDateTimeLabel(po)))}
-        ${kv("Ref. SO", esc(po.po_number))}
-      </table>
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;line-height:1.35;">
+    ${docHeadHtml("INVOICE", [`No. <b>${esc(po.receipt_no || po.po_number)}</b>`, esc(poDateTimeLabel(po)),
+      `<span style="display:inline-block;margin-top:2px;padding:1px ${G.sm}px;border:1px solid #000;font-weight:bold;letter-spacing:.06em">${status}</span>`])}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;margin-top:${G.md}px;">
       <table style="border-collapse:collapse;">
         ${kv("Kepada", esc(po.customer_name || "-"), true)}
         ${kv("No. HP", esc(po.customer_phone || "-"))}
         ${kv("No. Plat", esc(po.plate_full || "Belum dicatat"))}
       </table>
       <table style="border-collapse:collapse;">
+        ${kv("Ref. SO", esc(po.po_number), true)}
         ${kv("Sumber Order", po.order_source === "whatsapp" ? "WhatsApp" : "Walk-in")}
-        ${kv("Metode Pembayaran", esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-"))}
-        ${kv("Status Pesanan", esc(preorderStatusLabel(po.status)))}
+        ${kv("Pembayaran", esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-"))}
       </table>
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-top:6px;">
-      <thead style="display:table-header-group;">
-        <tr style="${rule}border-bottom:1.5px solid #000;font-weight:bold;">
-          <th style="${cell}width:8mm;text-align:left;">No</th>
-          <th style="${cell}text-align:left;">Nama Barang</th>
-          <th style="${cell}width:12mm;text-align:center;">Qty</th>
-          <th style="${cell}width:18mm;text-align:left;">Satuan</th>
-          <th style="${cell}width:30mm;text-align:right;">Harga Satuan</th>
-          <th style="${cell}width:30mm;text-align:right;">Jumlah</th>
-        </tr>
-      </thead>
+    <table style="width:100%;border-collapse:collapse;margin-top:${G.md}px;border-bottom:1.5px solid #000;">
+      <thead style="display:table-header-group;"><tr>
+        <th style="${th}width:8mm;text-align:center;">NO</th>
+        <th style="${th}text-align:left;">NAMA BARANG</th>
+        <th style="${th}width:12mm;text-align:center;">QTY</th>
+        <th style="${th}width:18mm;text-align:left;">SATUAN</th>
+        <th style="${th}width:30mm;text-align:right;">HARGA SATUAN</th>
+        <th style="${th}width:30mm;text-align:right;">JUMLAH</th>
+      </tr></thead>
       <tbody>${lines.map((it, i) => `<tr>
-          <td style="${cell}">${i + 1}</td>
-          <td style="${cell}">${esc(it.product_name)}${it.note ? `<div style="font-size:8pt;">Catatan: ${esc(it.note)}</div>` : ""}</td>
+          <td style="${cell}text-align:center;">${i + 1}</td>
+          <td style="${cell}">${esc(it.product_name)}${it.note ? `<div style="font-size:8pt;margin-top:1px">Catatan: ${esc(it.note)}</div>` : ""}</td>
           <td style="${cell}text-align:center;">${it.quantity}</td>
           <td style="${cell}">${esc(it.unit || "")}</td>
           <td style="${cell}text-align:right;">${money(it.unit_price)}</td>
           <td style="${cell}text-align:right;">${money(it.quantity * it.unit_price)}</td>
         </tr>`).join("")}</tbody>
     </table>
-    <div style="${rule}margin-top:4px;padding-top:6px;display:flex;justify-content:space-between;gap:16px;">
-      <div style="min-width:0;">
-        ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:3px;">Pembayaran transfer dapat dilakukan ke rekening berikut:</div>
-          ${accounts.map(a => `<div style="margin-bottom:3px;">${esc(a.bank_name)}<br>${esc(a.account_number)}<br>a.n. ${esc(a.account_name)}</div>`).join("")}
-          <div style="margin-top:4px;">Mohon konfirmasi setelah melakukan transfer.</div>` : ""}
-        ${po.notes ? `<div style="margin-top:4px;">Catatan: ${esc(po.notes)}</div>` : ""}
+    <div style="margin-top:${G.sm}px;display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;">
+      <div style="min-width:0;font-size:9pt;">
+        ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:${G.xs}px;">Pembayaran transfer ke rekening:</div>
+          ${accounts.map(a => `<div style="margin-bottom:${G.xs}px;">${esc(a.bank_name)} &nbsp;<b>${esc(a.account_number)}</b><br>a.n. ${esc(a.account_name)}</div>`).join("")}
+          <div>Mohon konfirmasi setelah melakukan transfer.</div>` : ""}
+        ${po.notes ? `<div style="margin-top:${G.sm}px;">Catatan: ${esc(po.notes)}</div>` : ""}
       </div>
       <table style="border-collapse:collapse;flex-shrink:0;">
         ${sum("Subtotal", money(subtotal))}
-        ${sum("Potongan", money(cut))}
-        <tr><td colspan="3" style="border-top:1px dashed #000;padding:0;height:3px;"></td></tr>
+        ${cut ? sum("Potongan", money(cut)) : ""}
+        <tr><td colspan="3" style="border-top:1px solid #000;padding:0;height:${G.xs}px;"></td></tr>
         ${sum("Jumlah", money(po.total))}
         ${sum(status === "LUNAS" ? "Dibayar" : "Dibayar (DP)", money(paid))}
         ${sum("Sisa", money(Math.max(po.remaining, 0)), true)}
       </table>
     </div>
-    ${settings.footer ? `<div style="${rule}margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;align-items:flex-start;">
-      <div style="text-align:center;">Penerima,<div style="margin-top:10mm;">(____________________)</div></div>
-      <div style="align-self:center;">Terima kasih atas kepercayaan Anda.</div>
-      <div style="text-align:center;">Hormat kami,<div style="margin-top:10mm;">(____________________)</div></div>
+    ${settings.footer ? `<div style="margin-top:${G.md}px;padding-top:${G.sm}px;border-top:1px solid #000;">
+      <div style="text-align:center;font-size:8.5pt;">Terima kasih atas kepercayaan Anda.</div>
+      ${svcSigns(["Penerima,", po.customer_name], ["Hormat kami,", ""])}
     </div>` : ""}
   </div>`;
 }
@@ -27840,7 +27809,7 @@ async function svcHandoverSubmit() {
 }
 
 // ── Print (LX-310, 80 columns) ───────────────────────────────────────────────
-const svcPrintState = { doc: "terima", text: "", copies: [] };
+const svcPrintState = { doc: "terima", text: "", copies: [], facts: null };
 async function svcOpenPrint(id, doc) {
   if (location.hash !== "#/service") { svcGoto(() => svcOpenPrint(id, doc)); return; }
   try { await svcEnsureMeta(); svcCur = await rtsApi(`/api/services/${id}`); } catch (e) { showToast(e.message); return; }
@@ -27885,80 +27854,163 @@ function svcSetPaper(v) {
   try { localStorage.setItem("svc-paper", v); } catch (_) {}
   svcPrintPreview();
 }
-function svcTerimaHtml(o) {
+// ── Printed documents: one letterhead and one spacing scale (owner 25-10-2026) ──────────────────────────
+// Every nota (Tanda Terima / Surat Jalan / Nota Hasil Service, Invoice Sales Order, Nota Penjualan) opens with the
+// same head: the logo as a black silhouette, the shop's name, address and WA, and a boxed title with the number
+// and date. Black only (they go to the LX-310 dot matrix): solid rules, no grey fills. Spacing comes from one scale
+// (DOC_GAP) so no block sits on a rule or crowds the next one.
+const DOC_GAP = { xs: 4, sm: 8, md: 12, lg: 16 };
+function docShop() {
   const co = poPrintCompany.settings || {};
-  const shop = co.name || SHOP_PROFILE.name;
   // Fallbacks from the shop's printed letterhead, used only while Pengaturan Perusahaan is still empty.
-  const addr = co.address || SHOP_PROFILE.address || "Jl. Mayjend Sutoyo No.1, Gunungsari Ulu, Balikpapan Tengah, Balikpapan";
-  const wa = co.phone || SHOP_PROFILE.phone || "0811 343 2869";
-  const when = o.received_at ? new Date(o.received_at) : null;
-  const tgl = when && !isNaN(when) ? `${pad2(when.getDate())}/${pad2(when.getMonth() + 1)}/${when.getFullYear()} ${pad2(when.getHours())}:${pad2(when.getMinutes())}` : "-";
-  const v = x => esc(x || "-");
-  const brought = (o.accessories || []).filter(a => a.brought).map(a => a.name);
-  const kv = (k, val) => `<tr><td style="padding:1px 0;width:92px;white-space:nowrap">${k}</td><td style="padding:1px 4px;width:8px">:</td><td style="padding:1px 0;font-weight:bold;width:100%">${val}</td></tr>`;
-  const cell = "border:1px solid #000;padding:3px 6px;vertical-align:top";
-  const head = "border:1px solid #000;padding:2px 6px;font-size:8pt;font-weight:bold;letter-spacing:.04em;text-align:left";
-  const label = t => `<div style="font-size:8pt;font-weight:bold;letter-spacing:.08em;margin:7px 0 3px">${t}</div>`;
-  const sign = (role, name) => `<div style="text-align:center;width:44%"><div>${role}</div><div style="height:34px"></div>
-      <div style="border-top:1px solid #000;padding-top:2px;font-weight:bold">${esc(name || "")}</div></div>`;
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;line-height:1.3;color:#000;background:#fff">
-    <div style="display:flex;align-items:center;gap:12px;padding-bottom:6px;border-bottom:2px solid #000">
-      <img src="${SHOP_PROFILE.logo}" alt="" style="height:52px;width:auto;filter:brightness(0);-webkit-print-color-adjust:exact;print-color-adjust:exact" onerror="this.style.display='none'">
+  return { name: co.name || SHOP_PROFILE.name,
+           addr: co.address || SHOP_PROFILE.address || "Jl. Mayjend Sutoyo No.1, Gunungsari Ulu, Balikpapan Tengah, Balikpapan",
+           wa: co.phone || SHOP_PROFILE.phone || "0811 343 2869" };
+}
+// title: the document's name; lines: what goes under it in the box (number, date, status).
+function docHeadHtml(title, lines) {
+  const sh = docShop();
+  return `<div style="display:flex;align-items:center;gap:${DOC_GAP.md}px;padding-bottom:${DOC_GAP.sm}px;border-bottom:2px solid #000">
+      <img src="${SHOP_PROFILE.logo}" alt="" style="height:46px;width:auto;flex:none;filter:brightness(0);-webkit-print-color-adjust:exact;print-color-adjust:exact" onerror="this.style.display='none'">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13pt;font-weight:bold;letter-spacing:.02em">${esc(shop)}</div>
-        ${addr ? `<div style="font-size:8.5pt">${esc(addr)}</div>` : ""}
-        ${wa ? `<div style="font-size:8.5pt">WA ${esc(wa)}</div>` : ""}
+        <div style="font-size:13pt;font-weight:bold;letter-spacing:.02em;line-height:1.2">${esc(sh.name)}</div>
+        ${sh.addr ? `<div style="font-size:8.5pt;margin-top:2px">${esc(sh.addr)}</div>` : ""}${sh.wa ? `<div style="font-size:8.5pt">WA ${esc(sh.wa)}</div>` : ""}
       </div>
-      <div style="border:1.5px solid #000;padding:4px 10px;text-align:center;min-width:200px">
-        <div style="font-size:11.5pt;font-weight:bold;letter-spacing:.06em">TANDA TERIMA SERVICE</div>
-        <div style="font-size:9pt;margin-top:2px">No. <b>${esc(o.service_no || "-")}</b></div>
-        <div style="font-size:9pt">${tgl}</div>
+      <div style="flex:none;border:1.5px solid #000;padding:${DOC_GAP.xs}px ${DOC_GAP.md}px;text-align:center;min-width:200px">
+        <div style="font-size:11.5pt;font-weight:bold;letter-spacing:.06em;line-height:1.25">${title}</div>
+        ${lines.map(l => `<div style="font-size:9pt;margin-top:2px">${l}</div>`).join("")}
       </div>
+    </div>`;
+}
+function svcPrintWhen(iso) {
+  const t = iso ? new Date(iso) : null;
+  return t && !isNaN(t) ? `${pad2(t.getDate())}/${pad2(t.getMonth() + 1)}/${t.getFullYear()} ${pad2(t.getHours())}:${pad2(t.getMinutes())}` : "-";
+}
+const svcV = x => esc(x === 0 ? "0" : (x || "-"));
+const svcKv = (k, val, w = 96) => `<tr><td style="padding:2px 0;white-space:nowrap;vertical-align:top"><div style="width:${w}px">${k}</div></td><td style="padding:2px 6px 2px 0;vertical-align:top">:</td><td style="padding:2px 0;font-weight:bold;width:100%">${val}</td></tr>`;
+const svcSec = t => `<div style="font-size:8pt;font-weight:bold;letter-spacing:.08em;margin:${DOC_GAP.md}px 0 ${DOC_GAP.xs}px">${t}</div>`;
+const SVC_CELL = "border:1px solid #000;padding:3px 8px;vertical-align:top";
+const SVC_TH = "border:1px solid #000;padding:3px 8px;font-size:8pt;font-weight:bold;letter-spacing:.04em;text-align:left";
+const svcDocHead = (title, lines) => docHeadHtml(title, lines);
+// A rule-topped note line under the facts.
+const svcNote = t => `<div style="font-size:8pt;margin-top:${DOC_GAP.md}px;padding-top:${DOC_GAP.xs + 2}px;border-top:1px solid #000">${t}</div>`;
+function svcSigns(...pairs) {
+  return `<div style="display:flex;justify-content:space-between;gap:40px;margin-top:${DOC_GAP.md}px;padding:0 ${DOC_GAP.lg}px">${pairs.map(([role, name]) =>
+    `<div style="text-align:center;flex:1"><div>${role}</div><div style="height:38px"></div>
+      <div style="border-top:1px solid #000;padding-top:3px;font-weight:bold;min-height:1.3em">${esc(name || "")}</div></div>`).join("")}</div>`;
+}
+const svcLegend = no => `<div style="display:flex;justify-content:space-between;margin-top:${DOC_GAP.md}px;font-size:7.5pt">
+    <span>Lembar Putih: Arsip Toko &nbsp;·&nbsp; Kuning: Supplier &nbsp;·&nbsp; Merah: Customer</span><span>${esc(no || "")}</span></div>`;
+const svcSheet = body => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;line-height:1.35;color:#000;background:#fff">${body}</div>`;
+const svcItemTable = (o, serial) => `<table style="border-collapse:collapse;width:100%">
+      <thead><tr><th style="${SVC_TH}">NAMA BARANG</th><th style="${SVC_TH}">MEREK / TIPE</th><th style="${SVC_TH}">NO. SERI</th><th style="${SVC_TH};text-align:center;width:64px">QTY</th></tr></thead>
+      <tbody><tr><td style="${SVC_CELL};font-weight:bold">${svcV(o.product_name)}</td><td style="${SVC_CELL}">${esc([o.brand_name, o.model].filter(Boolean).join(" / ") || "-")}</td>
+        <td style="${SVC_CELL}">${serial}</td><td style="${SVC_CELL};text-align:center;white-space:nowrap">${esc(String(o.qty || 1))} ${esc(o.unit || "PCS")}</td></tr></tbody></table>`;
+const svcChecks = names => names.length ? names.map(n => `&#9745;&nbsp;${esc(n)}`).join("&nbsp;&nbsp; ") : "-";
+const svcFacts = rows => `<table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">${rows}</table>`;
+
+function svcTerimaHtml(o) {
+  const brought = (o.accessories || []).filter(a => a.brought).map(a => a.name);
+  return svcSheet(`${svcDocHead("TANDA TERIMA SERVICE", [`No. <b>${esc(o.service_no || "-")}</b>`, svcPrintWhen(o.received_at)])}
+    ${svcSec("DATA CUSTOMER &amp; KENDARAAN")}
+    <div style="display:flex;gap:32px">
+      <table style="border-collapse:collapse;flex:1">${svcKv("Nama Pemilik", svcV(o.customer_name))}${svcKv("No. HP", svcV(o.customer_phone))}</table>
+      <table style="border-collapse:collapse;flex:1">${svcKv("No. Polisi", svcV(o.plate))}${svcKv("Unit Mobil", svcV(o.vehicle))}</table>
     </div>
-    ${label("DATA CUSTOMER &amp; KENDARAAN")}
-    <div style="display:flex;gap:24px">
-      <table style="border-collapse:collapse;flex:1">${kv("Nama Pemilik", v(o.customer_name))}${kv("No. HP", v(o.customer_phone))}</table>
-      <table style="border-collapse:collapse;flex:1">${kv("No. Polisi", v(o.plate))}${kv("Unit Mobil", v(o.vehicle))}</table>
-    </div>
-    ${label("BARANG YANG DITERIMA")}
+    ${svcSec("BARANG YANG DITERIMA")}${svcItemTable(o, svcV(o.serial_no))}
+    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
+      ${svcKv("Keluhan", svcV(o.complaint))}${svcKv("Kondisi Fisik", svcV(o.condition_in))}${svcKv("Kelengkapan", svcChecks(brought))}
+      ${svcKv("Estimasi", `${svcV(o.est_days)}<span style="font-weight:normal"> &nbsp;·&nbsp; biaya dikonfirmasi ke customer sebelum dikerjakan</span>`)}
+      ${o.reset_consent ? svcKv("Catatan", "Customer setuju unit boleh di-reset (data / akun bisa hilang)") : ""}
+    </table>
+    ${svcNote(`Bawa tanda terima ini saat mengambil barang. Barang yang tidak diambil 90 hari setelah dikabari di luar tanggung jawab toko.`)}
+    ${svcSigns(["Diserahkan oleh (Customer)", o.customer_name], ["Diterima oleh (Petugas)", o.received_by])}
+    ${svcLegend(o.service_no)}`);
+}
+
+// Surat Jalan: the unit leaving for the supplier / factory, with what goes with it and what stays at the shop.
+function svcSuratJalanHtml(o, f) {
+  const pack = [`${esc(String(f.koli))} koli`, f.weight ? esc(f.weight) : "", f.packing ? esc(f.packing) : ""].filter(Boolean).join(" · ");
+  const packNote = `<span style="font-weight:normal"> &nbsp;·&nbsp; ${pack}</span>`;
+  const route = f.channel === "ekspedisi"
+    ? svcKv("Dikirim via", `${esc([f.courier, f.mode].filter(Boolean).join(" · ") || "Ekspedisi")}${f.awb ? ` &nbsp;·&nbsp; Resi ${esc(f.awb)}` : ""}${packNote}`)
+    : svcKv("Diambil oleh", `${esc(f.sales_name || "-")} (sales)${f.sales_phone ? ` &nbsp;·&nbsp; ${esc(f.sales_phone)}` : ""}${packNote}`);
+  return svcSheet(`${svcDocHead("SURAT JALAN SERVICE", [`No. <b>${esc(f.doc_no)}</b>`, `Tgl. ${esc(f.date)} &nbsp;·&nbsp; Ref. ${esc(o.service_no || "-")}`])}
+    ${svcSec("KEPADA")}
     <table style="border-collapse:collapse;width:100%">
-      <thead><tr><th style="${head}">NAMA BARANG</th><th style="${head}">MEREK / TIPE</th><th style="${head}">NO. SERI</th><th style="${head};text-align:center;width:64px">QTY</th></tr></thead>
-      <tbody><tr><td style="${cell};font-weight:bold">${v(o.product_name)}</td><td style="${cell}">${esc([o.brand_name, o.model].filter(Boolean).join(" / ") || "-")}</td>
-        <td style="${cell}">${v(o.serial_no)}</td><td style="${cell};text-align:center;white-space:nowrap">${esc(String(o.qty || 1))} ${esc(o.unit || "PCS")}</td></tr></tbody>
+      ${svcKv("Supplier", `${esc(f.supplier)}${f.contact ? `<span style="font-weight:normal"> &nbsp;·&nbsp; Up. ${esc(f.contact)}</span>` : ""}${f.phone ? `<span style="font-weight:normal"> &nbsp;·&nbsp; ${esc(f.phone)}</span>` : ""}`)}
+      ${f.address ? svcKv("Alamat", `<span style="font-weight:normal">${esc(f.address)}</span>`) : ""}
+      ${route}
     </table>
-    <table style="border-collapse:collapse;width:100%;margin-top:5px">
-      ${kv("Keluhan", v(o.complaint))}
-      ${kv("Kondisi Fisik", v(o.condition_in))}
-      ${kv("Kelengkapan", brought.length ? brought.map(n => `&#9745;&nbsp;${esc(n)}`).join("&nbsp;&nbsp; ") : "-")}
-      ${kv("Estimasi", `${v(o.est_days)}<span style="font-weight:normal"> &nbsp;·&nbsp; biaya dikonfirmasi ke customer sebelum dikerjakan</span>`)}
-      ${o.reset_consent ? kv("Catatan", "Customer setuju unit boleh di-reset (data / akun bisa hilang)") : ""}
+    ${svcSec("BARANG YANG DIKIRIM")}${svcItemTable(o, svcV(o.serial_no))}
+    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
+      ${svcKv("Jenis", esc(f.claim))}${svcKv("Keluhan", svcV(o.complaint))}${svcKv("Kondisi Fisik", svcV(o.condition_in))}
+      ${f.tech_note ? svcKv("Catatan", esc(f.tech_note)) : ""}
+      ${svcKv("Ikut Dikirim", `${f.sent.length ? svcChecks(f.sent) : "Unit saja"}${f.held.length ? `<span style="font-weight:normal"> &nbsp;·&nbsp; ditahan di toko: ${f.held.map(esc).join(", ")}</span>` : ""}`)}
     </table>
-    <div style="font-size:8pt;margin-top:6px;padding-top:4px;border-top:1px solid #000">Bawa tanda terima ini saat mengambil barang. Barang yang tidak diambil 90 hari setelah dikabari di luar tanggung jawab toko.</div>
-    <div style="display:flex;justify-content:space-between;margin-top:8px">
-      ${sign("Diserahkan oleh (Customer)", o.customer_name)}
-      ${sign("Diterima oleh (Petugas)", o.received_by)}
+    ${svcNote(`Mohon hasil pemeriksaan dan estimasi biaya dikabarkan ke toko sebelum unit dikerjakan.`)}
+    ${svcSigns(["Dikirim oleh (Toko)", f.officer], [f.channel === "ekspedisi" ? "Kurir / Ekspedisi" : "Diambil oleh (Sales)", f.channel === "ekspedisi" ? "" : f.sales_name], ["Diterima (Supplier)", ""])}
+    ${svcLegend(o.service_no)}`);
+}
+
+// Nota Hasil Service: what was done, what it costs, and the unit going back to the customer.
+function svcHasilHtml(o, f) {
+  const money = n => formatIDR(n || 0), W = 128;  // one label width for every row of this document
+  const costs = f.costs.length ? `<table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
+      <thead><tr><th style="${SVC_TH}">RINCIAN BIAYA</th><th style="${SVC_TH};text-align:center;width:56px">QTY</th><th style="${SVC_TH};text-align:right;width:130px">JUMLAH</th></tr></thead>
+      <tbody>${f.costs.map(c => `<tr><td style="${SVC_CELL}">${esc(c.name)}</td><td style="${SVC_CELL};text-align:center">${esc(String(c.qty))}</td><td style="${SVC_CELL};text-align:right;white-space:nowrap">${money(c.amount)}</td></tr>`).join("")}
+        <tr><td colspan="3" style="${SVC_CELL};text-align:right;white-space:nowrap">Total <b>${money(f.billable)}</b> &nbsp;&nbsp;·&nbsp;&nbsp; Dibayar ${money(f.paid)}${f.fee_receipt_no ? ` (Nota Jasa ${esc(f.fee_receipt_no)})` : ""} &nbsp;&nbsp;·&nbsp;&nbsp; Sisa <b>${money(f.remaining)}</b></td></tr></tbody></table>`
+    : "";
+  const back = f.returned.length ? f.returned.map(a => `${a.back ? "&#9745;" : "&#9744;"}&nbsp;${esc(a.name)}`).join("&nbsp;&nbsp; ") : "-";
+  return svcSheet(`${svcDocHead("NOTA HASIL SERVICE", [`No. <b>${esc(o.service_no || "-")}</b>`, `Selesai ${esc(f.ready || "-")}`])}
+    ${svcSec("DATA CUSTOMER &amp; KENDARAAN")}
+    <div style="display:flex;gap:32px">
+      <table style="border-collapse:collapse;flex:1">${svcKv("Nama Pemilik", svcV(o.customer_name))}${svcKv("No. HP", svcV(o.customer_phone))}</table>
+      <table style="border-collapse:collapse;flex:1">${svcKv("No. Polisi", svcV(o.plate))}${svcKv("Unit Mobil", svcV(o.vehicle))}</table>
     </div>
-    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:7.5pt">
-      <span>Lembar Putih: Arsip Toko &nbsp;·&nbsp; Kuning: Supplier &nbsp;·&nbsp; Merah: Customer</span><span>${esc(o.service_no || "")}</span>
-    </div>
-  </div>`;
+    ${svcSec("HASIL SERVICE")}${svcItemTable(o, `${svcV(o.serial_no)}${o.serial_new ? `<div style="font-size:8pt">diganti: <b>${esc(o.serial_new)}</b></div>` : ""}`)}
+    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
+      ${svcKv("Hasil", `<span style="text-transform:uppercase">${esc(f.result)}</span>`, W)}
+      ${f.diagnosis ? svcKv("Pemeriksaan", esc(f.diagnosis), W) : ""}${f.stop_reason ? svcKv("Alasan", esc(f.stop_reason), W) : ""}
+      ${f.qc_note ? svcKv("Cek Toko", esc(f.qc_note), W) : ""}
+      ${f.costs.length ? "" : svcKv("Biaya", "Tanpa biaya", W)}
+    </table>
+    ${costs}
+    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
+      ${svcKv("Kelengkapan Kembali", back, W)}
+      ${f.picked_up ? svcKv("Diambil", `${esc(f.picked_up)}${f.receiver_phone ? ` &nbsp;·&nbsp; ${esc(f.receiver_phone)}` : ""}`, W) : ""}
+    </table>
+    ${f.warranty ? `${svcNote(`${esc(f.warranty)}`)}` : ""}
+    ${svcSigns(["Diserahkan oleh (Toko)", f.handed_by], ["Diterima oleh (Customer)", f.receiver])}
+    ${svcLegend(o.service_no)}`);
+}
+
+// Which documents print in the graphic layout, and their html from the last /print answer.
+const SVC_GRAPHIC = { terima: o => svcTerimaHtml(o), surat_jalan: (o, f) => svcSuratJalanHtml(o, f), hasil: (o, f) => svcHasilHtml(o, f) };
+function svcDocHtml() {
+  const make = SVC_GRAPHIC[svcPrintState.doc];
+  return make && (svcPrintState.doc === "terima" || svcPrintState.facts) ? make(svcCur, svcPrintState.facts) : null;
 }
 
 async function svcPrintPreview() {
   const box = document.getElementById("svc-print-preview");
   try { Object.assign(svcPrintState, await rtsApi(`/api/services/${svcCur.id}/print/${svcPrintState.doc}`, "POST")); }
   catch (e) { showToast(e.message); return; }
-  if (svcPrintState.doc === "terima") {
+  if (SVC_GRAPHIC[svcPrintState.doc]) {
     // The sheet at its real size (96 px per inch), shrunk to fit the card.
     await loadPoPrintCompany();
     const pp = SVC_PAPERS[svcPaper()];
-    box.innerHTML = `<div class="bg-[#E9EBEF] p-3 overflow-hidden"><div id="svc-sheet-fit" style="width:${pp.w * 96}px;min-height:${pp.h * 96}px;padding:${0.25 * 96}px ${0.3 * 96}px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15);transform-origin:top left">${svcTerimaHtml(svcCur)}</div></div>`;
+    box.innerHTML = `<div class="bg-[#E9EBEF] p-3 overflow-hidden"><div id="svc-sheet-fit" style="width:${pp.w * 96}px;min-height:${pp.h * 96}px;padding:${0.25 * 96}px ${0.3 * 96}px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15);transform-origin:top left">${svcDocHtml()}</div></div>`;
     const sheet = document.getElementById("svc-sheet-fit"), room = box.clientWidth - 24;
     const k = Math.min(1, room / (pp.w * 96));
     sheet.style.transform = `scale(${k})`;
     sheet.parentElement.style.height = `${Math.max(sheet.offsetHeight, pp.h * 96) * k + 24}px`;
     const c = document.getElementById("svc-print-copies");
-    if (c) c.textContent = "Dicetak sekali di kertas rangkap 3 (Putih: arsip toko · Kuning: supplier · Merah: customer).";
+    // Content taller than the chosen form would run onto a second sheet: say so before it is printed.
+    const tooTall = sheet.offsetHeight > pp.h * 96 + 1;
+    if (c) c.innerHTML = tooTall
+      ? `<span class="text-failed font-medium">Isi dokumen ini lebih panjang dari kertas ${esc(pp.label)} dan akan terpotong ke lembar kedua. Pilih kertas Penuh.</span>`
+      : "Dicetak sekali di kertas rangkap 3 (Putih: arsip toko · Kuning: supplier · Merah: customer).";
     const ps = document.getElementById("svc-paper-row");
     if (ps) ps.classList.remove("hidden");
     return;
@@ -27969,14 +28021,14 @@ async function svcPrintPreview() {
   if (c) c.textContent = svcPrintState.copies.length > 1 ? `${svcPrintState.copies.length} rangkap: ${svcPrintState.copies.join(", ")}` : "1 lembar";
 }
 function svcDoPrint() {
-  if (svcPrintState.doc === "terima") {
+  if (SVC_GRAPHIC[svcPrintState.doc]) {
     // One pass on carbonless 3-ply paper gives all three copies; the page has the form's exact size.
     const pp = SVC_PAPERS[svcPaper()];
     const rule = document.getElementById("print-page-rule"), before = rule.textContent;
     rule.textContent = `@page { size: ${pp.w}in ${pp.h}in; margin: 0.25in 0.3in; }`;
     const root = document.createElement("div");
     root.id = "cr-print-root";
-    root.innerHTML = svcTerimaHtml(svcCur);
+    root.innerHTML = svcDocHtml();
     document.body.appendChild(root);
     document.body.classList.add("printing-cr");
     const done = () => { document.body.classList.remove("printing-cr"); root.remove(); rule.textContent = before; window.removeEventListener("afterprint", done); };

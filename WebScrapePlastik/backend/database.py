@@ -15413,6 +15413,7 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
     acc = o["accessories"]
     box = lambda flag: "  ".join(f"[{'x' if a[flag] else ' '}] {a['name']}" for a in acc if a["brought"] or flag == "brought")
     L, copies = [], ["Lembar 1 - Customer", "Lembar 2 - Toko / arsip"]
+    facts = None  # the same document as plain data, for the printed (graphic) layout of Surat Jalan / Nota Hasil
     gar = {"aktif": f"Aktif s/d {d(o['warranty_until'])}", "habis": f"Habis ({d(o['warranty_until'])})", "ditolak": "Ditolak pabrik",
            "belum": "Belum diverifikasi"}[o["warranty_status"]]
     if doc == "terima":
@@ -15476,6 +15477,15 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
             L += _svc_wrap("   Catatan : ", o["tech_note"])
         pk = sh["packing"] or {}
         pack = " + ".join(x for x in (pk.get("kemasan"), pk.get("pelindung")) if x)
+        facts = {"doc_no": sh["doc_no"] or "(draft)", "date": d(sh["handed_at"]) or d(sh["scheduled_at"]) or d(shop_today().isoformat()),
+                 "supplier": o["supplier_name"] or "-", "address": o["supplier_address"] or "",
+                 "contact": o["supplier_contact"] or o["pic"] or "", "phone": o["supplier_phone"] or "",
+                 "channel": sh["channel"], "mode": SVC_SHIP_MODES.get(sh["mode"] or "", ""), "courier": sh["courier"] or "",
+                 "awb": sh["awb"] or "", "sales_name": sh["sales_name"] or "", "sales_phone": sh["sales_phone"] or "",
+                 "claim": claim, "sent": [a["name"] for a in acc if a["sent"]],
+                 "held": [a["name"] for a in acc if a["brought"] and not a["sent"]], "tech_note": o["tech_note"] or "",
+                 "koli": sh["koli"] or 1, "weight": sh["weight"] or "", "packing": pack,
+                 "officer": sh["officer"] or o["received_by"] or ""}
         L += [rule, (f"Koli: {sh['koli'] or 1}" + (f"  Berat: {sh['weight']}" if sh["weight"] else "") + (f"  Kemasan: {pack}" if pack else ""))[:80],
               "Mohon hasil pemeriksaan & estimasi biaya dikabarkan sebelum dikerjakan.", "",
               "   Dikirim oleh,                Diperiksa,                 Diterima,", "", "",
@@ -15519,6 +15529,22 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
             # Owner 23-10-2026: the replacement keeps the original nota's warranty end date, no reset.
             L.append(f"Garansi unit pengganti mengikuti nota asli, s/d {d(o['warranty_until'])}." if o["warranty_until"]
                      else "Garansi unit pengganti mengikuti nota asli.")
+        warranty_line = None
+        if o["result"] == "diperbaiki" and until:
+            warranty_line = f"Garansi service {o['after_warranty_days']} hari untuk kerusakan yang sama, s/d {d(until)}."
+        elif o["result"] == "diganti":
+            warranty_line = L[-1]
+        facts = {"result": SVC_RESULTS[o["result"]], "ready": local(o["ready_at"])[:10] if o["ready_at"] else "",
+                 "picked_up": local(o["picked_up_at"]) if o["picked_up_at"] else "",
+                 "diagnosis": (diag["description"] + (f" ({diag['rma_no']})" if diag["rma_no"] else "")) if diag else "",
+                 "stop_reason": o["stop_reason"] or "", "qc_note": o["qc_note"] or "",
+                 "costs": [{"name": l["item_name"] if l["master_item_id"] else f"{SVC_COST_KINDS[l['kind']]}{' - ' + l['description'] if l['description'] else ''}",
+                            "qty": l["qty"], "amount": l["customer_price"] * l["qty"]} for l in lines],
+                 "billable": o["billable"], "paid": o["paid"], "remaining": o["remaining"],
+                 "fee_receipt_no": o["fee_receipt"]["receipt_no"] if o["fee_receipt"] else "",
+                 "returned": [{"name": a["name"], "back": bool(a["returned"] or o["location"] != "diserahkan")} for a in acc if a["brought"]],
+                 "warranty": warranty_line, "handed_by": o["picked_up_by"] or "",
+                 "receiver": o["picker_name"] or o["customer_name"] or "", "receiver_phone": o["picker_phone"] or ""}
         L += ["", "   Diserahkan (toko),                          Diterima (customer),", "", "",
               f"  ( {(o['picked_up_by'] or '')[:16]:^16} )                         ( {(o['picker_name'] or o['customer_name'] or '')[:18]:^18} )"]
     elif doc == "ganti":
@@ -15550,7 +15576,7 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
     with _conn() as con:
         _svc_event(con, order_id, "cetak", "Dicetak: " + {"terima": "Tanda Terima", "label": "Label Unit", "surat_jalan": "Surat Jalan Service",
                                                          "hasil": "Nota Hasil Service", "ganti": "Bukti Penggantian Garansi"}[doc], user.get("username"))
-    return {"text": "\n".join(x[:80] for x in L), "copies": copies}
+    return {"text": "\n".join(x[:80] for x in L), "copies": copies, "facts": facts}
 
 
 # =====================================================================================================

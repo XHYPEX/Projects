@@ -112,6 +112,7 @@
       body.printing-cr > *:not(#cr-print-root) { display: none !important; }
       body.printing-cr #cr-print-root { display: block !important; }
       body.printing-cr * { visibility: visible !important; }
+      body.printing-cr { background: #FFFFFF !important; }
     }
 
     #cr-print-root { display: none; }
@@ -27860,22 +27861,130 @@ function svcPrintPage(doc) {
     ${rtsCard("Preview Dokumen", `<div id="svc-print-preview" class="border border-line bg-white min-h-[420px]"></div>`)}
     ${rtsCard("Pengaturan", `<div class="grid grid-cols-1 gap-3">
         ${rtsField("Dokumen", `<select class="${RTS_IN}" onchange="svcPrintState.doc=this.value; svcPrintPreview()">${svcOpt(docs, svcPrintState.doc)}</select>`)}
-        ${rtsField("Printer", rtsRO("Epson LX-310 · continuous form 9,5&quot; × 11&quot; · teks 80 kolom"))}
+        ${rtsField("Printer", rtsRO("Epson LX-310 · continuous form"))}
+        <div id="svc-paper-row" class="hidden">${rtsField("Ukuran kertas", `<select class="${RTS_IN}" onchange="svcSetPaper(this.value)">${Object.entries(SVC_PAPERS).map(([k, p]) => `<option value="${k}" ${svcPaper() === k ? "selected" : ""}>${esc(p.label)}</option>`).join("")}</select>`)}</div>
         <p id="svc-print-copies" class="text-xs text-muted"></p></div>
       <div class="flex flex-wrap gap-2 mt-4"><button type="button" onclick="svcBackToDetail()" class="${RTS_BTN3}">Kembali ke Detail</button><button type="button" onclick="svcDoPrint()" class="${RTS_BTN}">Cetak</button></div>`)}
   </div>`;
   svcActionPage("Cetak Dokumen Service", "Hitam putih, untuk printer dot matrix", html, null);
   svcPrintPreview();
 }
+// ── Tanda Terima Service (owner 25-10-2026) ─────────────────────────────────
+// Printed once on the Epson LX-310 on 3-ply carbonless continuous form (white: shop archive, yellow: supplier,
+// red: customer), so it is black only: solid rules, no grey fills (dot matrix bands them), the logo as a black
+// silhouette. It carries the service facts only: who handed in what, for which car; nothing about warranty.
+const SVC_PAPERS = {
+  half: { label: "Setengah · 9,5\" × 5,5\"", w: 9.5, h: 5.5 },
+  full: { label: "Penuh · 9,5\" × 11\"", w: 9.5, h: 11 },
+};
+function svcPaper() {
+  try { const v = localStorage.getItem("svc-paper"); if (SVC_PAPERS[v]) return v; } catch (_) {}
+  return "half";
+}
+function svcSetPaper(v) {
+  try { localStorage.setItem("svc-paper", v); } catch (_) {}
+  svcPrintPreview();
+}
+function svcTerimaHtml(o) {
+  const co = poPrintCompany.settings || {};
+  const shop = co.name || SHOP_PROFILE.name;
+  // Fallbacks from the shop's printed letterhead, used only while Pengaturan Perusahaan is still empty.
+  const addr = co.address || SHOP_PROFILE.address || "Jl. Mayjend Sutoyo No.1, Gunungsari Ulu, Balikpapan Tengah, Balikpapan";
+  const wa = co.phone || SHOP_PROFILE.phone || "0811 343 2869";
+  const when = o.received_at ? new Date(o.received_at) : null;
+  const tgl = when && !isNaN(when) ? `${pad2(when.getDate())}/${pad2(when.getMonth() + 1)}/${when.getFullYear()} ${pad2(when.getHours())}:${pad2(when.getMinutes())}` : "-";
+  const v = x => esc(x || "-");
+  const brought = (o.accessories || []).filter(a => a.brought).map(a => a.name);
+  const kv = (k, val) => `<tr><td style="padding:1px 0;width:92px;white-space:nowrap">${k}</td><td style="padding:1px 4px;width:8px">:</td><td style="padding:1px 0;font-weight:bold;width:100%">${val}</td></tr>`;
+  const cell = "border:1px solid #000;padding:3px 6px;vertical-align:top";
+  const head = "border:1px solid #000;padding:2px 6px;font-size:8pt;font-weight:bold;letter-spacing:.04em;text-align:left";
+  const label = t => `<div style="font-size:8pt;font-weight:bold;letter-spacing:.08em;margin:7px 0 3px">${t}</div>`;
+  const sign = (role, name) => `<div style="text-align:center;width:44%"><div>${role}</div><div style="height:34px"></div>
+      <div style="border-top:1px solid #000;padding-top:2px;font-weight:bold">${esc(name || "")}</div></div>`;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;line-height:1.3;color:#000;background:#fff">
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:6px;border-bottom:2px solid #000">
+      <img src="${SHOP_PROFILE.logo}" alt="" style="height:52px;width:auto;filter:brightness(0);-webkit-print-color-adjust:exact;print-color-adjust:exact" onerror="this.style.display='none'">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13pt;font-weight:bold;letter-spacing:.02em">${esc(shop)}</div>
+        ${addr ? `<div style="font-size:8.5pt">${esc(addr)}</div>` : ""}
+        ${wa ? `<div style="font-size:8.5pt">WA ${esc(wa)}</div>` : ""}
+      </div>
+      <div style="border:1.5px solid #000;padding:4px 10px;text-align:center;min-width:200px">
+        <div style="font-size:11.5pt;font-weight:bold;letter-spacing:.06em">TANDA TERIMA SERVICE</div>
+        <div style="font-size:9pt;margin-top:2px">No. <b>${esc(o.service_no || "-")}</b></div>
+        <div style="font-size:9pt">${tgl}</div>
+      </div>
+    </div>
+    ${label("DATA CUSTOMER &amp; KENDARAAN")}
+    <div style="display:flex;gap:24px">
+      <table style="border-collapse:collapse;flex:1">${kv("Nama Pemilik", v(o.customer_name))}${kv("No. HP", v(o.customer_phone))}</table>
+      <table style="border-collapse:collapse;flex:1">${kv("No. Polisi", v(o.plate))}${kv("Unit Mobil", v(o.vehicle))}</table>
+    </div>
+    ${label("BARANG YANG DITERIMA")}
+    <table style="border-collapse:collapse;width:100%">
+      <thead><tr><th style="${head}">NAMA BARANG</th><th style="${head}">MEREK / TIPE</th><th style="${head}">NO. SERI</th><th style="${head};text-align:center;width:64px">QTY</th></tr></thead>
+      <tbody><tr><td style="${cell};font-weight:bold">${v(o.product_name)}</td><td style="${cell}">${esc([o.brand_name, o.model].filter(Boolean).join(" / ") || "-")}</td>
+        <td style="${cell}">${v(o.serial_no)}</td><td style="${cell};text-align:center;white-space:nowrap">${esc(String(o.qty || 1))} ${esc(o.unit || "PCS")}</td></tr></tbody>
+    </table>
+    <table style="border-collapse:collapse;width:100%;margin-top:5px">
+      ${kv("Keluhan", v(o.complaint))}
+      ${kv("Kondisi Fisik", v(o.condition_in))}
+      ${kv("Kelengkapan", brought.length ? brought.map(n => `&#9745;&nbsp;${esc(n)}`).join("&nbsp;&nbsp; ") : "-")}
+      ${kv("Estimasi", `${v(o.est_days)}<span style="font-weight:normal"> &nbsp;·&nbsp; biaya dikonfirmasi ke customer sebelum dikerjakan</span>`)}
+      ${o.reset_consent ? kv("Catatan", "Customer setuju unit boleh di-reset (data / akun bisa hilang)") : ""}
+    </table>
+    <div style="font-size:8pt;margin-top:6px;padding-top:4px;border-top:1px solid #000">Bawa tanda terima ini saat mengambil barang. Barang yang tidak diambil 90 hari setelah dikabari di luar tanggung jawab toko.</div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px">
+      ${sign("Diserahkan oleh (Customer)", o.customer_name)}
+      ${sign("Diterima oleh (Petugas)", o.received_by)}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:7.5pt">
+      <span>Lembar Putih: Arsip Toko &nbsp;·&nbsp; Kuning: Supplier &nbsp;·&nbsp; Merah: Customer</span><span>${esc(o.service_no || "")}</span>
+    </div>
+  </div>`;
+}
+
 async function svcPrintPreview() {
   const box = document.getElementById("svc-print-preview");
   try { Object.assign(svcPrintState, await rtsApi(`/api/services/${svcCur.id}/print/${svcPrintState.doc}`, "POST")); }
   catch (e) { showToast(e.message); return; }
+  if (svcPrintState.doc === "terima") {
+    // The sheet at its real size (96 px per inch), shrunk to fit the card.
+    await loadPoPrintCompany();
+    const pp = SVC_PAPERS[svcPaper()];
+    box.innerHTML = `<div class="bg-[#E9EBEF] p-3 overflow-hidden"><div id="svc-sheet-fit" style="width:${pp.w * 96}px;min-height:${pp.h * 96}px;padding:${0.25 * 96}px ${0.3 * 96}px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15);transform-origin:top left">${svcTerimaHtml(svcCur)}</div></div>`;
+    const sheet = document.getElementById("svc-sheet-fit"), room = box.clientWidth - 24;
+    const k = Math.min(1, room / (pp.w * 96));
+    sheet.style.transform = `scale(${k})`;
+    sheet.parentElement.style.height = `${Math.max(sheet.offsetHeight, pp.h * 96) * k + 24}px`;
+    const c = document.getElementById("svc-print-copies");
+    if (c) c.textContent = "Dicetak sekali di kertas rangkap 3 (Putih: arsip toko · Kuning: supplier · Merah: customer).";
+    const ps = document.getElementById("svc-paper-row");
+    if (ps) ps.classList.remove("hidden");
+    return;
+  }
+  document.getElementById("svc-paper-row")?.classList.add("hidden");
   box.innerHTML = `<div class="rts-doc p-6 overflow-x-auto">${esc(svcPrintState.text)}</div>`;
   const c = document.getElementById("svc-print-copies");
   if (c) c.textContent = svcPrintState.copies.length > 1 ? `${svcPrintState.copies.length} rangkap: ${svcPrintState.copies.join(", ")}` : "1 lembar";
 }
 function svcDoPrint() {
+  if (svcPrintState.doc === "terima") {
+    // One pass on carbonless 3-ply paper gives all three copies; the page has the form's exact size.
+    const pp = SVC_PAPERS[svcPaper()];
+    const rule = document.getElementById("print-page-rule"), before = rule.textContent;
+    rule.textContent = `@page { size: ${pp.w}in ${pp.h}in; margin: 0.25in 0.3in; }`;
+    const root = document.createElement("div");
+    root.id = "cr-print-root";
+    root.innerHTML = svcTerimaHtml(svcCur);
+    document.body.appendChild(root);
+    document.body.classList.add("printing-cr");
+    const done = () => { document.body.classList.remove("printing-cr"); root.remove(); rule.textContent = before; window.removeEventListener("afterprint", done); };
+    window.addEventListener("afterprint", done);
+    const img = root.querySelector("img");
+    (img && img.decode ? img.decode() : Promise.resolve()).catch(() => {}).then(() => setTimeout(() => window.print(), 50));
+    return;
+  }
   const copies = svcPrintState.copies.length > 1 ? svcPrintState.copies : [""];
   document.getElementById("rts-print-root").innerHTML = copies.map(c => `<div class="rts-copy rts-sheet">${c ? `<div style="text-align:right;font:10px Arial">${esc(c)}</div>` : ""}<div class="rts-doc">${esc(svcPrintState.text)}</div></div>`).join("");
   document.body.classList.add("printing-rts");

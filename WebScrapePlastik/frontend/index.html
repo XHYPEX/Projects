@@ -1501,9 +1501,9 @@
   <!-- PAGE: PROSES PENGERJAAN (wo* functions) -->
   <div id="page-pengerjaan" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="wo-root" class="w-full"></div></div>
   <!-- PAGE: MASTER KARYAWAN (emp* functions) -->
-  <div id="page-karyawan" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="emp-root" class="max-w-[1500px] mx-auto"></div></div>
+  <div id="page-karyawan" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="emp-root" class="w-full"></div></div>
   <!-- PAGE: INSENTIF (ins* functions; Master / Monitoring / Riwayat & Koreksi share it). Admin only, the API refuses everyone else. -->
-  <div id="page-insentif" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="ins-root" class="max-w-[1500px] mx-auto"></div></div>
+  <div id="page-insentif" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="ins-root" class="w-full"></div></div>
 
   <!-- PAGE: INVOICES (receipt history, browsable by all logged-in users). One search box (plate,
        customer name or phone), a date range with quick chips, and a status filter. Every change
@@ -1747,7 +1747,7 @@
   </div>
 
   <!-- PAGE: FAKTUR PEMBELIAN (purchase invoices / accounts payable — supplier bills we owe) -->
-  <div id="page-purchase-invoices" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-purchase-invoices" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
 
       <!-- LIST PANEL: Daftar Faktur Pembelian. Tiles, filters and table are drawn from one fetch of all
@@ -1812,7 +1812,7 @@
       </div>
 
       <!-- FORM PANEL -->
-      <div id="pi-form-panel" class="hidden max-w-4xl">
+      <div id="pi-form-panel" class="hidden">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h2 id="pi-form-title" class="font-serif text-lg font-semibold text-ink">Faktur Baru</h2>
@@ -2004,7 +2004,7 @@
   </div>
 
   <!-- PAGE: PREORDER (pesanan barang yang belum ada di toko — bukan transaksi, tidak menyentuh stok) -->
-  <div id="page-preorder" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-preorder" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
 
       <!-- LIST PANEL -->
@@ -2451,7 +2451,7 @@
   </div>
 
   <!-- PAGE: PEMBELIAN SUPPLIER (Purchase Order — pesanan ke supplier, dibuat dari barang Sales Order; tidak menyentuh stok) -->
-  <div id="page-supplier-po" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-supplier-po" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="w-full">
 
       <!-- LIST PANEL -->
@@ -2910,7 +2910,7 @@
 
   <!-- PAGE: DASHBOARD (Ringkasan — moved here from the Inventori tab bar) -->
   <!-- ===== MASTER KATEGORI ===== -->
-  <div id="page-kategori" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-kategori" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
 
       <!-- LIST + STRUKTUR -->
@@ -3055,7 +3055,7 @@
 
   <!-- ===== STOCK OPNAME ===== -->
   <!-- PAGE: STOK KARANTINA (goods in the shop that may not be sold; stock_qty excludes them) -->
-  <div id="page-karantina" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-karantina" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
         <p class="text-sm text-muted max-w-2xl">Barang di sini <b class="text-ink font-medium">tidak termasuk stok siap jual</b> dan tidak bisa dipakai kasir maupun Sales Order. Masuk otomatis dari Terima Barang / Barang Masuk berkondisi rusak atau tidak sesuai, dan dari retur pelanggan (ke supplier / rusak). Simpan fisiknya terpisah dari rak jual.</p>
@@ -3089,7 +3089,7 @@
     </div>
   </div>
 
-  <div id="page-retur-supplier" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-retur-supplier" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div id="rts-list-panel"></div>
       <div id="rts-form-panel" class="hidden"></div>
@@ -3098,7 +3098,7 @@
     </div>
   </div>
 
-  <div id="page-service" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-service" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div id="svc-list-panel"></div>
       <div id="svc-form-panel" class="hidden"></div>
@@ -3107,7 +3107,7 @@
     </div>
   </div>
 
-  <div id="page-master-service" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-master-service" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div id="msv-list-panel"></div>
       <div id="msv-edit-panel" class="hidden"></div>
@@ -3206,7 +3206,7 @@
     </div>
   </div>
 
-  <div id="page-dashboard" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-dashboard" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
 
       <div class="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3 mb-6">
@@ -3425,8 +3425,8 @@
   </div>
 
   <!-- PAGE: USERS (admin-only account management) -->
-  <div id="page-users" class="hidden flex-1 overflow-auto p-4 sm:p-6">
-    <div class="max-w-3xl mx-auto">
+  <div id="page-users" class="hidden flex-1 overflow-auto p-3 sm:p-4">
+    <div class="w-full">
       <div class="flex items-center justify-end mb-4">
         <button onclick="openAddUserModal()" class="px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">+ Tambah Pengguna</button>
       </div>
@@ -3453,7 +3453,7 @@
 
   <!-- PAGE: AKTIVITAS (admin-only audit trail) -->
   <!-- K-20 Kas Keluar (admin): every refund, with the proof and the nota it belongs to. -->
-  <div id="page-cash-receipt" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-cash-receipt" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
 
       <!-- Daftar -->
@@ -3534,19 +3534,19 @@
   </div>
 
   <!-- PAGE: DASHBOARD SALES ORDER / PURCHASE ORDER (read-only monitoring; filled by odSoRender / odPoRender) -->
-  <div id="page-dashboard-so" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="od-so-body" class="max-w-none mx-auto"></div></div>
-  <div id="page-dashboard-po" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="od-po-body" class="max-w-none mx-auto"></div></div>
+  <div id="page-dashboard-so" class="hidden flex-1 overflow-auto p-3 sm:p-4"><div id="od-so-body" class="max-w-none mx-auto"></div></div>
+  <div id="page-dashboard-po" class="hidden flex-1 overflow-auto p-3 sm:p-4"><div id="od-po-body" class="max-w-none mx-auto"></div></div>
 
-  <div id="page-account-payable" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-account-payable" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div id="ap-tabs" class="flex flex-wrap items-center gap-1.5 mb-4"></div>
       <div id="ap-body"></div>
     </div>
   </div>
 
-  <div id="page-quotations" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="qt-root" class="max-w-none mx-auto"></div></div>
-  <div id="page-company" class="hidden flex-1 overflow-auto p-4 sm:p-6"><div id="co-root" class="max-w-none mx-auto"></div></div>
-  <div id="page-credit-notes" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-quotations" class="hidden flex-1 overflow-auto p-3 sm:p-4"><div id="qt-root" class="max-w-none mx-auto"></div></div>
+  <div id="page-company" class="hidden flex-1 overflow-auto p-3 sm:p-4"><div id="co-root" class="max-w-none mx-auto"></div></div>
+  <div id="page-credit-notes" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div id="cn-list-panel"></div>
       <div id="cn-detail-panel" class="hidden"></div>
@@ -3554,7 +3554,7 @@
     </div>
   </div>
 
-  <div id="page-kas-keluar" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-kas-keluar" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div class="flex flex-wrap items-end gap-2 mb-4">
         <div><label for="ko-from" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Dari</label>
@@ -3590,7 +3590,7 @@
     </div>
   </div>
 
-  <div id="page-activity" class="hidden flex-1 overflow-auto p-4 sm:p-6">
+  <div id="page-activity" class="hidden flex-1 overflow-auto p-3 sm:p-4">
     <div class="max-w-none mx-auto">
       <div class="flex items-center justify-between mb-4">
         <span id="activity-total" class="text-sm text-muted px-1"></span>

@@ -19970,7 +19970,8 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const last = page === pages;
   const minHeightMm = opts.minHeightMm || 132;
   const vehicle = [r.vehicle_make, r.vehicle_model, r.vehicle_year].filter(Boolean).join(" ");
-  const cell = `padding:2px ${DOC_GAP.sm}px;`;
+  const W = 84;  // one label column for the whole nota
+  const cell = `padding:3px ${DOC_GAP.sm}px;vertical-align:top;`;
   const th = `padding:3px ${DOC_GAP.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;white-space:nowrap;`;
   const name = r.customer_full_name || r.customer_name || "";
   const addressBits = [customer && customer.address, r.customer_phone].filter(Boolean);
@@ -19986,40 +19987,24 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
       <td style="${cell}text-align:right;">${groupDigits(item.quantity * item.unit_price) || "0"}</td>
     </tr>`).join("");
 
-  const totalRow = (label, value, extra = "") => `
-    <tr>
-      <td style="padding:1px 0;">${label}</td>
-      <td style="padding:1px 6px;">:</td>
-      <td style="padding:1px 0;text-align:right;${extra}">${value}</td>
-    </tr>`;
-
-  const kv = (label, value) => `
-    <tr>
-      <td style="padding:1.5px 0;vertical-align:top;white-space:nowrap;"><div style="min-width:76px;">${label}</div></td>
-      <td style="padding:1.5px 6px 1.5px 0;vertical-align:top;">:</td>
-      <td style="padding:1.5px 0;vertical-align:top;">${value}</td>
-    </tr>`;
+  const kv = (label, value) => docKv(label, value, W);
 
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;line-height:1.3;min-height:${minHeightMm}mm;display:flex;flex-direction:column;position:relative;${last ? "" : "break-after:page;page-break-after:always;"}">
     ${r.status !== "void" && r.work_status === "draft" ? `<div aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:64pt;font-weight:bold;letter-spacing:0.15em;color:rgba(0,0,0,0.12);transform:rotate(-22deg);">DRAFT</span></div>` : ""}
     ${docHeadHtml(`NOTA PENJUALAN${r.status === "void" ? " &middot; VOID" : r.work_status === "draft" ? " &middot; DRAFT" : ""}`,
       [`No. <b>${esc(r.receipt_no || "-")}</b>`, esc(formatNotaDate(r.created_at)), ...(pages > 1 ? [`Hal. ${page} / ${pages}`] : [])])}
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:${DOC_GAP.lg * 2}px;margin-top:${DOC_GAP.sm}px;">
-      <table style="border-collapse:collapse;font-size:9pt;">
+    <div style="margin-top:${DOC_GAP.md}px;">${docCols(`
         ${kv("Kepada", `<b>${esc(name) || "&ndash;"}</b>`)}
         ${addressBits.length ? kv("Alamat / HP", addressBits.map(esc).join("&nbsp;&nbsp;")) : ""}
-        ${kv("No. Plat", esc(r.plate_full) || "&ndash;")}${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}
-      </table>
-      <table style="border-collapse:collapse;font-size:9pt;">
+        ${kv("No. Plat", esc(r.plate_full) || "&ndash;")}${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}`, `
         ${r.po_number ? kv("Ref. SO", `${esc(r.po_number)}${(r.invoice_count || 1) > 1 ? ` (Invoice ${r.invoice_seq || 1})` : ""}`) : ""}
         ${kv("Pembayaran", `${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_account ? ` ke ${esc(r.transfer_account)}` : ""}${r.payment_method === "transfer" && r.transfer_sender ? ` (dari ${esc(r.transfer_sender)})` : ""}`)}
-        ${r.work_status === "pengerjaan" && r.status !== "void" ? kv("Status", "Dalam pengerjaan") : ""}
-      </table>
+        ${r.work_status === "pengerjaan" && r.status !== "void" ? kv("Status", "Dalam pengerjaan") : ""}`)}
     </div>
 
     <div style="flex:1 0 auto;">
-    <table style="width:100%;border-collapse:collapse;margin-top:${DOC_GAP.sm}px;">
+    <table style="width:100%;border-collapse:collapse;margin-top:${DOC_GAP.md}px;border-bottom:1.5px solid #000;">
       <thead style="display:table-header-group;">
         <tr style="border-top:1.5px solid #000;border-bottom:1.5px solid #000;">
           <th style="${th}width:7mm;text-align:center;">NO</th>
@@ -20034,28 +20019,29 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
     </table>
     </div>
 
-    ${last ? `    <div style="border-top:1px solid #000;margin-top:${DOC_GAP.xs}px;padding-top:${DOC_GAP.sm}px;display:flex;justify-content:space-between;gap:${DOC_GAP.lg * 2}px;">
+    ${last ? `    <div style="margin-top:${DOC_GAP.md}px;display:flex;justify-content:space-between;align-items:flex-start;gap:${DOC_GAP.lg * 2}px;">
       <div style="flex:1;min-width:0;">
-        <table style="border-collapse:collapse;">
+        <table style="border-collapse:collapse;width:100%;">
           ${kv("Terbilang", esc(terbilangRupiah(r.total)))}
           ${kv("Keterangan", "Barang yang diterima sudah diperiksa dalam keadaan baik &amp; lengkap<br>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan!!!")}
+          ${SHOP_PROFILE.bankAccount ? `<tr><td></td><td></td><td style="padding:${DOC_GAP.sm}px 0 0;">
+            <div style="display:inline-block;border:1px solid #000;padding:3px ${DOC_GAP.sm}px;font-family:'Courier New',monospace;font-weight:bold;font-size:8.5pt;">
+              PEMBAYARAN TRANSFER KE REKENING :<br>${esc(SHOP_PROFILE.bankAccount)}
+            </div></td></tr>` : ""}
         </table>
-        ${SHOP_PROFILE.bankAccount ? `
-        <div style="display:inline-block;margin:6px 0 0 70px;border:1px solid #000;padding:3px 8px;font-family:'Courier New',monospace;font-weight:bold;font-size:8.5pt;">
-          PEMBAYARAN TRANSFER KE REKENING :<br>${esc(SHOP_PROFILE.bankAccount)}
-        </div>` : ""}
       </div>
-      <table style="border-collapse:collapse;min-width:62mm;">
-        ${totalRow("Sub Total", groupDigits(r.subtotal) || "0")}
-        ${totalRow("Potongan", groupDigits(r.discount) || "0", "border-bottom:1px solid #000;")}
-        ${r.return_total > 0 ? totalRow("Total Awal", groupDigits(r.total + r.return_total)) + totalRow("Retur", "-" + groupDigits(r.return_total), "border-bottom:1px solid #000;") : ""}
-        ${totalRow(r.return_total > 0 ? "Jumlah Akhir" : "Jumlah", groupDigits(r.total) || "0", "font-weight:bold;")}
-        ${remaining > 0 && r.status !== "void" ? totalRow("Dibayar", groupDigits(r.amount_paid) || "0") + totalRow("Sisa", groupDigits(remaining), "font-weight:bold;") : ""}
+      <table style="border-collapse:collapse;flex:none;">
+        ${docSum("Sub Total", groupDigits(r.subtotal) || "0")}
+        ${docSum("Potongan", groupDigits(r.discount) || "0")}
+        ${r.return_total > 0 ? docSum("Total Awal", groupDigits(r.total + r.return_total)) + docSum("Retur", "-" + groupDigits(r.return_total)) : ""}
+        ${docSumRule}
+        ${docSum(r.return_total > 0 ? "Jumlah Akhir" : "Jumlah", groupDigits(r.total) || "0", true)}
+        ${remaining > 0 && r.status !== "void" ? docSum("Dibayar", groupDigits(r.amount_paid) || "0") + docSum("Sisa", groupDigits(remaining), true) : ""}
       </table>
     </div>
 
     ${svcSigns(["Penerima,", name], ["Hormat kami,", ""])}
-` : `<div style="border-top:1px solid #000;margin-top:6px;padding-top:6px;text-align:right;font-style:italic;">Bersambung ke halaman ${page + 1} &rarr;</div>`}
+` : `<div style="border-top:1px solid #000;margin-top:${DOC_GAP.md}px;padding-top:${DOC_GAP.sm}px;text-align:right;font-style:italic;">Bersambung ke halaman ${page + 1} &rarr;</div>`}
   </div>`;
 }
 
@@ -23353,8 +23339,8 @@ function poInvoiceHtml(po, settings) {
   const paid = Math.max(po.total - po.remaining, 0);
   const status = poPayStatus(po);
   const lastPay = [...(po.payments || [])].filter(p => p.state === "sah" && p.amount > 0).pop();
-  const kv = (label, value, bold) => `<tr><td style="padding:2px 0;white-space:nowrap;vertical-align:top"><div style="width:92px">${label}</div></td><td style="padding:2px 6px 2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top;${bold ? "font-weight:bold;" : ""}">${value}</td></tr>`;
-  const sum = (label, value, strong) => `<tr style="${strong ? "font-weight:bold;font-size:10.5pt;" : ""}"><td style="padding:2px 0">${label}</td><td style="padding:2px 0 2px ${G.lg}px">Rp</td><td style="padding:2px 0;text-align:right;min-width:26mm">${value}</td></tr>`;
+  const kv = (label, value, bold) => docKv(label, value, 92, bold);
+  const sum = docSum;
   const rule = settings.lines ? "border-bottom:1px solid #000;" : "";
   const cell = `padding:3px ${G.sm}px;vertical-align:top;${rule}`;
   const th = `padding:3px ${G.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;white-space:nowrap;border-top:1.5px solid #000;border-bottom:1.5px solid #000;`;
@@ -23363,17 +23349,13 @@ function poInvoiceHtml(po, settings) {
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;line-height:1.35;">
     ${docHeadHtml("INVOICE", [`No. <b>${esc(po.receipt_no || po.po_number)}</b>`, esc(poDateTimeLabel(po)),
       `<span style="display:inline-block;margin-top:2px;padding:1px ${G.sm}px;border:1px solid #000;font-weight:bold;letter-spacing:.06em">${status}</span>`])}
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;margin-top:${G.md}px;">
-      <table style="border-collapse:collapse;">
+    <div style="margin-top:${G.md}px;">${docCols(`
         ${kv("Kepada", esc(po.customer_name || "-"), true)}
         ${kv("No. HP", esc(po.customer_phone || "-"))}
-        ${kv("No. Plat", esc(po.plate_full || "Belum dicatat"))}
-      </table>
-      <table style="border-collapse:collapse;">
+        ${kv("No. Plat", esc(po.plate_full || "Belum dicatat"))}`, `
         ${kv("Ref. SO", esc(po.po_number), true)}
         ${kv("Sumber Order", po.order_source === "whatsapp" ? "WhatsApp" : "Walk-in")}
-        ${kv("Pembayaran", esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-"))}
-      </table>
+        ${kv("Pembayaran", esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-"))}`)}
     </div>
     <table style="width:100%;border-collapse:collapse;margin-top:${G.md}px;border-bottom:1.5px solid #000;">
       <thead style="display:table-header-group;"><tr>
@@ -23393,7 +23375,7 @@ function poInvoiceHtml(po, settings) {
           <td style="${cell}text-align:right;">${money(it.quantity * it.unit_price)}</td>
         </tr>`).join("")}</tbody>
     </table>
-    <div style="margin-top:${G.sm}px;display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;">
+    <div style="margin-top:${G.md}px;display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;">
       <div style="min-width:0;font-size:9pt;">
         ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:${G.xs}px;">Pembayaran transfer ke rekening:</div>
           ${accounts.map(a => `<div style="margin-bottom:${G.xs}px;">${esc(a.bank_name)} &nbsp;<b>${esc(a.account_number)}</b><br>a.n. ${esc(a.account_name)}</div>`).join("")}
@@ -23403,7 +23385,7 @@ function poInvoiceHtml(po, settings) {
       <table style="border-collapse:collapse;flex-shrink:0;">
         ${sum("Subtotal", money(subtotal))}
         ${cut ? sum("Potongan", money(cut)) : ""}
-        <tr><td colspan="3" style="border-top:1px solid #000;padding:0;height:${G.xs}px;"></td></tr>
+        ${docSumRule}
         ${sum("Jumlah", money(po.total))}
         ${sum(status === "LUNAS" ? "Dibayar" : "Dibayar (DP)", money(paid))}
         ${sum("Sisa", money(Math.max(po.remaining, 0)), true)}
@@ -27876,7 +27858,7 @@ function docHeadHtml(title, lines) {
         <div style="font-size:13pt;font-weight:bold;letter-spacing:.02em;line-height:1.2">${esc(sh.name)}</div>
         ${sh.addr ? `<div style="font-size:8.5pt;margin-top:2px">${esc(sh.addr)}</div>` : ""}${sh.wa ? `<div style="font-size:8.5pt">WA ${esc(sh.wa)}</div>` : ""}
       </div>
-      <div style="flex:none;border:1.5px solid #000;padding:${DOC_GAP.xs}px ${DOC_GAP.md}px;text-align:center;min-width:200px">
+      <div style="flex:none;border:1.5px solid #000;padding:${DOC_GAP.xs}px ${DOC_GAP.md}px;text-align:center;min-width:232px;box-sizing:border-box">
         <div style="font-size:11.5pt;font-weight:bold;letter-spacing:.06em;line-height:1.25">${title}</div>
         ${lines.map(l => `<div style="font-size:9pt;margin-top:2px">${l}</div>`).join("")}
       </div>
@@ -27887,17 +27869,27 @@ function svcPrintWhen(iso) {
   return t && !isNaN(t) ? `${pad2(t.getDate())}/${pad2(t.getMonth() + 1)}/${t.getFullYear()} ${pad2(t.getHours())}:${pad2(t.getMinutes())}` : "-";
 }
 const svcV = x => esc(x === 0 ? "0" : (x || "-"));
-const svcKv = (k, val, w = 96) => `<tr><td style="padding:2px 0;white-space:nowrap;vertical-align:top"><div style="width:${w}px">${k}</div></td><td style="padding:2px 6px 2px 0;vertical-align:top">:</td><td style="padding:2px 0;font-weight:bold;width:100%">${val}</td></tr>`;
+// One label column per document (w): the colon sits at its right edge, so every value in a document starts at one x.
+const DOC_LABEL = 96;
+const docKv = (k, val, w = DOC_LABEL, bold = false) => `<tr><td style="padding:2px 0;white-space:nowrap;vertical-align:top"><div style="width:${w}px">${k}</div></td><td style="padding:2px ${DOC_GAP.sm}px 2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top;width:100%;${bold ? "font-weight:bold;" : ""}">${val}</td></tr>`;
+const svcKv = (k, val, w = DOC_LABEL) => docKv(k, val, w, true);
+const docKvTable = rows => `<table style="border-collapse:collapse;width:100%">${rows}</table>`;
+// Two equal columns that share the page's left and right edges.
+const docCols = (left, right) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:${DOC_GAP.lg * 2}px;align-items:start">${docKvTable(left)}${docKvTable(right)}</div>`;
+// Totals block: label, "Rp", right-aligned amount. A rule row sits between the sums and the total.
+const docSum = (label, value, strong) => `<tr style="${strong ? "font-weight:bold;font-size:10.5pt;" : ""}"><td style="padding:2px 0">${label}</td><td style="padding:2px 0 2px ${DOC_GAP.lg}px">Rp</td><td style="padding:2px 0;text-align:right;min-width:26mm">${value}</td></tr>`;
+const docSumRule = `<tr><td colspan="3" style="border-top:1px solid #000;padding:0;height:${DOC_GAP.xs}px"></td></tr>`;
 const svcSec = t => `<div style="font-size:8pt;font-weight:bold;letter-spacing:.08em;margin:${DOC_GAP.md}px 0 ${DOC_GAP.xs}px">${t}</div>`;
-const SVC_CELL = "border:1px solid #000;padding:3px 8px;vertical-align:top";
-const SVC_TH = "border:1px solid #000;padding:3px 8px;font-size:8pt;font-weight:bold;letter-spacing:.04em;text-align:left";
+const SVC_CELL = `border:1px solid #000;padding:3px ${DOC_GAP.sm}px;vertical-align:top`;
+const SVC_TH = `border:1px solid #000;padding:3px ${DOC_GAP.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;text-align:left`;
 const svcDocHead = (title, lines) => docHeadHtml(title, lines);
 // A rule-topped note line under the facts.
-const svcNote = t => `<div style="font-size:8pt;margin-top:${DOC_GAP.md}px;padding-top:${DOC_GAP.xs + 2}px;border-top:1px solid #000">${t}</div>`;
+const svcNote = t => `<div style="font-size:8pt;margin-top:${DOC_GAP.md}px;padding-top:${DOC_GAP.sm}px;border-top:1px solid #000">${t}</div>`;
+// Signature boxes: one fixed width everywhere, the first on the left edge and the last on the right edge.
 function svcSigns(...pairs) {
-  return `<div style="display:flex;justify-content:space-between;gap:40px;margin-top:${DOC_GAP.md}px;padding:0 ${DOC_GAP.lg}px">${pairs.map(([role, name]) =>
-    `<div style="text-align:center;flex:1"><div>${role}</div><div style="height:38px"></div>
-      <div style="border-top:1px solid #000;padding-top:3px;font-weight:bold;min-height:1.3em">${esc(name || "")}</div></div>`).join("")}</div>`;
+  return `<div style="display:flex;justify-content:space-between;margin-top:${DOC_GAP.md}px">${pairs.map(([role, name]) =>
+    `<div style="flex:0 0 220px;text-align:center"><div>${role}</div><div style="height:38px"></div>
+      <div style="border-top:1px solid #000;padding-top:${DOC_GAP.xs}px;font-weight:bold;min-height:1.3em">${esc(name || "")}</div></div>`).join("")}</div>`;
 }
 const svcLegend = no => `<div style="display:flex;justify-content:space-between;margin-top:${DOC_GAP.md}px;font-size:7.5pt">
     <span>Lembar Putih: Arsip Toko &nbsp;·&nbsp; Kuning: Supplier &nbsp;·&nbsp; Merah: Customer</span><span>${esc(no || "")}</span></div>`;
@@ -27907,22 +27899,17 @@ const svcItemTable = (o, serial) => `<table style="border-collapse:collapse;widt
       <tbody><tr><td style="${SVC_CELL};font-weight:bold">${svcV(o.product_name)}</td><td style="${SVC_CELL}">${esc([o.brand_name, o.model].filter(Boolean).join(" / ") || "-")}</td>
         <td style="${SVC_CELL}">${serial}</td><td style="${SVC_CELL};text-align:center;white-space:nowrap">${esc(String(o.qty || 1))} ${esc(o.unit || "PCS")}</td></tr></tbody></table>`;
 const svcChecks = names => names.length ? names.map(n => `&#9745;&nbsp;${esc(n)}`).join("&nbsp;&nbsp; ") : "-";
-const svcFacts = rows => `<table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">${rows}</table>`;
+const svcFacts = rows => `<div style="margin-top:${DOC_GAP.md}px">${docKvTable(rows)}</div>`;
 
 function svcTerimaHtml(o) {
   const brought = (o.accessories || []).filter(a => a.brought).map(a => a.name);
   return svcSheet(`${svcDocHead("TANDA TERIMA SERVICE", [`No. <b>${esc(o.service_no || "-")}</b>`, svcPrintWhen(o.received_at)])}
     ${svcSec("DATA CUSTOMER &amp; KENDARAAN")}
-    <div style="display:flex;gap:32px">
-      <table style="border-collapse:collapse;flex:1">${svcKv("Nama Pemilik", svcV(o.customer_name))}${svcKv("No. HP", svcV(o.customer_phone))}</table>
-      <table style="border-collapse:collapse;flex:1">${svcKv("No. Polisi", svcV(o.plate))}${svcKv("Unit Mobil", svcV(o.vehicle))}</table>
-    </div>
+    ${docCols(svcKv("Nama Pemilik", svcV(o.customer_name)) + svcKv("No. HP", svcV(o.customer_phone)), svcKv("No. Polisi", svcV(o.plate)) + svcKv("Unit Mobil", svcV(o.vehicle)))}
     ${svcSec("BARANG YANG DITERIMA")}${svcItemTable(o, svcV(o.serial_no))}
-    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
-      ${svcKv("Keluhan", svcV(o.complaint))}${svcKv("Kondisi Fisik", svcV(o.condition_in))}${svcKv("Kelengkapan", svcChecks(brought))}
+    ${svcFacts(`${svcKv("Keluhan", svcV(o.complaint))}${svcKv("Kondisi Fisik", svcV(o.condition_in))}${svcKv("Kelengkapan", svcChecks(brought))}
       ${svcKv("Estimasi", `${svcV(o.est_days)}<span style="font-weight:normal"> &nbsp;·&nbsp; biaya dikonfirmasi ke customer sebelum dikerjakan</span>`)}
-      ${o.reset_consent ? svcKv("Catatan", "Customer setuju unit boleh di-reset (data / akun bisa hilang)") : ""}
-    </table>
+      ${o.reset_consent ? svcKv("Catatan", "Customer setuju unit boleh di-reset (data / akun bisa hilang)") : ""}`)}
     ${svcNote(`Bawa tanda terima ini saat mengambil barang. Barang yang tidak diambil 90 hari setelah dikabari di luar tanggung jawab toko.`)}
     ${svcSigns(["Diserahkan oleh (Customer)", o.customer_name], ["Diterima oleh (Petugas)", o.received_by])}
     ${svcLegend(o.service_no)}`);
@@ -27937,17 +27924,13 @@ function svcSuratJalanHtml(o, f) {
     : svcKv("Diambil oleh", `${esc(f.sales_name || "-")} (sales)${f.sales_phone ? ` &nbsp;·&nbsp; ${esc(f.sales_phone)}` : ""}${packNote}`);
   return svcSheet(`${svcDocHead("SURAT JALAN SERVICE", [`No. <b>${esc(f.doc_no)}</b>`, `Tgl. ${esc(f.date)} &nbsp;·&nbsp; Ref. ${esc(o.service_no || "-")}`])}
     ${svcSec("KEPADA")}
-    <table style="border-collapse:collapse;width:100%">
-      ${svcKv("Supplier", `${esc(f.supplier)}${f.contact ? `<span style="font-weight:normal"> &nbsp;·&nbsp; Up. ${esc(f.contact)}</span>` : ""}${f.phone ? `<span style="font-weight:normal"> &nbsp;·&nbsp; ${esc(f.phone)}</span>` : ""}`)}
+    ${docKvTable(`${svcKv("Supplier", `${esc(f.supplier)}${f.contact ? `<span style="font-weight:normal"> &nbsp;·&nbsp; Up. ${esc(f.contact)}</span>` : ""}${f.phone ? `<span style="font-weight:normal"> &nbsp;·&nbsp; ${esc(f.phone)}</span>` : ""}`)}
       ${f.address ? svcKv("Alamat", `<span style="font-weight:normal">${esc(f.address)}</span>`) : ""}
-      ${route}
-    </table>
+      ${route}`)}
     ${svcSec("BARANG YANG DIKIRIM")}${svcItemTable(o, svcV(o.serial_no))}
-    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
-      ${svcKv("Jenis", esc(f.claim))}${svcKv("Keluhan", svcV(o.complaint))}${svcKv("Kondisi Fisik", svcV(o.condition_in))}
+    ${svcFacts(`${svcKv("Jenis", esc(f.claim))}${svcKv("Keluhan", svcV(o.complaint))}${svcKv("Kondisi Fisik", svcV(o.condition_in))}
       ${f.tech_note ? svcKv("Catatan", esc(f.tech_note)) : ""}
-      ${svcKv("Ikut Dikirim", `${f.sent.length ? svcChecks(f.sent) : "Unit saja"}${f.held.length ? `<span style="font-weight:normal"> &nbsp;·&nbsp; ditahan di toko: ${f.held.map(esc).join(", ")}</span>` : ""}`)}
-    </table>
+      ${svcKv("Ikut Dikirim", `${f.sent.length ? svcChecks(f.sent) : "Unit saja"}${f.held.length ? `<span style="font-weight:normal"> &nbsp;·&nbsp; ditahan di toko: ${f.held.map(esc).join(", ")}</span>` : ""}`)}`)}
     ${svcNote(`Mohon hasil pemeriksaan dan estimasi biaya dikabarkan ke toko sebelum unit dikerjakan.`)}
     ${svcSigns(["Dikirim oleh (Toko)", f.officer], [f.channel === "ekspedisi" ? "Kurir / Ekspedisi" : "Diambil oleh (Sales)", f.channel === "ekspedisi" ? "" : f.sales_name], ["Diterima (Supplier)", ""])}
     ${svcLegend(o.service_no)}`);
@@ -27955,8 +27938,8 @@ function svcSuratJalanHtml(o, f) {
 
 // Nota Hasil Service: what was done, what it costs, and the unit going back to the customer.
 function svcHasilHtml(o, f) {
-  const money = n => formatIDR(n || 0), W = 128;  // one label width for every row of this document
-  const costs = f.costs.length ? `<table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
+  const money = n => formatIDR(n || 0), W = 140;  // one label width for every row of this document
+  const costs = f.costs.length ? `<table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.md}px">
       <thead><tr><th style="${SVC_TH}">RINCIAN BIAYA</th><th style="${SVC_TH};text-align:center;width:56px">QTY</th><th style="${SVC_TH};text-align:right;width:130px">JUMLAH</th></tr></thead>
       <tbody>${f.costs.map(c => `<tr><td style="${SVC_CELL}">${esc(c.name)}</td><td style="${SVC_CELL};text-align:center">${esc(String(c.qty))}</td><td style="${SVC_CELL};text-align:right;white-space:nowrap">${money(c.amount)}</td></tr>`).join("")}
         <tr><td colspan="3" style="${SVC_CELL};text-align:right;white-space:nowrap">Total <b>${money(f.billable)}</b> &nbsp;&nbsp;·&nbsp;&nbsp; Dibayar ${money(f.paid)}${f.fee_receipt_no ? ` (Nota Jasa ${esc(f.fee_receipt_no)})` : ""} &nbsp;&nbsp;·&nbsp;&nbsp; Sisa <b>${money(f.remaining)}</b></td></tr></tbody></table>`
@@ -27964,22 +27947,15 @@ function svcHasilHtml(o, f) {
   const back = f.returned.length ? f.returned.map(a => `${a.back ? "&#9745;" : "&#9744;"}&nbsp;${esc(a.name)}`).join("&nbsp;&nbsp; ") : "-";
   return svcSheet(`${svcDocHead("NOTA HASIL SERVICE", [`No. <b>${esc(o.service_no || "-")}</b>`, `Selesai ${esc(f.ready || "-")}`])}
     ${svcSec("DATA CUSTOMER &amp; KENDARAAN")}
-    <div style="display:flex;gap:32px">
-      <table style="border-collapse:collapse;flex:1">${svcKv("Nama Pemilik", svcV(o.customer_name))}${svcKv("No. HP", svcV(o.customer_phone))}</table>
-      <table style="border-collapse:collapse;flex:1">${svcKv("No. Polisi", svcV(o.plate))}${svcKv("Unit Mobil", svcV(o.vehicle))}</table>
-    </div>
+    ${docCols(svcKv("Nama Pemilik", svcV(o.customer_name), W) + svcKv("No. HP", svcV(o.customer_phone), W), svcKv("No. Polisi", svcV(o.plate), W) + svcKv("Unit Mobil", svcV(o.vehicle), W))}
     ${svcSec("HASIL SERVICE")}${svcItemTable(o, `${svcV(o.serial_no)}${o.serial_new ? `<div style="font-size:8pt">diganti: <b>${esc(o.serial_new)}</b></div>` : ""}`)}
-    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
-      ${svcKv("Hasil", `<span style="text-transform:uppercase">${esc(f.result)}</span>`, W)}
+    ${svcFacts(`${svcKv("Hasil", `<span style="text-transform:uppercase">${esc(f.result)}</span>`, W)}
       ${f.diagnosis ? svcKv("Pemeriksaan", esc(f.diagnosis), W) : ""}${f.stop_reason ? svcKv("Alasan", esc(f.stop_reason), W) : ""}
       ${f.qc_note ? svcKv("Cek Toko", esc(f.qc_note), W) : ""}
-      ${f.costs.length ? "" : svcKv("Biaya", "Tanpa biaya", W)}
-    </table>
+      ${f.costs.length ? "" : svcKv("Biaya", "Tanpa biaya", W)}`)}
     ${costs}
-    <table style="border-collapse:collapse;width:100%;margin-top:${DOC_GAP.sm}px">
-      ${svcKv("Kelengkapan Kembali", back, W)}
-      ${f.picked_up ? svcKv("Diambil", `${esc(f.picked_up)}${f.receiver_phone ? ` &nbsp;·&nbsp; ${esc(f.receiver_phone)}` : ""}`, W) : ""}
-    </table>
+    ${svcFacts(`${svcKv("Kelengkapan Kembali", back, W)}
+      ${f.picked_up ? svcKv("Diambil", `${esc(f.picked_up)}${f.receiver_phone ? ` &nbsp;·&nbsp; ${esc(f.receiver_phone)}` : ""}`, W) : ""}`)}
     ${f.warranty ? `${svcNote(`${esc(f.warranty)}`)}` : ""}
     ${svcSigns(["Diserahkan oleh (Toko)", f.handed_by], ["Diterima oleh (Customer)", f.receiver])}
     ${svcLegend(o.service_no)}`);

@@ -568,6 +568,43 @@
     /* Icon chips (the little square beside a card or page title) turn coral-tinted. */
     body span[class*="bg-bg2"][class*="rounded-lg"][class*="place-items-center"] { background: #FFEDD5; color: #C2410C; }
 
+    /* Dashboard Ringkasan: KPI tiles and fixed-height cards whose tables scroll inside. */
+    .ov-tile { display: flex; gap: 0.6rem; align-items: flex-start; border: 1px solid; border-radius: 12px; padding: 11px 12px; min-width: 0; overflow: hidden; }
+    .ov-tile > div { min-width: 0; }
+    @media (min-width: 1280px) { .ov-tile .ov-ico { width: 30px; height: 30px; } .ov-tile .ov-tile-value { font-size: 16px; } .ov-tile-label { font-size: 10.5px; } }
+    @media (min-width: 1536px) { .ov-tile .ov-tile-value { font-size: 19px; } }
+    .ov-tile-label { font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #374151; line-height: 1.3; }
+    .ov-tile-value { font-size: 22px; line-height: 1.2; font-weight: 700; color: #111827; margin-top: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .ov-tile-sub { font-size: 11.5px; color: #6B7280; margin-top: 4px; }
+    .ov-ico { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--b); color: var(--c); }
+    .ov-card { background: #fff; border: 1px solid #E3E6EB; border-radius: 12px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+    .ov-card-head { display: flex; align-items: center; gap: 0.75rem; padding: 12px 14px; }
+    .ov-card-head h3 { font-size: 15px; font-weight: 600; color: #111827; line-height: 1.25; display: flex; align-items: center; gap: 6px; }
+    .ov-card-head p { font-size: 12px; color: #6B7280; margin-top: 2px; }
+    .ov-badge { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; background: #FFEDD5; color: #C2410C; white-space: nowrap; }
+    .ov-badge:empty { display: none; }
+    .ov-count { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; background: #EF4444; color: #fff; }
+    .ov-more { font-size: 12px; font-weight: 600; border: 1px solid #E3E6EB; border-radius: 8px; padding: 5px 10px; color: #111827; background: #fff; white-space: nowrap; }
+    .ov-more:hover { background: #EEF0F3; }
+    .ov-scroll { overflow: auto; border-top: 1px solid #E3E6EB; flex: 1 1 auto; overscroll-behavior: contain; }
+    .ov-scroll table { width: 100%; font-size: 13px; border-collapse: separate; border-spacing: 0; }
+    .ov-scroll th:first-child, .ov-scroll td:first-child { padding-left: 14px; }
+    .ov-scroll th:last-child, .ov-scroll td:last-child { padding-right: 14px; }
+    .ov-scroll thead th { position: sticky; top: 0; z-index: 1; background: #F6F7F9; text-align: left; font-size: 10.5px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; padding: 7px 8px; border-bottom: 1px solid #E3E6EB; line-height: 1.25; vertical-align: bottom; }
+    .ov-scroll thead th.text-right { text-align: right; }
+    .ov-scroll td { padding: 7px 8px; font-size: 12.5px; border-bottom: 1px solid #EEF0F3; vertical-align: middle; color: #111827; }
+    .ov-scroll tbody tr:last-child td { border-bottom: 0; }
+    .ov-empty { padding: 36px 12px; text-align: center; font-size: 13px; color: #6B7280; }
+    .ov-pill { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 500; border: 1px solid transparent; }
+    .ov-act { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; border: 1px solid; border-radius: 8px; padding: 4px 9px; font-size: 12px; font-weight: 600; background: #fff; }
+    .ov-att button.ov-att-row { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 12px; border-bottom: 1px solid #EEF0F3; }
+    .ov-att button.ov-att-row:hover { background: #F6F7F9; }
+    @media (max-width: 639px) {
+      .ov-tile { padding: 10px; } .ov-tile .ov-ico { display: none; } .ov-tile-value { font-size: 17px; }
+      .ov-card-head { flex-wrap: wrap; } .ov-card-head > div:last-child:not(:nth-child(2)) { width: 100%; padding-left: 48px; }
+    }
+    .ov-clock { display: flex; }
+    @media (max-width: 767px) { .ov-clock { display: none !important; } }
     .card-title { display: flex; align-items: center; gap: 0.6rem; }
     .card-title .chip { width: 2rem; height: 2rem; flex: none; display: grid; place-items: center; border-radius: 0.6rem; background: #FFEDD5; color: #C2410C; }
     .card-title h3 { font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.2; font-weight: 600; color: #111827; }
@@ -884,6 +921,10 @@
       <img src="assets/hotdog_run_cream.gif" alt="" class="header-sprite" />
     </div>
     <div class="ml-auto flex items-center gap-3 shrink-0 relative z-10">
+      <div id="topbar-clock" class="ov-clock items-center gap-2.5 bg-white border border-line rounded-lg px-3 py-1.5" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-failed shrink-0" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+        <div class="leading-tight"><div id="topbar-clock-date" class="text-xs font-medium text-ink"></div><div id="topbar-clock-time" class="text-xs text-muted tabular-nums"></div></div>
+      </div>
       <div class="flex items-center gap-2.5">
         <span id="current-user-avatar" class="w-9 h-9 rounded-full bg-accent/20 text-ink grid place-items-center text-xs font-semibold" aria-hidden="true"></span>
         <div class="hidden sm:block leading-tight">
@@ -1705,6 +1746,7 @@
             <thead class="bg-bg2">
               <tr>
                 <th class="text-left pl-4 pr-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Invoice</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. SO</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
@@ -2105,6 +2147,9 @@
           </div>
         </div>
 
+        <!-- Owner 25-10-2026: a "Ringkasan Transaksi" rail on the right, like the Kasir's; the DP is taken there. -->
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+          <div class="min-w-0">
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
           <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Informasi Customer</h3></div>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
@@ -2159,8 +2204,8 @@
                 </select>
               </div>
               <div class="po-frow items-start">
-                <label for="po-notes" class="pt-2">Catatan Pesanan</label>
-                <textarea id="po-notes" rows="3" placeholder="opsional, mis. warna, ukuran, janji pemasangan" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea>
+                <label for="po-notes" class="pt-2">Catatan / Keterangan SO</label>
+                <textarea id="po-notes" rows="3" placeholder="opsional, untuk seluruh SO, mis. warna, ukuran, nomor plat, janji pemasangan" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea>
               </div>
             </div>
           </div>
@@ -2182,14 +2227,37 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-[minmax(320px,0.85fr)_1.15fr] gap-4 mb-4 items-start">
-          <div class="bg-white border border-line rounded-xl p-4 sm:p-5 text-sm">
-            <div class="card-title mb-3"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg></span><h3>Ringkasan Pembayaran Customer</h3></div>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-muted">Total Sales Order</span>
-                <span id="po-total-display" class="font-serif text-base font-semibold text-ink tabular-nums">Rp 0</span>
-              </div>
+          <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><h3>Preview Otomatis Draft PO</h3></div>
+              <span id="po-preview-count" class="text-xs text-muted"></span>
+            </div>
+            <p class="text-xs text-muted mb-3">Draft PO dibuat berdasarkan item yang memilih sumber Pesan Supplier, satu draft per supplier.</p>
+            <div id="po-preview-body" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+            <div class="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">
+              <span class="shrink-0 mt-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span>Barang dari stok tersedia tidak dibuatkan PO Supplier.</span>
+            </div>
+          </div>
+          </div>
+          <aside class="xl:sticky xl:top-0 bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)]" aria-label="Ringkasan transaksi Sales Order">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-4 pb-2">
+              <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><path d="M8 8h8M8 12h8"/></svg></span>
+              <h2 class="text-[15px] font-semibold text-ink whitespace-nowrap">Ringkasan Transaksi</h2>
+              <span id="po-pay-status" class="ml-auto po-pill is-pesanan_dibuat">-</span>
+            </div>
+            <div class="px-4 pb-4 min-w-0 text-sm">
+              <div id="po-sum-no" class="font-mono text-sm font-semibold text-accentDark tabular-nums mb-1 break-all"></div>
+              <div class="text-xs text-muted flex flex-wrap gap-x-2"><span id="po-sum-plate" class="font-medium">Plat belum diisi</span><span id="po-sum-date" class="tabular-nums"></span></div>
+              <div id="po-sum-customer" class="text-xs text-muted truncate">-</div>
+              <dl class="mt-2">
+                <div class="flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Jumlah Item</dt><dd id="po-sum-count" class="text-ink tabular-nums">0</dd></div>
+                <div class="flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Subtotal</dt><dd id="po-sum-subtotal" class="text-ink font-semibold tabular-nums">Rp 0</dd></div>
+                <div class="flex items-baseline justify-between gap-3 mt-1 px-3 py-2.5 rounded-xl bg-accent/10">
+                  <dt class="text-base font-semibold text-ink">Total</dt>
+                  <dd id="po-total-display" class="text-xl font-bold text-ink tabular-nums">Rp 0</dd>
+                </div>
+              </dl>
+              <div class="mt-3 space-y-2">
               <div class="flex items-center justify-between gap-3">
                 <label for="po-deposit" class="text-muted shrink-0">DP Customer</label>
                 <div id="po-deposit-wrap" class="relative w-40">
@@ -2227,30 +2295,18 @@
                 <p id="po-deposit-min" class="text-[11px] text-muted mt-1.5"></p>
                 <button id="po-deposit-fill" type="button" onclick="poFillMinDeposit()" class="hidden mt-1.5 text-xs text-accent hover:text-accentDark font-medium">Isi DP minimal</button>
               </div>
-              <div class="flex items-center justify-between border-t border-line pt-2">
-                <span class="text-muted">Sisa Tagihan</span>
-                <span id="po-remaining-display" class="font-serif text-base font-semibold text-failed tabular-nums">Rp 0</span>
               </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted">Status Pembayaran</span>
-                <span id="po-pay-status" class="po-pill is-pesanan_dibuat">-</span>
-              </div>
+              <dl class="mt-2 border-t border-line pt-2">
+                <div class="flex items-baseline justify-between gap-3 text-xs"><dt class="text-muted">Sudah Dibayar</dt><dd id="po-sum-paid" class="tabular-nums font-medium text-ink">Rp 0</dd></div>
+                <div class="flex items-baseline justify-between gap-3 pt-1 text-xs"><dt class="text-muted">Sisa Bayar</dt><dd id="po-remaining-display" class="tabular-nums font-semibold text-failed">Rp 0</dd></div>
+                <div class="mt-2" aria-hidden="true">
+                  <div class="h-1.5 rounded-full bg-bg2 overflow-hidden"><div id="po-sum-progress" class="h-full rounded-full bg-done transition-all" style="width:0%"></div></div>
+                  <div id="po-sum-progress-pct" class="text-[11px] text-muted mt-1 text-right tabular-nums">0% terbayar</div>
+                </div>
+              </dl>
+              <p class="mt-2 text-[11px] text-muted">Harga beli supplier tidak memengaruhi total tagihan customer.</p>
             </div>
-            <div class="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">
-              <span class="shrink-0 mt-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span>Harga beli supplier tidak memengaruhi total tagihan customer.</span>
-            </div>
-          </div>
-          <div class="bg-white border border-line rounded-xl p-4 sm:p-5">
-            <div class="flex items-center justify-between gap-2 mb-1">
-              <div class="card-title"><span class="chip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><h3>Preview Otomatis Draft PO</h3></div>
-              <span id="po-preview-count" class="text-xs text-muted"></span>
-            </div>
-            <p class="text-xs text-muted mb-3">Draft PO dibuat berdasarkan item yang memilih sumber Pesan Supplier, satu draft per supplier.</p>
-            <div id="po-preview-body" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
-            <div class="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">
-              <span class="shrink-0 mt-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span>Barang dari stok tersedia tidak dibuatkan PO Supplier.</span>
-            </div>
-          </div>
+          </aside>
         </div>
       </div>
 
@@ -2300,6 +2356,8 @@
           </div>
         </div>
 
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+          <div class="min-w-0">
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <table class="text-sm">
@@ -2329,31 +2387,14 @@
           </table>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 mb-4">
-          <div>
-            <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Daftar Pembayaran</div>
-            <div class="bg-white border border-line rounded-xl overflow-x-auto">
-              <table class="w-full min-w-[420px] text-sm">
-                <thead class="bg-bg2">
-                  <tr>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
-                    <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nominal</th>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Keterangan</th>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">User</th>
-                  </tr>
-                </thead>
-                <tbody id="po-detail-payments"></tbody>
-              </table>
-              <div id="po-detail-payments-empty" class="hidden text-center py-6 text-sm text-muted">Belum ada pembayaran.</div>
-            </div>
+        <!-- Owner 25-10-2026: payments and status history in one tabbed card, like Kasir's "Catatan & Riwayat Perubahan". -->
+        <section class="bg-white border border-line rounded-xl mb-4" aria-labelledby="po-tl-title">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 sm:px-5 pt-4 pb-2">
+            <h2 id="po-tl-title" class="font-serif text-base font-semibold text-ink">Catatan &amp; Riwayat Perubahan</h2>
           </div>
-          <div class="self-end bg-white border border-line rounded-xl p-4 text-sm space-y-2">
-            <div class="flex items-center justify-between"><span class="text-muted">Total Pesanan</span><span id="po-detail-total" class="font-semibold text-ink tabular-nums"></span></div>
-            <div class="flex items-center justify-between"><span class="text-muted">Total Dibayar</span><span id="po-detail-paid" class="font-semibold text-done tabular-nums"></span></div>
-            <div id="po-detail-pending-row" class="hidden flex items-center justify-between"><span class="text-muted">Menunggu konfirmasi</span><span id="po-detail-pending" class="font-semibold text-pending tabular-nums"></span></div>
-            <div class="flex items-center justify-between border-t border-line pt-2"><span class="text-muted">Sisa Tagihan</span><span id="po-detail-remaining" class="font-serif text-base font-semibold text-failed tabular-nums"></span></div>
-          </div>
-        </div>
+          <div id="po-tl-tabs" class="flex flex-wrap gap-x-5 px-4 sm:px-5 border-b border-line" role="tablist"></div>
+          <div id="po-timeline" class="px-4 sm:px-5 py-4 text-sm"></div>
+        </section>
 
         <div id="po-detail-invoice-card" class="hidden bg-white border border-line rounded-xl p-4 mb-4">
           <div class="flex flex-wrap items-center justify-between gap-2">
@@ -2374,20 +2415,36 @@
           <div id="po-detail-allocs" class="mt-2 space-y-1.5"></div>
         </div>
 
-        <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Riwayat Perubahan Status</div>
-        <div class="bg-white border border-line rounded-xl overflow-x-auto">
-          <table class="w-full min-w-[620px] text-sm">
-            <thead class="bg-bg2">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Lama</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Baru</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">User</th>
-              </tr>
-            </thead>
-            <tbody id="po-detail-history"></tbody>
-          </table>
+          </div>
+          <aside class="xl:sticky xl:top-0 bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)]" aria-label="Ringkasan transaksi Sales Order">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-4 pb-2">
+              <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><path d="M8 8h8M8 12h8"/></svg></span>
+              <h2 class="text-[15px] font-semibold text-ink whitespace-nowrap">Ringkasan Transaksi</h2>
+              <span id="po-sum-d-pay" class="ml-auto"></span>
+            </div>
+            <div class="px-4 pb-4 min-w-0 text-sm">
+              <div id="po-sum-d-status" class="flex flex-wrap gap-1.5 mb-2"></div>
+              <div id="po-sum-d-no" class="font-mono text-sm font-semibold text-accentDark tabular-nums mb-1 break-all"></div>
+              <div class="text-xs text-muted flex flex-wrap gap-x-2"><span id="po-sum-d-plate" class="font-medium"></span><span id="po-sum-d-date" class="tabular-nums"></span></div>
+              <div id="po-sum-d-customer" class="text-xs text-muted truncate"></div>
+              <dl class="mt-2">
+                <div class="flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Jumlah Item</dt><dd id="po-sum-d-count" class="text-ink tabular-nums">0</dd></div>
+                <div class="flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Subtotal</dt><dd id="po-sum-d-subtotal" class="text-ink font-semibold tabular-nums">Rp 0</dd></div>
+                <div class="flex items-baseline justify-between gap-3 mt-1 px-3 py-2.5 rounded-xl bg-accent/10">
+                  <dt class="text-base font-semibold text-ink">Total Pesanan</dt>
+                  <dd id="po-detail-total" class="text-xl font-bold text-ink tabular-nums">Rp 0</dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-3 pt-2 text-xs"><dt class="text-muted">Sudah Dibayar</dt><dd id="po-detail-paid" class="tabular-nums font-medium text-ink">Rp 0</dd></div>
+                <div id="po-detail-pending-row" class="hidden flex items-baseline justify-between gap-3 pt-1 text-xs"><dt class="text-muted">Menunggu konfirmasi</dt><dd id="po-detail-pending" class="tabular-nums font-medium text-pending">Rp 0</dd></div>
+                <div class="flex items-baseline justify-between gap-3 pt-1 text-xs"><dt class="text-muted">Sisa Bayar</dt><dd id="po-detail-remaining" class="tabular-nums font-semibold text-failed">Rp 0</dd></div>
+                <div class="mt-2" aria-hidden="true">
+                  <div class="h-1.5 rounded-full bg-bg2 overflow-hidden"><div id="po-sum-d-progress" class="h-full rounded-full bg-done transition-all" style="width:0%"></div></div>
+                  <div id="po-sum-d-progress-pct" class="text-[11px] text-muted mt-1 text-right tabular-nums">0% terbayar</div>
+                </div>
+              </dl>
+              <button id="po-pay-btn" type="button" onclick="poPayClick()" class="mt-3 w-full px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accentDark transition-colors">+ Tambah Pembayaran</button>
+            </div>
+          </aside>
         </div>
       </div>
 
@@ -3208,59 +3265,106 @@
   </div>
 
   <div id="page-dashboard" class="hidden flex-1 overflow-auto p-3 sm:p-4">
-    <div class="max-w-none mx-auto">
+    <div class="max-w-none mx-auto space-y-3">
 
-      <div class="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3 mb-6">
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">SKU Aktif</div>
-          <div id="ov-active-sku-count" class="font-sans text-2xl font-semibold text-ink">0</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2.5">
+        <div class="ov-tile" style="background:#FEF6F5;border-color:#FBE3E0">
+          <span class="ov-ico" style="--c:#DC2626;--b:#FEE2E2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2.5 3.5h2.5l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">SKU Aktif</div><div id="ov-active-sku-count" class="ov-tile-value">0</div><div id="ov-sku-sub" class="ov-tile-sub"></div></div>
         </div>
-        <div class="admin-only border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Nilai Persediaan</div>
-          <div id="ov-total-value" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
+        <div class="ov-tile admin-only" style="background:#F5F8FF;border-color:#DCE6FB">
+          <span class="ov-ico" style="--c:#2563EB;--b:#DBEAFE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">Nilai Persediaan</div><div id="ov-total-value" class="ov-tile-value">Rp 0</div><div class="ov-tile-sub">Nilai modal stok saat ini</div></div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]" title="Uang masuk yang sah bulan ini (termasuk DP), sudah dikurangi refund">Penerimaan Kas Bulan Ini</div>
-          <div id="ov-sales-month-revenue" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
-          <div id="ov-sales-month-count" class="text-xs text-muted mt-0.5">0 nota</div>
+        <div class="ov-tile" style="background:#F4FBF6;border-color:#D5F0DD" title="Uang masuk yang sah bulan ini (termasuk DP), sudah dikurangi refund. Panah membandingkan dengan tanggal yang sama bulan lalu.">
+          <span class="ov-ico" style="--c:#15803D;--b:#DCFCE7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">Penerimaan Kas Bulan Ini</div><div id="ov-sales-month-revenue" class="ov-tile-value">Rp 0</div><div id="ov-sales-month-trend" class="ov-tile-sub"></div></div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]" title="Total nota yang tutup (Lunas + Pengerjaan Selesai) bulan ini">Penjualan Bulan Ini</div>
-          <div id="ov-sales-closed-revenue" class="font-sans text-2xl font-semibold text-ink">Rp 0</div>
-          <div id="ov-sales-closed-count" class="text-xs text-muted mt-0.5">0 nota tutup</div>
+        <div class="ov-tile" style="background:#FFFAEF;border-color:#F8EACB" title="Total nota yang tutup (Lunas + Pengerjaan Selesai) bulan ini. Panah membandingkan dengan tanggal yang sama bulan lalu.">
+          <span class="ov-ico" style="--c:#D97706;--b:#FEF3C7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 20v-6M12 20V8M17 20v-9"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">Penjualan Bulan Ini</div><div id="ov-sales-closed-revenue" class="ov-tile-value">Rp 0</div><div id="ov-sales-closed-trend" class="ov-tile-sub"></div></div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Tagihan Tertunda</div>
-          <div id="ov-pending-count" class="font-sans text-2xl font-semibold text-ink">0</div>
-          <div id="ov-pending-outstanding" class="text-xs text-muted mt-0.5">Rp 0 belum dibayar</div>
+        <div class="ov-tile" style="background:#F9F6FF;border-color:#E7DFFB">
+          <span class="ov-ico" style="--c:#7C3AED;--b:#EDE9FE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8Z"/><path d="M14 2.5V8h5.5M9 13h6M9 17h6"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">Tagihan Tertunda</div><div id="ov-pending-count" class="ov-tile-value">0</div><div id="ov-pending-outstanding" class="ov-tile-sub">Rp 0 belum dibayar</div></div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Sales Order Berjalan</div>
-          <div id="ov-preorder-count" class="font-sans text-2xl font-semibold text-ink">0</div>
-          <div id="ov-preorder-outstanding" class="text-xs text-muted mt-0.5">Rp 0 sisa tagihan</div>
+        <div class="ov-tile" style="background:#FFF6F6;border-color:#FBE1E1">
+          <span class="ov-ico" style="--c:#E11D48;--b:#FFE4E6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8Z"/><path d="M14 2.5V8h5.5M9 13h6M9 17h6"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">Sales Order Berjalan</div><div id="ov-preorder-count" class="ov-tile-value">0</div><div id="ov-preorder-outstanding" class="ov-tile-sub">Rp 0 sisa tagihan</div></div>
         </div>
-        <div class="border border-line rounded-xl bg-bg2 px-4 py-3">
-          <div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 min-h-[26px]">Dokumen Masuk (30 hari)</div>
-          <div id="ov-inbound-count" class="font-sans text-2xl font-semibold text-ink">0</div>
+        <div class="ov-tile" style="background:#FFF8F2;border-color:#F9E6D6">
+          <span class="ov-ico" style="--c:#C2410C;--b:#FFEDD5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span>
+          <div class="min-w-0"><div class="ov-tile-label">Dokumen Masuk (30 Hari)</div><div id="ov-inbound-count" class="ov-tile-value">0</div><div id="ov-inbound-sub" class="ov-tile-sub"></div></div>
         </div>
       </div>
 
-      <!-- Notice Center: what needs attention, worked out from the documents (read-only). Hidden when nothing. -->
-      <div id="notice-center" class="hidden mb-6">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Pusat Notifikasi</h2>
-          <span id="notice-summary" class="text-xs text-muted"></span>
-        </div>
-        <div id="notice-grid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3"></div>
-      </div>
+      <!-- Every card below has a fixed height: a long list scrolls inside its table (header stays put) so the page never moves. -->
+      <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+        <section class="ov-card xl:col-span-12 xl:order-1 min-[1880px]:col-span-7 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#EA580C;--b:#FFEDD5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.3-.4-.4-2.3Z"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Transaksi Kasir Sedang Berjalan</h3><p>Nota yang masih dalam pengerjaan atau belum selesai.</p></div>
+            <div class="flex items-center gap-2 shrink-0"><a href="#/pengerjaan"  class="ov-more">Lihat Semua <span aria-hidden="true">→</span></a><span id="ov-nota-badge" class="ov-badge"></span></div>
+          </div><div class="ov-scroll" style="height:262px"><table><thead><tr><th>No. Nota</th><th>Pelanggan</th><th>Kendaraan</th><th>Teknisi</th><th>Status Pengerjaan</th><th>Status Pembayaran</th><th class="text-right">Sisa Bayar</th><th>Waktu</th><th class="text-right">Aksi</th></tr></thead><tbody id="ov-nota-tbody"></tbody></table>
+            <div id="ov-nota-empty" class="hidden ov-empty">Tidak ada transaksi kasir yang berjalan.</div></div>
+        </section>
+        <section class="ov-card xl:col-span-7 xl:order-2 min-[1880px]:col-span-5 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#E11D48;--b:#FFE4E6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8Z"/><path d="M14 2.5V8h5.5M9 13h6M9 17h6"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Sales Order Berjalan</h3><p>Pesanan customer yang belum selesai.</p></div>
+            <div class="flex items-center gap-2 shrink-0"><a href="#/sales-order"  class="ov-more">Lihat Semua <span aria-hidden="true">→</span></a><span id="ov-so-badge" class="ov-badge"></span></div>
+          </div><div class="ov-scroll" style="height:262px"><table><thead><tr><th>No. SO</th><th>Pelanggan</th><th class="text-right">Total</th><th>Status</th><th>Target</th><th class="text-right">Aksi</th></tr></thead><tbody id="ov-so-tbody"></tbody></table>
+            <div id="ov-so-empty" class="hidden ov-empty">Tidak ada sales order berjalan.</div></div>
+        </section>
 
-      <!-- K-08: work finished, vehicle not yet handed back. Hidden when none. -->
-      <div id="handover-card" class="hidden mb-6">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Selesai, belum diserahkan</h2>
-          <span id="handover-summary" class="text-xs text-muted"></span>
-        </div>
-        <div class="bg-white border border-line rounded-xl overflow-x-auto"><table class="w-full text-sm"><tbody id="handover-tbody"></tbody></table></div>
+        <section class="ov-card xl:col-span-7 xl:order-4 min-[1880px]:col-span-5 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#DC2626;--b:#FEE2E2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2.5 3.5h2.5l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Purchase Order Aktif</h3><p>PO yang belum diterima sepenuhnya.</p></div>
+            <div class="flex items-center gap-2 shrink-0"><a href="#/supplier-po"  class="ov-more">Lihat Semua <span aria-hidden="true">→</span></a><span id="ov-po-badge" class="ov-badge"></span></div>
+          </div><div class="ov-scroll" style="height:214px"><table><thead><tr><th>No. PO</th><th>Supplier</th><th>Tanggal</th><th>Estimasi</th><th>Status</th><th>Progres</th><th class="text-right">Aksi</th></tr></thead><tbody id="ov-po-tbody"></tbody></table>
+            <div id="ov-po-empty" class="hidden ov-empty">Tidak ada purchase order aktif.</div></div>
+        </section>
+        <section id="notice-center" class="ov-card xl:col-span-5 xl:order-3 min-[1880px]:col-span-3 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#DC2626;--b:#FEE2E2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Perlu Perhatian <span id="ov-att-count" class="ov-count">0</span></h3></div>
+            <div class="flex items-center gap-2 shrink-0"></div>
+          </div><div id="ov-att-list" class="ov-scroll ov-att" style="height:215px"></div>
+        </section>
+        <section id="pend-card" class="ov-card xl:col-span-5 xl:order-5 min-[1880px]:col-span-4 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#D97706;--b:#FEF3C7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="9" cy="7" rx="5.5" ry="2.5"/><path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V7M3.5 11v4c0 1.4 2.5 2.5 5.5 2.5 1 0 1.9-.1 2.7-.3"/><circle cx="16.5" cy="15.5" r="4.5"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Pembayaran Menunggu Konfirmasi</h3><p>Transfer / QRIS yang belum dicek masuk rekening.</p></div>
+            <div class="flex items-center gap-2 shrink-0"><span id="pend-summary" class="ov-badge"></span></div>
+          </div><div class="ov-scroll" style="height:214px"><table><thead><tr><th>Waktu</th><th>No. Nota / SO</th><th>Pelanggan</th><th class="text-right">Nominal</th><th class="text-right">Aksi</th></tr></thead><tbody id="ov-pend-tbody"></tbody></table>
+            <div id="ov-pend-empty" class="hidden ov-empty">Tidak ada pembayaran yang menunggu konfirmasi.</div></div>
+        </section>
+
+        <section class="ov-card xl:col-span-5 xl:order-6 min-[1880px]:col-span-5 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#DC2626;--b:#FEE2E2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 2.5 20h19Z"/><path d="M12 10v4.5M12 17.5h.01"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Stok Menipis</h3><p>Barang dengan stok di bawah batas minimum.</p></div>
+            <div class="flex items-center gap-2 shrink-0"><a href="#/master-barang"  class="ov-more">Lihat Semua <span aria-hidden="true">→</span></a></div>
+          </div><div class="ov-scroll" style="height:214px"><table><thead><tr><th>SKU</th><th>Nama Barang</th><th>Merek</th><th class="text-right">Stok</th><th class="text-right">Minimum</th></tr></thead><tbody id="ov-low-stock-tbody"></tbody></table>
+            <div id="ov-low-stock-empty" class="hidden ov-empty">Tidak ada barang dengan stok menipis.</div></div>
+        </section>
+        <section class="ov-card xl:col-span-3 xl:order-7 min-[1880px]:col-span-3 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#15803D;--b:#DCFCE7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Produk Terlaris (30 Hari)</h3></div>
+            <div class="flex items-center gap-2 shrink-0"></div>
+          </div><div class="ov-scroll" style="height:214px"><table><thead><tr><th>No</th><th>Produk</th><th class="text-right">Terjual</th></tr></thead><tbody id="ov-top-selling-tbody"></tbody></table>
+            <div id="ov-top-selling-empty" class="hidden ov-empty">Belum ada penjualan 30 hari terakhir.</div></div>
+        </section>
+        <section class="ov-card xl:col-span-4 xl:order-8 min-[1880px]:col-span-4 min-[1880px]:order-none">
+          <div class="ov-card-head">
+            <span class="ov-ico" style="--c:#2563EB;--b:#DBEAFE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span>
+            <div class="min-w-0 flex-1"><h3>Barang Masuk Terbaru</h3></div>
+            <div class="flex items-center gap-2 shrink-0"></div>
+          </div><div class="ov-scroll" style="height:214px"><table><thead><tr><th>Tanggal</th><th>Produk</th><th class="text-right">Qty</th></tr></thead><tbody id="ov-latest-incoming-tbody"></tbody></table>
+            <div id="ov-latest-incoming-empty" class="hidden ov-empty">Belum ada barang masuk.</div></div>
+        </section>
       </div>
 
       <!-- K-22: special prices staff asked for, waiting for an admin. Admin only; hidden when none. -->
@@ -3277,148 +3381,6 @@
             </tr></thead>
             <tbody id="price-tbody"></tbody>
           </table>
-        </div>
-      </div>
-
-      <!-- K-18: transfer/QRIS payments waiting for someone to see the money in the account. Hidden when none. -->
-      <div id="pend-card" class="hidden mb-6">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Pembayaran menunggu konfirmasi</h2>
-          <span id="pend-summary" class="text-xs text-muted"></span>
-        </div>
-        <div class="bg-white border border-pending/40 rounded-xl overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-bg2"><tr>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dicatat</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nota / SO</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Metode</th>
-              <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nominal</th>
-              <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Oleh</th>
-              <th class="px-3 py-2 border-b border-line"></th>
-            </tr></thead>
-            <tbody id="pend-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Produk Terlaris</h2>
-            <span class="text-xs text-muted">30 hari · unit terjual</span>
-          </div>
-          <div class="bg-white border border-line rounded-xl overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-bg2">
-                <tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Produk</th>
-                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Terjual</th>
-                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Omzet</th>
-                </tr>
-              </thead>
-              <tbody id="ov-top-selling-tbody"></tbody>
-            </table>
-            <div id="ov-top-selling-empty" class="hidden text-center py-8">
-              <p class="text-sm text-muted">Belum ada penjualan 30 hari terakhir.</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Barang Masuk Terbaru</h2>
-            <span class="text-xs text-muted">dari dokumen diposting</span>
-          </div>
-          <div class="bg-white border border-line rounded-xl overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-bg2">
-                <tr>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Produk</th>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
-                  <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty</th>
-                  <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
-                </tr>
-              </thead>
-              <tbody id="ov-latest-incoming-tbody"></tbody>
-            </table>
-            <div id="ov-latest-incoming-empty" class="hidden text-center py-8">
-              <p class="text-sm text-muted">Belum ada barang masuk.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="mb-6">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Stok Menipis</h2>
-          <span id="ov-low-stock-caption" class="text-xs text-muted"></span>
-        </div>
-        <div class="bg-white border border-line rounded-xl overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-bg2">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
-              </tr>
-            </thead>
-            <tbody id="ov-low-stock-tbody"></tbody>
-          </table>
-          <div id="ov-low-stock-empty" class="hidden text-center py-8">
-            <p class="text-sm text-muted">Tidak ada barang dengan stok menipis.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="mb-6">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Sales Order Berjalan</h2>
-          <span id="ov-preorder-caption" class="text-xs text-muted"></span>
-        </div>
-        <div class="bg-white border border-line rounded-xl overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-bg2">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. HP</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status</th>
-              </tr>
-            </thead>
-            <tbody id="ov-preorder-tbody"></tbody>
-          </table>
-          <div id="ov-preorder-empty" class="hidden text-center py-8">
-            <p class="text-sm text-muted">Tidak ada sales order berjalan.</p>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-[11px] font-semibold text-muted uppercase tracking-wider">Tagihan Tertunda Terbaru</h2>
-        </div>
-        <div class="bg-white border border-line rounded-xl overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-bg2">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pelanggan</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dibayar</th>
-                <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
-              </tr>
-            </thead>
-            <tbody id="ov-pending-tbody"></tbody>
-          </table>
-          <div id="ov-pending-empty" class="hidden text-center py-8">
-            <p class="text-sm text-muted">Tidak ada tagihan tertunda.</p>
-          </div>
         </div>
       </div>
 
@@ -5254,6 +5216,7 @@ function renderRoute() {
   if (route === "/dashboard-so") odSoInit();
   if (route === "/dashboard-po") odPoInit();
   if (route === "/cashier") { itemEntryInput()?.focus(); svcLoadSerialSkus(); kasirLoadEmployees(true); }
+  document.getElementById("topbar-clock").style.display = route === "/dashboard" ? "" : "none";
   if (route === "/dashboard") { loadDashboardOverview(); loadPendingPayments(); loadPricePending(); loadNotices(); }
   if (route === "/kas-keluar") koInit();
   if (route === "/cash-receipt") crInit();
@@ -5429,7 +5392,7 @@ const ROUTE_META = {
     icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
   },
   "/dashboard": {
-    subtitle: "Ringkasan persediaan, penjualan dan tagihan.",
+    subtitle: "Ringkasan operasional, pantau pekerjaan dan transaksi toko.",
     icon: '<path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/>',
   },
   "/dashboard-so": {
@@ -6242,6 +6205,7 @@ function addItemRow(prefill) {
   if (prefill && prefill.addedDuringWork) row.dataset.addedDuringWork = "1";
   // A line of a Sales Order is changed on the PO; a returned line is frozen (see applyCashierVoidLock).
   if (prefill && prefill.preorderItemId) row.dataset.poItem = prefill.preorderItemId;
+  if (prefill && prefill.soNote) row.dataset.soNote = prefill.soNote;  // the SO line's note, read-only here
   if (prefill && Number(prefill.returnedQty) > 0) row.dataset.returnedQty = prefill.returnedQty;
   // K-22: the Master Barang price this line is compared with, the cost (admin only) and the state of a special price.
   if (prefill && Number(prefill.listPrice) > 0) row.dataset.listPrice = prefill.listPrice;
@@ -6270,6 +6234,7 @@ function addItemRow(prefill) {
         <input type="text" placeholder="Scan barcode / cari nama, SKU, kode manual…" aria-label="Nama barang" autocomplete="off"
           class="item-name block w-full min-w-0 bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-semibold text-ink placeholder:font-normal placeholder:text-muted/70 placeholder-shown:border-line placeholder-shown:bg-white hover:border-line focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:text-ink disabled:cursor-default transition-colors" />
         <div class="item-meta text-[11px] text-muted leading-snug mt-0.5 px-[9px]"></div>
+        ${prefill && prefill.soNote ? `<div class="px-[9px]">${soItemNoteHtml(prefill.soNote)}</div>` : ""}
       </div>
     </div>
     <div class="item-added hidden"></div>
@@ -8740,6 +8705,7 @@ function tabStateFromReceipt(tabId, r) {
       addedBy: it.added_by || "",
       addedDuringWork: !!it.added_during_work,
       preorderItemId: it.preorder_item_id || null,
+      soNote: it.so_note || "",
       returnedQty: it.returned_qty || 0,
       // K-22: a saved special price keeps its own list price; a normal line is compared with today's master price.
       listPrice: (it.price_state ? it.list_price : it.master_price) || "", costPrice: it.avg_cost_price || "",
@@ -8839,6 +8805,7 @@ function captureFormIntoActiveTab() {
     addedBy: row.dataset.addedBy || "",
     addedDuringWork: !!row.dataset.addedDuringWork,
     preorderItemId: row.dataset.poItem ? Number(row.dataset.poItem) : null,
+    soNote: row.dataset.soNote || "",
     returnedQty: Number(row.dataset.returnedQty) || 0,
     listPrice: row.dataset.listPrice || "", costPrice: row.dataset.costPrice || "", priceState: row.dataset.priceState || "",
     priceReason: row.dataset.priceReason || "", priceApprovedBy: row.dataset.priceApprovedBy || "",
@@ -10582,6 +10549,7 @@ function renderHistoryTable(receipts, total) {
     tr.innerHTML = `
       <td class="pl-4 pr-2 py-3 whitespace-nowrap font-medium text-ink tabular-nums">${esc(r.receipt_no || "—")}${r.service_order_id ? `
         <div><button type="button" onclick="event.stopPropagation(); svcOpen(${Number(r.service_order_id)})" class="text-[11px] font-normal text-accentDark hover:underline">Nota Jasa ${esc(r.service_no || "")}</button></div>` : ""}</td>
+      <td class="px-2 py-3 whitespace-nowrap">${r.preorder_id ? `<button type="button" onclick="event.stopPropagation(); openPreorderFromDashboard('${esc(r.preorder_id)}')" class="font-mono text-xs text-accentDark hover:underline tabular-nums">${esc(r.po_number || "SO")}</button>` : '<span class="text-muted">&mdash;</span>'}</td>
       <td class="px-2 py-3 whitespace-nowrap">
         <button type="button" onclick="event.stopPropagation(); openReceiptFromHistory('${r.id}')"
           class="font-serif font-semibold text-ink hover:text-accentDark rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors">${esc(r.plate_full)}</button>
@@ -13808,29 +13776,25 @@ function odPoPrint() { odPrint("Dashboard Purchase Order — " + (OD_PO_TABS.fin
 // ── Dashboard: Ringkasan (overview) ──────────────────────────────────────────
 // K-18 dashboard card: transfer/QRIS payments still waiting for confirmation (notas and draft Sales Orders).
 async function loadPendingPayments() {
-  const card = document.getElementById("pend-card");
-  if (!card) return;
+  if (!document.getElementById("pend-card")) return;
   let data = { items: [], total: 0, count: 0 };
   try {
     const resp = await fetch("/api/payments/pending");
     if (resp.ok) data = await resp.json();
   } catch (_) {}
-  card.classList.toggle("hidden", data.count === 0);
-  document.getElementById("pend-summary").textContent = `${data.count} pembayaran · ${formatIDR(data.total)}`;
-  document.getElementById("pend-tbody").innerHTML = data.items.map(p => {
-    const source = p.source === "so" ? "so" : "nota";
-    const link = p.source === "so"
-      ? `<a href="#/sales-order" onclick="openPreorderFromDashboard('${esc(p.ref_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(p.ref_no || "SO")}</a>`
-      : `<a href="#/invoices" onclick="openReceiptFromHistory('${esc(p.ref_id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(p.ref_no || "Nota")}</a>`;
-    return `<tr class="border-b border-line last:border-b-0 align-top">
-      <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatReceiptWhen(p.paid_at, true))}</td>
-      <td class="px-3 py-2">${link}${p.source === "so" ? ' <span class="text-[10px] uppercase text-muted">draft SO</span>' : ""}</td>
-      <td class="px-3 py-2 text-ink">${esc(p.customer_name || "—")}<div class="text-xs text-muted">${esc(p.plate_full || "")}</div></td>
-      <td class="px-3 py-2 text-ink">${esc(PAYMENT_METHOD_LABELS[p.method] || p.method)}${p.transfer_account ? `<div class="text-xs text-muted">${esc(p.transfer_account)}</div>` : ""}${p.transfer_sender ? `<div class="text-xs text-muted">dari ${esc(p.transfer_sender)}</div>` : ""}</td>
-      <td class="px-3 py-2 text-right tabular-nums font-medium text-pending whitespace-nowrap">${esc(formatIDR(p.amount))}</td>
-      <td class="px-3 py-2 text-muted">${esc(p.created_by || "—")}</td>
-      <td class="px-3 py-2 text-right whitespace-nowrap">${payActionButtons(source, p.ref_id, { id: p.id, state: "pending" })}</td></tr>`;
-  }).join("");
+  OV.pending = data;
+  document.getElementById("pend-summary").textContent = data.count ? String(data.count) : "";
+  // "Cek" opens the nota / SO, where the money is confirmed or marked failed against its proof.
+  ovFill("pend", data.items, p => {
+    const open = p.source === "so" ? `openPreorderFromDashboard('${esc(p.ref_id)}')` : `openReceiptFromHistory('${esc(p.ref_id)}')`;
+    return `<tr>
+      <td class="text-muted tabular-nums whitespace-nowrap">${esc(formatReceiptWhen(p.paid_at, true))}</td>
+      <td class="font-mono text-[12.5px] whitespace-nowrap">${esc(p.ref_no || (p.source === "so" ? "SO" : "Nota"))}</td>
+      <td class="max-w-[140px] truncate" title="${esc(p.customer_name || "")}">${esc(p.customer_name || "—")}</td>
+      <td class="text-right tabular-nums font-medium whitespace-nowrap">${esc(formatIDR(p.amount))}</td>
+      <td class="text-right"><button type="button" onclick="${open}" class="ov-act text-[#1D4ED8] border-[#BFDBFE] hover:bg-[#EFF6FF]">Cek</button></td></tr>`;
+  });
+  renderOvAttention();
 }
 
 // Notice Center: computed on the server from the documents, so there is nothing to keep in step. A notice only
@@ -13852,31 +13816,51 @@ function noticeOpen(type, id) {
 }
 
 async function loadNotices() {
-  const box = document.getElementById("notice-center");
-  if (!box) return;
+  if (!document.getElementById("notice-center")) return;
   let data = null;
   try { const resp = await fetch("/api/notices"); if (resp.ok) data = await resp.json(); } catch (_) {}
-  const groups = data ? data.groups : [];
-  box.classList.toggle("hidden", groups.length === 0);
-  if (!groups.length) return;
-  document.getElementById("notice-summary").textContent = data.urgent ? `${data.urgent} hal mendesak` : "Tidak ada yang mendesak";
-  document.getElementById("notice-grid").innerHTML = groups.map(g => {
-    const tone = NOTICE_TONE[g.severity] || NOTICE_TONE.info;
-    const rows = g.items.map(it => `<button type="button" onclick="noticeOpen('${esc(it.link.type)}','${esc(it.link.id)}')"
-        class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg2 transition-colors">
-        <div class="text-sm text-ink truncate">${esc(it.title)}</div><div class="text-xs text-muted truncate">${esc(it.sub || "")}</div></button>`).join("");
-    const head = g.link ? `<button type="button" onclick="noticeOpen('${esc(g.link.type)}','')" class="text-left">` : "<div>";
-    const headEnd = g.link ? "</button>" : "</div>";
-    return `<section class="bg-white border ${tone.border} rounded-xl p-3">
-      <div class="flex items-start justify-between gap-2">
-        ${head}<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${tone.dot}" title="${tone.label}"></span><h3 class="font-serif text-sm font-semibold text-ink">${esc(g.title)}</h3></div>
-          <p class="text-[11px] text-muted mt-0.5">${esc(g.hint)}</p>${headEnd}
-        <span class="shrink-0 text-xs font-semibold tabular-nums text-ink bg-bg2 border border-line rounded-full px-2 py-0.5">${g.count}</span>
-      </div>
-      ${rows ? `<div class="mt-2 -mx-1">${rows}</div>` : ""}
-      ${g.more ? `<div class="text-[11px] text-muted mt-1 px-2">+ ${g.more} lainnya</div>` : ""}
-    </section>`;
-  }).join("");
+  OV.notices = data ? data.groups : [];
+  renderOvAttention();
+}
+
+// Perlu Perhatian: one line per thing to act on (notice groups, payments to check, low stock, vehicles not yet
+// handed back). A line with documents behind it opens them in place; the rest jump to their card or module.
+const OV_ATT_TONE = { tinggi: ["#DC2626", "#FEE2E2"], sedang: ["#D97706", "#FEF3C7"], info: ["#2563EB", "#DBEAFE"] };
+function renderOvAttention() {
+  const box = document.getElementById("ov-att-list");
+  if (!box) return;
+  const rows = (OV.notices || []).map(g => ({ key: "n-" + g.key, severity: g.severity, title: `${g.count} ${g.title}`,
+    sub: g.items[0]?.sub || g.hint, items: g.items, more: g.more, link: g.link }));
+  if (OV.pending?.count) rows.push({ key: "pend", severity: "sedang", title: `${OV.pending.count} transaksi menunggu konfirmasi pembayaran`,
+    sub: "Transfer masuk perlu dicek", jump: "pend-card" });
+  if (OV.lowStock?.length) rows.push({ key: "low", severity: "sedang", title: `Stok ${OV.lowStock.length} item sudah menipis`,
+    sub: "Perlu segera dilakukan pemesanan", jump: "ov-low-stock-tbody" });
+  if (OV.handover?.length) rows.push({ key: "hand", severity: "info", title: `${OV.handover.length} kendaraan selesai tetapi belum diserahkan`,
+    sub: "Customer perlu dihubungi", items: OV.handover.map(i => ({ title: `${i.receipt_no || "—"} · ${i.plate_full || ""}`,
+      sub: `${i.customer_name || "—"} · ${i.outstanding > 0 ? "sisa " + formatIDR(i.outstanding) : "Lunas"}`, link: { type: "receipt", id: i.id } })) });
+  const order = { tinggi: 0, sedang: 1, info: 2 };
+  rows.sort((a, b) => order[a.severity] - order[b.severity]);
+  document.getElementById("ov-att-count").textContent = rows.length;
+  OV.att = rows;
+  box.innerHTML = rows.length ? rows.map((r, i) => {
+    const [c, b] = OV_ATT_TONE[r.severity] || OV_ATT_TONE.info;
+    const open = OV.attOpen === r.key && r.items?.length;
+    const items = open ? `<div class="bg-bg px-3 py-1 border-b border-line">${r.items.map(it => `<button type="button" onclick="noticeOpen('${esc(it.link.type)}','${esc(it.link.id)}')"
+        class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white"><div class="text-[12.5px] text-ink truncate">${esc(it.title)}</div><div class="text-[11px] text-muted truncate">${esc(it.sub || "")}</div></button>`).join("")}
+        ${r.more ? `<div class="text-[11px] text-muted px-2 py-1">+ ${r.more} lainnya</div>` : ""}</div>` : "";
+    return `<button type="button" class="ov-att-row" onclick="ovAttClick(${i})" aria-expanded="${open ? "true" : "false"}">
+        <span class="w-7 h-7 rounded-lg grid place-items-center shrink-0" style="background:${b};color:${c}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 16.5h.01"/><circle cx="12" cy="12" r="9"/></svg></span>
+        <span class="min-w-0 flex-1"><span class="block text-[13px] font-medium text-ink truncate">${esc(r.title)}</span><span class="block text-[11.5px] text-muted truncate">${esc(r.sub || "")}</span></span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-muted shrink-0 transition-transform ${open ? "rotate-90" : ""}" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>${items}`;
+  }).join("") : `<div class="ov-empty">Tidak ada yang perlu ditindaklanjuti.</div>`;
+}
+
+function ovAttClick(i) {
+  const r = OV.att[i];
+  if (r.items?.length) { OV.attOpen = OV.attOpen === r.key ? null : r.key; renderOvAttention(); return; }
+  if (r.link) { noticeOpen(r.link.type, ""); return; }
+  if (r.jump) document.getElementById(r.jump)?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // K-22 dashboard card (admin): special prices waiting for approval, newest first.
@@ -13970,153 +13954,152 @@ function apOpenPaymentsFromKas(invoiceId, paymentId) {
   setTimeout(() => apOpenPayments(invoiceId, paymentId), 500);
 }
 
-async function loadDashboardOverview() {
-  const resp = await fetch("/api/inventory/overview");
-  if (!resp.ok) { showToast("Gagal memuat ringkasan persediaan."); return; }
-  const data = await resp.json();
-  renderDashboardOverview(data);
+// Dashboard Ringkasan. /inventory/overview carries the stock and money tiles and the stock tables; /dashboards/overview
+// the open Kasir notas, Sales Orders and Purchase Orders. Every list is sent whole and scrolls inside its card.
+const OV = { notices: null, pending: null, handover: null, lowStock: null, att: [], attOpen: null };
+
+function ovFill(key, rows, rowHtml) {
+  const tbody = document.getElementById(`ov-${key}-tbody`);
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(rowHtml).join("");
+  document.getElementById(`ov-${key}-empty`).classList.toggle("hidden", rows.length > 0);
 }
 
-function renderHandoverCard(list) {
-  document.getElementById("handover-card").classList.toggle("hidden", !list.length);
-  document.getElementById("handover-summary").textContent = `${list.length} kendaraan`;
-  document.getElementById("handover-tbody").innerHTML = list.map(i => `<tr class="border-b border-line last:border-b-0">
-    <td class="px-3 py-2"><a href="#/invoices" onclick="openReceiptFromHistory('${esc(i.id)}'); return false;" class="text-accentDark hover:underline font-mono">${esc(i.receipt_no || "—")}</a></td>
-    <td class="px-3 py-2 text-ink font-medium">${esc(i.plate_full)}</td>
-    <td class="px-3 py-2 text-ink">${esc(i.customer_name || "—")}</td>
-    <td class="px-3 py-2 text-right tabular-nums ${i.outstanding > 0 ? "text-failed" : "text-done"}">${i.outstanding > 0 ? "Sisa " + esc(formatIDR(i.outstanding)) : "Lunas"}</td></tr>`).join("");
+function ovAgo(iso) {
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (isNaN(m)) return "—";
+  if (m < 60) return `${Math.max(m, 0)} mnt`;
+  return m < 1440 ? `${Math.floor(m / 60)} jam` : `${Math.floor(m / 1440)} hari`;
+}
+const ovDate = ymd => ymd ? `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}` : "—";
+
+const OV_PILL = {
+  amber: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]", blue: "bg-[#DBEAFE] text-[#1E40AF] border-[#BFDBFE]",
+  purple: "bg-[#EDE9FE] text-[#5B21B6] border-[#DDD6FE]", green: "bg-[#DCFCE7] text-[#166534] border-[#BBF7D0]",
+  red: "bg-[#FEE2E2] text-[#B91C1C] border-[#FECACA]", grey: "bg-bg2 text-muted border-line",
+};
+const ovPill = (text, tone) => `<span class="ov-pill ${OV_PILL[tone] || OV_PILL.grey}">${esc(text)}</span>`;
+const OV_EYE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OV_DOC = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8Z"/><path d="M14 2.5V8h5.5"/></svg>';
+const ovLihat = onclick => `<button type="button" onclick="${onclick}" class="ov-act text-[#DC2626] border-[#FECACA] hover:bg-[#FEF2F2]">${OV_DOC} Lihat</button>`;
+
+// Month to date against the same days of last month, so the arrow is not just "the month is not over yet".
+function ovTrend(id, now, prev) {
+  const el = document.getElementById(id);
+  if (!prev) { el.textContent = "Belum ada data bulan lalu"; return; }
+  const pct = Math.round((now - prev) / prev * 100);
+  el.innerHTML = `<span class="font-semibold ${pct >= 0 ? "text-[#15803D]" : "text-[#DC2626]"}">${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}%</span> vs bulan lalu`;
+}
+
+async function loadDashboardOverview() {
+  const [inv, ext] = await Promise.all([
+    fetch("/api/inventory/overview").then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch("/api/dashboards/overview").then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+  if (!inv) showToast("Gagal memuat ringkasan persediaan.");
+  else renderDashboardOverview(inv);
+  if (ext) renderDashboardOrders(ext);
 }
 
 function renderDashboardOverview(data) {
-  renderHandoverCard(data.ready_handover || []);
+  OV.handover = data.ready_handover || [];
+  OV.lowStock = data.low_stock_items || [];
   document.getElementById("ov-active-sku-count").textContent = data.active_sku_count;
   document.getElementById("ov-total-value").textContent = formatIDR(data.total_inventory_value);
   document.getElementById("ov-inbound-count").textContent = data.inbound_doc_count_30d;
   document.getElementById("ov-sales-month-revenue").textContent = formatIDR(data.sales_month_revenue);
-  document.getElementById("ov-sales-month-count").textContent = `${data.sales_month_count} nota`;
   document.getElementById("ov-sales-closed-revenue").textContent = formatIDR(data.sales_closed_month_revenue || 0);
-  document.getElementById("ov-sales-closed-count").textContent = `${data.sales_closed_month_count || 0} nota tutup`;
   document.getElementById("ov-pending-count").textContent = data.pending_invoice_count;
   document.getElementById("ov-pending-outstanding").textContent = `${formatIDR(data.pending_invoice_outstanding)} belum dibayar`;
   document.getElementById("ov-preorder-count").textContent = data.preorder_open_count;
   document.getElementById("ov-preorder-outstanding").textContent = `${formatIDR(data.preorder_outstanding)} sisa tagihan`;
-  // Orders with goods already in the shop are the ones someone has to act on today.
-  document.getElementById("ov-preorder-caption").textContent = data.preorder_ready_count > 0
-    ? `${data.preorder_ready_count} pesanan sudah sampai di toko`
-    : "belum termasuk pesanan yang sudah terpasang";
-  document.getElementById("ov-low-stock-caption").textContent = "Stok sudah mencapai batas Stok Minimum barang";
-  renderLowStockTable(data.low_stock_items || []);
-  renderTopSellingTable(data.top_selling || []);
-  renderLatestIncomingTable(data.latest_incoming || []);
-  renderOpenPreordersTable(data.preorders || []);
-  renderPendingInvoicesTable(data.pending_invoices || []);
+  ovFill("low-stock", OV.lowStock, i => `<tr class="hover:bg-bg2/60 cursor-pointer" onclick="goToInventoryRoute('/master-barang', () => viewMasterItem(${Number(i.id)}))">
+    <td class="font-mono text-[12px] whitespace-nowrap">${esc(i.sku)}</td>
+    <td class="max-w-[260px] truncate" title="${esc(i.name)}">${esc(i.name)}</td>
+    <td class="text-muted whitespace-nowrap">${esc(i.brand_name || "")}</td>
+    <td class="text-right tabular-nums font-semibold text-[#DC2626]">${i.stock_qty}</td>
+    <td class="text-right tabular-nums text-[#EA580C]">${i.min_stock}</td></tr>`);
+  ovFill("top-selling", data.top_selling || [], (i, n) => `<tr>
+    <td class="text-muted tabular-nums">${n + 1}</td>
+    <td class="max-w-[220px] truncate" title="${esc(i.product_name)}">${esc(i.product_name)}</td>
+    <td class="text-right tabular-nums font-semibold">${i.units_sold}</td></tr>`);
+  ovFill("latest-incoming", data.latest_incoming || [], i => `<tr>
+    <td class="text-muted tabular-nums whitespace-nowrap">${esc(ovDate(i.received_date))}</td>
+    <td class="max-w-[220px] truncate" title="${esc(i.product_name)} · ${esc(i.supplier_name || "")}">${esc(i.product_name)}</td>
+    <td class="text-right tabular-nums font-semibold">${i.qty_in}</td></tr>`);
+  renderOvAttention();
 }
 
-function renderOpenPreordersTable(items) {
-  const tbody = document.getElementById("ov-preorder-tbody");
-  const emptyEl = document.getElementById("ov-preorder-empty");
-  tbody.innerHTML = "";
-  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
-  emptyEl.classList.add("hidden");
-  for (const item of items) {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
-    tr.innerHTML = `
-      <td class="px-3 py-2 font-medium text-ink">${esc(item.customer_name)}</td>
-      <td class="px-3 py-2 text-muted whitespace-nowrap tabular-nums">${esc(item.customer_phone)}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-muted">${item.item_count}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatIDR(item.total)}</td>
-      <td class="px-3 py-2 text-right tabular-nums ${item.remaining > 0 ? "text-failed font-medium" : "text-muted"}">${formatIDR(item.remaining)}</td>
-      <td class="px-3 py-2">${preorderStatusBadgeHtml(item.status)}</td>
-    `;
-    tr.onclick = () => openPreorderFromDashboard(item.id);
-    tbody.appendChild(tr);
-  }
+// Nota stage: Menunggu Barang (purple), the Dalam Pengerjaan step when one is set (blue), else Dalam Pengerjaan (amber).
+function ovWorkPill(n) {
+  if (n.work_status === "pengerjaan" && WORK_STAGE_LABELS[n.work_stage]) return ovPill(WORK_STAGE_LABELS[n.work_stage], "blue");
+  const tone = { menunggu: "purple", belum: "grey", pengerjaan: "amber", selesai: "green" }[n.work_status];
+  return ovPill(WORK_STATUS_LABELS[n.work_status] || n.work_status, tone);
+}
+function ovPayPill(n) {
+  const key = paymentKey(n.total, n.amount_paid, n.status);
+  return ovPill(PAYMENT_STATUS_LABELS[key] || "—", key === "lunas" ? "green" : "red")
+    + (n.pending_amount > 0 ? ` <span class="ov-pill ${OV_PILL.amber}" title="Menunggu konfirmasi dana masuk ${esc(formatIDR(n.pending_amount))}">Pending</span>` : "");
+}
+const OV_SO_TONE = { menunggu_supplier: "purple", menunggu_po: "purple", dalam_pengiriman: "blue", tiba_sebagian: "amber", siap: "green",
+  dialokasikan: "green", dititipkan: "blue", menunggu_lunas: "red", menunggu_selesai: "amber" };
+function ovPoStatus(p) {
+  if (p.late) return ovPill("Terlambat", "red");
+  if (p.ship_key === "dalam_pengiriman") return ovPill(p.ship_label, "amber");
+  const tone = { menunggu_konfirmasi: "red", dikonfirmasi: "blue", diproses: "blue", diterima_sebagian: "purple" }[p.order_status];
+  return ovPill(p.order_label, tone);
 }
 
-function renderTopSellingTable(items) {
-  const tbody = document.getElementById("ov-top-selling-tbody");
-  const emptyEl = document.getElementById("ov-top-selling-empty");
-  tbody.innerHTML = "";
-  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
-  emptyEl.classList.add("hidden");
-  for (const item of items) {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 transition-colors";
-    tr.innerHTML = `
-      <td class="px-3 py-2 font-serif font-medium text-ink">${esc(item.product_name)}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-ink font-medium">${item.units_sold}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-muted">${formatIDR(item.revenue)}</td>
-    `;
-    tbody.appendChild(tr);
-  }
+function renderDashboardOrders(d) {
+  ovTrend("ov-sales-month-trend", d.cash_month, d.cash_prev);
+  ovTrend("ov-sales-closed-trend", d.sales_month, d.sales_prev);
+  document.getElementById("ov-sku-sub").textContent = `Dari ${d.total_sku.toLocaleString("id-ID")} SKU`;
+  document.getElementById("ov-inbound-sub").textContent = d.po_partial_count ? `${d.po_partial_count} PO belum lengkap` : "Semua PO lengkap";
+  document.getElementById("ov-nota-badge").textContent = `${d.nota_count} transaksi`;
+  document.getElementById("ov-so-badge").textContent = `${d.so_count} pesanan`;
+  document.getElementById("ov-po-badge").textContent = `${d.po_count} PO aktif`;
+  ovFill("nota", d.notas, n => {
+    const car = [n.vehicle_make, n.vehicle_model].filter(Boolean).join(" ");
+    return `<tr>
+      <td><a href="#/invoices" onclick="openReceiptFromHistory('${esc(n.id)}'); return false;" class="font-mono text-[12.5px] font-semibold text-[#DC2626] hover:underline whitespace-nowrap">${esc(n.receipt_no || "—")}</a></td>
+      <td class="font-medium max-w-[130px] truncate" title="${esc(n.customer_name || "")}">${esc(n.customer_name || "—")}</td>
+      <td class="whitespace-nowrap"><div>${esc(n.plate_full || "—")}</div>${car ? `<div class="text-[11px] text-muted">${esc(car)}</div>` : ""}</td>
+      <td class="max-w-[120px] truncate">${n.technicians.length ? esc(n.technicians.join(", ")) : '<span class="text-muted">—</span>'}</td>
+      <td>${ovWorkPill(n)}</td>
+      <td class="whitespace-nowrap">${ovPayPill(n)}</td>
+      <td class="text-right tabular-nums font-semibold whitespace-nowrap ${n.outstanding > 0 ? "text-[#DC2626]" : ""}">${esc(formatIDR(n.outstanding))}</td>
+      <td class="text-muted whitespace-nowrap">${ovAgo(n.created_at)}</td>
+      <td class="text-right"><button type="button" onclick="openReceiptFromHistory('${esc(n.id)}')" class="ov-act text-[#1D4ED8] border-[#BFDBFE] hover:bg-[#EFF6FF]">${OV_EYE} Lihat Nota</button></td></tr>`;
+  });
+  ovFill("so", d.sos, o => `<tr>
+    <td class="font-mono text-[12.5px] whitespace-nowrap">${esc(o.so_number)}</td>
+    <td class="font-medium max-w-[140px] truncate" title="${esc(o.customer_name || "")}">${esc(o.customer_name || "—")}</td>
+    <td class="text-right tabular-nums whitespace-nowrap">${esc(formatIDR(o.total))}</td>
+    <td>${ovPill(o.status_label, OV_SO_TONE[o.status_key])}</td>
+    <td class="tabular-nums whitespace-nowrap ${o.late ? "text-[#DC2626] font-medium" : "text-muted"}">${o.eta ? esc(ovDate(o.eta)) : "-"}</td>
+    <td class="text-right">${ovLihat(`openPreorderFromDashboard('${esc(o.id)}')`)}</td></tr>`);
+  ovFill("po", d.pos, p => {
+    const pct = p.qty_total ? Math.round(Math.min(p.qty_received, p.qty_total) / p.qty_total * 100) : 0;
+    return `<tr>
+      <td class="font-mono text-[12px] whitespace-nowrap">${esc(p.po_number)}</td>
+      <td class="font-medium max-w-[96px] truncate" title="${esc(p.supplier_name || "")}">${esc(p.supplier_name || "—")}</td>
+      <td class="tabular-nums whitespace-nowrap text-muted">${esc(ovDate(p.po_date))}</td>
+      <td class="tabular-nums whitespace-nowrap ${p.late ? "text-[#DC2626] font-medium" : "text-muted"}">${esc(ovDate(p.eta))}</td>
+      <td>${ovPoStatus(p)}</td>
+      <td><div class="flex items-center gap-1.5 min-w-[62px]"><div class="flex-1 h-2 rounded-full bg-bg2 border border-line overflow-hidden"><div class="h-full rounded-full bg-[#22A06B]" style="width:${pct}%"></div></div><span class="text-[11.5px] text-muted tabular-nums">${pct}%</span></div></td>
+      <td class="text-right">${ovLihat(`openSupplierPoFromActivity('${esc(p.id)}')`)}</td></tr>`;
+  });
 }
 
-function renderLatestIncomingTable(items) {
-  const tbody = document.getElementById("ov-latest-incoming-tbody");
-  const emptyEl = document.getElementById("ov-latest-incoming-empty");
-  tbody.innerHTML = "";
-  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
-  emptyEl.classList.add("hidden");
-  for (const item of items) {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 transition-colors";
-    tr.innerHTML = `
-      <td class="px-3 py-2">
-        <div class="font-serif font-medium text-ink">${esc(item.product_name)}</div>
-        <div class="font-mono text-[11px] text-muted">${esc(item.sku)}</div>
-      </td>
-      <td class="px-3 py-2 text-muted">${esc(item.supplier_name)}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-done font-medium">+${item.qty_in}</td>
-      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(item.received_date || "-")}</td>
-    `;
-    tbody.appendChild(tr);
-  }
+// Top bar date and time, shown on the Dashboard only.
+function tickTopbarClock() {
+  const box = document.getElementById("topbar-clock");
+  if (!box || box.style.display === "none") return;
+  const now = new Date();
+  document.getElementById("topbar-clock-date").textContent = now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  document.getElementById("topbar-clock-time").textContent = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/\./g, ":");
 }
-
-function renderPendingInvoicesTable(items) {
-  const tbody = document.getElementById("ov-pending-tbody");
-  const emptyEl = document.getElementById("ov-pending-empty");
-  tbody.innerHTML = "";
-  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
-  emptyEl.classList.add("hidden");
-  for (const item of items) {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 transition-colors";
-    tr.innerHTML = `
-      <td class="px-3 py-2 font-mono text-xs text-ink">${esc(item.plate_full)}</td>
-      <td class="px-3 py-2 text-muted">${esc(item.customer_name || "-")}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-ink">${formatIDR(item.total)}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-muted">${formatIDR(item.amount_paid)}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-failed font-medium">${formatIDR(item.outstanding)}</td>
-      <td class="px-3 py-2 text-muted whitespace-nowrap">${esc((item.created_at || "").slice(0, 10))}</td>
-    `;
-    tbody.appendChild(tr);
-  }
-}
-
-function renderLowStockTable(items) {
-  const tbody = document.getElementById("ov-low-stock-tbody");
-  const emptyEl = document.getElementById("ov-low-stock-empty");
-  tbody.innerHTML = "";
-  if (items.length === 0) { emptyEl.classList.remove("hidden"); return; }
-  emptyEl.classList.add("hidden");
-  for (const item of items) {
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors";
-    tr.innerHTML = `
-      <td class="px-3 py-2 font-mono text-xs text-ink">${esc(item.sku)}</td>
-      <td class="px-3 py-2 font-serif font-medium text-ink">${esc(item.name)}</td>
-      <td class="px-3 py-2 text-muted">${esc(item.brand_name || "")}</td>
-      <td class="px-3 py-2 text-muted">${esc(item.supplier_name || "")}</td>
-      <td class="px-3 py-2 text-right tabular-nums text-failed font-medium">${item.stock_qty}</td>
-    `;
-    // Low-stock rows now live on the Dashboard, so jump to the Inventori route
-    // before switching tabs — otherwise the master panel opens on a hidden page.
-    tr.onclick = () => goToInventoryRoute("/master-barang", () => viewMasterItem(item.id));
-    tbody.appendChild(tr);
-  }
-}
+setInterval(tickTopbarClock, 1000);
 
 // ── Inventory: shared row building blocks ────────────────────────────────────
 // Status pills, icon buttons and glyphs used by Master Barang and by the Brand / Supplier /
@@ -16237,6 +16220,7 @@ let woState = { scope: "aktif", q: "", from: "", to: "", openId: null, sort: nul
 // Owner 25-10-2026: Nota, Kendaraan and Pelanggan sort on a header click (again = reverse); sorted in the browser.
 const WO_SORT = {
   nota: r => r.receipt_no || "",
+  so: r => r.po_number || "\uffff",
   kendaraan: r => ([r.vehicle_make, r.vehicle_model].filter(Boolean).join(" ") || "\uffff") + " " + (r.plate_full || ""),
   pelanggan: r => r.customer_name || "\uffff",
 };
@@ -16280,11 +16264,12 @@ function woRenderList() {
             <input type="date" aria-label="Sampai tanggal" value="${esc(woState.to)}" data-no-uppercase onchange="woSetDates(woState.from, this.value)" class="${GR_IN} !w-auto">
             <button type="button" onclick="woSetDates(toDateInputValue(new Date()), toDateInputValue(new Date()))" class="px-3 py-1.5 rounded-lg text-sm border border-line text-ink bg-white hover:bg-bg2">Hari ini</button>
             ${woState.from || woState.to ? `<button type="button" onclick="woSetDates('', '')" class="px-2 py-1.5 rounded-lg text-sm text-muted hover:text-ink" aria-label="Hapus filter tanggal">&times; Semua tanggal</button>` : ""}</span>
-          <input type="search" placeholder="Cari plat, nomor nota, pelanggan…" value="${esc(woState.q)}" onkeydown="if(event.key==='Enter'){woState.q=this.value; woList()}" class="${GR_IN} sm:max-w-xs ml-auto"></div>`
-        + pgTable([woSortHead("nota", "Nota"), woSortHead("kendaraan", "Kendaraan"), woSortHead("pelanggan", "Pelanggan"), "Teknisi", { label: "Progres" }, "Pengerjaan", "Pembayaran", { label: "Total", right: true }, ""], rows.map(r => {
+          <input type="search" placeholder="Cari plat, nomor nota, no. SO, pelanggan…" value="${esc(woState.q)}" onkeydown="if(event.key==='Enter'){woState.q=this.value; woList()}" class="${GR_IN} sm:max-w-xs ml-auto"></div>`
+        + pgTable([woSortHead("nota", "Nota"), woSortHead("so", "No. SO"), woSortHead("kendaraan", "Kendaraan"), woSortHead("pelanggan", "Pelanggan"), "Teknisi", { label: "Progres" }, "Pengerjaan", "Pembayaran", { label: "Total", right: true }, ""], rows.map(r => {
           const pay = PG_PAY(r), work = PG_WORK[r.work_status] || ["gray", r.work_status];
           return `<tr class="hover:bg-bg2/40 cursor-pointer" onclick="woOpen('${r.id}')">
             <td class="${GR_TD} font-medium text-ink whitespace-nowrap">${esc(r.receipt_no)}<div class="text-[11px] text-muted">${pgDateTime(r.created_at)}</div></td>
+            <td class="${GR_TD} whitespace-nowrap">${r.preorder_id ? `<button type="button" onclick="event.stopPropagation(); openPreorderFromDashboard('${esc(r.preorder_id)}')" class="font-mono text-xs text-accentDark hover:underline">${esc(r.po_number || "SO")}</button>` : '<span class="text-muted">—</span>'}</td>
             <td class="${GR_TD}">${esc([r.vehicle_make, r.vehicle_model].filter(Boolean).join(" ") || "—")}<div class="text-[11px] text-muted">${esc(r.plate_full)}</div></td>
             <td class="${GR_TD}">${esc(r.customer_name || "—")}</td><td class="${GR_TD}">${esc(r.technicians.join(", ") || "—")}</td>
             <td class="${GR_TD} tabular-nums">${r.job_count ? `${r.jobs_done}/${r.job_count} selesai` : '<span class="text-muted">Tanpa pemasangan</span>'}</td>
@@ -16985,9 +16970,9 @@ async function grLoadList() {
          <button type="button" onclick="grOpen(${r.id})" class="${GR_BTN3} !px-3 !py-1.5 text-xs">Lihat</button>`;
     return `<tr class="border-b border-line last:border-b-0 hover:bg-bg2/40">
       <td class="${GR_TD}"><a href="#" onclick="grOpen(${r.id}); return false;" class="font-mono text-xs font-semibold text-accentDark underline underline-offset-2">${esc(r.doc_number)}</a></td>
+      <td class="${GR_TD} text-xs">${(r.pos || []).length ? r.pos.map(po => `<div><a href="#/supplier-po" onclick="openSupplierPoFromActivity('${esc(po.id)}'); return false;" title="Buka detail Purchase Order" class="font-mono text-accentDark hover:underline">${esc(po.po_number)}</a></div>`).join("") : '<span class="text-muted">Tanpa PO</span>'}</td>
       <td class="${GR_TD} text-xs text-ink whitespace-nowrap">${grWhen(r.received_date, r.received_time)}</td>
       <td class="${GR_TD} text-ink">${esc(r.supplier_name)}</td>
-      <td class="${GR_TD} text-xs text-ink">${r.po_numbers.length ? r.po_numbers.map(n => `<div class="font-mono">${esc(n)}</div>`).join("") : '<span class="text-muted">Tanpa PO</span>'}</td>
       <td class="${GR_TD} text-xs text-ink whitespace-nowrap">${r.item_count} jenis · <b>${formatInt(r.qty_total)}</b></td>
       <td class="${GR_TD} text-right tabular-nums font-medium text-ink whitespace-nowrap">${formatIDR(r.total_value)}</td>
       <td class="${GR_TD}">${grStatusPill(r)}</td>
@@ -17011,7 +16996,7 @@ async function grLoadList() {
         ${grField("Rentang Tanggal", `<div class="flex items-center gap-1.5"><input id="gr-f-from" type="date" value="${esc(s.from)}" data-no-uppercase class="${GR_IN}"><span class="text-muted">—</span><input id="gr-f-to" type="date" value="${esc(s.to)}" data-no-uppercase class="${GR_IN}"></div>`)}</div>
       <div class="flex justify-end gap-2 mt-3"><button type="button" onclick="grResetFilter()" class="${GR_BTN3}">Reset Filter</button><button type="button" onclick="grApplyFilter()" class="${GR_BTN}">Terapkan Filter</button></div>`)}
     ${grCard("Daftar Penerimaan Barang", data.rows.length ? `<div class="overflow-x-auto border border-line rounded-lg"><table class="w-full text-sm min-w-[1000px]"><thead class="bg-bg2"><tr>
-        <th class="${GR_TH}">No. GR</th><th class="${GR_TH}">Tanggal</th><th class="${GR_TH}">Supplier</th><th class="${GR_TH}">PO Referensi</th><th class="${GR_TH}">Jenis / Qty</th>
+        <th class="${GR_TH}">No. GR</th><th class="${GR_TH}">PO Referensi</th><th class="${GR_TH}">Tanggal</th><th class="${GR_TH}">Supplier</th><th class="${GR_TH}">Jenis / Qty</th>
         <th class="${GR_THR}">Nilai Aktual</th><th class="${GR_TH}">Status</th><th class="${GR_THR}">Label / Aksi</th></tr></thead><tbody>${rows}</tbody></table></div>`
       : '<div class="text-center text-sm text-muted py-10">Belum ada Goods Receipt.</div>',
       '<span class="text-[11px] text-muted">Semua dokumen GR berasal dari Purchase Order.</span>')}`);
@@ -20544,6 +20529,8 @@ function preorderRowTemplate() {
           <option value="normal">Normal</option><option value="urgent">Urgent</option></select></label>
       <label class="flex items-center gap-1 po-col-status">Status
         <select class="po-row-status ${SO_ROW_SELECT}" onchange="onPoRowStatusChange(this)">${statusOptions}</select></label>
+      <label class="flex items-center gap-1 flex-1 min-w-[240px]">Catatan
+        <input type="text" maxlength="500" placeholder="mis. nomor plat yang dipesan: KT 1234 AB" class="po-row-note flex-1 min-w-0 ${SO_ROW_SELECT}" /></label>
       <span class="po-row-hint"></span>
     </div>
     <div class="po-row-meta hidden text-[11px] text-muted mt-1"></div>
@@ -20637,6 +20624,7 @@ async function refreshPoNumberPreview() {
     const resp = await fetch(`/api/preorders/next-number?po_date=${encodeURIComponent(date)}`);
     if (resp.ok && date === document.getElementById("po-date").value) field.value = (await resp.json()).po_number;
   } catch (_) { /* the number is assigned on save anyway */ }
+  poFormSummary();
 }
 
 function addPreorderRow(prefill) {
@@ -20673,6 +20661,7 @@ function addPreorderRow(prefill) {
     div.querySelector(".po-row-route").value = prefill.ship_route || "";
     div.querySelector(".po-row-priority").value = prefill.priority || "normal";
     div.querySelector(".po-row-eta").value = prefill.eta_date || "";
+    div.querySelector(".po-row-note").value = prefill.note || "";
     setPoRowMeta(div, prefill.sku, prefill.supplier_pos);
     // K-22: a saved special price keeps its own list price; a normal line is compared with today's master price.
     div.dataset.listPrice = String((prefill.price_state ? prefill.list_price : prefill.master_price) || "");
@@ -20850,6 +20839,7 @@ function preorderRowValues() {
       ? (parseInt(rowEl.querySelector(".po-row-supplier").value, 10) || null) : null,
     price_reason: rowEl.dataset.priceReason || null,
     allow_below_cost: !!rowEl.dataset.belowOk,
+    note: rowEl.querySelector(".po-row-note").value.trim() || null,
     rowEl,
   }));
 }
@@ -20939,7 +20929,33 @@ function updatePreorderTotals() {
   remainingEl.textContent = formatIDR(remaining);
   remainingEl.classList.toggle("text-failed", remaining > 0);
   remainingEl.classList.toggle("text-done", remaining === 0 && total > 0);
+  poFormSummary(total, deposit);
 }
+
+// Ringkasan Transaksi rail on the SO form: who and what, from the fields as they are typed.
+function poFormSummary(total = null, deposit = null) {
+  if (total === null) { updatePreorderTotals(); return; }
+  const v = id => (document.getElementById(id)?.value || "").trim();
+  const plate = [v("po-plate-region"), v("po-plate-number"), v("po-plate-suffix")].filter(Boolean).join(" ");
+  const rows = preorderRowValues();
+  document.getElementById("po-sum-no").textContent = v("po-number");
+  document.getElementById("po-sum-plate").textContent = plate || "Plat belum diisi";
+  document.getElementById("po-sum-date").textContent = v("po-date") ? formatPoDate(v("po-date")) : "";
+  document.getElementById("po-sum-customer").textContent = [v("po-customer-name"), v("po-customer-phone")].filter(Boolean).join(" · ") || "-";
+  document.getElementById("po-sum-count").textContent = rows.reduce((n, r) => n + (Number(r.quantity) || 0), 0);
+  document.getElementById("po-sum-subtotal").textContent = formatIDR(total);
+  document.getElementById("po-sum-paid").textContent = formatIDR(deposit);
+  poSumProgress("po-sum", total, deposit);
+}
+
+function poSumProgress(prefix, total, paid) {
+  const pct = total > 0 ? Math.min(100, Math.round(paid / total * 100)) : 0;
+  document.getElementById(`${prefix}-progress`).style.width = pct + "%";
+  document.getElementById(`${prefix}-progress-pct`).textContent = pct + "% terbayar";
+}
+document.getElementById("po-form-panel")?.addEventListener("input", e => {
+  if (["po-customer-name", "po-customer-phone", "po-plate-region", "po-plate-number", "po-plate-suffix", "po-date"].includes(e.target.id)) poFormSummary();
+});
 
 function poDepositMethodChanged() {
   const m = document.getElementById("po-deposit-method").value;
@@ -21291,6 +21307,11 @@ function poInfoRow(label, valueHtml) {
   </tr>`;
 }
 
+// A line's note (e.g. the plate number on an ordered number plate), shown wherever the line is.
+function soItemNoteHtml(note) {
+  return note ? `<div class="mt-1 inline-flex items-start gap-1 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[11px] text-amber-900"><span class="font-semibold">Catatan:</span> ${esc(note)}</div>` : "";
+}
+
 // Under a line's name on the detail page: where it comes from and, for a supplier line, which one.
 function soItemSourceHtml(item) {
   const label = item.source ? SO_SOURCE_LABELS[item.source] : "Otomatis";
@@ -21345,7 +21366,7 @@ function renderPreorderDetail(detail) {
     <tr class="border-b border-line last:border-b-0">
       <td class="px-3 py-2 text-muted tabular-nums">${idx + 1}</td>
       <td class="px-3 py-2 text-ink">${esc(item.product_name)}${item.sku
-        ? ` <span class="ml-1 font-mono text-[11px] text-muted">${esc(item.sku)}</span>` : ""}${soItemSourceHtml(item)}${specialDetailHtml(item, "preorder", detail.id)}</td>
+        ? ` <span class="ml-1 font-mono text-[11px] text-muted">${esc(item.sku)}</span>` : ""}${soItemSourceHtml(item)}${soItemNoteHtml(item.note)}${specialDetailHtml(item, "preorder", detail.id)}</td>
       <td class="px-3 py-2 text-muted">${esc(item.unit || "")}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums">${item.quantity}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(item.unit_price)}</td>
@@ -21362,16 +21383,6 @@ function renderPreorderDetail(detail) {
     </tr>
   `).join("");
 
-  const paymentsBody = document.getElementById("po-detail-payments");
-  paymentsBody.innerHTML = detail.payments.map(p => `
-    <tr class="border-b border-line last:border-b-0">
-      <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatDateTimeSeconds(p.paid_at).slice(0, 16))}</td>
-      <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(p.amount)}</td>
-      <td class="px-3 py-2 text-muted">${esc(p.note || "—")}${p.method ? ` <span class="text-[11px] uppercase text-muted">· ${esc(p.method)}</span>` : ""}${p.state && p.state !== "sah" ? " " + payStateBadge(p) : ""}${p.state === "pending" ? `<div class="mt-1">${payActionButtons(p.receipt_id ? "nota" : "so", p.receipt_id || detail.id, p)}</div>` : ""}${soProofCell(detail, p)}</td>
-      <td class="px-3 py-2 text-muted">${esc(p.created_by || "—")}</td>
-    </tr>
-  `).join("");
-  document.getElementById("po-detail-payments-empty").classList.toggle("hidden", detail.payments.length > 0);
   // With an invoice the money side is the invoice's: it also carries lines the cashier added (jasa) and returns.
   const poTotalEl = document.getElementById("po-detail-total");
   poTotalEl.textContent = formatIDR(detail.receipt_id ? (detail.invoice_total || 0) : detail.total);
@@ -21383,6 +21394,21 @@ function renderPreorderDetail(detail) {
   remainingEl.textContent = formatIDR(detail.remaining);
   remainingEl.classList.toggle("text-failed", detail.remaining > 0);
   remainingEl.classList.toggle("text-done", detail.remaining === 0);
+  // Ringkasan Transaksi rail.
+  const liveItems = detail.items.filter(i => i.status !== "dibatalkan");
+  const pay = detail.payment_status || "belum";
+  document.getElementById("po-sum-d-pay").innerHTML = `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SO_PAY_TINTS[pay] || ""}">${esc(SO_PAY_LABELS[pay] || pay)}</span>`;
+  document.getElementById("po-sum-d-status").innerHTML = `<span class="po-pill is-${esc(detail.status)}">${esc(preorderStatusLabel(detail.status))}</span>`
+    + (detail.receipt_no ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border border-accent/40 text-accentDark tabular-nums">${esc(detail.receipt_no)}</span>` : "");
+  document.getElementById("po-sum-d-no").textContent = detail.po_number;
+  document.getElementById("po-sum-d-plate").textContent = detail.plate_full || "Plat belum diisi";
+  document.getElementById("po-sum-d-date").textContent = poDateTimeLabel(detail);
+  document.getElementById("po-sum-d-customer").textContent = [detail.customer_name, detail.customer_phone].filter(Boolean).join(" · ");
+  document.getElementById("po-sum-d-count").textContent = liveItems.reduce((n, i) => n + i.quantity, 0);
+  document.getElementById("po-sum-d-subtotal").textContent = formatIDR(liveItems.reduce((n, i) => n + i.quantity * i.unit_price, 0));
+  const dueTotal = detail.receipt_id ? (detail.invoice_total || 0) : detail.total;
+  poSumProgress("po-sum-d", dueTotal, detail.deposit);
+  document.getElementById("po-pay-btn").classList.toggle("hidden", !!detail.cancelled_at || (detail.receipt_id && detail.invoice_status === "void") || detail.remaining <= 0);
 
   // Every published PO has its invoice: payments are taken there and it follows the PO's items.
   // The old "Buat Nota Penjualan" card is left only for a PO that has none (draft, or an old PO).
@@ -21411,7 +21437,6 @@ function renderPreorderDetail(detail) {
     document.getElementById("po-inv-followup-btn")?.classList.toggle("hidden", !(isAdmin() && !detail.cancelled_at && !invVoid));
     renderPoInvoiceList(detail);
   }
-  document.getElementById("po-pay-btn")?.classList.toggle("hidden", hasInvoice && (detail.invoice_status === "void" || detail.remaining <= 0));
   const poReady = detail.items.filter(i => !i.receipt_id && ["sampai_di_toko", "dititipkan", "terpasang"].includes(i.status));
   const poOnNota = detail.items.filter(i => i.receipt_id).length;
   document.getElementById("po-convert-btn").disabled = poReady.length === 0;
@@ -21424,18 +21449,54 @@ function renderPreorderDetail(detail) {
       <span class="text-xs text-muted tabular-nums">${esc(formatDateTimeSeconds(a.allocated_at).slice(0, 16))}${a.allocated_by ? " &middot; " + esc(a.allocated_by) : ""}</span>
     </div>`).join("");
 
-  document.getElementById("po-detail-history").innerHTML = detail.history.length === 0
-    ? `<tr><td colspan="5" class="px-3 py-6 text-center text-sm text-muted">Belum ada perubahan status.</td></tr>`
-    : detail.history.map(h => `
-      <tr class="border-b border-line last:border-b-0">
-        <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatDateTimeSeconds(h.changed_at).slice(0, 16))}</td>
-        <td class="px-3 py-2 text-ink">${esc(h.product_name)}</td>
-        <td class="px-3 py-2 text-muted">${h.old_status ? esc(PREORDER_STATUS_DETAIL[h.old_status] || h.old_status) : "—"}</td>
-        <td class="px-3 py-2 text-ink">${esc(PREORDER_STATUS_DETAIL[h.status] || h.status)}</td>
-        <td class="px-3 py-2 text-muted">${esc(h.changed_by || "—")}</td>
-      </tr>
-    `).join("");
+  if (poTlFor !== detail.id) { poTlFor = detail.id; poTlTab = "bayar"; }
+  renderPoTimeline(detail);
   showPreorderPanel("po-detail-panel");
+}
+
+// Catatan & Riwayat Perubahan of a Sales Order: one tab per kind, the same look as Kasir's timeline.
+let poTlTab = "bayar", poTlFor = null;
+function setPoTlTab(key) {
+  poTlTab = key;
+  if (currentPreorder) renderPoTimeline(currentPreorder);
+}
+function renderPoTimeline(detail) {
+  const invoices = (detail.invoices || []).filter(i => i.receipt_no);
+  const groups = [["catatan", "Catatan", detail.notes ? 1 : 0], ["bayar", "Riwayat Pembayaran", detail.payments.length],
+                  ["status", "Riwayat Status", detail.history.length], ["invoice", "Terkait Invoice", invoices.length]];
+  document.getElementById("po-tl-tabs").innerHTML = groups.map(([key, label, n]) => `
+    <button type="button" role="tab" aria-selected="${key === poTlTab}" onclick="setPoTlTab('${key}')"
+      class="py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${key === poTlTab ? "border-accent text-accentDark" : "border-transparent text-muted hover:text-ink"}">${esc(label)} (${n})</button>`).join("");
+  const head = cols => `<thead><tr class="bg-bg2 text-[11px] uppercase tracking-wider text-muted">${cols.map(c => `<th class="text-left font-medium px-3 py-2">${c}</th>`).join("")}</tr></thead>`;
+  const table = (cols, rows) => rows.length
+    ? `<div class="overflow-x-auto"><table class="w-full text-xs">${head(cols)}<tbody>${rows.join("")}</tbody></table></div>`
+    : `<p class="text-xs text-muted">Belum ada data.</p>`;
+  const td = (v, cls = "") => `<td class="px-3 py-2 text-ink align-top ${cls}">${v}</td>`;
+  const when = at => esc(formatDateTimeSeconds(at).slice(0, 16));
+  let html;
+  if (poTlTab === "catatan") {
+    html = detail.notes ? `<div class="rounded-lg bg-bg2 px-3 py-2.5 text-sm text-ink whitespace-pre-line">${esc(detail.notes)}</div>` : `<p class="text-xs text-muted">Belum ada catatan.</p>`;
+  } else if (poTlTab === "bayar") {
+    html = table(["Waktu", "Metode", "Nominal", "Catatan", "Dilakukan Oleh"],
+      [...detail.payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(p => `<tr class="border-b border-line last:border-b-0">`
+        + td(when(p.paid_at), "tabular-nums whitespace-nowrap")
+        + td(esc(PAYMENT_METHOD_LABELS[p.method] || p.method || "—"))
+        + td(esc((p.amount < 0 ? "-" : "") + formatIDR(Math.abs(p.amount))) + (p.state && p.state !== "sah" ? " " + payStateBadge(p) : ""), "tabular-nums font-medium whitespace-nowrap")
+        + td(esc(p.note || "") + (p.receipt_no ? ` <span class="text-muted">· ${esc(p.receipt_no)}</span>` : "")
+          + (p.state === "pending" ? `<div class="mt-1">${payActionButtons(p.receipt_id ? "nota" : "so", p.receipt_id || detail.id, p)}</div>` : "")
+          + (p.state === "gagal" && p.fail_reason ? ` <span class="text-failed">· ${esc(p.fail_reason)}</span>` : "")
+          + soProofCell(detail, p), "min-w-[18rem] whitespace-normal break-words leading-relaxed")
+        + td(esc(p.created_by || "—")) + `</tr>`));
+  } else if (poTlTab === "status") {
+    html = table(["Waktu", "Barang", "Status Lama", "Status Baru", "Dilakukan Oleh"],
+      detail.history.map(h => `<tr class="border-b border-line last:border-b-0">${td(when(h.changed_at), "tabular-nums whitespace-nowrap")}${td(esc(h.product_name))}`
+        + `${td(h.old_status ? esc(PREORDER_STATUS_DETAIL[h.old_status] || h.old_status) : "—", "text-muted")}${td(esc(PREORDER_STATUS_DETAIL[h.status] || h.status))}${td(esc(h.changed_by || "—"))}</tr>`));
+  } else {
+    html = table(["No. Invoice", "Total", "Dibayar", "Status", ""],
+      invoices.map(i => `<tr class="border-b border-line last:border-b-0">${td(`<span class="font-mono">${esc(i.receipt_no)}</span>`)}${td(esc(formatIDR(i.total)), "tabular-nums")}${td(esc(formatIDR(i.amount_paid)), "tabular-nums")}`
+        + `${td(esc(i.status === "done" ? "Lunas" : i.status === "void" ? "Void" : "Belum lunas"))}${td(`<button type="button" class="text-accentDark hover:underline" onclick="openReceiptFromHistory('${esc(i.id)}')">Buka</button>`)}</tr>`));
+  }
+  document.getElementById("po-timeline").innerHTML = html;
 }
 
 // ── K-19: Sales Order with Invoice Lanjutan ──
@@ -23242,7 +23303,7 @@ function poInvoiceHtml(po, settings) {
       </thead>
       <tbody>${lines.map((it, i) => `<tr>
           <td style="${cell}">${i + 1}</td>
-          <td style="${cell}">${esc(it.product_name)}</td>
+          <td style="${cell}">${esc(it.product_name)}${it.note ? `<div style="font-size:8pt;">Catatan: ${esc(it.note)}</div>` : ""}</td>
           <td style="${cell}text-align:center;">${it.quantity}</td>
           <td style="${cell}">${esc(it.unit || "")}</td>
           <td style="${cell}text-align:right;">${money(it.unit_price)}</td>
@@ -29644,11 +29705,6 @@ function qtLetterHtml(s, screen) {
   const P = t => esc(t).replace(/\n/g, "<br>");
   const paras = txt => String(txt || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
     .map((p, i) => i === 0 && /^dengan hormat,?$/i.test(p) ? `<p style="margin:0 0 6px;font-weight:700">${esc(p)}</p>` : `<p style="margin:0 0 8px;text-align:justify">${P(p)}</p>`).join("");
-  const band = formal
-    ? `<div style="position:relative;height:30px;background:#C8302A;margin:${screen ? "-40px -48px 18px" : "0 0 14px"};overflow:hidden"><div style="position:absolute;right:0;top:0;width:36%;height:100%;background:#F3A93B;border-bottom-left-radius:100% 70%"></div></div>`
-    : `<div style="position:absolute;inset:0 0 auto 0;height:${screen ? "96px" : "84px"};background:#FDEEE8;overflow:hidden;z-index:0"><div style="position:absolute;right:0;top:0;width:40%;height:100%;background:#F8BE9F;clip-path:polygon(0 0,100% 0,100% 30%,22% 100%)"></div></div>`;
-  const right = [`${co.city}${co.region ? ", " + co.region : ""}`.toUpperCase(), co.tagline, co.address, [co.phone, co.email].filter(Boolean).join(" · ")].filter(Boolean)
-    .map((t, i) => `<div style="font-size:${i ? 8.5 : 9}px;${i ? "color:#6B7280" : "font-weight:600;letter-spacing:.3px"}">${esc(t)}</div>`).join("");
   const td = "padding:6px 8px;border-bottom:1px solid #EBEDF0;vertical-align:top";
   const rows = s.lines.map((l, i) => `<tr style="background:${i % 2 ? "#F7F7F9" : "#fff"};break-inside:avoid">
       <td style="${td};text-align:center">${l.no}</td><td style="${td}"><div style="font-weight:600">${esc(l.name)}</div>${l.sku ? `<div style="font-size:8.5px;color:#6B7280">${esc(l.sku)}</div>` : ""}</td>
@@ -29663,16 +29719,13 @@ function qtLetterHtml(s, screen) {
     .map(([k, v]) => `<tr><td style="width:62px;font-weight:600;padding:1px 0">${k}</td><td style="padding:1px 6px">:</td><td style="padding:1px 0">${esc(v)}</td></tr>`).join("");
   const bank = s.bank ? `<div style="margin:10px 0 0;padding:8px 10px;border:1px solid #EBEDF0;border-radius:6px;break-inside:avoid"><div style="font-weight:700;margin-bottom:2px">Rekening Resmi Pembayaran</div>
       ${esc(s.bank.bank_name)} · <b>${esc(s.bank.account_number)}</b> · a.n. ${esc(s.bank.account_name)}<div style="font-size:8.5px;color:#6B7280;margin-top:2px">Penyebutan rekening bukan tagihan atau bukti pembayaran.</div></div>` : "";
-  const outer = screen ? "width:794px;min-height:1123px;padding:40px 48px 56px;box-shadow:0 2px 14px rgba(17,24,39,.12);margin:0 auto;"
+  // Owner 25-10-2026: the shop's letterhead (kop surat) is the paper; the letter sits inside its safe area.
+  const outer = screen ? `width:794px;min-height:1123px;padding:${QT_LH.top}mm ${QT_LH.side}mm ${QT_LH.bottom}mm;box-shadow:0 2px 14px rgba(17,24,39,.12);margin:0 auto;background:#F7F7F7 url(${QT_LH.src}) top left / 100% auto no-repeat;`
                        : "width:100%;";
-  return `<div class="qt-letter" style="${outer}position:relative;background:#fff;color:#1F1F1E;font-family:Inter,Arial,Helvetica,sans-serif;font-size:10.5px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden">
-    ${formal ? band : band}
+  // Arial, not the web font: Edge's "Save as PDF" mangles Inter's spacing ("VARI ASI").
+  return `<div class="qt-letter" style="${outer}position:relative;color:#1F1F1E;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden">
     <div style="position:relative;z-index:1">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
-        <div style="display:flex;align-items:center;gap:10px"><img src="assets/logo-nota.png" alt="" style="height:40px;width:auto" onerror="this.style.display='none'">
-          <div><div style="font-size:13px;font-weight:800;letter-spacing:.4px">${esc(co.name)}</div></div></div>
-        <div style="text-align:right">${right}</div></div>
-      <div style="text-align:center;font-size:15px;font-weight:800;letter-spacing:1px;margin:14px 0 6px">SURAT PENAWARAN HARGA</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;letter-spacing:.5px;margin:0 0 6px">SURAT PENAWARAN HARGA</div>
       <div style="height:2px;background:${formal ? "#C8302A" : "#E5643F"};opacity:.55;margin-bottom:12px"></div>
       <table style="font-size:10px;margin-bottom:12px;border-collapse:collapse">${meta}</table>
       <div style="margin-bottom:10px"><div style="font-weight:700">Kepada Yth.</div>${s.recipient.to_lines.map((t, i) => `<div style="${i === 0 ? "font-weight:700" : ""}">${esc(t)}</div>`).join("")}</div>
@@ -29687,25 +29740,34 @@ function qtLetterHtml(s, screen) {
       <div style="break-inside:avoid;margin-top:10px">${paras(s.texts.closing)}
         <div style="margin-top:12px">Hormat kami,</div><div style="font-weight:700;margin-top:2px">${esc(co.name)}</div>
         <div style="height:46px"></div><div style="font-weight:700;text-decoration:underline">${esc(s.signer.name)}</div>${s.signer.title ? `<div style="color:#6B7280">${esc(s.signer.title)}</div>` : ""}</div>
-      ${screen ? `<div style="position:absolute;left:0;right:0;bottom:-36px;display:flex;justify-content:space-between;border-top:1px solid #F0C9BA;padding-top:5px;font-size:8px;color:#6B7280"><span>Surat penawaran harga · Bukan faktur atau bukti pembayaran</span><span>${esc(s.doc_number)}</span></div>` : ""}
     </div></div>`;
 }
-// Prints / saves as PDF from the snapshot. The footer and page numbers ride in the @page margin boxes (A4).
+// Kop surat (frontend/assets/kop-surat.jpg, A4 portrait): the header art takes the top ~top mm and the footer art and car
+// photo the bottom ~bottom mm, so the letter stays inside that frame on screen and on every printed page.
+const QT_LH = { src: "assets/kop-surat.jpg", top: 34, bottom: 46, side: 16 };
+
+// Prints / saves as PDF from the snapshot. The page has no margin so the letterhead can run to the paper's edge; a
+// fixed image repeats it on every page, and the empty thead/tfoot rows (repeated by the browser on each page) keep
+// the text out of the header and footer art.
 function qtPrintSnapshot(s, qid, vid) {
   const rule = document.getElementById("print-page-rule"), before = rule.textContent, title = document.title;
-  rule.textContent = `@page { size: A4 portrait; margin: 14mm 15mm 16mm;
-    @bottom-left { content: "Surat penawaran harga · Bukan faktur atau bukti pembayaran · ${s.doc_number}"; font: 7.5pt Arial, sans-serif; color: #6B7280; }
-    @bottom-right { content: "Halaman " counter(page) " / " counter(pages); font: 7.5pt Arial, sans-serif; color: #6B7280; } }`;
+  rule.textContent = "@page { size: A4 portrait; margin: 0; }";
   const root = document.createElement("div");
   root.id = "cr-print-root";
-  root.innerHTML = qtLetterHtml(s, false);
+  root.innerHTML = `<img src="${QT_LH.src}" alt="" style="position:fixed;left:0;top:0;width:210mm;height:297mm;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    <table style="position:relative;z-index:1;width:100%;border-collapse:collapse">
+      <thead style="display:table-header-group"><tr><td style="height:${QT_LH.top}mm;padding:0"></td></tr></thead>
+      <tfoot style="display:table-footer-group"><tr><td style="height:${QT_LH.bottom}mm;padding:0"></td></tr></tfoot>
+      <tbody><tr><td style="padding:0 ${QT_LH.side}mm">${qtLetterHtml(s, false)}</td></tr></tbody></table>`;
   document.body.appendChild(root);
   document.body.classList.add("printing-cr");
   document.title = `Penawaran ${s.doc_number.replace(/\//g, "-")}`;
   const done = () => { document.body.classList.remove("printing-cr"); root.remove(); rule.textContent = before; document.title = title; window.removeEventListener("afterprint", done); };
   window.addEventListener("afterprint", done);
   if (qid && vid) qtApi(`/api/quotations/${qid}/versions/${vid}/printed`, "POST", {}).catch(() => {});
-  setTimeout(() => window.print(), 50);
+  // Print only once the letterhead has loaded, or the first page comes out blank.
+  const img = root.querySelector("img");
+  (img.decode ? img.decode() : Promise.resolve()).catch(() => {}).then(() => setTimeout(() => window.print(), 50));
 }
 async function qtPrintVersion(vid) {
   const d = QT.cur;

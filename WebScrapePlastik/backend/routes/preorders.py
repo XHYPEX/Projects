@@ -202,6 +202,7 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         cancelled_by=row.get("cancelled_by"),
         cancel_kind=row.get("cancel_kind"),
         cancel_reason=row.get("cancel_reason"),
+        note=row.get("note"),
         list_price=row.get("list_price"), price_state=row.get("price_state"), price_reason=row.get("price_reason"),
         price_requested_by=row.get("price_requested_by"), price_requested_at=row.get("price_requested_at"),
         price_approved_by=row.get("price_approved_by"), price_approved_at=row.get("price_approved_at"),

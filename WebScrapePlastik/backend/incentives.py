@@ -1539,8 +1539,9 @@ def work_orders(scope: str = "aktif", q: str | None = None, date_from: str | Non
     elif scope == "selesai":
         sql += " AND r.work_status='selesai'"
     if q:
-        sql += " AND (r.plate_full LIKE ? OR r.receipt_no LIKE ? OR r.customer_name LIKE ? OR c.first_name LIKE ?)"
-        args += [f"%{q.strip()}%"] * 4
+        sql += (" AND (r.plate_full LIKE ? OR r.receipt_no LIKE ? OR r.customer_name LIKE ? OR c.first_name LIKE ?"
+                " OR r.preorder_id IN (SELECT id FROM preorders WHERE po_number LIKE ?))")
+        args += [f"%{q.strip()}%"] * 5
     sql += " ORDER BY r.created_at DESC LIMIT 200"
     with db._conn() as con:
         recs = [dict(r) for r in con.execute(sql, args).fetchall()]
@@ -1552,7 +1553,8 @@ def work_orders(scope: str = "aktif", q: str | None = None, date_from: str | Non
         jobs = [i for i in items if i["technicians"]]
         if not r.get("has_job"):
             continue  # a walk-in purchase has no work to follow
-        out.append({"id": r["id"], "receipt_no": r["receipt_no"], "plate_full": r["plate_full"], "vehicle_make": r["vehicle_make"],
+        out.append({"id": r["id"], "receipt_no": r["receipt_no"], "preorder_id": r.get("preorder_id"), "po_number": r.get("po_number"),
+                    "plate_full": r["plate_full"], "vehicle_make": r["vehicle_make"],
                     "vehicle_model": r["vehicle_model"], "customer_name": r["customer_full_name"], "total": r["total"],
                     "amount_paid": r["amount_paid"], "status": r["status"], "work_status": r["work_status"], "created_at": r["created_at"],
                     "item_count": len(items), "job_count": len(jobs), "jobs_done": len([j for j in jobs if j["work_status"] == "selesai"]),

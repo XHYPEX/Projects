@@ -592,11 +592,12 @@ def list_receipts(status: str | None = None, supplier_id: int | None = None, q: 
                 FROM inbound_documents d JOIN suppliers s ON s.id = d.supplier_id
                 WHERE {' AND '.join(where)} ORDER BY d.created_at DESC, d.id DESC""", params)]
         for r in rows:
-            r["po_numbers"] = [x[0] for x in con.execute(
-                """SELECT DISTINCT sp.po_number FROM supplier_pos sp WHERE sp.id IN (
+            r["pos"] = [{"id": x[0], "po_number": x[1]} for x in con.execute(
+                """SELECT DISTINCT sp.id, sp.po_number FROM supplier_pos sp WHERE sp.id IN (
                        SELECT supplier_po_id FROM inbound_document_pos WHERE document_id=?
                        UNION SELECT spi.supplier_po_id FROM inbound_items ii JOIN supplier_po_items spi ON spi.id = ii.spo_item_id
                              WHERE ii.document_id=?) ORDER BY sp.po_number""", (r["id"], r["id"]))]
+            r["po_numbers"] = [x["po_number"] for x in r["pos"]]
             if r["status"] == "draft":
                 r["total_value"] = r["value_now"]
         month = db.shop_today().strftime("%Y-%m")

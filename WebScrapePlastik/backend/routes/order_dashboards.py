@@ -20,3 +20,8 @@ async def sales_orders_route():
 @router.get("/purchase-orders")
 async def purchase_orders_route():
     return await _run(od.po_dashboard)
+
+
+@router.get("/overview")
+async def overview_route():
+    return await _run(od.overview)

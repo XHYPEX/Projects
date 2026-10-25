@@ -175,6 +175,7 @@ class ReceiptItemOut(BaseModel):
     unit_price: int
     warranty_date: str | None
     serial_no: str | None = None
+    so_note: str | None = None  # the Sales Order line's note (e.g. the plate to print), read-only on the nota
     sku: str | None = None
     unit: str | None = None  # the linked master item's unit; None for a hand-typed line
     item_type: str = "barang"
@@ -1115,6 +1116,8 @@ class PreorderItemRequest(BaseModel):
     source: str | None = None
     # The supplier to buy from, for source 'supplier'. Empty means it still has to be chosen.
     supplier_id: int | None = None
+    # Free note for this line, e.g. the plate number to put on an ordered number plate.
+    note: str | None = Field(default=None, max_length=500)
 
 
 class PreorderRequest(BaseModel):
@@ -1285,6 +1288,7 @@ class PreorderItemOut(BaseModel):
     avg_cost_price: int = 0
     supplier_pos: list[PreorderItemSupplierPo] = []
     id: int
+    note: str | None = None
     master_item_id: int | None = None
     # SKU of the linked master item, null for a free-text line.
     sku: str | None = None

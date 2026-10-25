@@ -19,6 +19,7 @@ Purchase Order:
 from __future__ import annotations
 
 import sqlite3
+from datetime import timedelta
 
 from backend import database as db
 
@@ -364,3 +365,63 @@ def po_dashboard() -> dict:
         })
     return {"today": today, "month": month, "rows": out, "order_labels": PO_ORDER_LABELS, "ship_labels": PO_SHIP_LABELS,
             "receipt_labels": PO_RECEIPT_LABELS}
+
+
+# ── Dashboard Ringkasan ──────────────────────────────────────────────────────
+
+def _cash_and_sales(con: sqlite3.Connection, start: str, end: str) -> tuple[int, int]:
+    """Penerimaan Kas (Sah payments, no internal moves) and Penjualan (notas closed) between two shop dates."""
+    shift = f"{db.SHOP_UTC_OFFSET_MINUTES:+d} minutes"
+    cash = con.execute(
+        "SELECT COALESCE(SUM(p.amount), 0) AS v FROM receipt_payments p JOIN receipts r ON r.id = p.receipt_id "
+        "WHERE r.status != 'void' AND p.state = 'sah' AND COALESCE(p.kind, '') <> 'pindah' AND date(p.paid_at, ?) BETWEEN ? AND ?",
+        (shift, start, end)).fetchone()["v"]
+    sales = con.execute(
+        "SELECT COALESCE(SUM(total), 0) AS v FROM receipts WHERE status = 'done' AND closed_at IS NOT NULL "
+        "AND date(closed_at, ?) BETWEEN ? AND ?", (shift, start, end)).fetchone()["v"]
+    return cash, sales
+
+
+def overview() -> dict:
+    """What the Ringkasan adds to the Inventori overview: open Kasir notas, open Sales Orders, active Purchase
+    Orders, and this month vs the same days of last month for the trend arrows. Every row is sent: the cards
+    scroll inside a fixed height instead of growing."""
+    today = db.shop_today()
+    month_start = today.replace(day=1)
+    prev_end_month = month_start - timedelta(days=1)
+    prev_start = prev_end_month.replace(day=1)
+    prev_end = prev_start + timedelta(days=min(today.day, prev_end_month.day) - 1)
+    with _conn() as con:
+        total_sku = con.execute("SELECT COUNT(*) AS n FROM master_items WHERE archived_at IS NULL").fetchone()["n"]
+        cash_now, sales_now = _cash_and_sales(con, month_start.isoformat(), today.isoformat())
+        cash_prev, sales_prev = _cash_and_sales(con, prev_start.isoformat(), prev_end.isoformat())
+        # Open = not void, not a draft, and not yet closed (Lunas + Pengerjaan Selesai).
+        notas = [dict(r) for r in con.execute(
+            """SELECT r.id, r.receipt_no, r.customer_name, r.plate_full, r.vehicle_make, r.vehicle_model, r.work_status,
+                      r.work_stage, r.status, r.total, r.amount_paid, r.created_at,
+                      (SELECT COALESCE(SUM(p.amount), 0) FROM receipt_payments p WHERE p.receipt_id = r.id AND p.state = 'pending') AS pending_amount
+               FROM receipts r WHERE r.status <> 'void' AND r.work_status <> 'draft' AND NOT (r.status = 'done' AND r.work_status = 'selesai')
+               ORDER BY r.created_at DESC""")]
+        techs: dict[str, list[str]] = {}
+        for r in con.execute(
+                """SELECT DISTINCT t.receipt_id, e.name FROM receipt_item_technicians t JOIN employees e ON e.id = t.employee_id
+                   ORDER BY t.receipt_id, t.position, t.id"""):
+            techs.setdefault(r["receipt_id"], []).append(r["name"])
+    for n in notas:
+        n["technicians"] = techs.get(n["id"], [])
+        n["outstanding"] = max(n["total"] - n["amount_paid"], 0)
+
+    so_open = [r for r in so_dashboard()["rows"] if r["stage"] != "selesai"]
+    po_active = sorted((r for r in po_dashboard()["rows"] if r["active"]), key=lambda r: r["po_date"] or "", reverse=True)
+    return {
+        "today": today.isoformat(), "total_sku": total_sku,
+        "cash_month": cash_now, "cash_prev": cash_prev, "sales_month": sales_now, "sales_prev": sales_prev,
+        "nota_count": len(notas), "notas": notas,
+        "so_count": len(so_open),
+        "sos": [{k: r[k] for k in ("id", "so_number", "customer_name", "total", "remaining", "status_key", "status_label", "eta", "late")}
+                for r in so_open],
+        "po_count": len(po_active), "po_partial_count": sum(1 for r in po_active if r["receipt_status"] == "sebagian"),
+        "pos": [{k: r[k] for k in ("id", "po_number", "supplier_name", "po_date", "eta", "late", "order_status", "order_label",
+                                   "ship_key", "ship_label", "receipt_status", "qty_total", "qty_received")}
+                for r in po_active],
+    }

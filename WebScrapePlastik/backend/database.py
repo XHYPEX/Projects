@@ -1187,6 +1187,8 @@ def init_db() -> None:
             ("preorder_items", (("source", "TEXT"), ("supplier_id", "INTEGER REFERENCES suppliers(id)"),
                                 ("cancelled_at", "TEXT"), ("cancelled_by", "TEXT"),
                                 ("cancel_kind", "TEXT"), ("cancel_reason", "TEXT"))),
+            # Owner 25-10-2026: a note per line, e.g. the plate number to print on an ordered number plate.
+            ("preorder_items", (("note", "TEXT"),)),
         ):
             have = {row["name"] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
             for col, ddl in cols:
@@ -4019,7 +4021,8 @@ def get_receipt_items(receipt_id: str) -> list[dict]:
         # just with sku=NULL — reopening it for edit keeps that link, or lack of
         # one, as-is.
         rows = con.execute(
-            """SELECT ri.*, mi.sku AS sku, mi.unit AS unit, mi.sell_price AS master_price, mi.avg_cost_price AS avg_cost_price
+            """SELECT ri.*, mi.sku AS sku, mi.unit AS unit, mi.sell_price AS master_price, mi.avg_cost_price AS avg_cost_price,
+                      (SELECT pi.note FROM preorder_items pi WHERE pi.id = ri.preorder_item_id) AS so_note
                FROM receipt_items ri
                LEFT JOIN master_items mi ON mi.id = ri.master_item_id
                WHERE ri.receipt_id=? ORDER BY ri.id ASC""",
@@ -5469,7 +5472,7 @@ def get_inventory_overview() -> dict:
                JOIN master_items mi ON mi.id = ii.master_item_id
                JOIN suppliers s ON s.id = d.supplier_id
                WHERE d.status='posted' AND ii.master_item_id IS NOT NULL
-               ORDER BY ii.received_date DESC, ii.id DESC LIMIT 5"""
+               ORDER BY ii.received_date DESC, ii.id DESC LIMIT 20"""
         ).fetchall()
 
         # Top-selling products (last 30 days, by units sold) from paid receipts.
@@ -5482,7 +5485,7 @@ def get_inventory_overview() -> dict:
                JOIN receipts r ON r.id = ri.receipt_id
                WHERE r.status='done' AND date(r.created_at) >= ?
                GROUP BY ri.product_name
-               ORDER BY units_sold DESC, revenue DESC LIMIT 5""",
+               ORDER BY units_sold DESC, revenue DESC LIMIT 20""",
             (sales_cutoff,),
         ).fetchall()
 
@@ -8050,13 +8053,13 @@ def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict,
            (preorder_id, master_item_id, product_name, unit, quantity, unit_price, status, position, created_at,
             ship_route, priority, eta_date, source, supplier_id,
             list_price, price_state, price_reason, price_requested_by, price_requested_at, price_approved_by,
-            price_approved_at, price_below_cost)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            price_approved_at, price_below_cost, note)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             preorder_id, item.get("master_item_id"), item["product_name"], item.get("unit"),
             item["quantity"], item["unit_price"], item.get("status") or PREORDER_STATUSES[0],
             position, now, *_preorder_item_logistics(item), *_preorder_item_source(con, item),
-            *[price[c] for c in _PRICE_COLS],
+            *[price[c] for c in _PRICE_COLS], (item.get("note") or "").strip() or None,
         ),
     )
     item_id = cur.lastrowid
@@ -9311,11 +9314,12 @@ def update_preorder(
                         """UPDATE preorder_items SET master_item_id=?, product_name=?, unit=?,
                            quantity=?, unit_price=?, status=?, position=?, ship_route=?, priority=?, eta_date=?,
                            source=?, supplier_id=?, list_price=?, price_state=?, price_reason=?, price_requested_by=?,
-                           price_requested_at=?, price_approved_by=?, price_approved_at=?, price_below_cost=? WHERE id=?""",
+                           price_requested_at=?, price_approved_by=?, price_approved_at=?, price_below_cost=?, note=? WHERE id=?""",
                         (
                             item.get("master_item_id"), item["product_name"], item.get("unit"),
                             item["quantity"], item["unit_price"], new_status, position,
-                            *_preorder_item_logistics(item), source, supplier_id, *[price[c] for c in _PRICE_COLS], item_id,
+                            *_preorder_item_logistics(item), source, supplier_id, *[price[c] for c in _PRICE_COLS],
+                            (item.get("note") or "").strip() or None, item_id,
                         ),
                     )
                     if new_status != prev["status"]:

@@ -12263,6 +12263,19 @@ def _sr_returned_from_line(con: sqlite3.Connection, inbound_item_id: int, exclud
            WHERE i.inbound_item_id=? AND r.doc_status<>'dibatalkan' AND r.id<>?""", (inbound_item_id, excluding_return or 0)).fetchone()["n"]
 
 
+def _sr_blocked_reason(con: sqlite3.Connection, inbound_item_id: int, left: int, avail: int, source: str,
+                       excluding_return: int | None) -> str:
+    """Why a Barang Masuk line offers nothing to return, in words the staff can act on."""
+    if left <= 0:
+        nums = [r["return_number"] for r in con.execute(
+            """SELECT DISTINCT r.return_number FROM supplier_return_items i JOIN supplier_returns r ON r.id = i.return_id
+               WHERE i.inbound_item_id=? AND r.doc_status<>'dibatalkan' AND r.id<>? AND i.qty > 0""", (inbound_item_id, excluding_return or 0))]
+        return "Sudah diretur" + (f" di {', '.join(nums)}" if nums else "")
+    if source == "karantina":
+        return "Sudah tidak ada di Stok Karantina"
+    return "Stok di toko 0 (sudah terjual / terpasang)" if avail <= 0 else "Tidak tersedia"
+
+
 def supplier_return_inbound_lines(document_id: int, excluding_return: int | None = None) -> dict:
     """What a posted Barang Masuk offers for a return: its lines (good ones are on the shelf, bad ones in
     quarantine) and the quarantine lots its PO receipt put aside, with received / already returned / returnable."""
@@ -12292,6 +12305,8 @@ def supplier_return_inbound_lines(document_id: int, excluding_return: int | None
                 else:
                     avail = 0
             row["returnable"] = max(min(i["qty_in"] - returned, avail), 0)
+            row["blocked_reason"] = _sr_blocked_reason(con, i["id"], i["qty_in"] - returned, avail, row["source"], excluding_return) \
+                if row["returnable"] == 0 else None
             rows.append(row)
         for lot in con.execute(
                 """SELECT q.*, mi.sku, mi.unit FROM quarantine_lots q LEFT JOIN master_items mi ON mi.id = q.master_item_id

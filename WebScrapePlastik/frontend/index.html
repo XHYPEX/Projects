@@ -1972,60 +1972,86 @@
         </div>
         <div id="pi-item-rows" class="space-y-2 mb-4"></div>
 
-        <div class="border-t border-line pt-4 mb-4">
-          <div class="sm:ml-auto sm:max-w-sm space-y-2 text-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Subtotal</span>
-              <span id="pi-subtotal-display" class="tabular-nums text-ink">Rp 0</span>
+        <!-- Totals: the summary card on the right; how to read the tax and shipping fields beside it. -->
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-4 items-start border-t border-line pt-4 mb-4">
+          <div class="rounded-xl border border-line bg-bg2/60 px-4 py-3 text-xs text-muted leading-relaxed order-2 lg:order-1">
+            <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink mb-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+              Cara mengisi
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <label for="pi-discount" class="text-muted shrink-0">Diskon</label>
-              <div class="relative w-36">
-                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                <input id="pi-discount" type="text" inputmode="numeric" value="0" oninput="updatePurchaseInvoiceTotals()"
-                  class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+            <ul class="space-y-1 list-disc pl-4">
+              <li>Isi semua angka <b class="text-ink font-medium">persis seperti di faktur supplier</b>.</li>
+              <li><b class="text-ink font-medium">PPN (%)</b> dihitung dari subtotal setelah diskon.</li>
+              <li><b class="text-ink font-medium">DPP ongkir 0</b> berarti ongkir tanpa PPN.</li>
+              <li><b class="text-ink font-medium">PPN ongkir</b> dikosongkan = dihitung otomatis (DPP ongkir × tarif PPN).</li>
+            </ul>
+          </div>
+
+          <section class="rounded-xl border border-line bg-white text-sm order-1 lg:order-2" aria-labelledby="pi-sum-title">
+            <h3 id="pi-sum-title" class="px-4 pt-3 pb-2 text-[15px] font-semibold text-ink border-b border-line">Ringkasan Faktur</h3>
+            <div class="px-4 py-2 space-y-0.5">
+              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider pt-1">Barang</div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <span class="text-muted">Subtotal</span>
+                <span id="pi-subtotal-display" class="tabular-nums font-medium text-ink">Rp 0</span>
+              </div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <label for="pi-discount" class="text-muted">Diskon</label>
+                <div class="relative w-40 shrink-0">
+                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
+                  <input id="pi-discount" type="text" inputmode="numeric" value="0" oninput="updatePurchaseInvoiceTotals()"
+                    class="price-input w-full border border-line rounded-lg pl-8 pr-2.5 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors" />
+                </div>
               </div>
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <label for="pi-tax-rate" class="text-muted shrink-0">PPN (%)</label>
-              <input id="pi-tax-rate" type="number" min="0" max="100" step="0.5" value="0" oninput="updatePurchaseInvoiceTotals()"
-                class="w-36 border border-line rounded-lg px-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Nilai PPN</span>
-              <span id="pi-tax-display" class="tabular-nums text-ink">Rp 0</span>
+            <div class="px-4 py-2 space-y-0.5 border-t border-line">
+              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider pt-1">PPN</div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <label for="pi-tax-rate" class="text-muted">Tarif PPN</label>
+                <div class="relative w-40 shrink-0">
+                  <input id="pi-tax-rate" type="number" min="0" max="100" step="0.5" value="0" oninput="updatePurchaseInvoiceTotals()"
+                    class="w-full border border-line rounded-lg pl-2.5 pr-7 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors" />
+                  <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <span class="text-muted">Nilai PPN</span>
+                <span id="pi-tax-display" class="tabular-nums font-medium text-ink">Rp 0</span>
+              </div>
             </div>
             <!-- Shipping exactly as on the supplier's faktur: PPN on it only when the faktur charges it. -->
-            <div class="flex items-center justify-between gap-3">
-              <label for="pi-shipping" class="text-muted shrink-0">Ongkir</label>
-              <div class="relative w-36">
-                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                <input id="pi-shipping" type="text" inputmode="numeric" value="0"  oninput="updatePurchaseInvoiceTotals()"
-                  class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
+            <div class="px-4 py-2 space-y-0.5 border-t border-line">
+              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider pt-1">Ongkir</div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <label for="pi-shipping" class="text-muted">Ongkir</label>
+                <div class="relative w-40 shrink-0">
+                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
+                  <input id="pi-shipping" type="text" inputmode="numeric" value="0" oninput="updatePurchaseInvoiceTotals()"
+                    class="price-input w-full border border-line rounded-lg pl-8 pr-2.5 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors" />
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <label for="pi-shipping-dpp" class="text-muted">DPP ongkir</label>
+                <div class="relative w-40 shrink-0">
+                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
+                  <input id="pi-shipping-dpp" type="text" inputmode="numeric" value="0" oninput="updatePurchaseInvoiceTotals()"
+                    class="price-input w-full border border-line rounded-lg pl-8 pr-2.5 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors" />
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3 py-1">
+                <label for="pi-shipping-tax" class="text-muted">PPN ongkir</label>
+                <div class="relative w-40 shrink-0">
+                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">Rp</span>
+                  <input id="pi-shipping-tax" type="text" inputmode="numeric" value="" placeholder="otomatis" oninput="updatePurchaseInvoiceTotals()"
+                    class="price-input w-full border border-line rounded-lg pl-8 pr-2.5 py-1.5 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors" />
+                </div>
               </div>
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <label for="pi-shipping-dpp" class="text-muted shrink-0">DPP ongkir</label>
-              <div class="relative w-36">
-                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                <input id="pi-shipping-dpp" type="text" inputmode="numeric" value="0"  oninput="updatePurchaseInvoiceTotals()"
-                  class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
-              </div>
+            <div class="mx-3 mb-3 mt-1 flex items-center justify-between gap-3 rounded-lg bg-accent/10 px-3 py-2.5">
+              <span class="font-semibold text-ink">Total Faktur</span>
+              <span id="pi-total-display" class="text-lg font-bold text-ink tabular-nums">Rp 0</span>
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <label for="pi-shipping-tax" class="text-muted shrink-0">PPN ongkir</label>
-              <div class="relative w-36">
-                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                <input id="pi-shipping-tax" type="text" inputmode="numeric" value="" placeholder="otomatis" oninput="updatePurchaseInvoiceTotals()"
-                  class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-60 transition-colors" />
-              </div>
-            </div>
-            <p class="text-[11px] text-muted text-right -mt-1">Ikuti faktur supplier. DPP ongkir 0 = ongkir tanpa PPN; PPN ongkir kosong = DPP × tarif.</p>
-            <div class="flex items-center justify-between border-t border-line pt-2">
-              <span class="font-serif font-semibold text-ink">Total</span>
-              <span id="pi-total-display" class="font-serif text-base font-semibold text-ink tabular-nums">Rp 0</span>
-            </div>
-          </div>
+          </section>
         </div>
 
         <!-- Payment block: posted invoices only — a draft isn't a payable yet. -->
@@ -25768,7 +25794,7 @@ async function rtsLoadBm() {
   // Every Barang Masuk line is shown; lines already on the draft keep their entries.
   for (const b of data.lines) {
     const have = f.lines.find(l => l.key === b.key);
-    if (have) Object.assign(have, { qty_received: b.qty_received, returnable: b.returnable, sku: b.sku, unit: b.unit });
+    if (have) Object.assign(have, { qty_received: b.qty_received, returnable: b.returnable, blocked_reason: b.blocked_reason, sku: b.sku, unit: b.unit });
     else f.lines.push({ ...b, qty: 0, reason_code: "", reason_detail: "", test_result: "", serial_no: "" });
   }
 }
@@ -25923,6 +25949,8 @@ function rtsStepItems() {
   const f = rtsForm, admin = isAdmin();
   if (!f.selected && f.lines.length) f.selected = (f.lines.find(l => l.qty > 0) || f.lines[0]).key;
   const sel = f.lines.find(l => l.key === f.selected);
+  // Owner 25-10-2026: picking a line means returning at least one; start at 1 instead of 0.
+  if (sel && !sel.qtyTouched && !(sel.qty > 0) && (sel.returnable == null || sel.returnable > 0)) sel.qty = 1;
   const reasonPill = l => l.qty > 0 && l.reason_code ? rtsPill("bg-red-50 text-red-700", rtsLabel("reasons", l.reason_code)) : rtsPill(RTS_TINT.gray, l.qty > 0 ? "Pilih alasan" : "Belum Dipilih");
   const proofCount = f.photos.filter(p => p.stage === "bukti").length;
   const table = f.lines.length ? `<div class="border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[760px] text-sm">
@@ -25931,7 +25959,7 @@ function rtsStepItems() {
       <tbody>${f.lines.map(l => `<tr onclick="rtsSelectLine('${l.key}')" class="border-b border-line last:border-b-0 cursor-pointer align-top ${l.key === f.selected ? "bg-accent/5" : "hover:bg-bg2/60"}">
         <td class="px-3 py-2.5"><div class="font-medium text-ink">${esc(l.product_name)}</div><div class="text-[11px] text-muted">${[l.sku ? "SKU: " + l.sku : "", l.source === "karantina" ? "Stok Karantina" : "Stok toko", l.lot_label || "", admin && l.unit_cost ? "Harga beli " + formatIDR(l.unit_cost) : ""].filter(Boolean).map(esc).join(" • ")}</div></td>
         <td class="px-3 py-2.5 text-right tabular-nums">${l.qty_received != null ? `${l.qty_received} ${esc(l.unit || "PCS")}` : "—"}</td>
-        <td class="px-3 py-2.5 text-right tabular-nums">${l.returnable != null ? `${l.returnable} ${esc(l.unit || "PCS")}` : "—"}</td>
+        <td class="px-3 py-2.5 text-right tabular-nums">${l.returnable != null ? `${l.returnable} ${esc(l.unit || "PCS")}` : "—"}${l.returnable === 0 && l.blocked_reason ? `<div class="text-[11px] text-failed font-normal leading-snug max-w-[11rem] ml-auto">${esc(l.blocked_reason)}</div>` : ""}</td>
         <td class="px-3 py-2.5 text-right tabular-nums ${l.qty > 0 ? "font-semibold text-ink" : "text-muted"}">${l.qty} ${esc(l.unit || "PCS")}</td>
         <td class="px-3 py-2.5">${reasonPill(l)}</td>
         <td class="px-3 py-2.5 text-xs text-ink max-w-[14rem]">${esc(l.qty > 0 ? (l.test_result || l.reason_detail || "-") : "-")}</td>
@@ -25940,7 +25968,9 @@ function rtsStepItems() {
   const reasons = Object.entries(rtsMeta.reasons);
   const panel = sel ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       ${rtsField("Nama Barang", rtsRO(esc(sel.product_name)))}
-      ${rtsField("Qty Retur", `<input id="rts-it-qty" type="number" min="0" ${sel.returnable != null ? `max="${sel.returnable}"` : ""} value="${sel.qty}" oninput="rtsItemLive()" class="${RTS_IN} text-right tabular-nums">`, true)}
+      ${rtsField("Qty Retur", sel.returnable === 0
+        ? `<input id="rts-it-qty" type="number" value="0" disabled class="${RTS_IN} text-right tabular-nums bg-bg2"><p class="text-[11px] text-failed mt-1">${esc(sel.blocked_reason || "Tidak ada qty yang bisa diretur.")}</p>`
+        : `<input id="rts-it-qty" type="number" min="1" ${sel.returnable != null ? `max="${sel.returnable}"` : ""} value="${sel.qty}" oninput="rtsItemLive()" class="${RTS_IN} text-right tabular-nums">`, true)}
       ${rtsField("Alasan", `<select id="rts-it-reason" onchange="rtsItemLive()" class="${RTS_IN}"><option value="">Pilih alasan…</option>${reasons.map(([k, l]) => `<option value="${k}" ${sel.reason_code === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`, true)}
       ${rtsField("Kondisi Fisik", sel.source === "karantina" ? rtsRO(esc(rtsLabel("conditions", sel.condition))) : `<select id="rts-it-cond" class="${RTS_IN}">${Object.entries(rtsMeta.conditions).map(([k, l]) => `<option value="${k}" ${sel.condition === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`)}
       <div class="sm:col-span-2">${rtsField(`Hasil Pengujian${sel.reason_code === "tidak_berfungsi" ? ' <span class="text-failed">*</span>' : ""}`, `<input id="rts-it-test" type="text" maxlength="300" value="${esc(sel.test_result)}" placeholder="mis. lampu kanan tidak menyala diuji suplai 12 V" data-no-uppercase class="${RTS_IN}">`)}</div>
@@ -25966,6 +25996,7 @@ function rtsStepItems() {
 }
 function rtsItemLive() {
   const f = rtsForm, l = f.lines.find(x => x.key === f.selected); if (!l) return;
+  l.qtyTouched = true;  // a qty typed by hand (even 0, to leave the line out) is kept
   const q = document.getElementById("rts-it-qty"), max = l.returnable;
   if (max != null && parseInt(q.value) > max) { q.value = max; showToast(`Maksimal ${max}.`); }
 }

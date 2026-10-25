@@ -18696,7 +18696,7 @@ function renderPurchaseInvoiceList() {
   renderPurchaseInvoiceKpis(list);
   const sortTh = (k, label) => `<th class="${OD_TH}"><button type="button" onclick="sortPurchaseInvoices('${k}')" class="inline-flex items-center gap-1 uppercase tracking-wider hover:text-ink ${PI_LIST.sort === k ? "text-ink" : ""}">${label}<span aria-hidden="true">${PI_LIST.sort === k ? (PI_LIST.dir === "asc" ? "↑" : "↓") : "↕"}</span></button></th>`;
   document.getElementById("pi-list-head").innerHTML = sortTh("date", "Tanggal")
-    + ["No. Invoice Supplier", "Supplier", "Referensi Goods Receipt"].map(h => `<th class="${OD_TH}">${h}</th>`).join("")
+    + ["No. Invoice Supplier", "Referensi Goods Receipt", "Supplier"].map(h => `<th class="${OD_TH}">${h}</th>`).join("")
     + `<th class="${OD_TH} !text-right">Nilai Tagihan</th><th class="${OD_TH}">Status Faktur</th><th class="${OD_TH}">Status AP</th>`
     + sortTh("due", "Jatuh Tempo") + `<th class="${OD_TH} text-center">Aksi</th>`;
   const tbody = document.getElementById("pi-list-tbody");
@@ -18722,8 +18722,8 @@ function renderPurchaseInvoiceList() {
     return `<tr class="border-b border-line last:border-b-0 hover:bg-bg/60 cursor-pointer" onclick="openPurchaseInvoice(${inv.id})">
       <td class="${OD_TD} whitespace-nowrap"><div class="text-[13px] text-ink">${ymd(inv.invoice_date)}</div><div class="text-[11px] text-muted">${hm(inv.created_at)}</div></td>
       <td class="${OD_TD}"><a href="#/purchase-invoices" onclick="event.stopPropagation(); openPurchaseInvoice(${inv.id}); return false;" class="font-mono text-[12.5px] font-semibold text-accentDark underline decoration-dotted underline-offset-2 whitespace-nowrap">${inv.supplier_invoice_no ? esc(inv.supplier_invoice_no) : '<span class="font-sans italic">Belum diisi</span>'}</a></td>
-      <td class="${OD_TD} text-[13px] font-medium text-ink uppercase">${esc(inv.supplier_name || inv.supplier_name_snapshot)}</td>
       <td class="${OD_TD}">${gr}</td>
+      <td class="${OD_TD} text-[13px] font-medium text-ink uppercase">${esc(inv.supplier_name || inv.supplier_name_snapshot)}</td>
       <td class="${OD_TD} text-right text-[13px] font-semibold text-ink tabular-nums whitespace-nowrap">${esc(formatIDR(inv.total))}${inv.status === "posted" && inv.outstanding > 0 && inv.amount_paid > 0 ? `<div class="text-[11px] font-normal text-muted">Sisa ${esc(formatIDR(inv.outstanding))}</div>` : ""}</td>
       <td class="${OD_TD}">${odBadge(fTone, fLabel)}</td>
       <td class="${OD_TD}">${apTone ? odBadge(apTone, apLabel) : `<span class="text-muted">—</span>`}</td>
@@ -27244,9 +27244,40 @@ const svcAway = o => ["di_ekspedisi", "dibawa_sales", "di_pabrik", "perjalanan_b
 const svcAtShop = o => ["di_toko", "kembali_di_toko"].includes(o.location);
 const svcClosed = o => ["selesai", "dibatalkan"].includes(o.stage);
 
+// Icons for the service buttons, picked by the action they open (24px grid, drawn with the current text colour).
+const SVC_ICON = {
+  route: '<path d="M6 3v12"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  check: '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>',
+  truck: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  factory: '<path d="M3 21V9l6 4V9l6 4V5h6v16Z"/><path d="M7 17h2M12 17h2M17 17h1"/>',
+  clipboard: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 13h6M9 17h4"/>',
+  thumb: '<path d="M7 11v9H4v-9Z"/><path d="M7 11l4-8a2 2 0 0 1 3 2l-1 4h6a2 2 0 0 1 2 2.3l-1.4 7A2 2 0 0 1 17.6 20H7"/>',
+  back: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6Z"/>',
+  swap: '<path d="M7 7h13l-4-4M17 17H4l4 4"/>',
+  x: '<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>',
+  box: '<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  receipt: '<path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  hand: '<path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/>',
+  print: '<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6Z"/>',
+  note: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+};
+const svcIcon = k => SVC_ICON[k] ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0">${SVC_ICON[k]}</svg>` : "";
+// Print buttons look the same across the app: green with the printer icon (as "Print Nota SO").
+const SVC_PRINT_BTN = "px-4 py-2 bg-[#15803D] text-white rounded-lg text-sm font-medium hover:bg-[#166534] transition-colors";
+const SVC_BTN_ICON = { svcHandlingModal: "route", svcInternalPage: "clipboard", svcOutPage: "truck", svcAtFactoryModal: "factory",
+  svcDiagnosisPage: "clipboard", svcApprovalPage: "thumb", svcStopPage: "x", svcReturnShipModal: "back", svcBackPage: "inbox",
+  svcSwapDecide: "swap", svcSwapPost: "box", svcReplacePage: "swap", svcFeeReceipt: "receipt", svcHandoverPage: "hand",
+  svcPrintPage: "print", svcNoteModal: "note" };
+
 // Every button the current state allows, primary first. The server re-checks each one.
 function svcActions(o) {
-  const a = [], admin = isAdmin(), B = (label, fn, cls = RTS_BTN2) => a.push(`<button type="button" onclick="${fn}" class="${cls}">${label}</button>`);
+  const a = [], admin = isAdmin(), B = (label, fn, cls = RTS_BTN2) => {
+    let icon = SVC_BTN_ICON[fn.split("(")[0]];
+    if (fn === "svcSwapDecide('setuju')") icon = "check";
+    a.push(`<button type="button" onclick="${fn}" class="${cls} inline-flex items-center gap-1.5">${svcIcon(icon)}${label}</button>`);
+  };
   const hasDiag = o.diagnoses.some(d => d.is_current);
   if (o.stage === "diterima") B("Pilih Jalur Penanganan", "svcHandlingModal()", RTS_BTN);
   if (o.stage === "pengecekan") B("Hasil Pemeriksaan Toko", "svcInternalPage()", RTS_BTN);
@@ -27273,7 +27304,7 @@ function svcActions(o) {
   if (o.stage === "siap_diambil" && o.billable > 0 && !o.fee_receipt) B("Buat Nota Jasa", "svcFeeReceipt()", RTS_BTN);
   if (o.stage === "siap_diambil" || (o.stage === "dibatalkan" && svcAtShop(o) && o.location !== "diserahkan")) B("Serah ke Customer", "svcHandoverPage()", o.billable > 0 && !o.fee_receipt ? RTS_BTN2 : RTS_BTN);
   if (admin && !svcClosed(o) && o.stage !== "siap_diambil" && o.result !== "ditolak") B("Tolak / Batalkan", "svcStopPage(false)", RTS_BTND);
-  B("Cetak", "svcPrintPage()", RTS_BTN3);
+  B("Cetak", "svcPrintPage()", SVC_PRINT_BTN);
   B("Catatan", "svcNoteModal()", RTS_BTN3);
   return a.join("");
 }
@@ -27815,7 +27846,7 @@ function svcPrintPage(doc) {
         ${rtsField("Printer", rtsRO("Epson LX-310 · continuous form"))}
         <div id="svc-paper-row" class="hidden">${rtsField("Ukuran kertas", `<select class="${RTS_IN}" onchange="svcSetPaper(this.value)">${Object.entries(SVC_PAPERS).map(([k, p]) => `<option value="${k}" ${svcPaper() === k ? "selected" : ""}>${esc(p.label)}</option>`).join("")}</select>`)}</div>
         <p id="svc-print-copies" class="text-xs text-muted"></p></div>
-      <div class="flex flex-wrap gap-2 mt-4"><button type="button" onclick="svcBackToDetail()" class="${RTS_BTN3}">Kembali ke Detail</button><button type="button" onclick="svcDoPrint()" class="${RTS_BTN}">Cetak</button></div>`)}
+      <div class="flex flex-wrap gap-2 mt-4"><button type="button" onclick="svcBackToDetail()" class="${RTS_BTN3} inline-flex items-center gap-1.5">${svcIcon("back")}Kembali ke Detail</button><button type="button" onclick="svcDoPrint()" class="${SVC_PRINT_BTN} inline-flex items-center gap-1.5">${svcIcon("print")}Cetak</button></div>`)}
   </div>`;
   svcActionPage("Cetak Dokumen Service", "Hitam putih, untuk printer dot matrix", html, null);
   svcPrintPreview();

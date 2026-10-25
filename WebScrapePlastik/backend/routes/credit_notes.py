@@ -1,4 +1,4 @@
-"""Credit Note Supplier: Draft → verifikasi → posting → alokasi / refund → reversal. Admin only (the whole router
+"""Debit Note Supplier: Draft → verifikasi → posting → alokasi / refund → reversal. Admin only (the whole router
 sits behind require_admin); approving a reversal additionally needs the Owner flag, checked in the module."""
 import asyncio
 import base64

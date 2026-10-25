@@ -21,7 +21,7 @@ from backend import database as db
 from backend import credit_notes, invoice_verify
 
 PAY_KIND_LABELS = {"bayar": "Pembayaran", "batal": "Pembatalan pembayaran", "dp": "Uang muka (DP) dari PO",
-                   "dp_batal": "DP dikembalikan ke PO", "kredit": "Nota kredit retur"}
+                   "dp_batal": "DP dikembalikan ke PO", "kredit": "Nota debit retur"}
 PAY_STATUS_LABELS = {"belum": "Belum bayar", "sebagian": "Sebagian", "lunas": "Lunas"}
 
 
@@ -101,7 +101,7 @@ def _month_back(today: date, n: int) -> str:
 
 
 def _balances(con: sqlite3.Connection) -> dict:
-    """DP paid on a PO that has not been carried onto a faktur, and credit notes not yet allocated: kept
+    """DP paid on a PO that has not been carried onto a faktur, and debit notes not yet allocated: kept
     out of the outstanding total on purpose (they are assets of the shop, not part of the faktur)."""
     dp_free = con.execute(
         """SELECT COALESCE(SUM(p.amount - p.applied_amount), 0) AS n FROM spo_payments p
@@ -383,7 +383,7 @@ def credit_view() -> dict:
 
 
 def credit_detail(cn_id: int) -> dict | None:
-    """One credit note: where it came from, how it was allocated, and what it does to the faktur it is applied to."""
+    """One debit note: where it came from, how it was allocated, and what it does to the faktur it is applied to."""
     with _conn() as con:
         c = con.execute(
             """SELECT c.*, s.name AS supplier_name, r.return_number, r.doc_status AS return_status, r.return_date, r.requested_settlement, o.po_number
@@ -434,7 +434,7 @@ def refund_view() -> dict:
                LEFT JOIN supplier_returns r ON r.id = c.return_id LEFT JOIN supplier_refund_claims cl ON cl.id = c.claim_id
                LEFT JOIN supplier_pos o ON o.id = c.supplier_po_id
                WHERE c.kind='refund' ORDER BY c.issued_at DESC, c.id DESC""").fetchall()]
-        # Refund against a posted Credit Note (Kas Masuk KM-SUP-…): money in, never a supplier payment.
+        # Refund against a posted Debit Note (Kas Masuk KM-SUP-…): money in, never a supplier payment.
         received += [dict(r) for r in con.execute(
             """SELECT f.id, f.amount, f.received_at AS issued_at, f.method, f.refund_number || COALESCE(' · ' || f.reference_no, '') AS reference_no,
                       f.status, c.return_id, NULL AS claim_id, s.name AS supplier_name, r.return_number, c.cn_number AS claim_no, NULL AS po_number,
@@ -501,14 +501,14 @@ def reconciliation() -> dict:
                         "ref_type": "po", "ref_id": r["id"], "number": r["po_number"], "supplier": r["supplier_name"], "value": r["free"],
                         "detail": "DP PO belum terpakai", "status": "Perlu keputusan"})
         for c in con.execute("SELECT c.*, s.name AS supplier_name FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id WHERE c.kind='kredit' AND c.status IN ('draft','review','disetujui')").fetchall():
-            out.append({"kind": "kredit", "category": "Credit Note belum diposting", "ref_type": "credit", "ref_id": c["id"], "number": c["cn_number"],
+            out.append({"kind": "kredit", "category": "Debit Note belum diposting", "ref_type": "credit", "ref_id": c["id"], "number": c["cn_number"],
                         "supplier": c["supplier_name"], "value": c["amount"], "detail": credit_notes.CN_STATUS[c["status"]] + "; tagihan belum terpotong",
                         "status": "Perlu posting"})
         for c in con.execute("SELECT c.*, s.name AS supplier_name FROM supplier_credit_notes c JOIN suppliers s ON s.id = c.supplier_id WHERE c.kind='kredit' AND c.status='aktif'").fetchall():
             free = credit_notes.available(con, dict(c))
             owes = any(r["supplier_id"] == c["supplier_id"] and r["outstanding"] > 0 for r in rows)
             if free > 0 and owes:
-                out.append({"kind": "kredit", "category": "Nota kredit belum dialokasikan padahal ada faktur terbuka", "ref_type": "credit", "ref_id": c["id"],
+                out.append({"kind": "kredit", "category": "Nota debit belum dialokasikan padahal ada faktur terbuka", "ref_type": "credit", "ref_id": c["id"],
                             "number": c["cn_number"], "supplier": c["supplier_name"], "value": free, "detail": "Saldo kredit siap dipotongkan", "status": "Perlu alokasi"})
         for cl in con.execute("SELECT cl.*, s.name AS supplier_name, o.po_number FROM supplier_refund_claims cl JOIN suppliers s ON s.id = cl.supplier_id JOIN supplier_pos o ON o.id = cl.supplier_po_id WHERE cl.status='menunggu'").fetchall():
             out.append({"kind": "refund", "category": "Refund / kredit supplier belum diterima", "ref_type": "po", "ref_id": cl["supplier_po_id"], "number": cl["claim_no"],

@@ -85,7 +85,7 @@ async def credits_route():
 async def credit_detail_route(cn_id: int):
     data = await _run(ap.credit_detail, cn_id)
     if data is None:
-        raise HTTPException(status_code=404, detail="Nota kredit tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota debit tidak ditemukan.")
     return data
 
 

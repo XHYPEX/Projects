@@ -962,7 +962,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_quarantine_writeoffs_lot ON quarantine_writeoffs(lot_id);
         """)
         # Retur Supplier: one document per return (RTS-YYYYMMDD-NNN). Goods wait in quarantine, leave stock
-        # once at handover, and the supplier's answer is settled by replacement goods, credit notes
+        # once at handover, and the supplier's answer is settled by replacement goods, debit notes
         # (allocated to Faktur Pembelian) or refunds.
         con.executescript("""
             CREATE TABLE IF NOT EXISTS supplier_returns (
@@ -1082,7 +1082,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_sca_note ON supplier_credit_allocations(credit_note_id);
             -- Piutang Refund / Kredit Supplier: what a supplier owes back after agreeing to cancel a Purchase Order that
             -- was already paid. A claim is only a promise (counts for nothing) until the money arrives (refund) or the
-            -- supplier's credit note is confirmed (kredit); each confirmation writes a supplier_credit_notes row.
+            -- supplier's debit note is confirmed (kredit); each confirmation writes a supplier_credit_notes row.
             CREATE TABLE IF NOT EXISTS supplier_refund_claims (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 claim_no TEXT UNIQUE NOT NULL,
@@ -1148,7 +1148,7 @@ def init_db() -> None:
             ("spo_receipts", (("gr_number", "TEXT"), ("officer", "TEXT"))),
             ("spo_receipt_lines", (("condition", "TEXT NOT NULL DEFAULT 'baik'"), ("location", "TEXT"), ("package_id", "INTEGER"))),
             ("spo_payments", (("reference_no", "TEXT"), ("bank_account", "TEXT"))),
-            # A credit note / refund that came from a cancelled Purchase Order (not a Retur Supplier) names the PO and the claim.
+            # A debit note / refund that came from a cancelled Purchase Order (not a Retur Supplier) names the PO and the claim.
             ("supplier_credit_notes", (("supplier_po_id", "TEXT"), ("claim_id", "INTEGER"))),
             # K-19: kind='pindah' marks the paired rows of a DP moved between two invoices of one Sales Order
             # (they net to zero and are left out of sales figures).
@@ -2098,7 +2098,7 @@ def get_notices(is_admin: bool = False) -> dict:
                     debt_over.append(row)
                 else:
                     debt_soon.append(row)
-            add("refund_claims", "sedang", "Refund / Kredit Supplier belum diterima", "Uang muka PO yang dibatalkan, menunggu uang masuk atau nota kredit supplier.", [
+            add("refund_claims", "sedang", "Refund / Kredit Supplier belum diterima", "Uang muka PO yang dibatalkan, menunggu uang masuk atau nota debit supplier.", [
                 {"title": f"{r['claim_no']} · {r['supplier_name']}", "link": {"type": "supplier_po", "id": r["supplier_po_id"]},
                  "sub": f"{'Refund' if r['kind'] == 'refund' else 'Kredit'} sisa Rp {r['amount'] - r['settled_amount']:,}".replace(",", ".")
                         + f" · {r['po_number']} · {_days_between(r['created_at'], today)} hari lalu"}
@@ -7189,7 +7189,7 @@ def delete_purchase_invoice(invoice_id: int) -> None:
 
 
 PURCHASE_PAYMENT_KINDS = {"bayar": "Pembayaran", "batal": "Pembatalan pembayaran", "dp": "Uang muka (DP) dari PO",
-                          "dp_batal": "DP dikembalikan ke PO", "kredit": "Nota kredit retur"}
+                          "dp_batal": "DP dikembalikan ke PO", "kredit": "Nota debit retur"}
 
 
 def _pi_payment_row(con: sqlite3.Connection, invoice_id: int, amount: int, kind: str, by: str | None, *,
@@ -7448,7 +7448,7 @@ def po_billable_lines(con: sqlite3.Connection, supplier_po_id: str) -> list[dict
                              AND sri.settlement IS NULL) AS returned
                    FROM inbound_items ii JOIN inbound_documents d ON d.id = ii.document_id
                    WHERE ii.spo_item_id=? AND d.status='posted' ORDER BY ii.id""", (i["id"],)):
-            # Goods sent back from Barang Masuk before the faktur was posted are not billed (no Credit Note needed).
+            # Goods sent back from Barang Masuk before the faktur was posted are not billed (no Debit Note needed).
             by_price[r["cost_price"]] = by_price.get(r["cost_price"], 0) + r["qty_in"] - r["returned"]
             if not r["is_over"]:
                 counted += r["qty_in"]
@@ -11541,7 +11541,7 @@ def _spo_make_refund_claim(con: sqlite3.Connection, supplier_po_id: str, kind: s
                     (no, po["supplier_id"], supplier_po_id, kind, due, by, _now()))
     _spo_event(con, supplier_po_id, "refund_claim",
                (f"{'Piutang Refund Supplier' if kind == 'refund' else 'Kredit Supplier'} {no} Rp {due:,}: uang muka yang sudah dibayar melebihi tagihan setelah pembatalan. "
-                "Belum dianggap diterima sampai uang benar-benar masuk / nota kredit dikonfirmasi.").replace(",", "."), by)
+                "Belum dianggap diterima sampai uang benar-benar masuk / nota debit dikonfirmasi.").replace(",", "."), by)
     return due
 
 
@@ -11641,8 +11641,8 @@ def list_refund_claims(supplier_po_id: str | None = None, status: str | None = N
 
 
 def settle_refund_claim(claim_id: int, data: dict, user: dict) -> dict:
-    """Admin: the refund money really arrived (kind refund: amount, method, reference) or the supplier's credit note is
-    confirmed (kind kredit: the supplier's credit note number). Only then does the claim count."""
+    """Admin: the refund money really arrived (kind refund: amount, method, reference) or the supplier's debit note is
+    confirmed (kind kredit: the supplier's debit note number). Only then does the claim count."""
     _sr_require_admin(user, "mencatat refund / kredit supplier")
     by = user.get("username")
     with _conn() as con:
@@ -11667,12 +11667,12 @@ def settle_refund_claim(claim_id: int, data: dict, user: dict) -> dict:
             if not _sr_text(data.get("reference_no")):
                 raise ValueError("Isi nomor referensi / bukti uang masuk.")
         elif not _sr_text(data.get("supplier_cn_no")):
-            raise ValueError("Isi nomor nota kredit dari supplier.")
+            raise ValueError("Isi nomor nota debit dari supplier.")
         con.execute(
             """INSERT INTO supplier_credit_notes (cn_number, kind, supplier_id, return_id, amount, supplier_cn_no, issued_at, method,
                    reference_no, note, created_by, created_at, supplier_po_id, claim_id, subtotal, posted_by, posted_at, source, updated_at)
                VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pembatalan_po', ?)""",
-            (_sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number") if cl["kind"] == "kredit" else None, cl["kind"], cl["supplier_id"],
+            (_sr_number(con, "DN-SUP", "supplier_credit_notes", "cn_number") if cl["kind"] == "kredit" else None, cl["kind"], cl["supplier_id"],
              amount, _sr_text(data.get("supplier_cn_no")), issued, data.get("method") if cl["kind"] == "refund" else None,
              _sr_text(data.get("reference_no")), _sr_text(data.get("note")), by, _now(), cl["supplier_po_id"], claim_id, amount, by, _now(), _now()))
         settled = cl["settled_amount"] + amount
@@ -11682,7 +11682,7 @@ def settle_refund_claim(claim_id: int, data: dict, user: dict) -> dict:
                      by if done else None, _now() if done else None, claim_id))
         _spo_event(con, cl["supplier_po_id"], "refund_claim",
                    (f"Refund diterima Rp {amount:,} ({data.get('method')}, ref {_sr_text(data.get('reference_no'))})" if cl["kind"] == "refund"
-                    else f"Nota kredit supplier {_sr_text(data.get('supplier_cn_no'))} Rp {amount:,} dikonfirmasi; saldo kredit bisa dipakai").replace(",", ".")
+                    else f"Nota debit supplier {_sr_text(data.get('supplier_cn_no'))} Rp {amount:,} dikonfirmasi; saldo kredit bisa dipakai").replace(",", ".")
                    + f" — klaim {cl['claim_no']}" + ("" if done else f", sisa Rp {left - amount:,}".replace(",", ".")), by)
     return next(c for c in list_refund_claims() if c["id"] == claim_id)
 
@@ -12083,10 +12083,10 @@ def get_receipt_preorders(receipt_id: str) -> list[dict]:
 # sit in quarantine from approval; physical stock goes down exactly once, at handover (courier with a
 # waybill, or the supplier's salesman signing the Bukti Serah Terima). The supplier's answer is per
 # item; settling it never edits a faktur: replacements come in as Barang Masuk at the original cost,
-# credit notes are allocated onto Faktur Pembelian, refunds are recorded as money received.
+# debit notes are allocated onto Faktur Pembelian, refunds are recorded as money received.
 
 SR_TYPES = {"bermasalah": "Barang bermasalah", "garansi": "Klaim garansi", "salah_kirim": "Kelebihan / salah kirim"}
-SR_SETTLEMENTS = {"ganti": "Ganti barang", "kredit": "Nota kredit (potong tagihan)", "refund": "Refund uang"}
+SR_SETTLEMENTS = {"ganti": "Ganti barang", "kredit": "Nota debit (potong tagihan)", "refund": "Refund uang"}
 SR_METHODS = {"ekspedisi": "Dikirim lewat ekspedisi", "sales": "Diambil sales supplier"}
 SR_COST_BEARERS = {"supplier": "Supplier", "toko": "Toko", "khusus": "Kesepakatan khusus"}
 SR_REASONS = {
@@ -12177,7 +12177,7 @@ def _sr_value(qty: int, unit_cost: int, rate: float) -> int:
 def _sr_money(con: sqlite3.Connection, ret: dict, items: list[dict]) -> dict:
     """Goods value (purchase price), the money part the supplier approved (approved qty settled by credit
     or refund incl. the faktur's PPN, plus the shipping claim), and how much of it is settled by posted credit
-    notes / refunds. A Credit Note still in Draft / verification settles nothing yet (credit_pending); what the
+    notes / refunds. A Debit Note still in Draft / verification settles nothing yet (credit_pending); what the
     shop gave up on a posted note (waived) is not claimed again."""
     goods = sum(i["qty"] * i["unit_cost"] for i in items)
     rate = _sr_rate(con, ret)
@@ -12340,7 +12340,7 @@ def _sr_clean_header(data: dict) -> dict:
     if h.get("return_type") and h["return_type"] not in SR_TYPES:
         raise ValueError("Jenis retur tidak dikenal.")
     if h.get("requested_settlement") and h["requested_settlement"] not in SR_SETTLEMENTS:
-        raise ValueError("Penyelesaian yang diminta harus Ganti, Nota Kredit, atau Refund.")
+        raise ValueError("Penyelesaian yang diminta harus Ganti, Nota Debit, atau Refund.")
     if h.get("method") and h["method"] not in SR_METHODS:
         raise ValueError("Metode pengembalian harus Ekspedisi atau Diambil Sales.")
     if h.get("cost_bearer") and h["cost_bearer"] not in SR_COST_BEARERS:
@@ -12567,6 +12567,41 @@ def return_supplier_return_to_draft(return_id: int, note: str, user: dict) -> di
     return get_supplier_return(return_id)
 
 
+# A draft nobody has acted on yet: only created, edited or given photos. Anything else (submitted and sent back,
+# printed, a decision, money) has left a trail and is cancelled instead.
+SR_UNTOUCHED_EVENTS = ("dibuat", "diubah", "foto")
+
+
+def supplier_return_deletable(con: sqlite3.Connection, ret: dict) -> bool:
+    if ret["doc_status"] != "draft":
+        return False
+    q = f"SELECT 1 FROM supplier_return_events WHERE return_id=? AND kind NOT IN ({_placeholders(SR_UNTOUCHED_EVENTS)}) LIMIT 1"
+    if con.execute(q, (ret["id"], *SR_UNTOUCHED_EVENTS)).fetchone():
+        return False
+    return not any(con.execute(f"SELECT 1 FROM {t} WHERE return_id=? LIMIT 1", (ret["id"],)).fetchone()
+                   for t in ("supplier_return_replacements", "supplier_credit_notes"))
+
+
+def delete_supplier_return(return_id: int, user: dict) -> None:
+    """Owner 25-10-2026: an untouched draft can be deleted outright (nothing moved: stock, quarantine and debt
+    are untouched by a draft). Its photos' files go too."""
+    with _conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        ret = _sr_get(con, return_id)
+        if not supplier_return_deletable(con, ret):
+            raise ValueError("Hanya retur berstatus Draft yang belum diajukan, dicetak, atau diproses yang bisa dihapus. "
+                             "Retur lain dibatalkan lewat tombol Batalkan.")
+        paths = [r["path"] for r in con.execute("SELECT path FROM supplier_return_photos WHERE return_id=?", (return_id,))]
+        for t in ("supplier_return_photos", "supplier_return_events", "supplier_return_items"):
+            con.execute(f"DELETE FROM {t} WHERE return_id=?", (return_id,))
+        con.execute("DELETE FROM supplier_returns WHERE id=?", (return_id,))
+    for path in paths:
+        try:
+            Path(path).unlink()
+        except OSError:
+            pass
+
+
 def cancel_supplier_return(return_id: int, reason: str, keep_in_quarantine: bool, user: dict) -> dict:
     _sr_require_admin(user, "membatalkan retur")
     by = user.get("username")
@@ -12727,7 +12762,7 @@ def record_supplier_return_decision(return_id: int, data: dict, user: dict) -> d
         money = _sr_money(con, test, list(items.values()))
         if money["claim_value"] < money["settled_value"]:
             raise ValueError(f"Nilai yang disetujui (Rp {_sr_rupiah(money['claim_value'])}) lebih kecil dari yang sudah dikredit/direfund "
-                             f"(Rp {_sr_rupiah(money['settled_value'])}). Batalkan nota kreditnya dulu.")
+                             f"(Rp {_sr_rupiah(money['settled_value'])}). Batalkan nota debitnya dulu.")
         for i in lines:
             con.execute("""UPDATE supplier_return_items SET qty_approved=?, qty_rejected=?, settlement=?, reject_reason=?, reject_fate=?
                            WHERE id=?""", (i["qty_approved"], i["qty_rejected"], i["settlement"], i["reject_reason"], i["reject_fate"], i["id"]))
@@ -12843,7 +12878,7 @@ def _sr_allocate(con: sqlite3.Connection, cn: dict, invoice_id: int, amount: int
     if inv is None:
         raise ValueError("Faktur pembelian tidak ditemukan.")
     if inv["status"] != "posted" or inv["supplier_id"] != cn["supplier_id"]:
-        raise ValueError("Nota kredit hanya bisa dialokasikan ke Faktur Pembelian supplier yang sama dan sudah diposting.")
+        raise ValueError("Nota debit hanya bisa dialokasikan ke Faktur Pembelian supplier yang sama dan sudah diposting.")
     room = inv["total"] - inv["amount_paid"]
     if amount > room:
         raise ValueError(f"Alokasi melebihi sisa tagihan faktur {inv['invoice_number']} (Rp {_sr_rupiah(room)}).")
@@ -12853,7 +12888,7 @@ def _sr_allocate(con: sqlite3.Connection, cn: dict, invoice_id: int, amount: int
                 (cn["id"], invoice_id, amount, by, _now()))
     con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid + ?, updated_at=? WHERE id=?", (amount, _now(), invoice_id))
     _pi_payment_row(con, invoice_id, amount, "kredit", by, reference_no=cn["cn_number"],
-                    note=f"Nota kredit retur {cn['cn_number']}")
+                    note=f"Nota debit retur {cn['cn_number']}")
     return amount
 
 
@@ -12862,13 +12897,13 @@ def _sr_cn_allocated(con: sqlite3.Connection, cn_id: int) -> int:
 
 
 def record_supplier_return_credit(return_id: int, data: dict, user: dict) -> dict:
-    """Admin: refund money received for the approved claim. A credit note is no longer written here: 'kredit' opens
-    (or reuses) a Draft in the Credit Note module, which is verified, posted and allocated there."""
-    _sr_require_admin(user, "mencatat nota kredit / refund")
+    """Admin: refund money received for the approved claim. A debit note is no longer written here: 'kredit' opens
+    (or reuses) a Draft in the Debit Note module, which is verified, posted and allocated there."""
+    _sr_require_admin(user, "mencatat nota debit / refund")
     by = user.get("username")
     kind = data.get("kind")
     if kind not in ("kredit", "refund"):
-        raise ValueError("Pilih Nota Kredit atau Refund.")
+        raise ValueError("Pilih Nota Debit atau Refund.")
     if kind == "kredit":
         from backend import credit_notes
         made = credit_notes.create_from_return(return_id, user, data.get("note"))
@@ -12890,11 +12925,11 @@ def record_supplier_return_credit(return_id: int, data: dict, user: dict) -> dic
         cur = con.execute(
             """INSERT INTO supplier_credit_notes (cn_number, kind, supplier_id, return_id, amount, supplier_cn_no, issued_at, method,
                    reference_no, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (_sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number") if kind == "kredit" else None, kind, ret["supplier_id"],
+            (_sr_number(con, "DN-SUP", "supplier_credit_notes", "cn_number") if kind == "kredit" else None, kind, ret["supplier_id"],
              return_id, amount, _sr_text(data.get("supplier_cn_no")), issued, data.get("method") if kind == "refund" else None,
              _sr_text(data.get("reference_no")), _sr_text(data.get("note")), by, _now()))
         cn = dict(con.execute("SELECT * FROM supplier_credit_notes WHERE id=?", (cur.lastrowid,)).fetchone())
-        msg = f"Nota kredit {cn['cn_number']} Rp {_sr_rupiah(amount)}" if kind == "kredit" else \
+        msg = f"Nota debit {cn['cn_number']} Rp {_sr_rupiah(amount)}" if kind == "kredit" else \
             f"Refund diterima Rp {_sr_rupiah(amount)} ({data.get('method')})"
         if kind == "kredit" and data.get("invoice_id"):
             inv = con.execute("SELECT total, amount_paid, invoice_number FROM purchase_invoices WHERE id=?", (int(data["invoice_id"]),)).fetchone()
@@ -12911,7 +12946,7 @@ def record_supplier_return_credit(return_id: int, data: dict, user: dict) -> dic
 
 
 def allocate_supplier_credit(cn_id: int, invoice_id: int, amount: int, user: dict) -> dict:
-    _sr_require_admin(user, "mengalokasikan nota kredit")
+    _sr_require_admin(user, "mengalokasikan nota debit")
     from backend import credit_notes
     with _conn() as con:
         row = con.execute("SELECT kind, return_id FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone()
@@ -12924,21 +12959,21 @@ def allocate_supplier_credit(cn_id: int, invoice_id: int, amount: int, user: dic
         con.execute("BEGIN IMMEDIATE")
         cn = con.execute("SELECT * FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone()
         if cn is None or cn["kind"] != "kredit" or cn["status"] != "aktif":
-            raise ValueError("Nota kredit tidak ditemukan atau sudah dibatalkan.")
+            raise ValueError("Nota debit tidak ditemukan atau sudah dibatalkan.")
         cn = dict(cn)
         left = cn["amount"] - _sr_cn_allocated(con, cn_id)
         if amount <= 0 or amount > left:
-            raise ValueError(f"Saldo nota kredit yang bisa dialokasikan Rp {_sr_rupiah(left)}.")
+            raise ValueError(f"Saldo nota debit yang bisa dialokasikan Rp {_sr_rupiah(left)}.")
         _sr_allocate(con, cn, invoice_id, amount, by)
         inv = con.execute("SELECT invoice_number FROM purchase_invoices WHERE id=?", (invoice_id,)).fetchone()
         if cn["return_id"]:
-            _sr_event(con, cn["return_id"], "keuangan", f"Nota kredit {cn['cn_number']}: Rp {_sr_rupiah(amount)} dialokasikan ke {inv['invoice_number']}", by)
+            _sr_event(con, cn["return_id"], "keuangan", f"Nota debit {cn['cn_number']}: Rp {_sr_rupiah(amount)} dialokasikan ke {inv['invoice_number']}", by)
     return get_supplier_return(cn["return_id"]) if cn["return_id"] else {}
 
 
 def cancel_supplier_credit(cn_id: int, reason: str, user: dict) -> dict:
-    """Reverses a credit note or refund with counter rows; nothing is deleted."""
-    _sr_require_admin(user, "membatalkan nota kredit / refund")
+    """Reverses a debit note or refund with counter rows; nothing is deleted."""
+    _sr_require_admin(user, "membatalkan nota debit / refund")
     by = user.get("username")
     if not (reason or "").strip():
         raise ValueError("Alasan pembatalan wajib diisi.")
@@ -12946,10 +12981,10 @@ def cancel_supplier_credit(cn_id: int, reason: str, user: dict) -> dict:
         con.execute("BEGIN IMMEDIATE")
         cn = con.execute("SELECT * FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone()
         if cn is None or cn["status"] != "aktif":
-            raise ValueError("Nota kredit tidak ditemukan atau sudah dibatalkan.")
+            raise ValueError("Nota debit tidak ditemukan atau sudah dibatalkan.")
         cn = dict(cn)
         if cn["kind"] == "kredit":
-            raise ValueError("Credit Note yang sudah diposting dibatalkan lewat Ajukan Reversal di menu Credit Note (disetujui Owner).")
+            raise ValueError("Debit Note yang sudah diposting dibatalkan lewat Ajukan Reversal di menu Debit Note (disetujui Owner).")
         per_invoice: dict[int, int] = {}
         for a in con.execute("SELECT invoice_id, amount FROM supplier_credit_allocations WHERE credit_note_id=?", (cn_id,)):
             per_invoice[a["invoice_id"]] = per_invoice.get(a["invoice_id"], 0) + a["amount"]
@@ -12962,11 +12997,11 @@ def cancel_supplier_credit(cn_id: int, reason: str, user: dict) -> dict:
             con.execute("INSERT INTO supplier_credit_allocations (credit_note_id, invoice_id, amount, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
                         (cn_id, inv_id, -amt, by, _now()))
             con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid - ?, updated_at=? WHERE id=?", (amt, _now(), inv_id))
-            _pi_payment_row(con, inv_id, -amt, "kredit", by, reference_no=cn["cn_number"], note=f"Nota kredit {cn['cn_number']} dibatalkan")
+            _pi_payment_row(con, inv_id, -amt, "kredit", by, reference_no=cn["cn_number"], note=f"Nota debit {cn['cn_number']} dibatalkan")
         con.execute("UPDATE supplier_credit_notes SET status='dibatalkan', cancelled_by=?, cancelled_at=?, cancel_reason=? WHERE id=?",
                     (by, _now(), reason.strip(), cn_id))
         if cn["return_id"]:
-            label = f"Nota kredit {cn['cn_number']}" if cn["kind"] == "kredit" else f"Refund Rp {_sr_rupiah(cn['amount'])}"
+            label = f"Nota debit {cn['cn_number']}" if cn["kind"] == "kredit" else f"Refund Rp {_sr_rupiah(cn['amount'])}"
             _sr_event(con, cn["return_id"], "keuangan", f"{label} dibatalkan: {reason.strip()}", by)
             _sr_refresh(con, cn["return_id"], by)
     return get_supplier_return(cn["return_id"]) if cn["return_id"] else {}
@@ -13016,9 +13051,9 @@ def _sr_next_step(ret: dict, prog: dict) -> str:
     if prog["replacement_left"]:
         parts.append(f"terima barang pengganti ({prog['replacement_left']} lagi)")
     if prog["credit_pending"]:
-        parts.append(f"verifikasi & posting Credit Note di menu Credit Note (Rp {_sr_rupiah(prog['credit_pending'])})")
+        parts.append(f"verifikasi & posting Debit Note di menu Debit Note (Rp {_sr_rupiah(prog['credit_pending'])})")
     if prog["claim_left"] > prog["credit_pending"]:
-        parts.append(f"buat Credit Note / catat refund (sisa Rp {_sr_rupiah(prog['claim_left'] - prog['credit_pending'])})")
+        parts.append(f"buat Debit Note / catat refund (sisa Rp {_sr_rupiah(prog['claim_left'] - prog['credit_pending'])})")
     if prog["rejected_back_left"]:
         parts.append(f"terima kembali barang ditolak ({prog['rejected_back_left']} lagi)")
     return ("Selanjutnya: " + ", ".join(parts) + ".") if parts else "Menunggu penyelesaian."
@@ -13159,7 +13194,7 @@ def list_supplier_returns(tab: str = "semua", query: str | None = None, supplier
                         "doc_status_label": SR_DOC_STATUS.get(r["doc_status"]), "handover_label": SR_HANDOVER.get(r["handover_status"]),
                         "item_count": len(items), "qty": sum(i["qty"] for i in items), "products": ", ".join(i["product_name"] for i in items[:3]),
                         "decision": decisions.pop() if len(decisions) == 1 else ("sebagian" if decisions else "menunggu"),
-                        "flags": flags, "stage": stage, **prog})
+                        "flags": flags, "stage": stage, "can_delete": supplier_return_deletable(con, r), **prog})
         total = len(out)
         page = max(page, 1)
         return {"items": out[(page - 1) * SR_PAGE_SIZE: page * SR_PAGE_SIZE], "total": total, "page": page,

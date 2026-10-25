@@ -858,7 +858,7 @@ def integration(document_id: int) -> dict:
 # --- Retur ke Supplier from a posted Goods Receipt (owner, 21-10-2026) ---------------------------------------------
 # The shop does not void Account Payable to send goods back: it cuts the bill. A return made here is an Admin action
 # that at once (1) takes the goods off the sellable shelf into quarantine, waiting for the supplier to collect them,
-# (2) settles the money: a Credit Note allocated to the GR's posted faktur (anything beyond what is still owed stays
+# (2) settles the money: a Debit Note allocated to the GR's posted faktur (anything beyond what is still owed stays
 # as supplier credit), or, when the faktur is still a draft or does not exist yet, fewer units on that faktur.
 # It is a normal Retur Supplier document, so pickup / shipping is finished from the Retur Supplier menu.
 
@@ -971,8 +971,8 @@ def return_to_supplier(document_id: int, data: dict, user: dict) -> dict:
         for fk_id, ps in by_fk.items():
             fk = ps[0]["faktur"]
             if fk and fk["status"] == "posted":
-                # Blueprint CN: the credit is a Draft Credit Note at the GR value; the faktur is only reduced once
-                # Admin has checked the supplier's proof, posted the note and allocated it (menu Credit Note).
+                # Blueprint DN: the credit is a Draft Debit Note at the GR value; the faktur is only reduced once
+                # Admin has checked the supplier's proof, posted the note and allocated it (menu Debit Note).
                 from backend import credit_notes
                 rate = float(fk["tax_rate"] or 0)
                 items_by_ii = {r["inbound_item_id"]: r for r in con.execute(
@@ -988,8 +988,8 @@ def return_to_supplier(document_id: int, data: dict, user: dict) -> dict:
                                   "subtotal": sub, "tax": tax, "amount": amt, "entitled": amt})
                 cn = credit_notes.create_draft(con, supplier_id=doc["supplier_id"], return_id=rid, invoice_id=fk["id"], lines=lines, by=by,
                                                note=f"Retur {number} dari {doc['doc_number']}", source="barang_masuk")
-                txt = (f"Draft Credit Note {cn['cn_number']} Rp {db._sr_rupiah(cn['amount'])} dibuat untuk faktur {fk['invoice_number']}; "
-                       f"tagihan dipotong setelah CN diperiksa, diposting, dan dialokasikan di menu Credit Note")
+                txt = (f"Draft Debit Note {cn['cn_number']} Rp {db._sr_rupiah(cn['amount'])} dibuat untuk faktur {fk['invoice_number']}; "
+                       f"tagihan dipotong setelah DN diperiksa, diposting, dan dialokasikan di menu Debit Note")
                 msgs.append(txt)
                 con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'retur', ?)",
                             (fk["id"], now, by, f"Retur {number}: {txt}"))

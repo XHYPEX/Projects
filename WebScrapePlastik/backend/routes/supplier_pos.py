@@ -344,7 +344,7 @@ def _perm(fn, *args):
 
 @router.post("/supplier-refund-claims/{claim_id}/settle")
 async def settle_refund_claim_route(claim_id: int, req: RefundClaimSettleRequest, user: dict = Depends(require_admin)):
-    """Admin: the refund money arrived, or the supplier's credit note is confirmed."""
+    """Admin: the refund money arrived, or the supplier's debit note is confirmed."""
     return await _perm(settle_refund_claim, claim_id, req.model_dump(), user)
 
 

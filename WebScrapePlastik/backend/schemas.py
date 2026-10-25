@@ -1696,7 +1696,7 @@ class RefundClaimSettleRequest(BaseModel):
     received_at: str | None = None
     method: str | None = None  # refund: transfer | cash | giro
     reference_no: str | None = None
-    supplier_cn_no: str | None = None  # kredit: the supplier's credit note number
+    supplier_cn_no: str | None = None  # kredit: the supplier's debit note number
     note: str | None = None
 
 

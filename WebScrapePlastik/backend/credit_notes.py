@@ -1,7 +1,7 @@
-"""Credit Note Supplier (Blueprint Credit Note Supplier, 22-10-2026).
+"""Debit Note Supplier (Blueprint Debit Note Supplier, 22-10-2026).
 
-A credit note is the money side of a supplier return the supplier agreed to settle as credit. Returning the
-goods, the supplier's agreement, the credit note and its use on a faktur are separate steps:
+A debit note is the money side of a supplier return the supplier agreed to settle as credit. Returning the
+goods, the supplier's agreement, the debit note and its use on a faktur are separate steps:
 
     draft → review (Menunggu Verifikasi) → disetujui → aktif (Posted) → reversed
     draft / review / disetujui → ditolak ;  draft → dibatalkan
@@ -33,7 +33,7 @@ CN_STATUS = {"draft": "Draft", "review": "Menunggu Verifikasi", "disetujui": "Di
 LIVE = ("draft", "review", "disetujui", "aktif")
 OPEN = ("draft", "review", "disetujui")
 ALLOC_LABELS = {"none": "Belum Dialokasikan", "partial": "Sebagian Dialokasikan", "full": "Teralokasi Penuh"}
-CHECKS = {"bukti": "Nomor / bukti Credit Note supplier sudah sesuai",
+CHECKS = {"bukti": "Nomor / bukti Debit Note supplier sudah sesuai",
           "nominal": "Nominal sama dengan keputusan supplier (bukan otomatis harga PO)",
           "faktur": "Faktur sumber dan supplier sudah benar"}
 REFUND_METHODS = {"transfer": "Transfer bank", "cash": "Tunai"}
@@ -93,7 +93,7 @@ def migrate(con: sqlite3.Connection) -> None:
             created_by TEXT, created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_scnf_note ON supplier_credit_note_files(credit_note_id);
-        -- Money the supplier paid back against a posted credit note: cash IN (Kas Masuk), not a supplier payment.
+        -- Money the supplier paid back against a posted debit note: cash IN (Kas Masuk), not a supplier payment.
         CREATE TABLE IF NOT EXISTS supplier_credit_refunds (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             refund_number TEXT NOT NULL UNIQUE,
@@ -188,7 +188,7 @@ def _alloc_state(cn: dict, allocated: int, refunded: int) -> str:
 def _get(con: sqlite3.Connection, cn_id: int) -> dict:
     row = con.execute("SELECT * FROM supplier_credit_notes WHERE id=?", (cn_id,)).fetchone()
     if row is None or row["kind"] != "kredit":
-        raise LookupError("Credit Note tidak ditemukan.")
+        raise LookupError("Debit Note tidak ditemukan.")
     return dict(row)
 
 
@@ -275,7 +275,7 @@ def _entitlements(con: sqlite3.Connection, ret: dict, exclude_cn: int | None = N
 
 
 def _number(con: sqlite3.Connection) -> str:
-    return db._sr_number(con, "CN-SUP", "supplier_credit_notes", "cn_number")
+    return db._sr_number(con, "DN-SUP", "supplier_credit_notes", "cn_number")
 
 
 def create_draft(con: sqlite3.Connection, *, supplier_id: int, return_id: int | None, invoice_id: int | None, lines: list[dict],
@@ -299,7 +299,7 @@ def create_draft(con: sqlite3.Connection, *, supplier_id: int, return_id: int | 
              ln.get("unit"), ln["qty"], ln["unit_price"], ln["tax_rate"], ln["subtotal"], ln["tax"], ln["amount"], ln["entitled"],
              ln.get("waived", 0), ln.get("waive_reason"), pos))
     cn = _get(con, cn_id)
-    _event(con, cn_id, "draft", f"Draft Credit Note {cn['cn_number']} dibuat {_rp(cn['amount'])}" + (f" — {note}" if note else ""), by, cn["amount"])
+    _event(con, cn_id, "draft", f"Draft Debit Note {cn['cn_number']} dibuat {_rp(cn['amount'])}" + (f" — {note}" if note else ""), by, cn["amount"])
     return cn
 
 
@@ -314,7 +314,7 @@ def _line_from_ent(e: dict, amount: int | None = None) -> dict:
 def create_from_return(return_id: int, user: dict, note: str | None = None) -> dict:
     """Admin: a Draft note for whatever the supplier agreed to credit on this return and is not on another note yet.
     An open draft of the same return is returned instead of a second one."""
-    _require_admin(user, "membuat Credit Note")
+    _require_admin(user, "membuat Debit Note")
     by = user.get("username")
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
@@ -324,14 +324,14 @@ def create_from_return(return_id: int, user: dict, note: str | None = None) -> d
         if open_:
             return {"id": open_["id"], "existing": True}
         if ret["doc_status"] not in ("diproses", "selesai"):
-            raise ValueError(_err("ERR-C01", "Retur belum diproses. Credit Note dibuat setelah retur disetujui dan keputusan supplier dicatat."))
+            raise ValueError(_err("ERR-C01", "Retur belum diproses. Debit Note dibuat setelah retur disetujui dan keputusan supplier dicatat."))
         ent = _entitlements(con, ret)
         if not ent["lines"]:
             raise ValueError(_err("ERR-C01", "Retur baru disetujui secara internal. Persetujuan nilai kredit dari supplier belum tercatat."))
         lines = [_line_from_ent(e) for e in ent["lines"] if e["remaining"] > 0]
         total = sum(ln["amount"] for ln in lines)
         if not lines or ent["pool"] <= 0:
-            raise ValueError(_err("ERR-C02", "Seluruh nilai kredit yang disetujui supplier untuk retur ini sudah dibuatkan Credit Note."))
+            raise ValueError(_err("ERR-C02", "Seluruh nilai kredit yang disetujui supplier untuk retur ini sudah dibuatkan Debit Note."))
         if total > ent["pool"]:  # older notes without lines already took part of the claim
             over = total - ent["pool"]
             for ln in reversed(lines):
@@ -345,18 +345,18 @@ def create_from_return(return_id: int, user: dict, note: str | None = None) -> d
             inv = None
         cn = create_draft(con, supplier_id=ret["supplier_id"], return_id=return_id, invoice_id=inv, lines=lines, by=by,
                           note=db._sr_text(note) or f"Dari retur {ret['return_number']}", source="retur")
-        db._sr_event(con, return_id, "keuangan", f"Draft Credit Note {cn['cn_number']} {_rp(cn['amount'])} dibuat; menunggu verifikasi dan posting", by)
+        db._sr_event(con, return_id, "keuangan", f"Draft Debit Note {cn['cn_number']} {_rp(cn['amount'])} dibuat; menunggu verifikasi dan posting", by)
     return {"id": cn["id"], "existing": False}
 
 
 def update_draft(cn_id: int, data: dict, user: dict) -> dict:
-    _require_admin(user, "mengubah Credit Note")
+    _require_admin(user, "mengubah Debit Note")
     by = user.get("username")
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] == "aktif":
-            raise Conflict(_err("ERR-C08", "Credit Note yang telah diposting tidak dapat diubah langsung. Ajukan koreksi atau reversal."))
+            raise Conflict(_err("ERR-C08", "Debit Note yang telah diposting tidak dapat diubah langsung. Ajukan koreksi atau reversal."))
         if cn["status"] != "draft":
             raise Conflict("Hanya Draft yang bisa diubah. Kembalikan ke Draft dulu.")
         before = {"amount": cn["amount"], "supplier_cn_no": cn["supplier_cn_no"], "issued_at": cn["issued_at"], "purchase_invoice_id": cn["purchase_invoice_id"]}
@@ -366,7 +366,7 @@ def update_draft(cn_id: int, data: dict, user: dict) -> dict:
                                  AND UPPER(TRIM(supplier_cn_no))=UPPER(?) AND status IN ('draft','review','disetujui','aktif')""",
                               (cn["supplier_id"], cn_id, supplier_cn_no)).fetchone()
             if dup:
-                raise ValueError(f"Nomor Credit Note supplier {supplier_cn_no} sudah dipakai di {dup['cn_number']}.")
+                raise ValueError(f"Nomor Debit Note supplier {supplier_cn_no} sudah dipakai di {dup['cn_number']}.")
         issued = _date(data.get("issued_at"), "Tanggal efektif") if "issued_at" in data else cn["issued_at"]
         inv_id = cn["purchase_invoice_id"]
         if "purchase_invoice_id" in data:
@@ -376,7 +376,7 @@ def update_draft(cn_id: int, data: dict, user: dict) -> dict:
                 if inv is None or inv["status"] == "void":
                     raise ValueError("Faktur sumber tidak ditemukan.")
                 if inv["supplier_id"] != cn["supplier_id"]:
-                    raise ValueError(_err("ERR-C04", "Credit Note tidak dapat digunakan untuk faktur supplier lain."))
+                    raise ValueError(_err("ERR-C04", "Debit Note tidak dapat digunakan untuk faktur supplier lain."))
         note = db._sr_text(data.get("note"), 1000) if "note" in data else cn["note"]
         lines = _lines(con, cn_id)
         if data.get("lines") is not None:
@@ -387,7 +387,7 @@ def update_draft(cn_id: int, data: dict, user: dict) -> dict:
             for d in data["lines"]:
                 ln = by_id.get(int(d.get("id") or 0))
                 if ln is None:
-                    raise ValueError("Baris Credit Note tidak ditemukan.")
+                    raise ValueError("Baris Debit Note tidak ditemukan.")
                 amt = int(d.get("amount") or 0)
                 if amt < 0:
                     raise ValueError("Nominal tidak boleh minus.")
@@ -426,12 +426,12 @@ def _check_ready(con: sqlite3.Connection, cn: dict) -> list[dict]:
     lines = _lines(con, cn["id"])
     errs = []
     if not (cn["supplier_cn_no"] or "").strip():
-        errs.append({"code": "ERR-C05", "message": "Nomor/bukti Credit Note dari supplier belum lengkap. Lengkapi sebelum Posting."})
+        errs.append({"code": "ERR-C05", "message": "Nomor/bukti Debit Note dari supplier belum lengkap. Lengkapi sebelum Posting."})
     if cn["amount"] <= 0 or not lines:
-        errs.append({"code": "ERR-C02", "message": "Nominal Credit Note harus lebih dari 0."})
+        errs.append({"code": "ERR-C02", "message": "Nominal Debit Note harus lebih dari 0."})
     if sum(ln["amount"] for ln in lines) != cn["amount"] or sum(ln["subtotal"] + ln["tax"] for ln in lines) != cn["amount"] \
             or cn["subtotal"] + cn["tax_amount"] != cn["amount"]:
-        errs.append({"code": "ERR-C10", "message": "Jumlah baris, pajak, dan total Credit Note tidak cocok. Periksa perhitungan dan pembulatan."})
+        errs.append({"code": "ERR-C10", "message": "Jumlah baris, pajak, dan total Debit Note tidak cocok. Periksa perhitungan dan pembulatan."})
     if cn["return_id"]:
         ret = db._sr_get(con, cn["return_id"])
         ent = _entitlements(con, ret, cn["id"])
@@ -445,7 +445,7 @@ def _check_ready(con: sqlite3.Connection, cn: dict) -> list[dict]:
     if cn["purchase_invoice_id"]:
         inv = con.execute("SELECT supplier_id, status FROM purchase_invoices WHERE id=?", (cn["purchase_invoice_id"],)).fetchone()
         if inv and inv["supplier_id"] != cn["supplier_id"]:
-            errs.append({"code": "ERR-C04", "message": "Credit Note tidak dapat digunakan untuk faktur supplier lain."})
+            errs.append({"code": "ERR-C04", "message": "Debit Note tidak dapat digunakan untuk faktur supplier lain."})
     return errs
 
 
@@ -455,7 +455,7 @@ def _raise_first(errs: list[dict]) -> None:
 
 
 def submit(cn_id: int, note: str | None, user: dict) -> dict:
-    _require_admin(user, "mengajukan verifikasi Credit Note")
+    _require_admin(user, "mengajukan verifikasi Debit Note")
     by = user.get("username")
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
@@ -470,14 +470,14 @@ def submit(cn_id: int, note: str | None, user: dict) -> dict:
 
 
 def approve(cn_id: int, data: dict, user: dict) -> dict:
-    _require_admin(user, "menyetujui Credit Note")
+    _require_admin(user, "menyetujui Debit Note")
     by = user.get("username")
     checks = [c for c in (data.get("checks") or []) if c in CHECKS]
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] != "review":
-            raise Conflict("Credit Note ini tidak sedang menunggu verifikasi.")
+            raise Conflict("Debit Note ini tidak sedang menunggu verifikasi.")
         missing = [CHECKS[k] for k in CHECKS if k not in checks]
         if missing:
             raise ValueError("Centang semua pemeriksaan: " + "; ".join(missing) + ".")
@@ -491,7 +491,7 @@ def approve(cn_id: int, data: dict, user: dict) -> dict:
 
 
 def send_back(cn_id: int, note: str, user: dict) -> dict:
-    _require_admin(user, "mengembalikan Credit Note ke Draft")
+    _require_admin(user, "mengembalikan Debit Note ke Draft")
     by = user.get("username")
     if not (note or "").strip():
         raise ValueError("Tulis apa yang perlu diperbaiki.")
@@ -499,14 +499,14 @@ def send_back(cn_id: int, note: str, user: dict) -> dict:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] not in ("review", "disetujui"):
-            raise Conflict("Hanya Credit Note yang sedang diverifikasi / disetujui yang bisa dikembalikan ke Draft.")
+            raise Conflict("Hanya Debit Note yang sedang diverifikasi / disetujui yang bisa dikembalikan ke Draft.")
         con.execute("UPDATE supplier_credit_notes SET status='draft', reviewed_by=NULL, reviewed_at=NULL, checklist=NULL WHERE id=?", (cn_id,))
         _event(con, cn_id, "kembali_draft", f"Dikembalikan ke Draft: {note.strip()}", by, None, {"status": cn["status"]}, {"status": "draft"})
     return detail(cn_id, user)
 
 
 def reject(cn_id: int, reason: str, user: dict) -> dict:
-    _require_admin(user, "menolak Credit Note")
+    _require_admin(user, "menolak Debit Note")
     by = user.get("username")
     if not (reason or "").strip():
         raise ValueError("Alasan penolakan wajib diisi.")
@@ -514,40 +514,40 @@ def reject(cn_id: int, reason: str, user: dict) -> dict:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] not in OPEN:
-            raise Conflict("Credit Note ini sudah diposting atau ditutup.")
+            raise Conflict("Debit Note ini sudah diposting atau ditutup.")
         new = "dibatalkan" if cn["status"] == "draft" else "ditolak"
         con.execute("UPDATE supplier_credit_notes SET status=?, rejected_by=?, rejected_at=?, reject_reason=? WHERE id=?",
                     (new, by, db._now(), reason.strip()[:500], cn_id))
         _event(con, cn_id, "tolak" if new == "ditolak" else "batal", f"{'Ditolak' if new == 'ditolak' else 'Draft dibatalkan'}: {reason.strip()}", by,
                None, {"status": cn["status"]}, {"status": new})
-        _return_event(con, cn, f"Credit Note {cn['cn_number']} {'ditolak' if new == 'ditolak' else 'dibatalkan'}: {reason.strip()}", by)
+        _return_event(con, cn, f"Debit Note {cn['cn_number']} {'ditolak' if new == 'ditolak' else 'dibatalkan'}: {reason.strip()}", by)
     return detail(cn_id, user)
 
 
 def post(cn_id: int, user: dict) -> dict:
     """Approved → Posted, exactly once. Makes supplier credit available; no faktur and no stock changes."""
-    _require_admin(user, "memposting Credit Note")
+    _require_admin(user, "memposting Debit Note")
     by = user.get("username")
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] == "aktif":
-            raise Conflict(_err("ERR-C06", "Credit Note ini sudah diposting. Posting kedua tidak dilakukan."))
+            raise Conflict(_err("ERR-C06", "Debit Note ini sudah diposting. Posting kedua tidak dilakukan."))
         if cn["status"] != "disetujui":
-            raise Conflict("Credit Note harus diverifikasi dan disetujui sebelum diposting.")
+            raise Conflict("Debit Note harus diverifikasi dan disetujui sebelum diposting.")
         _raise_first(_check_ready(con, cn))
         now = db._now()
         cur = con.execute("UPDATE supplier_credit_notes SET status='aktif', posted_by=?, posted_at=? WHERE id=? AND status='disetujui'", (by, now, cn_id))
         if cur.rowcount != 1:
-            raise Conflict(_err("ERR-C06", "Credit Note ini sudah diposting. Posting kedua tidak dilakukan."))
+            raise Conflict(_err("ERR-C06", "Debit Note ini sudah diposting. Posting kedua tidak dilakukan."))
         pos = supplier_position(con, cn["supplier_id"])
         _event(con, cn_id, "posting", f"Diposting {_rp(cn['amount'])}; kredit supplier tersedia naik {_rp(cn['amount'])} "
                                       f"(saldo kredit {_rp(pos['credit_available'])}). Faktur belum berubah sampai dialokasikan.",
                by, cn["amount"], {"status": "disetujui"}, {"status": "aktif"})
         if cn["purchase_invoice_id"]:
             con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'kredit', ?)",
-                        (cn["purchase_invoice_id"], now, by, f"Credit Note {cn['cn_number']} {_rp(cn['amount'])} diposting; menunggu alokasi"))
-        _return_event(con, cn, f"Credit Note {cn['cn_number']} {_rp(cn['amount'])} diposting (No. CN supplier {cn['supplier_cn_no']})", by)
+                        (cn["purchase_invoice_id"], now, by, f"Debit Note {cn['cn_number']} {_rp(cn['amount'])} diposting; menunggu alokasi"))
+        _return_event(con, cn, f"Debit Note {cn['cn_number']} {_rp(cn['amount'])} diposting (No. CN supplier {cn['supplier_cn_no']})", by)
     return detail(cn_id, user)
 
 
@@ -567,7 +567,7 @@ def _pending_reversal(con: sqlite3.Connection, cn_id: int):
 def allocate(cn_id: int, data: dict, user: dict) -> dict:
     """Admin: apply posted credit to one or more posted faktur of the same supplier, all or nothing. Each row is capped
     by the credit still available and the faktur's outstanding (re-read under the lock)."""
-    _require_admin(user, "mengalokasikan Credit Note")
+    _require_admin(user, "mengalokasikan Debit Note")
     by = user.get("username")
     rows = [r for r in (data.get("allocations") or []) if int(r.get("amount") or 0) != 0]
     note = db._sr_text(data.get("note"), 300)
@@ -577,9 +577,9 @@ def allocate(cn_id: int, data: dict, user: dict) -> dict:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] != "aktif":
-            raise Conflict("Credit Note harus berstatus Posted untuk dialokasikan.")
+            raise Conflict("Debit Note harus berstatus Posted untuk dialokasikan.")
         if _pending_reversal(con, cn_id):
-            raise Conflict("Credit Note sedang diajukan reversal; alokasi ditahan sampai Owner memutuskan.")
+            raise Conflict("Debit Note sedang diajukan reversal; alokasi ditahan sampai Owner memutuskan.")
         left = available(con, cn)
         msgs = []
         seen = set()
@@ -590,7 +590,7 @@ def allocate(cn_id: int, data: dict, user: dict) -> dict:
             seen.add(inv_id)
             inv = _invoice(con, inv_id)
             if inv["supplier_id"] != cn["supplier_id"]:
-                raise ValueError(_err("ERR-C04", f"Credit Note {cn['cn_number']} tidak dapat digunakan untuk faktur supplier lain."))
+                raise ValueError(_err("ERR-C04", f"Debit Note {cn['cn_number']} tidak dapat digunakan untuk faktur supplier lain."))
             if inv["status"] != "posted":
                 raise ValueError(f"Faktur {inv['invoice_number']} belum diposting atau sudah dibatalkan.")
             due = max(inv["total"] - inv["amount_paid"], 0)
@@ -607,20 +607,20 @@ def allocate(cn_id: int, data: dict, user: dict) -> dict:
             con.execute("""INSERT INTO supplier_credit_allocations (credit_note_id, invoice_id, amount, created_by, created_at, note, cross_invoice)
                            VALUES (?, ?, ?, ?, ?, ?, ?)""", (cn_id, inv_id, amount, by, now, note, int(cross)))
             con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid + ?, updated_at=? WHERE id=?", (amount, now, inv_id))
-            db._pi_payment_row(con, inv_id, amount, "kredit", by, reference_no=cn["cn_number"], note=f"Credit Note {cn['cn_number']}")
+            db._pi_payment_row(con, inv_id, amount, "kredit", by, reference_no=cn["cn_number"], note=f"Debit Note {cn['cn_number']}")
             con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'kredit', ?)",
-                        (inv_id, now, by, f"Credit Note {cn['cn_number']} dialokasikan {_rp(amount)}; sisa tagihan {_rp(due - amount)}"))
+                        (inv_id, now, by, f"Debit Note {cn['cn_number']} dialokasikan {_rp(amount)}; sisa tagihan {_rp(due - amount)}"))
             left -= amount
             msgs.append(f"{_rp(amount)} ke {inv['invoice_number']} (sisa tagihan {_rp(due)} → {_rp(due - amount)})")
         _event(con, cn_id, "alokasi", "Dialokasikan " + "; ".join(msgs) + f". Kredit tersisa {_rp(left)}" + (f". Catatan: {note}" if note else ""),
                by, sum(int(r["amount"]) for r in rows))
-        _return_event(con, cn, f"Credit Note {cn['cn_number']}: dialokasikan " + "; ".join(msgs), by)
+        _return_event(con, cn, f"Debit Note {cn['cn_number']}: dialokasikan " + "; ".join(msgs), by)
     return detail(cn_id, user)
 
 
 def unallocate(cn_id: int, allocation_id: int, reason: str, user: dict) -> dict:
     """Admin: undo one allocation with a counter row (the faktur owes that amount again)."""
-    _require_admin(user, "membatalkan alokasi Credit Note")
+    _require_admin(user, "membatalkan alokasi Debit Note")
     by = user.get("username")
     if not (reason or "").strip():
         raise ValueError("Alasan pembatalan alokasi wajib diisi.")
@@ -633,7 +633,7 @@ def unallocate(cn_id: int, allocation_id: int, reason: str, user: dict) -> dict:
         if con.execute("SELECT 1 FROM supplier_credit_allocations WHERE reverses_id=?", (allocation_id,)).fetchone():
             raise Conflict("Alokasi ini sudah dibatalkan.")
         if cn["status"] != "aktif":
-            raise Conflict("Credit Note ini tidak aktif.")
+            raise Conflict("Debit Note ini tidak aktif.")
         inv = _invoice(con, a["invoice_id"])
         if inv["status"] != "posted":
             raise ValueError(f"Faktur {inv['invoice_number']} sudah tidak aktif; alokasinya tidak bisa dibalik.")
@@ -643,9 +643,9 @@ def unallocate(cn_id: int, allocation_id: int, reason: str, user: dict) -> dict:
         con.execute("UPDATE purchase_invoices SET amount_paid = amount_paid - ?, updated_at=? WHERE id=?", (a["amount"], now, a["invoice_id"]))
         db._pi_payment_row(con, a["invoice_id"], -a["amount"], "kredit", by, reference_no=cn["cn_number"], note=f"Alokasi {cn['cn_number']} dibatalkan")
         con.execute("INSERT INTO purchase_invoice_events (invoice_id, at, by_user, kind, note) VALUES (?, ?, ?, 'kredit', ?)",
-                    (a["invoice_id"], now, by, f"Alokasi Credit Note {cn['cn_number']} {_rp(a['amount'])} dibatalkan: {reason.strip()}"))
+                    (a["invoice_id"], now, by, f"Alokasi Debit Note {cn['cn_number']} {_rp(a['amount'])} dibatalkan: {reason.strip()}"))
         _event(con, cn_id, "batal_alokasi", f"Alokasi {_rp(a['amount'])} ke {inv['invoice_number']} dibatalkan: {reason.strip()}", by, -a["amount"])
-        _return_event(con, cn, f"Credit Note {cn['cn_number']}: alokasi {_rp(a['amount'])} ke {inv['invoice_number']} dibatalkan", by)
+        _return_event(con, cn, f"Debit Note {cn['cn_number']}: alokasi {_rp(a['amount'])} ke {inv['invoice_number']} dibatalkan", by)
     return detail(cn_id, user)
 
 
@@ -668,9 +668,9 @@ def record_refund(cn_id: int, data: dict, user: dict) -> dict:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] != "aktif":
-            raise Conflict("Refund hanya untuk Credit Note yang sudah diposting.")
+            raise Conflict("Refund hanya untuk Debit Note yang sudah diposting.")
         if _pending_reversal(con, cn_id):
-            raise Conflict("Credit Note sedang diajukan reversal; refund ditahan sampai Owner memutuskan.")
+            raise Conflict("Debit Note sedang diajukan reversal; refund ditahan sampai Owner memutuskan.")
         left = available(con, cn)
         if amount <= 0 or amount > left:
             raise Conflict(_err("ERR-F01", f"Bukti penerimaan refund belum lengkap atau saldo kredit tidak mencukupi. Kredit tersedia {_rp(left)}."))
@@ -681,7 +681,7 @@ def record_refund(cn_id: int, data: dict, user: dict) -> dict:
                            db._now())).lastrowid
         _event(con, cn_id, "refund", f"Refund diterima {_rp(amount)} ({REFUND_METHODS[method]}{', ' + account if account else ''}, ref {ref}) — "
                                      f"Kas Masuk {number}; kredit tersisa {_rp(left - amount)}", by, amount)
-        _return_event(con, cn, f"Credit Note {cn['cn_number']}: refund {_rp(amount)} diterima ({number})", by)
+        _return_event(con, cn, f"Debit Note {cn['cn_number']}: refund {_rp(amount)} diterima ({number})", by)
     out = detail(cn_id, user)
     out["refund_id"] = rid
     return out
@@ -701,7 +701,7 @@ def cancel_refund(cn_id: int, refund_id: int, reason: str, user: dict) -> dict:
         con.execute("UPDATE supplier_credit_refunds SET status='dibatalkan', cancelled_by=?, cancelled_at=?, cancel_reason=? WHERE id=?",
                     (by, db._now(), reason.strip()[:300], refund_id))
         _event(con, cn_id, "batal_refund", f"Refund {r['refund_number']} {_rp(r['amount'])} dibatalkan: {reason.strip()}", by, -r["amount"])
-        _return_event(con, cn, f"Credit Note {cn['cn_number']}: refund {r['refund_number']} dibatalkan", by)
+        _return_event(con, cn, f"Debit Note {cn['cn_number']}: refund {r['refund_number']} dibatalkan", by)
     return detail(cn_id, user)
 
 
@@ -724,7 +724,7 @@ def _impact(con: sqlite3.Connection, cn: dict) -> dict:
 
 
 def request_reversal(cn_id: int, data: dict, user: dict) -> dict:
-    _require_admin(user, "mengajukan reversal Credit Note")
+    _require_admin(user, "mengajukan reversal Debit Note")
     by = user.get("username")
     reason = db._sr_text(data.get("reason"), 500)
     if not reason:
@@ -735,7 +735,7 @@ def request_reversal(cn_id: int, data: dict, user: dict) -> dict:
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] != "aktif":
-            raise Conflict("Reversal hanya untuk Credit Note yang sudah diposting." if cn["status"] != "reversed" else "Credit Note ini sudah di-reversal.")
+            raise Conflict("Reversal hanya untuk Debit Note yang sudah diposting." if cn["status"] != "reversed" else "Debit Note ini sudah di-reversal.")
         if _pending_reversal(con, cn_id):
             raise Conflict("Sudah ada pengajuan reversal yang menunggu Owner.")
         if corr is not None and (corr < 0 or corr > cn["amount"]):
@@ -745,7 +745,7 @@ def request_reversal(cn_id: int, data: dict, user: dict) -> dict:
         rid = con.execute("""INSERT INTO supplier_credit_reversals (rev_number, credit_note_id, reason, evidence, make_replacement, correction_amount,
                                  impact_json, requested_by, requested_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                           (number, cn_id, reason, db._sr_text(data.get("evidence"), 500), int(replace), corr, json.dumps(impact), by, db._now())).lastrowid
-        _event(con, cn_id, "ajukan_reversal", f"Reversal {number} diajukan: {reason}" + (f"; CN pengganti diusulkan {_rp(corr)}" if replace else "")
+        _event(con, cn_id, "ajukan_reversal", f"Reversal {number} diajukan: {reason}" + (f"; DN pengganti diusulkan {_rp(corr)}" if replace else "")
                + " — menunggu persetujuan Owner", by, -cn["amount"])
     return detail(cn_id, user)
 
@@ -753,7 +753,7 @@ def request_reversal(cn_id: int, data: dict, user: dict) -> dict:
 def decide_reversal(reversal_id: int, approve_: bool, note: str | None, user: dict) -> dict:
     """Owner: approve runs the whole reversal atomically (counter rows for every allocation, note → Reversed,
     optional replacement Draft); reject leaves the note as it was."""
-    _require_owner(user, "menyetujui reversal Credit Note")
+    _require_owner(user, "menyetujui reversal Debit Note")
     by = user.get("username")
     note = db._sr_text(note, 500)
     with db._conn() as con:
@@ -774,9 +774,9 @@ def decide_reversal(reversal_id: int, approve_: bool, note: str | None, user: di
             _event(con, cn["id"], "tolak_reversal", f"Reversal {rv['rev_number']} ditolak Owner: {note}", by)
             return detail(cn["id"], user)
         if cn["status"] != "aktif":
-            raise Conflict("Credit Note ini sudah tidak aktif.")
+            raise Conflict("Debit Note ini sudah tidak aktif.")
         if _refunded(con, cn["id"]):
-            raise Conflict(_err("ERR-C09", "Credit Note memiliki alokasi atau refund aktif. Selesaikan koreksi terkait sebelum reversal (batalkan refund dulu)."))
+            raise Conflict(_err("ERR-C09", "Debit Note memiliki alokasi atau refund aktif. Selesaikan koreksi terkait sebelum reversal (batalkan refund dulu)."))
         impact = _impact(con, cn)
         for i in impact["invoices"]:
             if i["status"] != "posted":
@@ -825,7 +825,7 @@ def _upload_dir(cn_id: int) -> Path:
 
 
 def add_file(cn_id: int, filename: str, mime: str, data: bytes, user: dict, refund_id: int | None = None) -> dict:
-    _require_admin(user, "melampirkan bukti Credit Note")
+    _require_admin(user, "melampirkan bukti Debit Note")
     if mime not in FILE_MIMES:
         raise ValueError("Bukti harus JPG, PNG, WEBP, atau PDF.")
     if not data or len(data) > FILE_MAX_BYTES:
@@ -835,7 +835,7 @@ def add_file(cn_id: int, filename: str, mime: str, data: bytes, user: dict, refu
         con.execute("BEGIN IMMEDIATE")
         cn = _get(con, cn_id)
         if cn["status"] in ("reversed", "dibatalkan", "ditolak"):
-            raise Conflict("Credit Note ini sudah ditutup.")
+            raise Conflict("Debit Note ini sudah ditutup.")
         name = f"{uuid.uuid4().hex}{FILE_MIMES[mime]}"
         path = _upload_dir(cn_id) / name
         path.write_bytes(data)
@@ -1053,7 +1053,7 @@ def detail(cn_id: int, user: dict | None = None) -> dict:
 
 
 def _chain(con: sqlite3.Connection, c: dict, ret: dict | None, items: list[dict] | None, origin: dict | None) -> dict:
-    """PO → GR → Faktur → Retur → CN → Alokasi, with the figures each module owns (Gambar 16)."""
+    """PO → GR → Faktur → Retur → DN → Alokasi, with the figures each module owns (Gambar 16)."""
     po = gr = None
     po_id = (ret or {}).get("supplier_po_id")
     if not po_id and origin:

@@ -1,19 +1,19 @@
 """Retur Supplier: staff draft and submit, admin approves; goods leave once at handover; the supplier's
-answer is settled by replacement goods, credit notes or refunds. Money fields are admin-only."""
+answer is settled by replacement goods, debit notes or refunds. Money fields are admin-only."""
 
 import asyncio
 import base64
 import binascii
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from backend.auth import get_current_user
 from backend.database import (
     SR_COST_BEARERS, SR_DOC_STATUS, SR_HANDOVER, SR_METHODS, SR_PHOTO_STAGES, SR_REASONS, SR_REJECT_FATES,
     SR_SETTLEMENTS, SR_TYPES, QUARANTINE_CONDITIONS,
     add_supplier_return_photo, allocate_supplier_credit, approve_supplier_return, cancel_supplier_credit,
-    cancel_supplier_return, confirm_supplier_return_out, delete_supplier_return_photo, flag_supplier_return_problem,
+    cancel_supplier_return, confirm_supplier_return_out, delete_supplier_return, delete_supplier_return_photo, flag_supplier_return_problem,
     get_supplier_return, get_supplier_return_photo, list_supplier_returns, mark_supplier_return_received,
     receive_supplier_return_rejected, receive_supplier_return_replacement, record_supplier_return_credit,
     record_supplier_return_decision, return_supplier_return_to_draft, save_supplier_return, submit_supplier_return,
@@ -38,7 +38,7 @@ async def _run(fn, *args):
 
 def _for(user: dict, data: dict) -> dict:
     """Staff see the return but not what it is worth to the supplier (the cost middleware zeroes unit_cost /
-    cost_value; credit notes and claim amounts are dropped here)."""
+    cost_value; debit notes and claim amounts are dropped here)."""
     if user.get("role") == "admin" or not isinstance(data, dict) or "items" not in data:
         return data
     events = [{**e, "note": "Penyelesaian keuangan dicatat admin"} if e.get("kind") == "keuangan" else e
@@ -116,6 +116,13 @@ async def sr_credit_cancel(cn_id: int, body: dict, user: dict = Depends(get_curr
 @router.get("/supplier-returns/{return_id}")
 async def sr_get(return_id: int, user: dict = Depends(get_current_user)):
     return _for(user, await _run(get_supplier_return, return_id))
+
+
+@router.delete("/supplier-returns/{return_id}", status_code=204, response_class=Response)
+async def sr_delete(return_id: int, user: dict = Depends(get_current_user)):
+    """An untouched draft only (see supplier_return_deletable); anything else is cancelled."""
+    await _run(delete_supplier_return, return_id, user)
+    return Response(status_code=204)
 
 
 @router.put("/supplier-returns/{return_id}")

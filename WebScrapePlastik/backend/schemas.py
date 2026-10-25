@@ -1302,7 +1302,7 @@ class PreorderItemOut(BaseModel):
     ship_route: str | None = None
     priority: str = "normal"
     eta_date: str | None = None
-    source: str | None = None  # supplier | stok | jasa | null (automatic)
+    source: str | None = None  # supplier | stok | jasa | campur (stok + pesan supplier) | null (automatic)
     supplier_id: int | None = None
     supplier_name: str | None = None
     # K-02: held for this line on the shelf, still coming from a supplier, and needed but not covered.

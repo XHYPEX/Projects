@@ -30,7 +30,7 @@ SO_STAGE_LABELS = {
     "menunggu_po": "Menunggu PO", "dalam_pengiriman": "Dalam Pengiriman", "tiba_sebagian": "Diterima Sebagian",
     "siap": "Barang Siap", "lain": "Status Lain", "selesai": "Selesai",
 }
-SO_SOURCE_LABELS = {"supplier": "Supplier", "stok": "Stok", "jasa": "Jasa", None: "Otomatis"}
+SO_SOURCE_LABELS = {"supplier": "Supplier", "stok": "Stok", "jasa": "Jasa", "campur": "Stok + Supplier", None: "Otomatis"}
 PO_ORDER_LABELS = {
     "draft": "Draft", "menunggu_konfirmasi": "Menunggu Konfirmasi", "dikonfirmasi": "Dikonfirmasi",
     "diproses": "Diproses", "dalam_pengiriman": "Dalam Pengiriman", "diterima_sebagian": "Diterima Sebagian",
@@ -131,7 +131,7 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
                       "arrived_qty": arrived_qty, "status": i["status"], "arrived": here, "source": i.get("source"),
                       "supplier_name": i.get("supplier_name"), "eta": eta,
                       "late": bool(eta and eta < today and not here),
-                      "missing_supplier": i.get("source") == "supplier" and i.get("supplier_id") is None and not here,
+                      "missing_supplier": i.get("source") in db.PREORDER_BUY_SOURCES and i.get("supplier_id") is None and not here,
                       "draft_pos": [{"id": l["po_id"], "po_number": l["po_number"]} for l in ls if l["po_status"] == "draft"]
                                    if not here else []})
     pos: list[dict] = []

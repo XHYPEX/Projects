@@ -155,6 +155,17 @@ def _validate_status(status: str, allow_cancelled: bool = False) -> str:
     return status
 
 
+def _require_prices(items: list[dict]) -> None:
+    """Owner 25-10-2026: a published Sales Order may not carry goods at Rp 0 (a free-text supplier line slipped
+    through without a price). A Jasa line may be free; a draft may still be unpriced; cancelled lines are history."""
+    unpriced = [i["product_name"] for i in items
+                if (i.get("source") or "") != "jasa" and i.get("status") != "dibatalkan" and (i.get("unit_price") or 0) <= 0]
+    if unpriced:
+        raise HTTPException(status_code=422, detail=f"Harga jual belum diisi untuk: {', '.join(unpriced[:5])}"
+                            + (f" dan {len(unpriced) - 5} barang lain" if len(unpriced) > 5 else "")
+                            + ". Isi harganya, atau simpan sebagai draft dulu.")
+
+
 def _validate_items(items: list[PreorderItemRequest]) -> list[dict]:
     validated: list[dict] = []
     for item in items:
@@ -279,6 +290,8 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
         _require_invoice_plate(plate_full)
 
     items = _validate_items(req.items)
+    if not req.is_draft:
+        _require_prices(items)
     if req.deposit > sum(i["quantity"] * i["unit_price"] for i in items):
         raise HTTPException(status_code=422, detail="Uang muka melebihi total pesanan.")
     notes = req.notes.strip() if req.notes else None
@@ -366,6 +379,10 @@ async def update_preorder_route(
     update_notes = "notes" in req.model_fields_set
     notes = (req.notes.strip() if req.notes else None) if update_notes else None
     will_be_draft = current["is_draft"] if req.is_draft is None else req.is_draft
+    if not will_be_draft and items is not None:
+        _require_prices(items)
+    elif not will_be_draft and current["is_draft"]:  # publishing a saved draft as it is
+        _require_prices(await loop.run_in_executor(None, get_preorder_items, preorder_id))
     if not will_be_draft and (plate_full is not None or current["is_draft"]):
         _require_invoice_plate(plate_full if plate_full is not None else current["plate_full"])
 

@@ -7938,7 +7938,7 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | N
     due = out["invoice_total"] if out["invoice_total"] is not None else total
     out["payment_status"] = "belum" if out["deposit"] <= 0 else ("lunas" if out["deposit"] >= due else "dp")
     out["missing_supplier_count"] = sum(
-        1 for i in live if i.get("source") == "supplier" and i.get("supplier_id") is None
+        1 for i in live if i.get("source") in PREORDER_BUY_SOURCES and i.get("supplier_id") is None
         and i["status"] not in PO_ARRIVED_STATUSES
     )
     out["line_suppliers"] = sorted({i["supplier_name"] for i in live if i.get("supplier_name")})
@@ -7985,7 +7985,10 @@ def _preorder_item_logistics(item: dict) -> tuple:
     return route, priority, eta
 
 
-PREORDER_SOURCES = ("supplier", "stok", "jasa")
+# 'campur' (owner 25-10-2026, "Stok + Pesan Supplier"): what free stock covers is held from the shelf, only the
+# rest goes on a draft PO to the line's supplier. One line, one invoice row.
+PREORDER_SOURCES = ("supplier", "stok", "jasa", "campur")
+PREORDER_BUY_SOURCES = ("supplier", "campur")  # sources whose line names the supplier to buy from
 PREORDER_SOURCE_LABELS = {"supplier": "Pesan Supplier", "stok": "Stok Tersedia", "jasa": "Manual / Jasa"}
 
 
@@ -7994,10 +7997,12 @@ def _preorder_item_source(con: sqlite3.Connection, item: dict) -> tuple[str | No
     supplier only matters for 'supplier' lines (it may still be empty: then the line waits for one)."""
     source = item.get("source") or None
     if source is not None and source not in PREORDER_SOURCES:
-        raise ValueError("Sumber barang harus Pesan Supplier, Stok Tersedia, atau Manual / Jasa.")
+        raise ValueError("Sumber barang harus Pesan Supplier, Stok Tersedia, Stok + Pesan Supplier, atau Manual / Jasa.")
     if source == "stok" and not item.get("master_item_id"):
         raise ValueError(f"“{item['product_name']}”: Stok Tersedia hanya untuk barang dari Master Barang.")
-    supplier_id = item.get("supplier_id") if source == "supplier" else None
+    if source == "campur" and not item.get("master_item_id"):
+        raise ValueError(f"“{item['product_name']}”: Stok + Pesan Supplier hanya untuk barang dari Master Barang.")
+    supplier_id = item.get("supplier_id") if source in PREORDER_BUY_SOURCES else None
     if supplier_id is not None:
         sup = con.execute("SELECT is_active FROM suppliers WHERE id=?", (supplier_id,)).fetchone()
         if sup is None or not sup["is_active"]:
@@ -8022,7 +8027,7 @@ def _require_stock_free(con: sqlite3.Connection, item: dict, own_line_id: int | 
     if item["quantity"] > free:
         raise ValueError(
             f"“{item['product_name']}”: stok yang bebas hanya {free} {mi['unit'] or 'unit'}, kurang dari {item['quantity']} yang dipesan. "
-            "Ubah sumbernya ke Pesan Supplier, atau kurangi jumlahnya.")
+            "Ubah sumbernya ke Stok + Pesan Supplier (sisanya dibuatkan PO), atau kurangi jumlahnya.")
 
 
 def _forbid_supplier_when_stocked(con: sqlite3.Connection, item: dict) -> None:
@@ -8116,6 +8121,11 @@ def _auto_supplier_pos_for_preorder(con: sqlite3.Connection, preorder_id: str, b
             if r["supplier_id"] is None:
                 continue
             qty = r["qty_left"]
+        elif r["source"] == "campur":
+            # Stok + Pesan Supplier: the shelf keeps what it can; only the shortfall is bought, from the line's supplier.
+            if r["supplier_id"] is None:
+                continue
+            qty = min(r["qty_left"], short.get(r["preorder_item_id"], 0))
         else:
             qty = r["qty_left"] if r["master_item_id"] is None else min(r["qty_left"], short.get(r["preorder_item_id"], 0))
         if qty <= 0:
@@ -9907,7 +9917,7 @@ def _spo_candidate_rows(con: sqlite3.Connection, query: str | None, exclude_po: 
                 GROUP BY spi.preorder_item_id
             ) o ON o.preorder_item_id = pi.id
             LEFT JOIN master_items m ON m.id = pi.master_item_id
-            LEFT JOIN suppliers s ON s.id = CASE WHEN pi.source = 'supplier' THEN COALESCE(pi.supplier_id, p.supplier_id)
+            LEFT JOIN suppliers s ON s.id = CASE WHEN pi.source IN ('supplier', 'campur') THEN COALESCE(pi.supplier_id, p.supplier_id)
                                                  ELSE COALESCE(p.supplier_id, m.supplier_id) END
             WHERE {' AND '.join(where)}
             ORDER BY p.created_at DESC, pi.position ASC, pi.id ASC""",

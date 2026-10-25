@@ -669,11 +669,13 @@
     .po-src[data-src="supplier"] { background-color: #FFEDD5; border-color: #F4D3B8; color: #9A5A1F; }
     .po-src[data-src="stok"] { background-color: #E9F5EC; border-color: #C9E4D0; color: #2F6B43; }
     .po-src[data-src="jasa"] { background-color: #E8F0FB; border-color: #C9DAF3; color: #2F5C9E; }
+    .po-src[data-src="campur"] { background-color: #FEF6E4; border-color: #F2DDAE; color: #855A10; }
     .po-src-wrap { position: relative; }
     .po-src-wrap::before { content: ""; position: absolute; left: 0.65rem; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 9999px; background: #9CA3AF; pointer-events: none; z-index: 1; }
     .po-src-wrap[data-src="supplier"]::before { background: #E08A3C; }
     .po-src-wrap[data-src="stok"]::before { background: #3F9A5A; }
     .po-src-wrap[data-src="jasa"]::before { background: #3F6EB5; }
+    .po-src-wrap[data-src="campur"]::before { background: linear-gradient(90deg, #3F9A5A 50%, #E08A3C 50%); }
     .po-na { display: block; padding: 0.4rem 0.7rem; border-radius: 8px; background: #F3F4F6; color: #8A8780; font-size: 13px; }
     .po-pill.is-proc_po { color: #9A5A1F; background: #FFEDD5; }
     .po-pill.is-proc_stok { color: #2F6B43; background: #E9F5EC; }
@@ -20519,7 +20521,19 @@ async function renderPreorderForm(detail) {
 }
 
 // ── Preorder: line items ─────────────────────────────────────────────────────
-const SO_SOURCE_LABELS = { supplier: "Pesan Supplier", stok: "Stok Tersedia", jasa: "Manual / Jasa" };
+const SO_SOURCE_LABELS = { supplier: "Pesan Supplier", stok: "Stok Tersedia", campur: "Stok + Pesan Supplier", jasa: "Manual / Jasa" };
+// Sources whose line names a supplier to buy from ("campur": free stock first, the rest on a draft PO).
+const SO_BUY_SOURCES = ["supplier", "campur"];
+
+// How a line splits between the shelf and a Purchase Order. A saved line uses what the server holds for it;
+// a new one what is free right now (the server works it out again on save).
+function poRowSplit(rowEl) {
+  const qty = parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 0;
+  const saved = rowEl.dataset.itemId ? currentPreorder?.items?.find(i => String(i.id) === rowEl.dataset.itemId) : null;
+  const free = saved && Number(saved.quantity) === qty ? Number(saved.reserved_qty) || 0 : Number(rowEl.dataset.available || 0);
+  const stock = Math.max(0, Math.min(free, qty));
+  return { qty, stock, buy: qty - stock };
+}
 const SO_ROW_SELECT = "border border-line rounded-md px-1.5 py-1 text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent";
 
 const PO_CELL = "w-full border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
@@ -20592,13 +20606,21 @@ function poRowLockSupplier(rowEl) {
   if (!opt || sourceEl.disabled) return;
   const avail = rowEl.dataset.available;
   const qty = parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 1;
-  const locked = !rowEl.dataset.itemId && !!rowEl.dataset.masterItemId && avail !== undefined && avail !== "" && Number(avail) >= qty;
+  const known = !rowEl.dataset.itemId && !!rowEl.dataset.masterItemId && avail !== undefined && avail !== "";
+  const locked = known && Number(avail) >= qty;
   opt.disabled = locked;
   opt.textContent = locked ? `Pesan Supplier (stok masih ada ${avail})` : SO_SOURCE_LABELS.supplier;
-  if (locked && sourceEl.value === "supplier") { sourceEl.value = "stok"; applyPoRowSource(rowEl); }
+  const mixOpt = sourceEl.querySelector('option[value="campur"]');
+  if (mixOpt) mixOpt.disabled = !rowEl.dataset.masterItemId;
+  if (locked && (sourceEl.value === "supplier" || sourceEl.value === "campur")) { sourceEl.value = "stok"; applyPoRowSource(rowEl); }
+  // Owner 25-10-2026: stock covers only part of the line, so take that part and order the rest. Done for the user until
+  // they pick a source themselves.
+  else if (known && Number(avail) > 0 && Number(avail) < qty && rowEl.dataset.srcTouched !== "1"
+           && (sourceEl.value === "stok" || sourceEl.value === "supplier")) { sourceEl.value = "campur"; applyPoRowSource(rowEl); }
 }
 
 function onPoRowSourceChange(selectEl) {
+  selectEl.closest(".po-item-row").dataset.srcTouched = "1";
   applyPoRowSource(selectEl.closest(".po-item-row"));
   updatePreorderTotals();
 }
@@ -20608,10 +20630,11 @@ function onPoRowSourceChange(selectEl) {
 function applyPoRowSource(rowEl) {
   const sourceEl = rowEl.querySelector(".po-row-source");
   const source = sourceEl.value;
-  const buys = source === "supplier" || source === "";
+  const names = SO_BUY_SOURCES.includes(source);
+  const buys = names || source === "";
   const supSel = rowEl.querySelector(".po-row-supplier");
-  supSel.classList.toggle("hidden", source !== "supplier");
-  rowEl.querySelector(".po-row-supplier-na").classList.toggle("hidden", source === "supplier");
+  supSel.classList.toggle("hidden", !names);
+  rowEl.querySelector(".po-row-supplier-na").classList.toggle("hidden", names);
   const eta = rowEl.querySelector(".po-row-eta");
   eta.classList.toggle("hidden", !buys);
   const etaNa = rowEl.querySelector(".po-row-eta-na");
@@ -20623,11 +20646,14 @@ function applyPoRowSource(rowEl) {
   sourceEl.parentElement.dataset.src = tone;
   const issued = rowEl.dataset.issued === "1";
   const proc = rowEl.querySelector(".po-row-proc");
+  const split = source === "campur" ? poRowSplit(rowEl) : null;
   const [label, cls] = issued ? ["PO terbit", "is-proc_po"] : source === "supplier" ? ["Akan dibuat PO", "is-proc_po"]
+    : split ? [split.buy > 0 ? `${split.stock} stok · ${split.buy} PO` : "Ambil dari stok", split.buy > 0 ? "is-proc_po" : "is-proc_stok"]
     : source === "stok" ? ["Ambil dari stok", "is-proc_stok"] : source === "jasa" ? ["Tanpa PO", "is-proc_none"] : ["Otomatis", "is-proc_none"];
   proc.textContent = label;
   proc.className = `po-row-proc po-pill ${cls}`;
-  const missing = source === "supplier" && !issued && !supSel.disabled && !supSel.value && rowEl.querySelector(".po-row-product").value.trim() !== "";
+  const missing = names && !issued && !supSel.disabled && !supSel.value && rowEl.querySelector(".po-row-product").value.trim() !== ""
+    && !(split && split.buy === 0);
   rowEl.classList.toggle("is-warn", missing);
   supSel.classList.toggle("border-failed", missing);
   supSel.classList.toggle("text-failed", missing);
@@ -20818,7 +20844,7 @@ function choosePoProduct(btnEl) {
   if (!sourceEl.disabled) {
     const free = item.available_qty ?? item.stock_qty ?? 0;
     const qty = parseInt(rowEl.querySelector(".po-row-qty").value, 10) || 1;
-    sourceEl.value = free >= qty ? "stok" : "supplier";
+    sourceEl.value = free >= qty ? "stok" : free > 0 ? "campur" : "supplier";
     if (!supEl.value && item.supplier_id) poRowSupplierOptions(supEl, item.supplier_id, item.supplier_name);
     applyPoRowSource(rowEl);
   }
@@ -20873,7 +20899,7 @@ function preorderRowValues() {
     priority: rowEl.querySelector(".po-row-priority").value || "normal",
     eta_date: rowEl.querySelector(".po-row-eta").value || null,
     source: rowEl.querySelector(".po-row-source").value || null,
-    supplier_id: rowEl.querySelector(".po-row-source").value === "supplier"
+    supplier_id: SO_BUY_SOURCES.includes(rowEl.querySelector(".po-row-source").value)
       ? (parseInt(rowEl.querySelector(".po-row-supplier").value, 10) || null) : null,
     price_reason: rowEl.dataset.priceReason || null,
     allow_below_cost: !!rowEl.dataset.belowOk,
@@ -21099,13 +21125,25 @@ function validatePreorderPayload(payload) {
   return null;
 }
 
+// Owner 25-10-2026: a published Sales Order needs a selling price on every line (a Jasa line may be free). The
+// unpriced rows are marked and the first one focused; the server checks it again on save.
+function poPriceMissingError() {
+  const rows = preorderRowValues().filter(r => r.product_name && r.source !== "jasa" && r.status !== "dibatalkan");
+  document.querySelectorAll("#po-item-rows .po-row-price").forEach(el => el.classList.remove("border-failed", "ring-2", "ring-failed/30"));
+  const bad = rows.filter(r => !(r.unit_price > 0));
+  if (!bad.length) return null;
+  bad.forEach(r => r.rowEl.querySelector(".po-row-price").classList.add("border-failed", "ring-2", "ring-failed/30"));
+  bad[0].rowEl.querySelector(".po-row-price").focus();
+  return `Harga jual belum diisi untuk: ${bad.slice(0, 3).map(r => r.product_name).join(", ")}${bad.length > 3 ? ` dan ${bad.length - 3} lainnya` : ""}. Isi harganya, atau Simpan Draft dulu.`;
+}
+
 // "Stok Tersedia" on a new line needs enough free stock; the server checks it again on save.
 function poStockShortError() {
   for (const r of preorderRowValues()) {
     if (r.source !== "stok" || !r.product_name || r.rowEl.dataset.itemId) continue;
     const free = r.rowEl.dataset.available;
     if (free !== "" && free !== undefined && Number(free) < r.quantity) {
-      return `“${r.product_name}”: stok yang bebas hanya ${Number(free)}, kurang dari ${r.quantity}. Ubah Sumber ke Pesan Supplier, atau kurangi jumlahnya.`;
+      return `“${r.product_name}”: stok yang bebas hanya ${Number(free)}, kurang dari ${r.quantity}. Ubah Sumber ke Stok + Pesan Supplier (sisanya dibuatkan PO), atau kurangi jumlahnya.`;
     }
   }
   return null;
@@ -21113,7 +21151,7 @@ function poStockShortError() {
 
 async function savePreorder(asDraft = false) {
   const payload = collectPreorderPayload(asDraft);
-  const error = poStockShortError() || validatePreorderPayload(payload) || poSpecialReasonError();
+  const error = poStockShortError() || validatePreorderPayload(payload) || (payload.is_draft ? null : poPriceMissingError()) || poSpecialReasonError();
   if (error) {
     showToast(error);
     if (/^DP/.test(error)) poFocusDeposit();
@@ -21176,6 +21214,16 @@ function renderPoDraftPreview() {
         if (!groups.has(r.supplier_id)) groups.set(r.supplier_id, []);
         groups.get(r.supplier_id).push(r);
       } else missing.push(r);
+    } else if (r.source === "campur") {
+      // Only the part stock cannot cover goes on the PO; the rest shows under "Dari stok toko".
+      const sp = poRowSplit(r.rowEl);
+      if (sp.stock > 0) stock.push({ ...r, quantity: sp.stock, mixed: true });
+      if (sp.buy > 0) {
+        if (r.supplier_id) {
+          if (!groups.has(r.supplier_id)) groups.set(r.supplier_id, []);
+          groups.get(r.supplier_id).push({ ...r, quantity: sp.buy });
+        } else missing.push({ ...r, quantity: sp.buy });
+      }
     } else if (r.source === "stok") stock.push(r);
     else if (r.source === "jasa") jasa.push(r);
     else auto.push(r);
@@ -21195,7 +21243,7 @@ function renderPoDraftPreview() {
   for (const [sid, items] of groups) parts.push(tile(esc(supName(sid)), `${items.length} item`, items, n++ % 2 ? "b" : "a"));
   if (missing.length) parts.push(tile("Supplier belum dipilih", `${missing.length} item`, missing, "red", "alert"));
   if (stock.length) {
-    const lowStock = stock.filter(r => r.rowEl.dataset.available !== "" && Number(r.rowEl.dataset.available) < r.quantity);
+    const lowStock = stock.filter(r => !r.mixed && r.rowEl.dataset.available !== "" && Number(r.rowEl.dataset.available) < r.quantity);
     parts.push(tile("Dari stok toko", lowStock.length ? `<span class="text-failed">${lowStock.length} barang stoknya kurang</span>` : "dicadangkan, tanpa PO", stock, "plain"));
   }
   if (jasa.length) parts.push(tile("Manual / Jasa", "tanpa PO", jasa, "plain"));
@@ -21216,7 +21264,7 @@ function soDraftPoIds(detail) {
 
 function soMissingSupplierItems(detail) {
   if (detail.is_draft || detail.cancelled_at) return [];
-  return (detail.items || []).filter(i => i.source === "supplier" && !i.supplier_id
+  return (detail.items || []).filter(i => SO_BUY_SOURCES.includes(i.source) && !i.supplier_id
     && !["sampai_di_toko", "dititipkan", "terpasang", "dibatalkan"].includes(i.status));
 }
 
@@ -21353,7 +21401,7 @@ function soItemNoteHtml(note) {
 // Under a line's name on the detail page: where it comes from and, for a supplier line, which one.
 function soItemSourceHtml(item) {
   const label = item.source ? SO_SOURCE_LABELS[item.source] : "Otomatis";
-  const sup = item.source === "supplier"
+  const sup = SO_BUY_SOURCES.includes(item.source)
     ? (item.supplier_name ? ` · ${esc(item.supplier_name)}` : ' · <span class="text-failed">supplier belum dipilih</span>') : "";
   const pos = (item.supplier_pos || []).map(sp => `<button type="button" onclick="event.stopPropagation(); openSupplierPoFromActivity('${esc(sp.supplier_po_id)}')" class="text-accentDark hover:underline tabular-nums">${esc(sp.po_number)}</button>`).join(", ");
   const pkgs = (item.supplier_pos || []).flatMap(sp => sp.packages || []).map(pk =>

@@ -149,6 +149,7 @@
     .status-dot.is-sudah_dipesankan  { background: #AD7A1E; }
     .status-dot.is-dalam_pengiriman  { background: #4B6C6F; }
     .status-dot.is-sampai_di_toko    { background: #EA580C; }
+    .status-dot.is-dititipkan        { background: #7C3AED; }
     .status-dot.is-terpasang         { background: #5B7A5B; }
 
 
@@ -159,6 +160,7 @@
     .po-pill.is-sudah_dipesankan { color: #8A6218; background: rgba(173, 122, 30, 0.15); }
     .po-pill.is-dalam_pengiriman { color: #3B5658; background: rgba(75, 108, 111, 0.15); }
     .po-pill.is-sampai_di_toko   { color: #C2410C; background: rgba(234, 88, 12, 0.17); }
+    .po-pill.is-dititipkan       { color: #6D28D9; background: rgba(124, 58, 237, 0.14); }
     .po-pill.is-terpasang        { color: #46633F; background: rgba(91, 122, 91, 0.17); }
     .po-pill.is-solid { color: #F6F7F9; padding: 3px 12px; }
     .po-pill.is-solid::before { background: #F6F7F9; }
@@ -166,6 +168,7 @@
     .po-pill.is-solid.is-sudah_dipesankan { background: #AD7A1E; }
     .po-pill.is-solid.is-dalam_pengiriman { background: #4B6C6F; }
     .po-pill.is-solid.is-sampai_di_toko   { background: #EA580C; }
+    .po-pill.is-solid.is-dititipkan       { background: #7C3AED; }
     .po-pill.is-solid.is-terpasang        { background: #5B7A5B; }
     .po-pill.is-dibatalkan       { color: #A83B3B; background: rgba(168, 59, 59, 0.12); }
     /* Sales Order list: Status Pengadaan (how far the order's goods have got). */
@@ -1390,7 +1393,9 @@
                 </div>
                   <div class="flex items-baseline justify-between gap-3 pt-1 text-xs"><span class="text-muted">Total diskon</span><span id="cashier-summary-discount" class="text-ink tabular-nums">Rp 0</span></div>
                 </div>
-                <div id="cashier-summary-return-row" class="hidden flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Retur</dt><dd id="cashier-summary-return" class="text-ink tabular-nums">Rp 0</dd></div>
+                <div id="cashier-summary-return-row" class="hidden py-2">
+                  <div class="flex items-baseline justify-between gap-3"><dt class="text-muted">Total Awal Nota</dt><dd id="cashier-summary-original" class="text-ink tabular-nums">Rp 0</dd></div>
+                  <div class="flex items-baseline justify-between gap-3 pt-1"><dt class="text-muted">Retur</dt><dd id="cashier-summary-return" class="text-ink tabular-nums">Rp 0</dd></div></div>
                 <div id="cashier-summary-service-row" class="hidden flex items-baseline justify-between gap-3 py-1 text-xs"><dt class="text-muted">Termasuk biaya jasa</dt><dd id="cashier-summary-service" class="text-ink tabular-nums">Rp 0</dd></div>
                 <div class="flex items-baseline justify-between gap-3 mt-2 px-3 py-2.5 rounded-xl bg-accent/10">
                   <dt class="text-base font-semibold text-ink">Total</dt>
@@ -2108,7 +2113,7 @@
                 <div class="fi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input id="po-customer-name" type="text" placeholder="Nama pemesan" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
               </div>
               <div class="po-frow">
-                <label for="po-plate-region">No. Plat <span class="text-failed">*</span></label>
+                <label for="po-plate-region">No. Plat <span class="text-[11px] font-normal text-muted">(opsional)</span></label>
                 <div>
                   <div class="flex items-center gap-2">
                     <span class="text-muted shrink-0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l2-5a2 2 0 0 1 1.9-1.3h10.2A2 2 0 0 1 19 7l2 5"/><path d="M3 12h18v5a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5Z"/><path d="M7 14.5h.01M17 14.5h.01"/></svg></span>
@@ -2147,7 +2152,7 @@
               </div>
               <div class="po-frow">
                 <label for="po-source">Sumber Order <span class="text-failed">*</span></label>
-                <select id="po-source" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                <select id="po-source" onchange="poDepositMethodChanged()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
                   <option value="walk_in">Walk-in (datang ke toko)</option>
                   <option value="whatsapp">WhatsApp</option>
                 </select>
@@ -2203,12 +2208,19 @@
                   <input id="po-deposit-confirmed" type="checkbox" class="accent-[#EA580C] mt-0.5" />
                   <span>Dana sudah saya cek masuk<span class="block text-[11px] text-muted">Bila tidak dicentang, DP dicatat <b>Pending</b> dan belum dihitung sebagai DP sampai dikonfirmasi.</span></span>
                 </label>
+                <div id="po-deposit-proof-wrap" class="hidden rounded-lg border border-line bg-white px-3 py-2">
+                  <label for="po-deposit-proof" class="block text-xs font-medium text-ink">Bukti Transfer dari Customer <span class="text-failed">*</span></label>
+                  <p class="text-[11px] text-muted mb-1.5">Pesanan WhatsApp: unggah screenshot transfer yang dikirim customer (JPG/PNG/WebP/PDF, maks. 5 MB).</p>
+                  <input id="po-deposit-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="poDepositProofChanged()"
+                    class="block w-full text-xs text-ink file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-line file:bg-bg2 file:text-ink file:text-xs file:font-medium hover:file:bg-bg" />
+                  <img id="po-deposit-proof-preview" alt="Pratinjau bukti transfer" class="hidden mt-2 max-h-40 rounded-lg border border-line" />
+                </div>
               </div>
               <div id="po-deposit-hint" class="hidden text-right">
                 <button type="button" onclick="openPoPaymentModal()" class="px-3 py-1.5 border border-accent text-accent rounded-lg text-xs font-medium hover:bg-accent/10 transition-colors">+ Tambah DP / Pembayaran</button>
                 <p class="text-[11px] text-muted mt-1">Dicatat langsung ke Sales Order ini; perubahan form yang belum disimpan tidak ikut.</p>
               </div>
-              <div class="rounded-lg bg-bg2 px-3 py-2">
+              <div id="po-deposit-min-box" class="hidden rounded-lg bg-bg2 px-3 py-2">
                 <div class="flex items-center justify-between text-xs"><span class="text-muted">Minimal DP (30%)</span><span id="po-deposit-need" class="tabular-nums text-ink">Rp 0</span></div>
                 <div class="mt-1.5 h-1.5 rounded-full bg-line overflow-hidden"><div id="po-deposit-bar" class="h-full bg-accent rounded-full transition-all" style="width:0%"></div></div>
                 <p id="po-deposit-min" class="text-[11px] text-muted mt-1.5"></p>
@@ -5469,6 +5481,10 @@ function renderPageHeader() {
   const tile = document.querySelector("#topbar-icon svg");
   if (sub) sub.textContent = meta ? meta.subtitle : "";
   if (tile) tile.innerHTML = meta ? meta.icon : "";
+  // Owner 25-10-2026: Sales Order shows no top-bar title; the page's own heading says it already.
+  const bare = currentRoute() === "/sales-order";
+  document.getElementById("topbar-icon")?.style.setProperty("display", bare ? "none" : "");
+  document.getElementById("topbar-title")?.parentElement.style.setProperty("display", bare ? "none" : "");
   if (currentRoute() === "/cashier") kasirTopbar(getActiveTab());
   renderSidebarDate();
 }
@@ -7490,6 +7506,9 @@ function renderCashierSummary() {
   document.getElementById("cashier-summary-service").textContent = formatIDR(bd.serviceTotal);
   document.getElementById("cashier-summary-service-row").classList.toggle("hidden", bd.serviceTotal <= 0);
   document.getElementById("cashier-summary-return").textContent = "- " + formatIDR(bd.returnTotal || 0);
+  // UAT-025: the nota keeps showing what it was before the return; the Total below is after it.
+  document.getElementById("cashier-summary-original").textContent = formatIDR(cashierLastTotal + (bd.returnTotal || 0));
+  document.getElementById("cashier-summary-total").previousElementSibling.textContent = bd.returnTotal > 0 ? "Total setelah Retur" : "Total";
   document.getElementById("cashier-summary-return-row").classList.toggle("hidden", !(bd.returnTotal > 0));
   const paidNow = priceValue(document.getElementById("amount-paid-input"));
   document.getElementById("cashier-summary-paid").textContent = formatIDR(paidNow);
@@ -10549,7 +10568,8 @@ function renderHistoryTable(receipts, total) {
         <div class="text-xs text-muted">${isNaN(created) ? "" : `${pad2(created.getHours())}:${pad2(created.getMinutes())}`}</div>
       </td>
       <td class="px-2 py-3 text-right text-muted tabular-nums">${r.item_count}</td>
-      <td class="px-2 py-3 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(r.total)}</td>
+      <td class="px-2 py-3 text-right text-ink tabular-nums whitespace-nowrap">${r.return_total > 0
+        ? `<div>${formatIDR(r.total + r.return_total)}</div><div class="text-xs text-failed">Retur -${formatIDR(r.return_total)}</div>` : formatIDR(r.total)}</td>
       <td class="px-2 py-3 text-right tabular-nums whitespace-nowrap ${r.status === "void" ? "text-muted" : "text-done"}">${r.status === "void" ? "&mdash;" : formatIDR(r.amount_paid)}</td>
       <td class="px-2 py-3 text-right tabular-nums whitespace-nowrap ${remaining > 0 ? "text-failed" : "text-muted"}">${r.status === "void" ? "&mdash;" : formatIDR(remaining)}</td>
       <td class="px-2 py-3">${workBadge(r.work_status, r.status, r.work_stage, r.handed_over_at, r.handover_debt) || esc(statusLabel(r.status))}</td>
@@ -13371,11 +13391,15 @@ async function odFetch(kind) {
 // ── Sales Order ──
 const OD_SO = { data: null, tab: "semua", page: 1, scope: "aktif", f: { q: "", supplier: "", status: "", line: "", po: "", from: "", eta: "" } };
 const OD_SO_TABS = [["semua", "Semua"], ["tindakan", "Perlu Tindakan"], ["menunggu_po", "Menunggu PO"], ["dalam_pengiriman", "Dalam Pengiriman"],
-  ["tiba_sebagian", "Tiba Sebagian"], ["siap", "Barang Siap"], ["terlambat", "Terlambat"], ["selesai", "Selesai"]];
+  ["tiba_sebagian", "Tiba Sebagian"], ["siap", "Barang Siap"], ["lunas_belum", "Lunas, Belum Diserahkan"], ["terlambat", "Terlambat"], ["selesai", "Selesai"]];
 const OD_SO_STATUS = {
   menunggu_supplier: ["orange", "Menunggu supplier"], menunggu_po: ["amber", "Menunggu PO"], dalam_pengiriman: ["blue", "Dalam pengiriman"],
-  tiba_sebagian: ["sky", "Tiba sebagian"], dialokasikan: ["violet", "Dialokasikan"], siap: ["green", "Barang siap"],
+  tiba_sebagian: ["sky", "Tiba sebagian"], dialokasikan: ["violet", "Dialokasikan"], siap: ["green", "Barang siap"], dititipkan: ["violet", "Dititipkan di toko"],
   menunggu_lunas: ["stone", "Menunggu pelunasan"], menunggu_selesai: ["stone", "Menunggu selesai"], selesai: ["green", "Selesai"],
+};
+const OD_SO_LINE_GROUPS = {
+  menunggu: ["Menunggu Supplier", ["pesanan_dibuat", "sudah_dipesankan", "dalam_pengiriman"]], siap: ["Siap Diambil", ["sampai_di_toko"]],
+  dititipkan: ["Dititipkan di Toko", ["dititipkan"]], terpasang: ["Diserahkan / Terpasang", ["terpasang"]],
 };
 const OD_SO_STAGE_COLORS = { menunggu_po: "#F2A541", dalam_pengiriman: "#3B8BD9", tiba_sebagian: "#8A6FD1", siap: "#3FAE6A", lain: "#B6BCC6" };
 // Order of the follow-ups (the first one is what the "Perlu Tindakan" card shows for an order).
@@ -13396,6 +13420,7 @@ function odSoInTab(r, tab) {
   if (tab === "semua") return r.stage !== "selesai";
   if (tab === "tindakan") return r.actions.length > 0;
   if (tab === "terlambat") return r.late && r.stage !== "selesai";
+  if (tab === "lunas_belum") return !!r.paid_not_handed;
   return r.stage === tab;
 }
 
@@ -13405,7 +13430,7 @@ function odSoFiltered() {
     && (!q || [r.so_number, r.customer_name, r.plate, r.customer_phone, r.receipt_no, ...r.item_names, ...r.pos.map(p => p.po_number)].some(v => String(v || "").toLowerCase().includes(q)))
     && (!f.supplier || r.suppliers.includes(f.supplier))
     && (!f.status || r.status_key === f.status)
-    && (!f.line || r.line_statuses.includes(f.line))
+    && (!f.line || r.line_statuses.some(st => OD_SO_LINE_GROUPS[f.line][1].includes(st)))
     && (!po || r.pos.some(p => p.po_number.toLowerCase().includes(po)))
     && (!f.from || r.so_date >= f.from)
     && (!f.eta || (r.eta && r.eta <= f.eta)));
@@ -13416,11 +13441,13 @@ function odSoRender() {
   const cnt = st => active.filter(r => r.stage === st).length;
   const actionRows = rows.filter(r => r.actions.length);
   const late = active.filter(r => r.late).length;
-  const kpis = `<div class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2.5 sm:gap-3 mb-4">
+  const paidOpen = rows.filter(r => r.paid_not_handed).length;
+  const kpis = `<div class="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-2.5 sm:gap-3 mb-4">
     ${odKpi("coral", "clipboard", "SO Aktif", active.length, "Pesanan masih berjalan", "odSoTab('semua')")}
     ${odKpi("amber", "cart", "Menunggu PO", cnt("menunggu_po"), "Perlu supplier / PO", "odSoTab('menunggu_po')")}
     ${odKpi("blue", "truck", "Dalam Pengiriman", cnt("dalam_pengiriman"), "Barang sedang dipesan / dikirim", "odSoTab('dalam_pengiriman')")}
     ${odKpi("violet", "box", "Barang Siap", cnt("siap"), "Siap dipasang / diambil", "odSoTab('siap')")}
+    ${odKpi("green", "coins", "Lunas, Belum Diserahkan", paidOpen, "Sudah bayar penuh, barang belum diserahkan", "odSoTab('lunas_belum')")}
     ${odKpi("red", "alert", "Perlu Tindakan", actionRows.length, "Butuh tindak lanjut hari ini", "odSoTab('tindakan')")}
     ${odKpi("green", "clock", "Terlambat", late, "Melewati ETA terkonfirmasi", "odSoTab('terlambat')")}</div>`;
 
@@ -13488,7 +13515,7 @@ function odSoRenderTable() {
     <label class="relative block"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">${odIcon("search", 14)}</span><input id="od-so-q" type="search" data-no-uppercase value="${esc(f.q)}" placeholder="Cari customer / SO / plat / barang" onkeydown="if(event.key==='Enter') odSoSearch()" class="${OD_INPUT} pl-8" /></label>
     ${sel("supplier", "Semua Supplier", suppliers.map(s => [s, s]))}
     ${sel("status", "Status SO", Object.entries(OD_SO_STATUS).map(([k, [, l]]) => [k, l]))}
-    ${sel("line", "Status Barang", Object.entries(d.line_status_labels).filter(([k]) => k !== "dibatalkan"))}
+    ${sel("line", "Status Barang", Object.entries(OD_SO_LINE_GROUPS).map(([k, [l]]) => [k, l]))}
     <input id="od-so-po" type="search" data-no-uppercase value="${esc(f.po)}" placeholder="Nomor PO" onkeydown="if(event.key==='Enter') odSoSearch()" class="${OD_INPUT}" />
     ${dateIn("from", "Tanggal SO dari")}${dateIn("eta", "ETA sampai")}
     <div class="flex gap-2"><button type="button" onclick="odSoSearch()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-accent text-white text-[13px] font-semibold hover:bg-accentDark">${odIcon("search", 14)}Cari</button>
@@ -16177,7 +16204,22 @@ async function empToggle(id, on) {
 
 // ── Proses Pengerjaan (mockups 08 / 09) ───────────────────────────────────────
 // Owner, 24-10-2026: monitoring only. Work status, items and payments are changed in the Kasir, never here.
-let woState = { scope: "aktif", q: "", from: "", to: "", openId: null };
+let woState = { scope: "aktif", q: "", from: "", to: "", openId: null, sort: null, dir: 1, data: null };
+// Owner 25-10-2026: Nota, Kendaraan and Pelanggan sort on a header click (again = reverse); sorted in the browser.
+const WO_SORT = {
+  nota: r => r.receipt_no || "",
+  kendaraan: r => ([r.vehicle_make, r.vehicle_model].filter(Boolean).join(" ") || "\uffff") + " " + (r.plate_full || ""),
+  pelanggan: r => r.customer_name || "\uffff",
+};
+function woSortBy(key) {
+  if (woState.sort === key) woState.dir = -woState.dir; else { woState.sort = key; woState.dir = 1; }
+  woRenderList();
+}
+function woSortHead(key, label) {
+  const on = woState.sort === key;
+  return { label: `<button type="button" onclick="woSortBy('${key}')" class="inline-flex items-center gap-1 uppercase tracking-wider hover:text-ink ${on ? "text-ink" : ""}"
+    aria-label="Urutkan ${label}">${label}<span class="text-[10px] ${on ? "" : "opacity-40"}">${on ? (woState.dir > 0 ? "▲" : "▼") : "↕"}</span></button>` };
+}
 let woSeq = 0;
 function woInit() { woState.openId ? woOpen(woState.openId) : woList(); }
 function woBack() { woState.openId = null; woList(); }
@@ -16188,6 +16230,16 @@ async function woList() {
     const d = await grApi(`/api/work-orders?scope=${woState.scope}&q=${encodeURIComponent(woState.q)}`
       + (woState.from ? `&date_from=${woState.from}` : "") + (woState.to ? `&date_to=${woState.to}` : ""));
     if (seq !== woSeq) return;
+    woState.data = d;
+    woRenderList();
+  } catch (e) { if (seq === woSeq) pgError("wo-root", e.message, "woList()"); }
+}
+function woRenderList() {
+  const d = woState.data;
+  if (!d) return;
+  const get = WO_SORT[woState.sort];
+  const rows = get ? [...d.rows].sort((a, b) => woState.dir * get(a).localeCompare(get(b), "id", { numeric: true, sensitivity: "base" })) : d.rows;
+  {
     const tab = (k, l) => `<button type="button" onclick="woState.scope='${k}'; woList()" class="px-3 py-1.5 rounded-lg text-sm ${woState.scope === k ? "bg-accent/10 text-accentDark font-semibold border border-accent/40" : "border border-line text-ink bg-white hover:bg-bg2"}">${l}</button>`;
     document.getElementById("wo-root").innerHTML = pgHead("Kasir", "Proses Pengerjaan", "Nota berjalan: progres pemasangan per item dan pembayaran dicatat terpisah. Nota lunas belum tentu selesai, dan sebaliknya.")
       + `<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">${grStat("amber", "Antrian", d.counts.antrian, "Pekerjaan menunggu teknisi")}
@@ -16200,7 +16252,7 @@ async function woList() {
             <button type="button" onclick="woSetDates(toDateInputValue(new Date()), toDateInputValue(new Date()))" class="px-3 py-1.5 rounded-lg text-sm border border-line text-ink bg-white hover:bg-bg2">Hari ini</button>
             ${woState.from || woState.to ? `<button type="button" onclick="woSetDates('', '')" class="px-2 py-1.5 rounded-lg text-sm text-muted hover:text-ink" aria-label="Hapus filter tanggal">&times; Semua tanggal</button>` : ""}</span>
           <input type="search" placeholder="Cari plat, nomor nota, pelanggan…" value="${esc(woState.q)}" onkeydown="if(event.key==='Enter'){woState.q=this.value; woList()}" class="${GR_IN} sm:max-w-xs ml-auto"></div>`
-        + pgTable(["Nota", "Kendaraan", "Pelanggan", "Teknisi", { label: "Progres" }, "Pengerjaan", "Pembayaran", { label: "Total", right: true }, ""], d.rows.map(r => {
+        + pgTable([woSortHead("nota", "Nota"), woSortHead("kendaraan", "Kendaraan"), woSortHead("pelanggan", "Pelanggan"), "Teknisi", { label: "Progres" }, "Pengerjaan", "Pembayaran", { label: "Total", right: true }, ""], rows.map(r => {
           const pay = PG_PAY(r), work = PG_WORK[r.work_status] || ["gray", r.work_status];
           return `<tr class="hover:bg-bg2/40 cursor-pointer" onclick="woOpen('${r.id}')">
             <td class="${GR_TD} font-medium text-ink whitespace-nowrap">${esc(r.receipt_no)}<div class="text-[11px] text-muted">${pgDateTime(r.created_at)}</div></td>
@@ -16211,7 +16263,7 @@ async function woList() {
             <td class="${GR_TD} text-right tabular-nums">${formatIDR(r.total)}</td>
             <td class="${GR_TD}"><button type="button" class="${GR_BTN3} !py-1.5">Lihat</button></td></tr>`;
         }), "Tidak ada nota pada filter ini."));
-  } catch (e) { if (seq === woSeq) pgError("wo-root", e.message, "woList()"); }
+  }
 }
 function woSetDates(from, to) {
   // Picking only one end, or ends in the wrong order, still gives a sensible range.
@@ -19928,7 +19980,8 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
       <table style="border-collapse:collapse;min-width:62mm;">
         ${totalRow("Sub Total", groupDigits(r.subtotal) || "0")}
         ${totalRow("Potongan", groupDigits(r.discount) || "0", "border-bottom:1px solid #000;")}
-        ${totalRow("Jumlah", groupDigits(r.total) || "0", "font-weight:bold;")}
+        ${r.return_total > 0 ? totalRow("Total Awal", groupDigits(r.total + r.return_total)) + totalRow("Retur", "-" + groupDigits(r.return_total), "border-bottom:1px solid #000;") : ""}
+        ${totalRow(r.return_total > 0 ? "Jumlah Akhir" : "Jumlah", groupDigits(r.total) || "0", "font-weight:bold;")}
         ${remaining > 0 && r.status !== "void" ? totalRow("Dibayar", groupDigits(r.amount_paid) || "0") + totalRow("Sisa", groupDigits(remaining), "font-weight:bold;") : ""}
       </table>
     </div>
@@ -20052,15 +20105,21 @@ function purchaseInvoicePrintHtml(inv) {
 // fittings already in the shop while the pipe is still with the supplier.
 // Four views share #page-preorder: the list, the new/edit form, the detail page
 // and the Nota PO print preview.
+// Owner 25-10-2026: staff see four simple stages; the three supplier stages read "Menunggu Supplier" (their
+// options are hidden, the system moves a line through them) and the detailed name stays in Riwayat Status.
 const PREORDER_STATUSES = [
-  { key: "pesanan_dibuat", label: "Pesanan dibuat" },
-  { key: "sudah_dipesankan", label: "Sudah dipesankan" },
-  { key: "dalam_pengiriman", label: "Dalam pengiriman" },
-  { key: "sampai_di_toko", label: "Sampai di toko" },
-  { key: "terpasang", label: "Terpasang" },
+  { key: "pesanan_dibuat", label: "Menunggu Supplier", detail: "Pesanan dibuat" },
+  { key: "sudah_dipesankan", label: "Menunggu Supplier", detail: "Sudah dipesankan", hidden: true },
+  { key: "dalam_pengiriman", label: "Menunggu Supplier", detail: "Dalam pengiriman", hidden: true },
+  { key: "sampai_di_toko", label: "Siap Diambil", detail: "Sampai di toko" },
+  { key: "dititipkan", label: "Dititipkan di Toko", detail: "Dititipkan di toko" },
+  { key: "terpasang", label: "Diserahkan / Terpasang", detail: "Diserahkan / terpasang" },
 ];
+const preorderStatusOptions = cur => PREORDER_STATUSES.map(s =>
+  `<option value="${esc(s.key)}" ${s.key === cur ? "selected" : ""} ${s.hidden ? "hidden" : ""}>${esc(s.label)}</option>`).join("");
 
 const PREORDER_STATUS_LABELS = { ...Object.fromEntries(PREORDER_STATUSES.map(s => [s.key, s.label])), dibatalkan: "Dibatalkan" };
+const PREORDER_STATUS_DETAIL = { ...Object.fromEntries(PREORDER_STATUSES.map(s => [s.key, s.detail])), dibatalkan: "Dibatalkan" };
 const PREORDER_DONE_STATUS = "terpasang";
 const PO_PANELS = ["po-list-panel", "po-form-panel", "po-detail-panel", "po-review-panel", "po-print-panel"];
 
@@ -20213,6 +20272,8 @@ const PO_ICON_VIEW = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none
 const PO_ICON_EDIT = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const PO_ICON_PRINT = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6Z"/></svg>';
 const PO_ICON_TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+
+const PO_ICON_HANDOVER = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3Z"/><path d="M14 10h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>';
 
 function poIconButton(icon, title, onclick, danger = false) {
   return `<button type="button" title="${esc(title)}" aria-label="${esc(title)}" onclick="event.stopPropagation(); ${onclick}"
@@ -20369,6 +20430,8 @@ async function renderPreorderForm(detail) {
   document.getElementById("po-deposit-method-wrap").classList.toggle("hidden", editing);
   document.getElementById("po-deposit-method").value = "cash";
   document.getElementById("po-deposit-confirmed").checked = false;
+  document.getElementById("po-deposit-proof").value = "";
+  poDepositProofChanged();
   poDepositMethodChanged();
   document.getElementById("po-deposit-fixed").classList.toggle("hidden", !editing);
   document.getElementById("po-deposit-hint").classList.toggle("hidden", !editing);
@@ -20389,8 +20452,7 @@ const SO_ROW_SELECT = "border border-line rounded-md px-1.5 py-1 text-xs bg-whit
 
 const PO_CELL = "w-full border border-line rounded-lg px-2.5 py-1.5 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors";
 function preorderRowTemplate() {
-  const statusOptions = PREORDER_STATUSES
-    .map(s => `<option value="${esc(s.key)}">${esc(s.label)}</option>`).join("");
+  const statusOptions = preorderStatusOptions(null);
   return `
     <div class="po-grid">
       <div class="relative min-w-0">
@@ -20818,6 +20880,32 @@ function updatePreorderTotals() {
 function poDepositMethodChanged() {
   const m = document.getElementById("po-deposit-method").value;
   document.getElementById("po-deposit-confirm-wrap").classList.toggle("hidden", !["transfer", "qris"].includes(m));
+  document.getElementById("po-deposit-proof-wrap").classList.toggle("hidden", !poProofNeeded());
+}
+
+// Owner 25-10-2026: a WhatsApp order paying its DP by transfer/QRIS keeps the screenshot the customer sent.
+function poProofNeeded() {
+  return !currentPreorder && document.getElementById("po-source").value === "whatsapp"
+    && ["transfer", "qris"].includes(document.getElementById("po-deposit-method").value);
+}
+function poDepositProofChanged() {
+  const file = document.getElementById("po-deposit-proof").files[0];
+  const img = document.getElementById("po-deposit-proof-preview");
+  if (img.src) URL.revokeObjectURL(img.src);
+  const show = !!file && file.type.startsWith("image/");
+  img.classList.toggle("hidden", !show);
+  if (show) img.src = URL.createObjectURL(file); else img.removeAttribute("src");
+}
+async function poProofPayload() {
+  const file = document.getElementById("po-deposit-proof").files[0];
+  if (!file) return null;
+  const data = await new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1] || "");
+    r.onerror = () => fail(new Error("File bukti transfer tidak bisa dibaca."));
+    r.readAsDataURL(file);
+  });
+  return { name: file.name, content_type: file.type, data };
 }
 
 function poFillMinDeposit() {
@@ -20861,7 +20949,7 @@ function collectPreorderPayload(asDraft) {
   return payload;
 }
 
-const SO_MIN_DP_PERCENT = 30;   // mirrors backend database.SO_MIN_DP_PERCENT
+const SO_MIN_DP_PERCENT = 0;   // mirrors backend database.SO_MIN_DP_PERCENT (owner 25-10-2026: no minimum)
 function soSourceBadge(source) {
   return source === "whatsapp"
     ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-green-50 text-green-800 border border-green-200">WhatsApp</span>'
@@ -20871,7 +20959,6 @@ function soMinDp(total) { return Math.ceil(total * SO_MIN_DP_PERCENT / 100); }
 
 function validatePreorderPayload(payload) {
   if (!payload.customer_name) return "Nama customer wajib diisi.";
-  if (!payload.plate_full) return "Nomor plat mobil wajib diisi.";
   if (!payload.customer_phone) return "Nomor telepon wajib diisi.";
   if (payload.items.length === 0) return "Isi minimal satu barang.";
   for (const item of payload.items) {
@@ -20881,6 +20968,11 @@ function validatePreorderPayload(payload) {
   }
   const total = payload.items.reduce((acc, i) => acc + i.quantity * i.unit_price, 0);
   if ((payload.deposit || 0) > total) return "DP melebihi total pesanan.";
+  if (poProofNeeded() && (payload.deposit || 0) > 0) {
+    const f = document.getElementById("po-deposit-proof").files[0];
+    if (!f) return "Bukti transfer wajib diunggah untuk DP pesanan WhatsApp.";
+    if (f.size > 5 * 1024 * 1024) return "Ukuran bukti transfer maksimal 5 MB.";
+  }
   const publishing = !payload.is_draft && (!currentPreorder || currentPreorder.is_draft);
   const paid = currentPreorder ? currentPreorder.deposit : (payload.deposit || 0);
   if (publishing && paid < soMinDp(total)) {
@@ -20913,6 +21005,7 @@ async function savePreorder(asDraft = false) {
   buttons.forEach(b => { b.disabled = true; });
   try {
     const editing = Boolean(currentPreorder);
+    if (!editing && poProofNeeded() && payload.deposit > 0) payload.deposit_proof = await poProofPayload();
     if (editing && currentPreorder.updated_at) payload.expected_updated_at = currentPreorder.updated_at;
     const resp = await fetch(editing ? `/api/preorders/${currentPreorder.id}` : "/api/preorders", {
       method: editing ? "PATCH" : "POST",
@@ -21006,7 +21099,7 @@ function soDraftPoIds(detail) {
 function soMissingSupplierItems(detail) {
   if (detail.is_draft || detail.cancelled_at) return [];
   return (detail.items || []).filter(i => i.source === "supplier" && !i.supplier_id
-    && !["sampai_di_toko", "terpasang", "dibatalkan"].includes(i.status));
+    && !["sampai_di_toko", "dititipkan", "terpasang", "dibatalkan"].includes(i.status));
 }
 
 async function openPoReview(detail) {
@@ -21195,6 +21288,8 @@ function renderPreorderDetail(detail) {
       <td class="px-3 py-2">${preorderStatusBadgeHtml(item.status)}${soReservationHtml(item)}</td>
       <td class="px-3 py-2">
         <div class="flex items-center justify-end gap-1.5">
+          ${detail.receipt_id && item.quantity > 1 && item.reserved_qty > 0 && item.status !== "terpasang"
+            ? poIconButton(PO_ICON_HANDOVER, "Serah terima sebagian", `openPoPartialHandover(${item.id})`) : ""}
           ${poIconButton(PO_ICON_EDIT, "Edit barang", `openPreorderEdit('${esc(detail.id)}')`)}
           ${poIconButton(PO_ICON_TRASH, "Hapus barang", `confirmRemovePoItem(${item.id})`, true)}
         </div>
@@ -21207,7 +21302,7 @@ function renderPreorderDetail(detail) {
     <tr class="border-b border-line last:border-b-0">
       <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatDateTimeSeconds(p.paid_at).slice(0, 16))}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(p.amount)}</td>
-      <td class="px-3 py-2 text-muted">${esc(p.note || "—")}${p.method ? ` <span class="text-[11px] uppercase text-muted">· ${esc(p.method)}</span>` : ""}${p.state && p.state !== "sah" ? " " + payStateBadge(p) : ""}${p.state === "pending" ? `<div class="mt-1">${payActionButtons(p.receipt_id ? "nota" : "so", p.receipt_id || detail.id, p)}</div>` : ""}</td>
+      <td class="px-3 py-2 text-muted">${esc(p.note || "—")}${p.method ? ` <span class="text-[11px] uppercase text-muted">· ${esc(p.method)}</span>` : ""}${p.state && p.state !== "sah" ? " " + payStateBadge(p) : ""}${p.state === "pending" ? `<div class="mt-1">${payActionButtons(p.receipt_id ? "nota" : "so", p.receipt_id || detail.id, p)}</div>` : ""}${soProofCell(detail, p)}</td>
       <td class="px-3 py-2 text-muted">${esc(p.created_by || "—")}</td>
     </tr>
   `).join("");
@@ -21252,7 +21347,7 @@ function renderPreorderDetail(detail) {
     renderPoInvoiceList(detail);
   }
   document.getElementById("po-pay-btn")?.classList.toggle("hidden", hasInvoice && (detail.invoice_status === "void" || detail.remaining <= 0));
-  const poReady = detail.items.filter(i => !i.receipt_id && (i.status === "sampai_di_toko" || i.status === "terpasang"));
+  const poReady = detail.items.filter(i => !i.receipt_id && ["sampai_di_toko", "dititipkan", "terpasang"].includes(i.status));
   const poOnNota = detail.items.filter(i => i.receipt_id).length;
   document.getElementById("po-convert-btn").disabled = poReady.length === 0;
   document.getElementById("po-convert-btn").classList.toggle("opacity-50", poReady.length === 0);
@@ -21270,8 +21365,8 @@ function renderPreorderDetail(detail) {
       <tr class="border-b border-line last:border-b-0">
         <td class="px-3 py-2 text-muted tabular-nums whitespace-nowrap">${esc(formatDateTimeSeconds(h.changed_at).slice(0, 16))}</td>
         <td class="px-3 py-2 text-ink">${esc(h.product_name)}</td>
-        <td class="px-3 py-2 text-muted">${h.old_status ? esc(preorderStatusLabel(h.old_status)) : "—"}</td>
-        <td class="px-3 py-2 text-ink">${esc(preorderStatusLabel(h.status))}</td>
+        <td class="px-3 py-2 text-muted">${h.old_status ? esc(PREORDER_STATUS_DETAIL[h.old_status] || h.old_status) : "—"}</td>
+        <td class="px-3 py-2 text-ink">${esc(PREORDER_STATUS_DETAIL[h.status] || h.status)}</td>
         <td class="px-3 py-2 text-muted">${esc(h.changed_by || "—")}</td>
       </tr>
     `).join("");
@@ -21728,6 +21823,71 @@ function confirmRemovePoItem(itemId) {
 }
 
 // K-02: what the shelf holds for this line, what is still coming from a supplier, and what nobody covers yet.
+// Transfer proof of a Sales Order payment: a link when there is one, an upload button for a transfer/QRIS without.
+function soProofCell(detail, p) {
+  if (!(p.amount > 0) || !["transfer", "qris"].includes(p.method) || p.kind) return "";
+  const src = p.receipt_id ? "nota" : "so";
+  if (p.has_proof) return `<div class="mt-1"><a href="/api/preorders/${esc(detail.id)}/payments/${p.id}/proof?src=${src}" target="_blank" rel="noopener"
+    class="inline-flex items-center gap-1 text-xs font-medium text-[#1D4ED8] hover:underline">Lihat bukti transfer</a></div>`;
+  const must = detail.order_source === "whatsapp";
+  return `<div class="mt-1 flex items-center gap-2"><span class="text-[11px] ${must ? "text-failed font-medium" : "text-muted"}">Belum ada bukti transfer</span>
+    <button type="button" onclick="pickSoProof(${p.id}, '${src}')" class="px-2 py-0.5 border border-line rounded-md text-[11px] font-medium text-ink hover:bg-bg2">Unggah bukti</button></div>`;
+}
+function pickSoProof(paymentId, src) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/webp,application/pdf";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showToast("Ukuran bukti transfer maksimal 5 MB."); return; }
+    try {
+      const resp = await fetch(`/api/preorders/${currentPreorder.id}/payments/${paymentId}/proof?src=${src}&name=${encodeURIComponent(file.name)}`,
+        { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Bukti transfer gagal diunggah."));
+      renderPreorderDetail(await resp.json());
+      showToast("Bukti transfer tersimpan.", "success");
+    } catch (e) { showToast(e.message); }
+  };
+  input.click();
+}
+
+// UAT-010: hand over part of a line now (the units already held at the shop); the rest stays on the line.
+function openPoPartialHandover(itemId) {
+  const it = currentPreorder?.items.find(i => i.id === itemId);
+  if (!it) return;
+  const max = Math.min(it.reserved_qty || 0, it.quantity - 1);
+  openModal("Serah Terima Sebagian", `
+    <div class="space-y-3">
+      <p class="text-sm text-ink"><span class="font-semibold">${esc(it.product_name)}</span>: ${it.quantity} ${esc(it.unit || "unit")} dipesan, ${it.reserved_qty} ada di toko.</p>
+      <div>
+        <label for="po-partial-qty" class="block text-xs text-muted mb-1.5">Jumlah yang diserahkan / dipasang sekarang (maks. ${max})</label>
+        <input id="po-partial-qty" type="number" min="1" max="${max}" step="1" value="${max}"
+          class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" />
+      </div>
+      <p class="text-xs text-muted">Baris dipecah: jumlah ini menjadi Diserahkan / Terpasang dan stoknya keluar; sisanya tetap menunggu di baris yang sama. Untuk semua unit, ubah status barisnya saja.</p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
+        <button type="button" onclick="submitPoPartialHandover(${itemId})" class="px-4 py-1.5 bg-[#1D4ED8] text-white rounded-lg text-sm font-medium hover:bg-[#1E40AF] transition-colors">Serahkan</button>
+      </div>
+    </div>`);
+}
+
+async function submitPoPartialHandover(itemId) {
+  const qty = parseInt(document.getElementById("po-partial-qty").value, 10) || 0;
+  try {
+    const resp = await fetch(`/api/preorders/${currentPreorder.id}/items/${itemId}/handover-partial`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ qty }),
+    });
+    if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Serah terima sebagian gagal."));
+    closeModal();
+    renderPreorderDetail(await resp.json());
+    showToast(`${qty} unit diserahkan.`, "success");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
 function soReservationHtml(item) {
   if (!item.master_item_id || item.status === "terpasang") return "";
   const bits = [];
@@ -22767,7 +22927,7 @@ function openStockOpnameForItem(itemId) { opPendingItem = itemId; opOrigin = "de
 function openPoConvertModal() {
   const po = currentPreorder;
   if (!po) return;
-  const ready = po.items.filter(i => !i.receipt_id && (i.status === "sampai_di_toko" || i.status === "terpasang"));
+  const ready = po.items.filter(i => !i.receipt_id && ["sampai_di_toko", "dititipkan", "terpasang"].includes(i.status));
   if (!ready.length) { showToast("Belum ada item yang sampai di toko dan belum masuk nota."); return; }
   const total = ready.reduce((a, i) => a + i.quantity * i.unit_price, 0);
   const dp = Math.min(po.dp_unallocated || 0, total);
@@ -22839,7 +22999,7 @@ function openPoPaymentModal() {
           <button type="button" onclick="setPriceInput(document.getElementById('po-pay-amount'), currentPreorder.remaining)"
             class="text-xs text-accent hover:text-accentDark font-medium">Isi sisa tagihan</button>
         </div>
-        ${currentPreorder.is_draft ? `<p class="text-[11px] text-muted mt-1.5">DP minimal ${SO_MIN_DP_PERCENT}% dari total ${formatIDR(currentPreorder.total)} = <b class="text-ink">${formatIDR(soMinDp(currentPreorder.total))}</b>${currentPreorder.deposit ? `; sudah dibayar ${formatIDR(currentPreorder.deposit)}` : ""}.
+        ${currentPreorder.is_draft && SO_MIN_DP_PERCENT > 0 ? `<p class="text-[11px] text-muted mt-1.5">DP minimal ${SO_MIN_DP_PERCENT}% dari total ${formatIDR(currentPreorder.total)} = <b class="text-ink">${formatIDR(soMinDp(currentPreorder.total))}</b>${currentPreorder.deposit ? `; sudah dibayar ${formatIDR(currentPreorder.deposit)}` : ""}.
           ${dpNeed > 0 ? "Hanya pembayaran yang sudah sah (bukan Pending) yang dihitung." : "DP sudah cukup untuk menerbitkan."}</p>` : ""}
       </div>
       <div>
@@ -22891,8 +23051,7 @@ async function submitPoPayment() {
 
 function openPoStatusModal() {
   if (!currentPreorder) return;
-  const options = PREORDER_STATUSES.map(s =>
-    `<option value="${esc(s.key)}" ${s.key === currentPreorder.status ? "selected" : ""}>${esc(s.label)}</option>`).join("");
+  const options = preorderStatusOptions(currentPreorder.status);
   openModal("Ubah Status Sales Order", `
     <div class="space-y-3">
       <div>

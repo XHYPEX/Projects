@@ -1,10 +1,14 @@
 import asyncio
+import base64
+import binascii
 import re
 from datetime import date
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 
+from backend import payment_proofs
 from backend.auth import get_current_user, require_admin
 from backend.routes.quotations import guard_conversion, record_conversion
 from backend.database import (
@@ -41,10 +45,14 @@ from backend.database import (
     get_preorder_payments,
     parse_ymd,
     set_preorder_item_status,
+    set_so_payment_proof,
+    get_so_payment_proof,
+    handover_preorder_item_partial,
     set_preorder_status,
     update_preorder,
 )
 from backend.schemas import (
+    PreorderPartialHandoverRequest,
     PriceDecisionRequest,
     PaymentFailRequest,
     PreorderCancelRequest,
@@ -90,17 +98,35 @@ def _validate_phone(raw: str) -> str:
     return phone
 
 
+def _check_proof(content_type: str, data: bytes) -> tuple[bytes, str]:
+    if content_type not in payment_proofs.PROOF_EXTENSIONS:
+        raise HTTPException(status_code=422, detail="Format bukti transfer harus JPEG, PNG, WebP, atau PDF.")
+    if not data:
+        raise HTTPException(status_code=422, detail="File bukti transfer kosong.")
+    if len(data) > payment_proofs.MAX_PROOF_BYTES:
+        raise HTTPException(status_code=413, detail="Ukuran bukti transfer maksimal 5 MB.")
+    if not payment_proofs.matches_content_type(content_type, data):
+        raise HTTPException(status_code=422, detail="Isi file bukti tidak cocok dengan formatnya.")
+    return data, content_type
+
+
+def _decode_proof(raw: dict) -> tuple[bytes, str]:
+    try:
+        data = base64.b64decode(str(raw.get("data") or ""), validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=422, detail="File bukti transfer rusak.")
+    return _check_proof(str(raw.get("content_type") or "").lower(), data)
+
+
 def _validate_plate(raw: str) -> str:
     # Stored upper-cased with single spaces, the way plates are read off a car.
-    plate = " ".join((raw or "").upper().split())
-    if not plate:
-        raise HTTPException(status_code=422, detail="Plat mobil wajib diisi.")
-    return plate
+    # Owner 25-10-2026: the plate may stay empty (WhatsApp / out-of-town orders); it can be filled in later.
+    return " ".join((raw or "").upper().split())
 
 
 def _require_invoice_plate(plate: str) -> None:
-    """A published PO gets its invoice at once, and an invoice needs a plate the cashier accepts."""
-    if split_plate(plate) is None:
+    """A published PO gets its invoice at once; a plate given must be one the cashier accepts (empty is fine)."""
+    if plate and split_plate(plate) is None:
         raise HTTPException(status_code=422, detail="Plat mobil harus berformat seperti B 1234 ABC (kode wilayah, nomor, huruf).")
 
 
@@ -202,10 +228,12 @@ async def _detail(preorder_id: str) -> PreorderDetail:
                                  "created_by": p["created_by"], "method": p["method"], "kind": p.get("kind"),
                                  "state": p.get("state") or "sah", "confirmed_by": p.get("confirmed_by"),
                                  "confirmed_at": p.get("confirmed_at"), "fail_reason": p.get("fail_reason"),
-                                 "receipt_no": inv["receipt_no"] if many else None, "receipt_id": inv["id"]})
+                                 "receipt_no": inv["receipt_no"] if many else None, "receipt_id": inv["id"],
+                                 "has_proof": bool(p.get("proof_file")), "proof_name": p.get("proof_name")})
         payments.sort(key=lambda x: (x["paid_at"], x["id"]))
     else:
-        payments = await loop.run_in_executor(None, get_preorder_payments, preorder_id)
+        payments = [{**p, "has_proof": bool(p.get("proof_file"))}
+                    for p in await loop.run_in_executor(None, get_preorder_payments, preorder_id)]
     allocations = await loop.run_in_executor(None, get_preorder_allocations, preorder_id)
     def _free() -> int:
         with _conn() as con:
@@ -257,15 +285,22 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
     loop = asyncio.get_event_loop()
     await _require_supplier(loop, req.supplier_id)
     await guard_conversion(req.quotation_id)
+    proof = None
+    if req.deposit_proof and req.deposit > 0 and req.deposit_method in ("transfer", "qris"):
+        proof = (await loop.run_in_executor(None, payment_proofs.save_proof, *_decode_proof(req.deposit_proof)),
+                 str(req.deposit_proof.get("name") or "")[:120] or None)
     try:
         await loop.run_in_executor(
             None, lambda: create_preorder(
                 preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
                 plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
                 deposit_confirmed=req.deposit_confirmed, price_actor=price_actor(user), order_source=req.order_source,
+                deposit_proof=proof,
             ),
         )
     except ValueError as e:
+        if proof:
+            await loop.run_in_executor(None, payment_proofs.delete_proof_file, proof[0])
         raise _po_error(e)
     detail = await _detail(preorder_id)
     await record_conversion(req.quotation_id, "so", preorder_id, detail.po_number, user)
@@ -393,6 +428,54 @@ async def update_preorder_item_status(
     except ValueError as e:
         raise _po_error(e)
     return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/items/{item_id}/handover-partial", response_model=PreorderDetail)
+async def handover_preorder_item_partial_route(
+    preorder_id: str, item_id: int, req: PreorderPartialHandoverRequest, user: dict = Depends(get_current_user)
+):
+    """UAT-010: Serah Terima Sebagian, part of a line goes to Terpasang and the rest waits."""
+    loop = asyncio.get_event_loop()
+    if await loop.run_in_executor(None, get_preorder, preorder_id) is None:
+        raise HTTPException(status_code=404, detail="Preorder tidak ditemukan.")
+    try:
+        await loop.run_in_executor(None, handover_preorder_item_partial, preorder_id, item_id, req.qty, user["username"])
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.put("/preorders/{preorder_id}/payments/{payment_id}/proof", response_model=PreorderDetail)
+async def put_so_payment_proof(preorder_id: str, payment_id: int, request: Request, src: str = "nota", name: str | None = None,
+                               user: dict = Depends(get_current_user)):
+    """Raw-body upload of a payment's transfer proof (JPEG / PNG / WebP / PDF, 5 MB). src = nota (an invoice payment)
+    or so (the Sales Order's own, before it has an invoice)."""
+    loop = asyncio.get_event_loop()
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > payment_proofs.MAX_PROOF_BYTES:
+            raise HTTPException(status_code=413, detail="Ukuran bukti transfer maksimal 5 MB.")
+    body, ctype = _check_proof(request.headers.get("content-type", "").split(";")[0].strip().lower(), bytes(data))
+    filename = await loop.run_in_executor(None, payment_proofs.save_proof, body, ctype)
+    try:
+        previous = await loop.run_in_executor(None, set_so_payment_proof, preorder_id, payment_id, src != "so", filename, name, user["username"])
+    except ValueError as e:
+        await loop.run_in_executor(None, payment_proofs.delete_proof_file, filename)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in str(e) else 422, detail=str(e))
+    await loop.run_in_executor(None, payment_proofs.delete_proof_file, previous)
+    return await _detail(preorder_id)
+
+
+@router.get("/preorders/{preorder_id}/payments/{payment_id}/proof")
+async def get_so_payment_proof_route(preorder_id: str, payment_id: int, src: str = "nota"):
+    loop = asyncio.get_event_loop()
+    stored = await loop.run_in_executor(None, get_so_payment_proof, preorder_id, payment_id, src != "so")
+    path = await loop.run_in_executor(None, payment_proofs.proof_file, stored)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Pembayaran ini belum punya bukti transfer.")
+    return FileResponse(path, media_type=payment_proofs.media_type_for(stored),
+                        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
 
 
 @router.patch("/preorders/{preorder_id}/status", response_model=PreorderDetail)

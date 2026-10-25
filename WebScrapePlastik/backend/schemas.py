@@ -225,6 +225,7 @@ class ReceiptOut(ReceiptExtra):
     started_at: str | None = None
     payment_method: str
     item_count: int
+    return_total: int = 0  # UAT-025: lists show the nota's original total with the return beside it
     customer_id: int | None = None
     # The linked master customer's name when there is one, else the receipt's own
     # customer_name -- what a listing should show. customer_name/customer_phone
@@ -1131,6 +1132,8 @@ class PreorderRequest(BaseModel):
     deposit: int = 0
     deposit_method: str = "cash"  # cash | transfer | qris | debit
     deposit_confirmed: bool | None = None  # K-18: transfer/QRIS DP already seen in the account
+    # Transfer screenshot for the DP {name, content_type, data (base64)}; required for a WhatsApp order paid by transfer/QRIS.
+    deposit_proof: dict | None = None
     notes: str | None = None
     # Buy every barang of this order from this supplier; null = each follows its Master Barang supplier.
     supplier_id: int | None = None
@@ -1158,6 +1161,10 @@ class PreorderUpdateRequest(BaseModel):
 
 class PreorderItemStatusRequest(BaseModel):
     status: str
+
+
+class PreorderPartialHandoverRequest(BaseModel):
+    qty: int
 
 
 class PreorderStatusRequest(BaseModel):
@@ -1196,6 +1203,8 @@ class PreorderPaymentOut(BaseModel):
     proof_ref: str | None = None
     receipt_no: str | None = None
     kind: str | None = None
+    has_proof: bool = False  # a transfer screenshot is attached (GET .../payments/{id}/proof)
+    proof_name: str | None = None
 
 
 class PreorderInvoiceOut(BaseModel):

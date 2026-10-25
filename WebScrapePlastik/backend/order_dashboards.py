@@ -8,7 +8,7 @@ The headline numbers are added up in the browser from these rows, so a tile and 
 Sales Order:
 - Active = published, not cancelled, and its invoice(s) not yet closed (Lunas + Pengerjaan Selesai).
 - One stage per order: menunggu_po → dalam_pengiriman → tiba_sebagian → siap → lain (all installed, invoice
-  still open) → selesai (invoice closed). A line is "arrived" at sampai_di_toko / terpasang, as everywhere else.
+  still open) → selesai (invoice closed). A line is "arrived" at sampai_di_toko / dititipkan / terpasang, as everywhere else.
 - Late = a line that has not arrived whose ETA (package → PO line → PO → SO line) is before today.
 
 Purchase Order:
@@ -160,12 +160,15 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
         eta_text = None if eta else "Belum ada"
 
     missing = [ln for ln in lines if ln["missing_supplier"]]
+    kept = [ln for ln in lines if ln["status"] == "dititipkan"]
     if stage == "menunggu_po":
         status_key, status_label = ("menunggu_supplier", "Menunggu supplier") if missing else ("menunggu_po", "Menunggu PO")
     elif stage == "dalam_pengiriman":
         status_key, status_label = "dalam_pengiriman", "Dalam pengiriman"
     elif stage == "tiba_sebagian":
         status_key, status_label = "tiba_sebagian", "Tiba sebagian"
+    elif stage == "siap" and kept and all(i["status"] in ("dititipkan", "terpasang") for i in live):
+        status_key, status_label = "dititipkan", "Dititipkan di toko"
     elif stage == "siap":
         status_key, status_label = ("dialokasikan", "Dialokasikan") if all_stock else ("siap", "Barang siap")
     elif stage == "selesai":
@@ -192,7 +195,7 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
         if row.get("pending_amount"):
             actions.append({"kind": "dana_pending", "button": "Lihat SO", "amount": row["pending_amount"],
                             "text": "Pembayaran transfer/QRIS menunggu konfirmasi dana masuk"})
-        if stage == "siap" and work_status not in ("pengerjaan", "selesai"):
+        if stage == "siap" and work_status not in ("pengerjaan", "selesai") and status_key != "dititipkan":
             what = summary if len(lines) == 1 else f"{len(lines)} jenis barang"
             actions.append({"kind": "hubungi_customer", "button": "Hubungi Customer",
                             "text": f"{what} siap — hubungi customer untuk pemasangan / pengambilan"})
@@ -209,6 +212,9 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
         "line_statuses": sorted({ln["status"] for ln in lines}),
         "total": due, "paid": row["deposit"], "remaining": row["remaining"], "payment_status": row["payment_status"],
         "actions": actions, "closed_at": _ymd(closed_at),
+        # Owner 25-10-2026: paying in full does not finish an order; these are paid but not all handed over yet.
+        "paid_not_handed": stage != "selesai" and row["remaining"] <= 0 and any(i["status"] != "terpasang" for i in live),
+        "kept_count": len(kept),
     }
 
 

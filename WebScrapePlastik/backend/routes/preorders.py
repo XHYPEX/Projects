@@ -6,7 +6,7 @@ from datetime import date
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from backend import payment_proofs
 from backend.auth import get_current_user, require_admin
@@ -39,6 +39,7 @@ from backend.database import (
     _preorder_item_logistics,
     create_preorder,
     get_all_preorders,
+    delete_preorder_draft,
     get_preorder,
     get_preorder_history,
     get_preorder_items,
@@ -308,11 +309,12 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
 
 
 @router.get("/preorders", response_model=list[PreorderOut])
-async def list_preorders(query: str | None = None, status: str | None = None, draft: bool = False):
+async def list_preorders(query: str | None = None, status: str | None = None, draft: bool = False,
+                         include_draft: bool = False):
     if status:
         _validate_status(status, allow_cancelled=True)
     loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, get_all_preorders, query, status, draft)
+    rows = await loop.run_in_executor(None, get_all_preorders, query, status, None if include_draft else draft)
     return [PreorderOut(**r) for r in rows]
 
 
@@ -646,10 +648,16 @@ async def convert_to_receipt(
     )
 
 
-# There is deliberately no DELETE /preorders/{preorder_id} route. A preorder
-# someone wants off the active list is archived via
-# PATCH /preorders/{preorder_id} {"is_draft": true} instead -- preorders are
-# never deleted. Do not re-add a delete route here.
+# DELETE only removes a draft that never took money (owner 25-10-2026). Anything
+# else is archived via PATCH {"is_draft": true} or cancelled, never deleted.
+@router.delete("/preorders/{preorder_id}", status_code=204, response_class=Response)
+async def delete_preorder_route(preorder_id: str, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, delete_preorder_draft, preorder_id)
+    except ValueError as e:
+        raise _po_error(e)
+    return Response(status_code=204)
 
 
 # ---- K-19: Sales Order with several invoices (admin) ----

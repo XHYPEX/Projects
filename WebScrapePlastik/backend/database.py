@@ -9075,13 +9075,13 @@ def _backfill_po_invoices(con: sqlite3.Connection) -> None:
             con.execute("RELEASE po_backfill")
 
 
-def get_all_preorders(query: str | None = None, status: str | None = None, draft: bool = False) -> list[dict]:
+def get_all_preorders(query: str | None = None, status: str | None = None, draft: bool | None = False) -> list[dict]:
     """`status` filters on the computed order-level stage, so it is applied in
     Python rather than SQL — the value does not exist as a column. `draft` is a
     real column, so it's applied in SQL: False (the default) is the active
-    list, True is the parked/archived one — the two never mix."""
-    where_clauses = ["is_draft=?"]
-    params: list = [1 if draft else 0]
+    list, True is the parked/archived one, None is both (the list's "Semua")."""
+    where_clauses = [] if draft is None else ["is_draft=?"]
+    params: list = [] if draft is None else [1 if draft else 0]
     if query:
         where_clauses.append(
             "(customer_name LIKE ? OR customer_phone LIKE ? OR po_number LIKE ? OR plate_full LIKE ? OR id IN "
@@ -9089,7 +9089,7 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
         )
         like = f"%{query}%"
         params.extend([like, like, like, like, like])
-    where_sql = "WHERE " + " AND ".join(where_clauses)
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     with _conn() as con:
         rows = [dict(r) for r in con.execute(
@@ -9110,6 +9110,33 @@ def get_all_preorders(query: str | None = None, status: str | None = None, draft
     if status:
         result = [r for r in result if r["status"] == status]
     return result
+
+
+def delete_preorder_draft(preorder_id: str) -> None:
+    """Owner 25-10-2026: a draft Sales Order that never took money can be deleted outright. One that
+    received any payment must be cancelled instead, so the refund stays on the cash books."""
+    with _conn() as con:
+        po = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if not po:
+            raise ValueError("Sales Order tidak ditemukan.")
+        if not po["is_draft"]:
+            raise ValueError("Hanya Sales Order berstatus Draft yang bisa dihapus.")
+        if con.execute("SELECT 1 FROM preorder_payments WHERE preorder_id=? LIMIT 1", (preorder_id,)).fetchone():
+            raise ValueError("Draft ini sudah menerima pembayaran. Batalkan Sales Order-nya agar refund tetap tercatat.")
+        if po["receipt_id"] or con.execute("SELECT 1 FROM receipts WHERE preorder_id=? LIMIT 1", (preorder_id,)).fetchone():
+            raise ValueError("Draft ini sudah punya invoice, jadi tidak bisa dihapus.")
+        lines = [dict(r) for r in con.execute("SELECT * FROM preorder_items WHERE preorder_id=?", (preorder_id,))]
+        for ln in lines:
+            if con.execute(
+                """SELECT 1 FROM supplier_po_items spi JOIN supplier_pos sp ON sp.id = spi.supplier_po_id
+                   WHERE spi.preorder_item_id=? AND sp.status <> 'draft' LIMIT 1""", (ln["id"],)
+            ).fetchone():
+                raise ValueError(f"Barang “{ln['product_name']}” sudah tercatat di Purchase Order. Batalkan Sales Order-nya saja.")
+        for ln in lines:
+            _release_preorder_line_from_pos(con, ln, None)
+        con.execute("DELETE FROM preorder_status_history WHERE preorder_id=?", (preorder_id,))
+        con.execute("DELETE FROM preorder_items WHERE preorder_id=?", (preorder_id,))
+        con.execute("DELETE FROM preorders WHERE id=?", (preorder_id,))
 
 
 def _release_preorder_line_from_pos(con: sqlite3.Connection, line: dict, by: str | None, changing: bool = False) -> None:

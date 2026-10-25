@@ -2877,6 +2877,10 @@ def create_receipt(
             "pengerjaan": "Nota dibuat, pengerjaan dimulai",
             "belum": "Nota dibuat, belum dikerjakan", "selesai": "Nota dibuat, pengerjaan selesai",
         }.get(work_status, "Nota dibuat"), created_by)
+        # The lines typed before the first save are listed too, so Riwayat Item shows them.
+        if resolved_items:
+            _log_receipt_event(con, receipt_id, "item_added",
+                               "Item ditambahkan: " + ", ".join(i["product_name"] for i in resolved_items), created_by)
         if work_status == "selesai":
             _incentives().finish_assigned_items(con, receipt_id, created_by)
         _incentives().sync_receipt(con, receipt_id, created_by, _assignments(extra, resolved_items))
@@ -3332,7 +3336,8 @@ def update_receipt(
                          *[item["_price"][c] for c in _PRICE_COLS]),
                     ).lastrowid
                     added_names.append(item["product_name"])
-            if added_names and not is_draft:
+            # Logged on drafts too: the owner reads Riwayat Item to see who added which line.
+            if added_names:
                 _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added_names), changed_by)
             if changed_notes and not is_draft:
                 _log_receipt_event(con, receipt_id, "item_changed", "Item diubah: " + "; ".join(changed_notes), changed_by)

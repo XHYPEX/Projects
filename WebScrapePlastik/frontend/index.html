@@ -7,7 +7,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -15,13 +15,13 @@
       theme: {
         extend: {
           colors: {
-            bg: '#FAF9F5',
-            bg2: '#F0EEE6',
-            ink: '#141413',
-            muted: '#6B6B66',
-            accent: '#D97757',
-            accentDark: '#C4633F',
-            line: '#E5E3DC',
+            bg: '#F6F7F9',
+            bg2: '#EEF0F3',
+            ink: '#111827',
+            muted: '#6B7280',
+            accent: '#EA580C',
+            accentDark: '#C2410C',
+            line: '#E3E6EB',
             console: '#2B2620',
             consoleText: '#E6D2C3',
             pending: '#AD7A1E',
@@ -30,7 +30,7 @@
             failed: '#A83B3B',
           },
           fontFamily: {
-            serif: ['Fraunces', 'Georgia', 'serif'],
+            serif: ['Inter', 'system-ui', 'sans-serif'],   // theme Navy Bengkel (24-10-2026): one family for headings and body
             sans: ['Inter', 'system-ui', 'sans-serif'],
             mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
           },
@@ -44,9 +44,9 @@
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
   <style>
-    * { scrollbar-width: thin; scrollbar-color: #D9D6CC transparent; }
+    * { scrollbar-width: thin; scrollbar-color: #CBD2DA transparent; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-thumb { background: #D9D6CC; border-radius: 8px; }
+    ::-webkit-scrollbar-thumb { background: #CBD2DA; border-radius: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
 
 
@@ -119,20 +119,20 @@
     #map { min-height: 320px; }
 
     .kec-chip input:checked + span {
-      background: #D97757;
-      border-color: #D97757;
-      color: #FAF9F5;
+      background: #EA580C;
+      border-color: #EA580C;
+      color: #F6F7F9;
     }
 
     /* Product photo drop zones (Tambah Barang, item detail). A dashed hairline (muted at 40%) until
        a file is dragged over or the pointer rests on it, then the accent border and a faint wash.
        .is-filled is the same tile once it holds a photo: solid hairline, no hover change. */
-    .img-drop { border: 1.5px dashed rgba(107, 107, 102, 0.4); background: #FAF9F5; transition: border-color 0.15s, background-color 0.15s; }
-    .img-drop:hover { border-color: #D97757; background: rgba(217, 119, 87, 0.06); }
+    .img-drop { border: 1.5px dashed rgba(107, 107, 102, 0.4); background: #F6F7F9; transition: border-color 0.15s, background-color 0.15s; }
+    .img-drop:hover { border-color: #EA580C; background: rgba(234, 88, 12, 0.06); }
     .img-drop.is-filled,
-    .img-drop.is-filled:hover { border: 1px solid #E5E3DC; background: #F0EEE6; }
+    .img-drop.is-filled:hover { border: 1px solid #E3E6EB; background: #EEF0F3; }
     .img-drop.is-dragover,
-    .img-drop.is-filled.is-dragover { border: 1.5px dashed #D97757; background: rgba(217, 119, 87, 0.06); }
+    .img-drop.is-filled.is-dragover { border: 1.5px dashed #EA580C; background: rgba(234, 88, 12, 0.06); }
     /* Children never take the pointer, so dragging across them cannot fire a stray dragleave. */
     .img-drop > * { pointer-events: none; }
 
@@ -145,90 +145,104 @@
     .status-dot.is-posted  { background: #5B7A5B; }
     .status-dot.is-void    { background: #A83B3B; }
     /* Preorder stages, in order: noted down -> ordered -> shipping -> at the shop -> installed. */
-    .status-dot.is-pesanan_dibuat    { background: #9A938A; }
+    .status-dot.is-pesanan_dibuat    { background: #9CA3AF; }
     .status-dot.is-sudah_dipesankan  { background: #AD7A1E; }
     .status-dot.is-dalam_pengiriman  { background: #4B6C6F; }
-    .status-dot.is-sampai_di_toko    { background: #D97757; }
+    .status-dot.is-sampai_di_toko    { background: #EA580C; }
     .status-dot.is-terpasang         { background: #5B7A5B; }
 
 
     /* Preorder stage pills (list, detail). Same hues as the status dots; .is-solid is the order-level badge. */
     .po-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; white-space: nowrap; }
     .po-pill::before { content: ""; width: 6px; height: 6px; border-radius: 9999px; background: currentColor; flex: none; }
-    .po-pill.is-pesanan_dibuat   { color: #6F6A62; background: rgba(154, 147, 138, 0.18); }
+    .po-pill.is-pesanan_dibuat   { color: #6B7280; background: rgba(154, 147, 138, 0.18); }
     .po-pill.is-sudah_dipesankan { color: #8A6218; background: rgba(173, 122, 30, 0.15); }
     .po-pill.is-dalam_pengiriman { color: #3B5658; background: rgba(75, 108, 111, 0.15); }
-    .po-pill.is-sampai_di_toko   { color: #B4532F; background: rgba(217, 119, 87, 0.17); }
+    .po-pill.is-sampai_di_toko   { color: #C2410C; background: rgba(234, 88, 12, 0.17); }
     .po-pill.is-terpasang        { color: #46633F; background: rgba(91, 122, 91, 0.17); }
-    .po-pill.is-solid { color: #FAF9F5; padding: 3px 12px; }
-    .po-pill.is-solid::before { background: #FAF9F5; }
-    .po-pill.is-solid.is-pesanan_dibuat   { background: #9A938A; }
+    .po-pill.is-solid { color: #F6F7F9; padding: 3px 12px; }
+    .po-pill.is-solid::before { background: #F6F7F9; }
+    .po-pill.is-solid.is-pesanan_dibuat   { background: #9CA3AF; }
     .po-pill.is-solid.is-sudah_dipesankan { background: #AD7A1E; }
     .po-pill.is-solid.is-dalam_pengiriman { background: #4B6C6F; }
-    .po-pill.is-solid.is-sampai_di_toko   { background: #D97757; }
+    .po-pill.is-solid.is-sampai_di_toko   { background: #EA580C; }
     .po-pill.is-solid.is-terpasang        { background: #5B7A5B; }
     .po-pill.is-dibatalkan       { color: #A83B3B; background: rgba(168, 59, 59, 0.12); }
     /* Sales Order list: Status Pengadaan (how far the order's goods have got). */
-    .po-pill.is-proc-draft         { color: #6F6A62; background: rgba(154, 147, 138, 0.16); }
+    .po-pill.is-proc-draft         { color: #6B7280; background: rgba(154, 147, 138, 0.16); }
     .po-pill.is-proc-menunggu      { color: #8A6218; background: rgba(173, 122, 30, 0.15); }
     .po-pill.is-proc-dipesan       { color: #3B5658; background: rgba(75, 108, 111, 0.15); }
-    .po-pill.is-proc-tiba_sebagian { color: #B4532F; background: rgba(217, 119, 87, 0.17); }
+    .po-pill.is-proc-tiba_sebagian { color: #C2410C; background: rgba(234, 88, 12, 0.17); }
     .po-pill.is-proc-siap          { color: #46633F; background: rgba(91, 122, 91, 0.17); }
-    .po-pill.is-proc-selesai       { color: #FAF9F5; background: #5B7A5B; }
-    .po-pill.is-proc-selesai::before { background: #FAF9F5; }
+    .po-pill.is-proc-selesai       { color: #F6F7F9; background: #5B7A5B; }
+    .po-pill.is-proc-selesai::before { background: #F6F7F9; }
     .po-pill.is-proc-dibatalkan    { color: #A83B3B; background: rgba(168, 59, 59, 0.12); }
-    .so-chip-count { display: inline-block; min-width: 1.25rem; margin-left: 6px; padding: 0 6px; border-radius: 9999px; font-size: 11px; line-height: 1.25rem; text-align: center; background: #F0EEE6; color: #6B6B66; }
+    .so-chip-count { display: inline-block; min-width: 1.25rem; margin-left: 6px; padding: 0 6px; border-radius: 9999px; font-size: 11px; line-height: 1.25rem; text-align: center; background: #EEF0F3; color: #6B7280; }
     .po-status-btn.is-active .so-chip-count, .po-draft-chip.is-active .so-chip-count { background: rgba(250, 249, 245, 0.25); color: inherit; }
     .po-pill.is-solid.is-dibatalkan       { background: #A83B3B; }
 
     /* Purchase Order statuses (same pill as the preorder stages). */
-    .po-pill.is-spo-draft { color: #6F6A62; background: rgba(154, 147, 138, 0.16); }
+    .po-pill.is-spo-draft { color: #6B7280; background: rgba(154, 147, 138, 0.16); }
     .po-pill.is-spo-menunggu_konfirmasi { color: #8A6218; background: rgba(173, 122, 30, 0.16); }
     .po-pill.is-spo-dikonfirmasi { color: #3B5658; background: rgba(75, 108, 111, 0.16); }
     .po-pill.is-spo-diproses { color: #3B5658; background: rgba(75, 108, 111, 0.16); }
-    .po-pill.is-spo-dalam_pengiriman { color: #B4532F; background: rgba(217, 119, 87, 0.16); }
+    .po-pill.is-spo-dalam_pengiriman { color: #C2410C; background: rgba(234, 88, 12, 0.16); }
     .po-pill.is-spo-diterima_sebagian { color: #8A6218; background: rgba(173, 122, 30, 0.16); }
     .po-pill.is-spo-diterima_lengkap { color: #46633F; background: rgba(91, 122, 91, 0.16); }
     .po-pill.is-spo-dibatalkan { color: #A83B3B; background: rgba(168, 59, 59, 0.12); }
-    .po-pill.is-spo-ship-belum_dikirim { color: #6F6A62; background: rgba(154, 147, 138, 0.16); }
+    .po-pill.is-spo-ship-belum_dikirim { color: #6B7280; background: rgba(154, 147, 138, 0.16); }
     .po-pill.is-spo-ship-diproses { color: #3B5658; background: rgba(75, 108, 111, 0.16); }
-    .po-pill.is-spo-ship-dalam_pengiriman { color: #B4532F; background: rgba(217, 119, 87, 0.16); }
+    .po-pill.is-spo-ship-dalam_pengiriman { color: #C2410C; background: rgba(234, 88, 12, 0.16); }
     .po-pill.is-spo-ship-tiba { color: #46633F; background: rgba(91, 122, 91, 0.16); }
     .po-pill.is-spo-recv-belum { color: #8A6218; background: rgba(173, 122, 30, 0.16); }
-    .po-pill.is-spo-recv-sebagian { color: #B4532F; background: rgba(217, 119, 87, 0.16); }
+    .po-pill.is-spo-recv-sebagian { color: #C2410C; background: rgba(234, 88, 12, 0.16); }
     .po-pill.is-spo-recv-lengkap { color: #46633F; background: rgba(91, 122, 91, 0.16); }
-    .po-pill.is-spo-pay-belum_ditagih { color: #6F6A62; background: rgba(154, 147, 138, 0.16); }
+    .po-pill.is-spo-pay-belum_ditagih { color: #6B7280; background: rgba(154, 147, 138, 0.16); }
     .po-pill.is-spo-pay-belum_bayar { color: #8A6218; background: rgba(173, 122, 30, 0.16); }
     .po-pill.is-spo-pay-sebagian { color: #3B5658; background: rgba(75, 108, 111, 0.16); }
     .po-pill.is-spo-pay-lunas { color: #46633F; background: rgba(91, 122, 91, 0.16); }
     .po-pill.is-spo-pay-lewat_jatuh_tempo { color: #A83B3B; background: rgba(168, 59, 59, 0.12); }
-    .po-pill.is-solid.is-spo-draft { background: #9A938A; }
+    .po-pill.is-solid.is-spo-draft { background: #9CA3AF; }
     .po-pill.is-solid.is-spo-menunggu_konfirmasi { background: #AD7A1E; }
     .po-pill.is-solid.is-spo-dikonfirmasi { background: #4B6C6F; }
     .po-pill.is-solid.is-spo-diproses { background: #4B6C6F; }
-    .po-pill.is-solid.is-spo-dalam_pengiriman { background: #D97757; }
+    .po-pill.is-solid.is-spo-dalam_pengiriman { background: #EA580C; }
     .po-pill.is-solid.is-spo-diterima_sebagian { background: #AD7A1E; }
     .po-pill.is-solid.is-spo-diterima_lengkap { background: #5B7A5B; }
     .po-pill.is-solid.is-spo-dibatalkan { background: #A83B3B; }
-    .po-pill.is-solid.is-spo-pay-belum_ditagih { background: #9A938A; }
+    .po-pill.is-solid.is-spo-pay-belum_ditagih { background: #9CA3AF; }
     .po-pill.is-solid.is-spo-pay-belum_bayar { background: #AD7A1E; }
     .po-pill.is-solid.is-spo-pay-sebagian { background: #4B6C6F; }
     .po-pill.is-solid.is-spo-pay-lunas { background: #5B7A5B; }
     .po-pill.is-solid.is-spo-pay-lewat_jatuh_tempo { background: #A83B3B; }
     /* the soft is-spo-* rules above set a dark text colour later in the sheet than .is-solid; keep solid pills light-on-colour */
-    .po-pill.is-solid[class*="is-spo-"] { color: #FAF9F5; }
+    .po-pill.is-solid[class*="is-spo-"] { color: #F6F7F9; }
 
-    ::selection { background: #D97757; color: #FAF9F5; }
+    ::selection { background: #EA580C; color: #F6F7F9; }
 
+    /* Theme Navy Bengkel (owner, 24-10-2026): navy sidebar, light grey canvas, white cards, orange accent.
+       Scoped to the drawer id so it wins over the light utility classes the links carry. */
+    #drawer-panel { background-color: #0F1B2D; border-color: #0F1B2D; color: #E5E7EB; scrollbar-color: #334155 transparent; }
+    #drawer-panel .border-line, #drawer-panel.border-line { border-color: rgba(255,255,255,0.08); }
+    #drawer-panel .text-muted { color: #94A3B8; }
+    #drawer-panel .text-ink { color: #F1F5F9; }
+    #drawer-panel .nav-link:hover, #drawer-panel .nav-sublink:hover { background-color: rgba(255,255,255,0.06); color: #FFFFFF; }
+    #drawer-panel .nav-link.is-active, #drawer-panel .nav-link.is-active:hover,
+    #drawer-panel .nav-sublink.is-active, #drawer-panel .nav-sublink.is-active:hover { background-color: rgba(234,88,12,0.18); color: #FFFFFF; }
+    #drawer-panel .nav-link.is-active > svg:first-child { color: #FB923C; }
+    #drawer-panel .nav-link[data-route$="-group"].is-active, #drawer-panel .nav-link[data-route$="-group"].is-active:hover { background-color: transparent; }
+    #drawer-panel .bg-white { background-color: rgba(255,255,255,0.05); }
+    #drawer-panel .bg-bg2 { background-color: rgba(255,255,255,0.08); }
+    #drawer-panel .hover\:bg-bg:hover { background-color: rgba(255,255,255,0.06); }
     /* Sidebar active state: a soft accent tint (accent at ~14% over bg2) with ink text, so the
        label keeps full contrast; only the icon carries the coral. The :hover twin stops
        Tailwind's hover:bg-bg from winning over the tint on the item you are already on. */
     .nav-link.is-active,
     .nav-link.is-active:hover {
-      background: rgba(217, 119, 87, 0.14);
-      color: #141413;
+      background: rgba(234, 88, 12, 0.14);
+      color: #111827;
     }
-    .nav-link.is-active > svg:first-child { color: #D97757; }
+    .nav-link.is-active > svg:first-child { color: #EA580C; }
     /* The Inventori group header lights up on every child route; the child link carries the tint. */
     .nav-link[data-route="/inventory-group"].is-active,
     .nav-link[data-route="/inventory-group"].is-active:hover,
@@ -243,8 +257,8 @@
 
     .nav-sublink.is-active,
     .nav-sublink.is-active:hover {
-      background: rgba(217, 119, 87, 0.14);
-      color: #141413;
+      background: rgba(234, 88, 12, 0.14);
+      color: #111827;
       font-weight: 500;
     }
 
@@ -263,16 +277,16 @@
     .history-status-btn.is-active,
     .history-work-btn.is-active,
     .history-pay-btn.is-active {
-      background: #D97757;
-      border-color: #D97757;
-      color: #FAF9F5;
+      background: #EA580C;
+      border-color: #EA580C;
+      color: #F6F7F9;
     }
 
     .po-status-btn.is-active,
     .history-range-btn.is-active {
-      background: #D97757;
-      border-color: #D97757;
-      color: #FAF9F5;
+      background: #EA580C;
+      border-color: #EA580C;
+      color: #F6F7F9;
     }
 
     /* Kasir buttons (owner, 24-10-2026): the colour says what a button does, the layout stays.
@@ -280,7 +294,7 @@
        Scoped by the page id so these win over the utility classes without !important. */
     #page-cashier .kb { --kb: #334155; --kb-h: #1E293B; --kb-tint: rgba(51,65,85,0.07); --kb-press: rgba(51,65,85,0.14);
       transition: background-color .15s, border-color .15s, color .15s; }
-    #page-cashier .kb-primary { --kb: #BE5638; --kb-h: #A2462B; --kb-tint: rgba(190,86,56,0.08); --kb-press: rgba(190,86,56,0.16); }
+    #page-cashier .kb-primary { --kb: #EA580C; --kb-h: #C2410C; --kb-tint: rgba(234,88,12,0.08); --kb-press: rgba(234,88,12,0.16); }
     #page-cashier .kb-ops { --kb: #1D4ED8; --kb-h: #1E40AF; --kb-tint: rgba(29,78,216,0.07); --kb-press: rgba(29,78,216,0.14); }
     #page-cashier .kb-print { --kb: #15803D; --kb-h: #166534; --kb-tint: rgba(21,128,61,0.07); --kb-press: rgba(21,128,61,0.14); }
     #page-cashier .kb-danger { --kb: #DC2626; --kb-h: #B91C1C; --kb-tint: rgba(220,38,38,0.07); --kb-press: rgba(220,38,38,0.14); }
@@ -308,17 +322,17 @@
        that is the narrowest width where the item table still leaves the name column ~260px. */
     .cashier-split { flex: 1 1 0%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
     .cashier-split > * { flex: none; }
-    .cashier-strip { order: 0; position: sticky; top: 0; z-index: 20; background: #FFFFFF; border-bottom: 1px solid #E5E3DC; }
+    .cashier-strip { order: 0; position: sticky; top: 0; z-index: 20; background: #FFFFFF; border-bottom: 1px solid #E3E6EB; }
     .cashier-main  { order: 1; grid-auto-rows: max-content; }
     .cashier-rail  { order: 2; display: flex; flex-direction: column; gap: 1rem; }
-    .cashier-bar   { order: 3; position: sticky; bottom: 0; z-index: 20; background: #FAF9F5; border-top: 1px solid #E5E3DC; }
+    .cashier-bar   { order: 3; position: sticky; bottom: 0; z-index: 20; background: #F6F7F9; border-top: 1px solid #E3E6EB; }
     .cashier-inner { width: 100%; max-width: 76rem; margin-inline: auto; padding-inline: 1rem; }
     @media (min-width: 640px) { .cashier-inner { padding-inline: 1.5rem; } }
     #receipt-list { max-height: 24rem; overflow-y: auto; }
     /* Riwayat Nota is not part of the rail: it opens as a floating panel from "Riwayat Hari Ini". */
     #cashier-history-card:not(.is-open) { display: none !important; }
     #cashier-history-card.is-open { position: fixed; top: 4.5rem; right: 1rem; bottom: 1rem; width: min(24rem, calc(100vw - 2rem)); z-index: 45;
-      display: flex !important; flex-direction: column; box-shadow: 0 12px 32px rgba(20,20,19,0.14); }
+      display: flex !important; flex-direction: column; box-shadow: 0 12px 32px rgba(17,24,39,0.14); }
     #cashier-history-card.is-open #receipt-list { max-height: none; flex: 1 1 0%; min-height: 0; overflow-y: auto; }
     @media (min-width: 1280px) {
       .cashier-split { display: grid; overflow: hidden; width: 100%;
@@ -358,15 +372,15 @@
     /* Informasi Transaksi: date and number side by side unless the card is narrow (three cards in a row on 1536-1800px). */
     .kasir-info-grid { grid-template-columns: minmax(0, 1fr); }
     @media (min-width: 640px) and (max-width: 1279px) { .kasir-info-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-    .kasir-tab { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.9rem; font-size: 0.875rem; font-weight: 600; color: #6B6B66;
+    .kasir-tab { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.9rem; font-size: 0.875rem; font-weight: 600; color: #6B7280;
       border-bottom: 2px solid transparent; margin-bottom: -1px; }
-    .kasir-tab:hover { color: #141413; }
-    .kasir-tab.is-active { color: #C4633F; border-bottom-color: #D97757; }
-    .kasir-method { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: #141413; padding: 0.35rem 0.25rem; border-radius: 0.5rem; cursor: pointer; }
-    .kasir-method:hover { background: #F7F5F0; }
-    .kasir-pick { width: 100%; min-width: 0; overflow: hidden; display: flex; align-items: center; gap: 0.35rem; min-height: 2.25rem; border: 1px solid #E5E3DC; border-radius: 0.5rem;
-      padding: 0.35rem 0.5rem 0.35rem 0.65rem; font-size: 0.8125rem; text-align: left; background: #FFFFFF; color: #141413; }
-    .kasir-pick:hover:not(:disabled) { border-color: rgba(217, 119, 87, 0.6); }
+    .kasir-tab:hover { color: #111827; }
+    .kasir-tab.is-active { color: #C2410C; border-bottom-color: #EA580C; }
+    .kasir-method { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: #111827; padding: 0.35rem 0.25rem; border-radius: 0.5rem; cursor: pointer; }
+    .kasir-method:hover { background: #F3F4F6; }
+    .kasir-pick { width: 100%; min-width: 0; overflow: hidden; display: flex; align-items: center; gap: 0.35rem; min-height: 2.25rem; border: 1px solid #E3E6EB; border-radius: 0.5rem;
+      padding: 0.35rem 0.5rem 0.35rem 0.65rem; font-size: 0.8125rem; text-align: left; background: #FFFFFF; color: #111827; }
+    .kasir-pick:hover:not(:disabled) { border-color: rgba(234, 88, 12, 0.6); }
     .kasir-pick:disabled { opacity: 0.55; cursor: not-allowed; }
     .kasir-pick .ph { color: #8B8B85; }
 
@@ -375,9 +389,9 @@
     #item-rows .item-no::before { counter-increment: item-no; content: counter(item-no); }
 
     /* Hari ini / Semua toggle on the history card: a neutral lifted segment, not another coral fill. */
-    .cashier-scope-btn { color: #6B6B66; }
-    .cashier-scope-btn:hover { color: #141413; }
-    .cashier-scope-btn.is-active { background: #FFFFFF; color: #141413; box-shadow: 0 0 0 1px #E5E3DC; }
+    .cashier-scope-btn { color: #6B7280; }
+    .cashier-scope-btn:hover { color: #111827; }
+    .cashier-scope-btn.is-active { background: #FFFFFF; color: #111827; box-shadow: 0 0 0 1px #E3E6EB; }
 
     /* Header sprite: dachshund walks right-to-left across the top bar on every page. */
     .header-sprite-track {
@@ -426,7 +440,7 @@
     .barcode-label-name {
       font-size: 14pt;
       font-weight: 600;
-      color: #141413;
+      color: #111827;
       max-width: 100%;
       flex-shrink: 0;      /* never squeezed by the other lines: it would slice through the text */
       line-height: 1.2;
@@ -448,7 +462,7 @@
        one keep the spacing they had. */
     .barcode-label-note {
       font-size: 7.5pt;
-      color: #141413;
+      color: #111827;
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -458,15 +472,15 @@
     .barcode-label-price {
       font-size: 16pt;
       font-weight: 700;
-      color: #141413;
+      color: #111827;
       white-space: nowrap;
     }
     /* Goods Receipt label: Nama → Barcode (Kode Manual) → Harga Jual → Kode Manual. 60x40 has room to breathe. */
     .barcode-label.is-tall { height: 40mm; gap: 0.6mm; }
     .barcode-label.has-code .barcode-label-price { font-size: 12pt; }
     .barcode-label.is-tall.has-code .barcode-label-price { font-size: 15pt; }
-    .barcode-label-caption { font-size: 5pt; letter-spacing: 0.18em; text-transform: uppercase; color: #6B6B66; line-height: 1; }
-    .barcode-label-code { font-size: 11pt; font-weight: 700; color: #141413; line-height: 1; white-space: nowrap; }
+    .barcode-label-caption { font-size: 5pt; letter-spacing: 0.18em; text-transform: uppercase; color: #6B7280; line-height: 1; }
+    .barcode-label-code { font-size: 11pt; font-weight: 700; color: #111827; line-height: 1; white-space: nowrap; }
     .barcode-label.is-tall .barcode-label-code { font-size: 14pt; }
 
     .is-staff .admin-only { display: none !important; }
@@ -516,7 +530,7 @@
         top: 0;
         left: 0;
         width: 100%;
-        color: #141413;
+        color: #111827;
         font-family: 'Inter', system-ui, sans-serif;
       }
       body.print-invoice #pi-print-area table { page-break-inside: auto; }
@@ -542,38 +556,38 @@
        titles (page titles and big numbers stay serif), a bar on the active menu item. Compact
        density above is kept. Delete this block to go back to the previous look. */
     body .rounded-xl { border-radius: 14px; }
-    body .bg-white.border.rounded-xl, body section.bg-white.border { border-color: #E9E6DE; box-shadow: 0 1px 2px rgba(20, 20, 19, 0.04); }
+    body .bg-white.border.rounded-xl, body section.bg-white.border { border-color: #E7E9ED; box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04); }
 
     /* Card titles in sans; h1 and the big page titles keep the serif. */
     main h2.font-serif:not(.text-2xl):not(.text-3xl), main h3.font-serif:not(.text-2xl):not(.text-3xl), main h4.font-serif,
     #modal-title { font-family: Inter, system-ui, sans-serif; letter-spacing: -0.005em; }
 
     /* Icon chips (the little square beside a card or page title) turn coral-tinted. */
-    body span[class*="bg-bg2"][class*="rounded-lg"][class*="place-items-center"] { background: #FBEBE4; color: #C4633F; }
+    body span[class*="bg-bg2"][class*="rounded-lg"][class*="place-items-center"] { background: #FFEDD5; color: #C2410C; }
 
     .card-title { display: flex; align-items: center; gap: 0.6rem; }
-    .card-title .chip { width: 2rem; height: 2rem; flex: none; display: grid; place-items: center; border-radius: 0.6rem; background: #FBEBE4; color: #C4633F; }
-    .card-title h3 { font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.2; font-weight: 600; color: #141413; }
-    .card-title p { font-size: 12px; color: #6B6B66; margin-top: 1px; }
+    .card-title .chip { width: 2rem; height: 2rem; flex: none; display: grid; place-items: center; border-radius: 0.6rem; background: #FFEDD5; color: #C2410C; }
+    .card-title h3 { font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.2; font-weight: 600; color: #111827; }
+    .card-title p { font-size: 12px; color: #6B7280; margin-top: 1px; }
 
     /* Input with a leading icon. */
     .fi { position: relative; }
-    .fi > svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9A958B; pointer-events: none; }
+    .fi > svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
     .fi > input { padding-left: 2.3rem; }
-    .fi:focus-within > svg { color: #C4633F; }
+    .fi:focus-within > svg { color: #C2410C; }
 
     /* Controls without their own border classes (filter selects and search boxes) match the rest. */
     select:not([class*="border"]) {
-      -webkit-appearance: none; appearance: none; background-color: #fff; border: 1px solid #E0DDD4; border-radius: 10px;
-      padding: 0.4rem 2.1rem 0.4rem 0.7rem; font-size: 14px; color: #141413;
+      -webkit-appearance: none; appearance: none; background-color: #fff; border: 1px solid #D8DCE2; border-radius: 10px;
+      padding: 0.4rem 2.1rem 0.4rem 0.7rem; font-size: 14px; color: #111827;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B6B66' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
       background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1rem;
     }
-    select:not([class*="border"]):focus { outline: none; border-color: #D97757; box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18); }
+    select:not([class*="border"]):focus { outline: none; border-color: #EA580C; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.18); }
     input[type="date"]:not([class*="border"]), input[type="datetime-local"]:not([class*="border"]) {
-      background-color: #fff; border: 1px solid #E0DDD4; border-radius: 10px; padding: 0.4rem 0.7rem; font-size: 14px; color: #141413;
+      background-color: #fff; border: 1px solid #D8DCE2; border-radius: 10px; padding: 0.4rem 0.7rem; font-size: 14px; color: #111827;
     }
-    input[type="date"]:not([class*="border"]):focus, input[type="datetime-local"]:not([class*="border"]):focus { outline: none; border-color: #D97757; box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18); }
+    input[type="date"]:not([class*="border"]):focus, input[type="datetime-local"]:not([class*="border"]):focus { outline: none; border-color: #EA580C; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.18); }
 
     /* Every other native select gets the same chevron, so none shows the OS arrow. */
     select:not(.select-chevron) {
@@ -584,16 +598,16 @@
     select:not(.select-chevron):not([class*="text-"]) { font-size: 14px; }
 
     /* Outlined buttons warm up on hover instead of going grey. */
-    button.border.border-line:not(:disabled):hover { border-color: rgba(217, 119, 87, 0.55); }
+    button.border.border-line:not(:disabled):hover { border-color: rgba(234, 88, 12, 0.55); }
 
     /* Active menu item: tint plus a coral bar on the left edge. */
-    .nav-link.is-active:not([data-route="/inventory-group"]), .nav-sublink.is-active { box-shadow: inset 3px 0 0 #D97757; }
+    .nav-link.is-active:not([data-route="/inventory-group"]), .nav-sublink.is-active { box-shadow: inset 3px 0 0 #EA580C; }
     .nav-link.is-active:not([data-route="/inventory-group"]) { font-weight: 600; }
 
 
     /* KPI cards: an icon chip on the left, coloured to match the card tint (added by decorateKpis). */
     body .border.rounded-xl.kpi-card { position: relative; padding-left: 3.4rem; }
-    .kpi-chip { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 2.3rem; height: 2.3rem; border-radius: 0.7rem; display: grid; place-items: center; background: #FBDCCF; color: #C4633F; }
+    .kpi-chip { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 2.3rem; height: 2.3rem; border-radius: 0.7rem; display: grid; place-items: center; background: #FBDCCF; color: #C2410C; }
     .kpi-card:nth-child(6n+2) .kpi-chip { background: #DCE9FB; color: #3F6EB5; }
     .kpi-card:nth-child(6n+3) .kpi-chip { background: #D6EDDC; color: #3F8A55; }
     .kpi-card:nth-child(6n+4) .kpi-chip { background: #F7E7BE; color: #A87612; }
@@ -607,35 +621,35 @@
     @media (max-width: 640px) { .po-frow { grid-template-columns: 1fr; gap: 0.25rem; } }
     .po-table { min-width: 1180px; }
     .po-grid { display: grid; grid-template-columns: minmax(170px, 1.8fr) 62px 54px 140px 130px 142px minmax(130px, 0.8fr) 138px 112px 32px; gap: 0.5rem; align-items: center; }
-    .po-head { padding: 0.45rem 0.25rem; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B6B66; border-bottom: 1px solid #E5E3DC; }
-    .po-item-row { padding: 0.45rem 0.25rem; border-bottom: 1px solid #EFECE4; }
+    .po-head { padding: 0.45rem 0.25rem; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B7280; border-bottom: 1px solid #E3E6EB; }
+    .po-item-row { padding: 0.45rem 0.25rem; border-bottom: 1px solid #EEF0F3; }
     .po-item-row:last-child { border-bottom: 0; }
     .po-item-row.is-warn { background: #FFF6E3; border-radius: 10px; }
-    select.po-src.po-src { -webkit-appearance: none; appearance: none; border-radius: 9999px; padding: 0.3rem 1.5rem 0.3rem 1.6rem; font-size: 12px; font-weight: 500; border: 1px solid #E0DDD4; background-color: #fff; position: relative; }
-    .po-src[data-src="supplier"] { background-color: #FDF0E6; border-color: #F4D3B8; color: #9A5A1F; }
+    select.po-src.po-src { -webkit-appearance: none; appearance: none; border-radius: 9999px; padding: 0.3rem 1.5rem 0.3rem 1.6rem; font-size: 12px; font-weight: 500; border: 1px solid #D8DCE2; background-color: #fff; position: relative; }
+    .po-src[data-src="supplier"] { background-color: #FFEDD5; border-color: #F4D3B8; color: #9A5A1F; }
     .po-src[data-src="stok"] { background-color: #E9F5EC; border-color: #C9E4D0; color: #2F6B43; }
     .po-src[data-src="jasa"] { background-color: #E8F0FB; border-color: #C9DAF3; color: #2F5C9E; }
     .po-src-wrap { position: relative; }
-    .po-src-wrap::before { content: ""; position: absolute; left: 0.65rem; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 9999px; background: #9A938A; pointer-events: none; z-index: 1; }
+    .po-src-wrap::before { content: ""; position: absolute; left: 0.65rem; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 9999px; background: #9CA3AF; pointer-events: none; z-index: 1; }
     .po-src-wrap[data-src="supplier"]::before { background: #E08A3C; }
     .po-src-wrap[data-src="stok"]::before { background: #3F9A5A; }
     .po-src-wrap[data-src="jasa"]::before { background: #3F6EB5; }
-    .po-na { display: block; padding: 0.4rem 0.7rem; border-radius: 8px; background: #F3F1EA; color: #8A8780; font-size: 13px; }
-    .po-pill.is-proc_po { color: #9A5A1F; background: #FDF0E6; }
+    .po-na { display: block; padding: 0.4rem 0.7rem; border-radius: 8px; background: #F3F4F6; color: #8A8780; font-size: 13px; }
+    .po-pill.is-proc_po { color: #9A5A1F; background: #FFEDD5; }
     .po-pill.is-proc_stok { color: #2F6B43; background: #E9F5EC; }
-    .po-pill.is-proc_none { color: #5E5A52; background: #EFEDE6; }
+    .po-pill.is-proc_none { color: #5E5A52; background: #EEF0F3; }
     .po-pill.is-pay_ok { color: #2F6B43; background: #E9F5EC; }
     .po-pill.is-pay_part { color: #8A6218; background: #FCF3DC; }
     .po-pill.is-pay_none { color: #A83B3B; background: #FBEBEB; }
-    .po-tile { border: 1px solid #E5E3DC; border-radius: 12px; padding: 0.6rem 0.75rem; display: flex; gap: 0.6rem; align-items: flex-start; background: #fff; }
+    .po-tile { border: 1px solid #E3E6EB; border-radius: 12px; padding: 0.6rem 0.75rem; display: flex; gap: 0.6rem; align-items: flex-start; background: #fff; }
     .po-tile .tile-ic { width: 2.1rem; height: 2.1rem; border-radius: 0.6rem; display: grid; place-items: center; flex: none; }
-    .po-tile[data-tone="a"] { background: #FDF3EA; border-color: #F4D9C2; } .po-tile[data-tone="a"] .tile-ic { background: #FADFC8; color: #B4642A; }
+    .po-tile[data-tone="a"] { background: #FFF4ED; border-color: #F4D9C2; } .po-tile[data-tone="a"] .tile-ic { background: #FADFC8; color: #B4642A; }
     .po-tile[data-tone="b"] { background: #EEF4FC; border-color: #D3E2F6; } .po-tile[data-tone="b"] .tile-ic { background: #D9E8FA; color: #3F6EB5; }
     .po-tile[data-tone="red"] { background: #FDEEEE; border-color: #F3CFCF; } .po-tile[data-tone="red"] .tile-ic { background: #F8D4D4; color: #B04646; }
-    .po-tile[data-tone="plain"] .tile-ic { background: #F0EEE6; color: #6B6B66; }
+    .po-tile[data-tone="plain"] .tile-ic { background: #EEF0F3; color: #6B7280; }
 
     /* Table header cells: a quieter band. */
-    thead.bg-bg2 { background: #F6F4EC; }
+    thead.bg-bg2 { background: #F3F5F8; }
   </style>
   <style id="print-page-rule">@page { size: 58mm 40mm; margin: 0; }</style>
 </head>
@@ -1048,7 +1062,7 @@
              JS, so move things freely but do not rename them. Nothing about incentives is ever shown on this page. -->
         <div class="cashier-strip">
           <div class="cashier-inner pt-4 pb-2">
-            <div class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] px-4 sm:px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)] px-4 sm:px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-3">
               <span class="w-12 h-12 rounded-xl bg-accent text-white grid place-items-center shrink-0" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21 7H6"/></svg></span>
               <div class="min-w-[min(100%,22rem)] flex-1">
                 <h2 class="font-serif text-[22px] sm:text-2xl font-semibold text-ink leading-tight">Kasir / <span id="kasir-head-mode">Transaksi Baru</span></h2>
@@ -1122,7 +1136,7 @@
 
           <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-[0.9fr_1.1fr_1.15fr] gap-4 items-stretch">
             <!-- Informasi Transaksi: the save time is recorded by the server and never editable. -->
-            <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] min-w-0" aria-labelledby="cashier-info-title">
+            <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)] min-w-0" aria-labelledby="cashier-info-title">
               <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 px-4 pt-4 pb-3">
               <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span>
               <h3 id="cashier-info-title" class="text-[15px] font-semibold text-ink">Informasi Transaksi</h3>
@@ -1162,7 +1176,7 @@
             </section>
 
             <!-- Pelanggan: pick from Master Customer or type phone + name; on save the server links by phone. -->
-            <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] min-w-0" aria-labelledby="kasir-cust-title">
+            <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)] min-w-0" aria-labelledby="kasir-cust-title">
               <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 px-4 pt-4 pb-3">
               <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg></span>
               <h3 id="kasir-cust-title" class="text-[15px] font-semibold text-ink">Pelanggan</h3>
@@ -1207,7 +1221,7 @@
             </section>
 
             <!-- Data Kendaraan: plate (required) plus make/model/colour/year; a linked customer's vehicles show as chips. -->
-            <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] min-w-0 md:col-span-2 2xl:col-span-1" aria-labelledby="cashier-vehicle-title">
+            <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)] min-w-0 md:col-span-2 2xl:col-span-1" aria-labelledby="cashier-vehicle-title">
               <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 px-4 pt-4 pb-3">
               <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l2-5a2 2 0 0 1 1.9-1.3h10.2A2 2 0 0 1 19 7l2 5"/><path d="M3 12h18v5a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5Z"/></svg></span>
               <h3 id="cashier-vehicle-title" class="text-[15px] font-semibold text-ink">Data Kendaraan</h3>
@@ -1249,7 +1263,7 @@
           <!-- Daftar Item / Catatan Pengerjaan. Rows are built by addItemRow(); the header grid below and the row grid
                there share one column template (.kasir-grid). The card is never overflow-hidden: the search list in
                the entry row is absolutely positioned. -->
-          <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)]" aria-labelledby="cashier-items-title">
+          <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)]" aria-labelledby="cashier-items-title">
             <div class="flex items-end gap-1 px-3 sm:px-4 pt-3 border-b border-line" role="tablist">
               <button id="kasir-tab-items" type="button" role="tab" aria-selected="true" onclick="kasirTab('items')" class="kasir-tab is-active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21 7H6"/></svg><span id="cashier-items-title">Daftar Item</span></button>
               <button id="kasir-tab-notes" type="button" role="tab" aria-selected="false" onclick="kasirTab('notes')" class="kasir-tab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Catatan Pengerjaan <span class="font-normal text-muted">(Opsional)</span></button>
@@ -1257,8 +1271,8 @@
             </div>
 
             <div id="kasir-panel-items">
-              <div class="kasir-grid kasir-grid-head hidden lg:grid px-4 py-2.5 bg-[#F7F5F0] border-b border-line text-[11px] font-semibold text-muted uppercase tracking-wider" aria-hidden="true">
-                <div class="k-chk"><input id="kasir-check-all" type="checkbox" class="accent-[#D97757]" onclick="kasirCheckAll(this.checked)" aria-label="Pilih semua item" tabindex="-1"></div>
+              <div class="kasir-grid kasir-grid-head hidden lg:grid px-4 py-2.5 bg-[#F3F4F6] border-b border-line text-[11px] font-semibold text-muted uppercase tracking-wider" aria-hidden="true">
+                <div class="k-chk"><input id="kasir-check-all" type="checkbox" class="accent-[#EA580C]" onclick="kasirCheckAll(this.checked)" aria-label="Pilih semua item" tabindex="-1"></div>
                 <div class="k-no">No</div>
                 <div class="k-prod">Produk / Jasa</div>
                 <div class="k-qty text-center">Qty</div>
@@ -1332,7 +1346,7 @@
         <!-- RAIL (Gambar 01, kanan): Ringkasan Transaksi, metode & jumlah bayar, status, simpan; then history. -->
         <aside class="cashier-rail cashier-inner pb-5" aria-label="Ringkasan transaksi dan riwayat nota">
 
-          <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)]" aria-labelledby="cashier-summary-title">
+          <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)]" aria-labelledby="cashier-summary-title">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-4 pb-2">
               <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><path d="M8 8h8M8 12h8"/></svg></span>
               <h2 id="cashier-summary-title" class="text-[15px] font-semibold text-ink whitespace-nowrap">Ringkasan Transaksi</h2>
@@ -1370,8 +1384,8 @@
                       class="w-16 text-right border border-line rounded-lg px-2 py-1 text-xs bg-white text-ink tabular-nums disabled:opacity-40" /> % dari subtotal</div>
                   <input id="discount-reason" type="text" maxlength="300" data-no-uppercase placeholder="Alasan diskon (wajib) — mis. pelanggan langganan"
                     class="w-full border border-line rounded-lg px-2.5 py-1.5 text-xs bg-white text-ink disabled:opacity-40" />
-                  <label id="discount-below-wrap" class="hidden flex items-center gap-2 text-xs text-ink"><input id="discount-below" type="checkbox" class="accent-[#D97757]"> Izinkan harga akhir di bawah modal (izin khusus Admin)</label>
-                  <label id="discount-stack-wrap" class="hidden flex items-center gap-2 text-xs text-ink"><input id="discount-stack" type="checkbox" class="accent-[#D97757]"> Gabungkan dengan harga khusus yang sudah ada</label>
+                  <label id="discount-below-wrap" class="hidden flex items-center gap-2 text-xs text-ink"><input id="discount-below" type="checkbox" class="accent-[#EA580C]"> Izinkan harga akhir di bawah modal (izin khusus Admin)</label>
+                  <label id="discount-stack-wrap" class="hidden flex items-center gap-2 text-xs text-ink"><input id="discount-stack" type="checkbox" class="accent-[#EA580C]"> Gabungkan dengan harga khusus yang sudah ada</label>
                   <div id="discount-state" class="text-xs"></div>
                 </div>
                   <div class="flex items-baseline justify-between gap-3 pt-1 text-xs"><span class="text-muted">Total diskon</span><span id="cashier-summary-discount" class="text-ink tabular-nums">Rp 0</span></div>
@@ -1400,14 +1414,14 @@
 
           <!-- Metode & Jumlah Bayar: what a NEW nota is paid with when it is saved. A saved nota takes payments
                through Tambah Pembayaran instead (each one a separate, auditable payment row). -->
-          <section id="kasir-pay-section" class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] px-4 py-4">
+          <section id="kasir-pay-section" class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)] px-4 py-4">
             <div class="text-sm font-semibold text-ink mb-2">Metode Pembayaran</div>
             <div id="kasir-methods" class="grid grid-cols-1 gap-1.5" role="radiogroup" aria-label="Metode pembayaran">
-              <label class="kasir-method"><input type="radio" name="kasir-method" value="cash" checked onchange="kasirMethodChanged()" class="accent-[#D97757]"> Tunai</label>
-              <label class="kasir-method"><input type="radio" name="kasir-method" value="transfer" onchange="kasirMethodChanged()" class="accent-[#D97757]"> Transfer</label>
-              <label class="kasir-method"><input type="radio" name="kasir-method" value="debit" onchange="kasirMethodChanged()" class="accent-[#D97757]"> Kartu Debit/Kredit</label>
-              <label class="kasir-method"><input type="radio" name="kasir-method" value="qris" onchange="kasirMethodChanged()" class="accent-[#D97757]"> QRIS</label>
-              <label class="kasir-method"><input type="radio" name="kasir-method" value="piutang" onchange="kasirMethodChanged()" class="accent-[#D97757]"> Piutang / Tempo</label>
+              <label class="kasir-method"><input type="radio" name="kasir-method" value="cash" checked onchange="kasirMethodChanged()" class="accent-[#EA580C]"> Tunai</label>
+              <label class="kasir-method"><input type="radio" name="kasir-method" value="transfer" onchange="kasirMethodChanged()" class="accent-[#EA580C]"> Transfer</label>
+              <label class="kasir-method"><input type="radio" name="kasir-method" value="debit" onchange="kasirMethodChanged()" class="accent-[#EA580C]"> Kartu Debit/Kredit</label>
+              <label class="kasir-method"><input type="radio" name="kasir-method" value="qris" onchange="kasirMethodChanged()" class="accent-[#EA580C]"> QRIS</label>
+              <label class="kasir-method"><input type="radio" name="kasir-method" value="piutang" onchange="kasirMethodChanged()" class="accent-[#EA580C]"> Piutang / Tempo</label>
             </div>
             <div id="kasir-amount-wrap" class="mt-3">
               <label for="amount-paid-input" class="text-sm font-semibold text-ink">Jumlah Bayar</label>
@@ -1425,7 +1439,7 @@
             </div>
           </section>
 
-          <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(20,20,19,0.03)] px-4 py-4">
+          <section class="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)] px-4 py-4">
             <div class="text-sm font-semibold text-ink mb-2">Status Transaksi</div>
             <div id="kasir-work-block" class="mb-3">
             <label for="kasir-work-target" class="block text-xs text-muted mb-1">Status Pengerjaan</label>
@@ -1994,13 +2008,13 @@
           <!-- Decorative car (side view), in the page's own colours; hidden on narrow screens. -->
           <div class="hidden sm:flex items-center gap-4 min-w-0" aria-hidden="true">
             <svg width="132" height="56" viewBox="0 0 132 56" fill="none" class="shrink-0">
-              <ellipse cx="66" cy="51" rx="58" ry="3" fill="#D97757" opacity="0.14"/>
-              <path d="M8 38c0-4 2-6 6-7l14-3 14-12c2-2 5-3 8-3h30c4 0 7 1 10 4l14 12 12 3c4 1 6 3 6 6v6c0 2-1 3-3 3h-6" stroke="#141413" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="#FAF9F5"/>
-              <path d="M8 38v6c0 2 1 3 3 3h7M100 47H48M30 47h-2" stroke="#141413" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M41 28l9-9c1-1 3-2 5-2h12v11H41ZM74 17h8c2 0 4 1 5 2l9 9H74V17Z" fill="#D97757" opacity="0.22" stroke="#141413" stroke-width="1.8" stroke-linejoin="round"/>
-              <path d="M120 33h4M10 35h5" stroke="#D97757" stroke-width="2.4" stroke-linecap="round"/>
-              <circle cx="38" cy="45" r="8" fill="#FAF9F5" stroke="#141413" stroke-width="2.2"/><circle cx="38" cy="45" r="2.6" fill="#D97757"/>
-              <circle cx="108" cy="45" r="8" fill="#FAF9F5" stroke="#141413" stroke-width="2.2"/><circle cx="108" cy="45" r="2.6" fill="#D97757"/>
+              <ellipse cx="66" cy="51" rx="58" ry="3" fill="#EA580C" opacity="0.14"/>
+              <path d="M8 38c0-4 2-6 6-7l14-3 14-12c2-2 5-3 8-3h30c4 0 7 1 10 4l14 12 12 3c4 1 6 3 6 6v6c0 2-1 3-3 3h-6" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="#F6F7F9"/>
+              <path d="M8 38v6c0 2 1 3 3 3h7M100 47H48M30 47h-2" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M41 28l9-9c1-1 3-2 5-2h12v11H41ZM74 17h8c2 0 4 1 5 2l9 9H74V17Z" fill="#EA580C" opacity="0.22" stroke="#111827" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M120 33h4M10 35h5" stroke="#EA580C" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="38" cy="45" r="8" fill="#F6F7F9" stroke="#111827" stroke-width="2.2"/><circle cx="38" cy="45" r="2.6" fill="#EA580C"/>
+              <circle cx="108" cy="45" r="8" fill="#F6F7F9" stroke="#111827" stroke-width="2.2"/><circle cx="108" cy="45" r="2.6" fill="#EA580C"/>
             </svg>
             <p class="text-sm text-muted leading-snug max-w-xs">Pesanan pelanggan. Stok di toko dicadangkan, kekurangannya dipesan ke supplier; stok baru keluar saat barang terpasang.</p>
           </div>
@@ -2186,7 +2200,7 @@
                     <option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option></select>
                 </div>
                 <label id="po-deposit-confirm-wrap" class="hidden flex items-start gap-2 rounded-lg border border-line bg-bg2 px-3 py-2 text-xs text-ink cursor-pointer">
-                  <input id="po-deposit-confirmed" type="checkbox" class="accent-[#D97757] mt-0.5" />
+                  <input id="po-deposit-confirmed" type="checkbox" class="accent-[#EA580C] mt-0.5" />
                   <span>Dana sudah saya cek masuk<span class="block text-[11px] text-muted">Bila tidak dicentang, DP dicatat <b>Pending</b> dan belum dihitung sebagai DP sampai dikonfirmasi.</span></span>
                 </label>
               </div>
@@ -2362,15 +2376,15 @@
         </div>
       </div>
 
-      <!-- PRINT PANEL (Preview dan Cetak Nota Sales Order, dot matrix) -->
+      <!-- PRINT PANEL (Preview dan Cetak Invoice Sales Order: status UANG MUKA / LUNAS) -->
       <div id="po-print-panel" class="hidden">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="font-serif text-lg font-semibold text-ink">Nota Sales Order</h2>
+          <h2 class="font-serif text-lg font-semibold text-ink">Invoice Sales Order</h2>
           <button onclick="poPrintBack()" class="text-sm text-accent hover:text-accentDark font-medium">&larr; Kembali</button>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 items-start">
-          <div class="bg-white border border-line rounded-xl p-4 overflow-auto">
-            <pre id="po-nota-preview" class="m-0 text-ink" style="font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.3;white-space:pre;"></pre>
+          <div class="bg-bg2 border border-line rounded-xl p-4 overflow-auto">
+            <div id="po-nota-preview" class="bg-white shadow-sm mx-auto" style="box-sizing:border-box;"></div>
           </div>
           <div class="bg-white border border-line rounded-xl p-4 space-y-4">
             <div class="text-sm font-semibold text-ink">Pengaturan Cetak</div>
@@ -2403,16 +2417,16 @@
               </div>
             </div>
             <label class="flex items-center gap-2 text-sm text-ink cursor-pointer">
-              <input id="po-print-lines" type="checkbox" checked onchange="renderPoNotaPreview()" class="accent-[#D97757]" /> Tampilkan garis pemisah
+              <input id="po-print-lines" type="checkbox" checked onchange="renderPoNotaPreview()" class="accent-[#EA580C]" /> Tampilkan garis pemisah
             </label>
             <label class="flex items-center gap-2 text-sm text-ink cursor-pointer">
-              <input id="po-print-footer" type="checkbox" checked onchange="renderPoNotaPreview()" class="accent-[#D97757]" /> Tampilkan footer toko
+              <input id="po-print-footer" type="checkbox" checked onchange="renderPoNotaPreview()" class="accent-[#EA580C]" /> Tampilkan footer toko
             </label>
             <div class="space-y-2 pt-1">
               <button type="button" onclick="renderPoNotaPreview()"
                 class="w-full px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Preview</button>
               <button type="button" onclick="printPreorderNota()"
-                class="w-full px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Cetak Nota</button>
+                class="w-full px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Cetak Invoice</button>
             </div>
             <p id="po-print-note" class="hidden text-[11px] text-muted"></p>
           </div>
@@ -3852,7 +3866,7 @@
                     <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal Rata-rata</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th>
                     <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Margin</th>
-                    <th class="sticky right-0 bg-bg2 text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line shadow-[-6px_0_6px_-6px_rgba(20,20,19,0.12)]">Aksi</th>
+                    <th class="sticky right-0 bg-bg2 text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line shadow-[-6px_0_6px_-6px_rgba(17,24,39,0.12)]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="master-items-tbody"></tbody>
@@ -6127,7 +6141,7 @@ function refreshItemSpecial(row) {
       <input type="text" ${dis} class="item-price-reason flex-1 min-w-[12rem] border border-line rounded-lg px-2.5 py-1 text-xs bg-white text-ink disabled:opacity-60" data-no-uppercase maxlength="300"
         placeholder="Alasan harga khusus (wajib) — mis. hasil negosiasi" value="${esc(row.dataset.priceReason || "")}"
         oninput="this.closest('.item-row').dataset.priceReason = this.value; markActiveTabDirty();">
-      ${below ? `<label class="flex items-center gap-1.5 text-xs text-failed font-medium"><input type="checkbox" ${dis} class="accent-[#D97757]" ${row.dataset.belowOk ? "checked" : ""}
+      ${below ? `<label class="flex items-center gap-1.5 text-xs text-failed font-medium"><input type="checkbox" ${dis} class="accent-[#EA580C]" ${row.dataset.belowOk ? "checked" : ""}
         onchange="this.closest('.item-row').dataset.belowOk = this.checked ? '1' : ''; if (!this.checked) delete this.closest('.item-row').dataset.belowOk; markActiveTabDirty();"> Harga di bawah modal — izinkan</label>` : ""}
     </div>`}`;
 }
@@ -6229,7 +6243,7 @@ function addItemRow(prefill) {
   if (prefill && prefill.salesId) { row.dataset.salesId = prefill.salesId; row.dataset.salesName = prefill.salesName || ""; }
   if (prefill && prefill.workStatus) row.dataset.workStatus = prefill.workStatus;
   row.innerHTML = `
-    <div class="k-chk"><input type="checkbox" class="item-check accent-[#D97757]" aria-label="Pilih item" tabindex="-1" onchange="kasirSelectionChanged()"></div>
+    <div class="k-chk"><input type="checkbox" class="item-check accent-[#EA580C]" aria-label="Pilih item" tabindex="-1" onchange="kasirSelectionChanged()"></div>
     <span class="k-no item-no text-sm text-muted tabular-nums" aria-hidden="true"></span>
     <div class="k-prod min-w-0 flex items-center gap-3">
       <span class="item-tile w-11 h-11 rounded-lg bg-bg2 border border-line text-muted grid place-items-center text-sm font-semibold shrink-0 overflow-hidden" aria-hidden="true"></span>
@@ -6724,7 +6738,7 @@ function kasirConfirm() {
   if (c.action === "draft" && c.amount > 0 && c.method !== "piutang") c.action = null;   // money is never kept on a Draft
   c.action = c.action || def;
   const opt = (key, title, sub, badge = "") => `<label class="flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer ${c.action === key ? "border-accent bg-accent/5" : "border-line hover:bg-bg2"}">
-      <input type="radio" name="kasir-act" value="${key}" ${c.action === key ? "checked" : ""} onchange="kasirSaveCtx.action=this.value; kasirConfirm()" class="accent-[#D97757]">
+      <input type="radio" name="kasir-act" value="${key}" ${c.action === key ? "checked" : ""} onchange="kasirSaveCtx.action=this.value; kasirConfirm()" class="accent-[#EA580C]">
       <span class="text-sm font-semibold text-ink">${title}</span><span class="ml-auto text-xs text-muted">${sub}</span>${badge}</label>`;
   const payLine = c.method === "piutang" || !c.amount ? "Tanpa pembayaran sekarang (Belum Bayar)."
     : `${payMethodLabel(c.method)} ${formatIDR(c.amount)}${c.amount < cashierLastTotal ? " (DP)" : " (penuh)"}${["transfer", "qris"].includes(c.method) ? " — detail diisi setelah nota disimpan" : ""}`;
@@ -6738,7 +6752,7 @@ function kasirConfirm() {
       ${job ? opt("nota", "Simpan Nota", "Simpan transaksi tanpa memulai kerja") : opt("nota", "Simpan Nota", "Pembelian langsung, tanpa pengerjaan")}
       ${job ? opt("start", "Simpan & Mulai Pengerjaan", "", jobs ? `<span class="ml-2">${grPill("green", "Disarankan")}</span>` : "") : ""}</div>
     <div class="text-sm text-ink">Pembayaran: <span class="font-medium">${c.action === "draft" ? "Draft belum menerima pembayaran." : esc(payLine)}</span></div>
-    <label class="flex items-center gap-2 text-sm"><input id="kasir-print-after" type="checkbox" class="accent-[#D97757]" ${c.print ? "checked" : ""} ${c.action === "draft" ? "disabled" : ""} onchange="kasirSaveCtx.print=this.checked"> Cetak nota setelah disimpan</label>
+    <label class="flex items-center gap-2 text-sm"><input id="kasir-print-after" type="checkbox" class="accent-[#EA580C]" ${c.print ? "checked" : ""} ${c.action === "draft" ? "disabled" : ""} onchange="kasirSaveCtx.print=this.checked"> Cetak nota setelah disimpan</label>
     ${grNote("amber", "Simpan dan cetak tidak otomatis mengubah status menjadi Lunas atau Pekerjaan Selesai. Cetak ulang tidak mengubah stok maupun pembayaran.")}
     <div class="flex justify-end gap-2"><button type="button" class="${GR_BTN3}" onclick="kasirReview()">Kembali</button>
       <button id="kasir-confirm-btn" type="button" class="${GR_BTN}" onclick="kasirDoSave()">${label}</button></div></div>`, { wide: true });
@@ -7947,7 +7961,7 @@ async function hoAddPhotos(input) {
 function hoSigInit() {
   const c = document.getElementById("ho-sig"); if (!c) return;
   const ctx = c.getContext("2d");
-  ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#141413";
+  ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#111827";
   let drawing = false;
   const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
   c.onpointerdown = e => { drawing = true; c.setPointerCapture(e.pointerId); const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 0.1, y + 0.1); ctx.stroke(); hoSigDirty = true; };
@@ -8007,6 +8021,20 @@ function wsStageChanged() {
   });
 }
 
+// Tahap kerja only means something while the car is in work, so it shows only when
+// "Dalam Pengerjaan" is the picked status, and follows the pick as it changes.
+function wsToChanged() {
+  const picked = document.querySelector("input[name=ws-to]:checked")?.value;
+  document.querySelectorAll("input[name=ws-to]").forEach(i => {
+    const lbl = i.closest("label");
+    lbl.classList.toggle("border-accent", i.checked);
+    lbl.classList.toggle("bg-accent/5", i.checked);
+    lbl.classList.toggle("border-line", !i.checked);
+    lbl.classList.toggle("hover:bg-bg2", !i.checked);
+  });
+  document.getElementById("ws-stage-wrap")?.classList.toggle("hidden", picked !== "pengerjaan");
+}
+
 function openWorkStatusModal() {
   const tab = getActiveTab();
   if (!tab || !tab.receiptId) return;
@@ -8018,7 +8046,7 @@ function openWorkStatusModal() {
       <div class="flex flex-wrap items-center gap-2 text-sm"><span class="text-muted">Pembayaran</span>${paymentBadge(tab.total, tab.amountPaid, tab.status, tab.pendingAmount)}</div>
       <div class="space-y-1.5" role="radiogroup" aria-label="Status pengerjaan">
         ${["belum", "pengerjaan", "selesai"].map(k => `<label class="flex items-center gap-3 border rounded-lg px-3 py-2.5 text-sm cursor-pointer ${k === tab.workStatus ? "border-accent bg-accent/5" : "border-line hover:bg-bg2"}">
-          <input type="radio" name="ws-to" value="${k}" ${k === tab.workStatus ? "checked" : ""} class="accent-[#D97757]" />
+          <input type="radio" name="ws-to" value="${k}" ${k === tab.workStatus ? "checked" : ""} class="accent-[#EA580C]" onchange="wsToChanged()" />
           <span class="min-w-0"><span class="block font-medium text-ink">${WORK_STATUS_LABELS[k]}</span><span class="block text-xs text-muted">${hints[k]}</span></span></label>`).join("")}
       </div>
       <div id="ws-stage-wrap" class="${tab.workStatus === "pengerjaan" ? "" : "hidden"}">
@@ -8064,6 +8092,12 @@ async function submitWorkStatus() {
     showToast(await responseErrorDetail(resp, "Status nota tidak bisa diubah."));
     if (btn) btn.disabled = false;
     return;
+  }
+  // Starting work with a stage picked records that stage too.
+  if (to === "pengerjaan" && stage && stage !== tab.workStage) {
+    await fetch(`/api/receipts/${tab.receiptId}/work-stage`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stage }),
+    }).catch(() => {});
   }
   closeModal();
   await reloadTabFromServer(tab);
@@ -9734,7 +9768,7 @@ async function openReceiptPaymentModal(receiptId) {
       <span class="inline-flex items-center gap-2">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PAYMENT_METHOD_ICONS[key] || ""}</svg>${esc(label)}
       </span>
-      <input type="radio" name="rp-method" value="${key}" ${key === ctx.method ? "checked" : ""} onchange="updateReceiptPayModal()" class="accent-[#D97757]" />
+      <input type="radio" name="rp-method" value="${key}" ${key === ctx.method ? "checked" : ""} onchange="updateReceiptPayModal()" class="accent-[#EA580C]" />
     </label>`).join("");
   const row = (label, id, extra = "") => `<div class="flex items-center justify-between py-1"><span class="text-muted">${label}</span><span id="${id}" class="font-semibold tabular-nums ${extra}"></span></div>`;
   openModal("Pembayaran Nota", `
@@ -9769,7 +9803,7 @@ async function openReceiptPaymentModal(receiptId) {
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${methods}</div>
             </div>
             <label id="rp-confirm-wrap" class="hidden flex items-start gap-2 rounded-lg border border-line bg-bg2 px-3 py-2.5 text-sm text-ink cursor-pointer">
-              <input id="rp-confirmed" type="checkbox" onchange="updateReceiptPayModal()" class="accent-[#D97757] mt-0.5" />
+              <input id="rp-confirmed" type="checkbox" onchange="updateReceiptPayModal()" class="accent-[#EA580C] mt-0.5" />
               <span>Dana sudah saya cek masuk<span class="block text-xs text-muted">Centang bila uangnya sudah terlihat di rekening / aplikasi QRIS. Bila tidak, pembayaran dicatat <b>Pending</b> dan belum dihitung lunas atau masuk laporan sampai dikonfirmasi.</span></span>
             </label>
             <div id="rp-transfer" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -9810,7 +9844,7 @@ async function openReceiptPaymentModal(receiptId) {
             <div class="flex items-center justify-between border-t border-line mt-1 pt-2"><span id="rp-after-label" class="text-failed">Sisa Setelah Pembayaran</span><span id="rp-after-remaining" class="font-serif text-lg font-semibold text-failed tabular-nums"></span></div>
           </div>
           <label class="flex items-start gap-2 text-sm text-ink cursor-pointer">
-            <input id="rp-print" type="checkbox" checked class="accent-[#D97757] mt-0.5" />
+            <input id="rp-print" type="checkbox" checked class="accent-[#EA580C] mt-0.5" />
             <span>Cetak nota setelah pembayaran<span class="block text-xs text-muted">Nota dicetak lewat printer setelah pembayaran disimpan.</span></span>
           </label>
         </div>
@@ -11344,7 +11378,7 @@ function openUnitModal(id) {
       </div>
       ${used > 0 ? `<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 leading-relaxed">
         <b>Dipakai ${formatInt(used)} produk.</b> Mengubah nama ikut mengubah tampilan satuan di semua produk itu. Gunakan hanya untuk memperbaiki penulisan, bukan mengganti arti satuan (mis. PCS menjadi METER). Mengganti satuan satu produk dilakukan di Edit Barang.
-        <label class="flex items-start gap-2 mt-2"><input id="unit-f-confirm" type="checkbox" class="mt-0.5 accent-[#D97757]"><span>Saya paham, ini hanya perbaikan penulisan nama.</span></label></div>` : ""}
+        <label class="flex items-start gap-2 mt-2"><input id="unit-f-confirm" type="checkbox" class="mt-0.5 accent-[#EA580C]"><span>Saya paham, ini hanya perbaikan penulisan nama.</span></label></div>` : ""}
       <p id="unit-form-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs px-3 py-2"></p>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
@@ -12537,7 +12571,7 @@ function crRenderList() {
     ? `Periode: ${f.date_from === f.date_to ? crLongDay(f.date_from) : `${f.date_from ? crWhen(f.date_from + " 0", true) : "…"} — ${f.date_to ? crWhen(f.date_to + " 0", true) : "…"}`}` : "Periode: semua tanggal";
   const money = n => esc(formatIDR(n));
   document.getElementById("cr-kpis").innerHTML =
-    crTile("Penerimaan Bruto", money(s.gross), `${s.gross_count} pembayaran sah`, "bg-[#FDF4EF] border-[#F3DDD2]")
+    crTile("Penerimaan Bruto", money(s.gross), `${s.gross_count} pembayaran sah`, "bg-[#FFF4ED] border-[#FED7AA]")
     + crTile("Refund", `<span class="${s.refund ? "text-failed" : ""}">${money(s.refund)}</span>`, `${s.refund_count} refund / pembalikan`, "bg-[#FDF1F1] border-[#F3D9D9]")
     + crTile("Penerimaan Bersih", money(s.net), "Bruto dikurangi refund", "bg-[#F1F8F3] border-[#D9EBDE]")
     + crTile("Tunai", money(m.cash.gross), `${m.cash.count} penerimaan`)
@@ -12893,7 +12927,7 @@ async function apGo(tab) {
 function apRenderDashboard(d) {
   const b = d.buckets;
   const tiles = `<div class="${apGrid(5)}">
-    ${crTile("Total utang aktif", apMoney(d.outstanding), `${d.open_count} faktur belum lunas`, "bg-[#FDF4EF] border-[#F3DDD2]")}
+    ${crTile("Total utang aktif", apMoney(d.outstanding), `${d.open_count} faktur belum lunas`, "bg-[#FFF4ED] border-[#FED7AA]")}
     ${crTile("Belum jatuh tempo", apMoney(b.not_due), `${d.not_due_count} tagihan aktif`, "bg-[#F1F8F3] border-[#D9EBDE]")}
     ${crTile("Jatuh tempo hari ini", apMoney(b.today), `${d.due_today_count} faktur${d.due_today_names.length ? " · " + esc(d.due_today_names.join(", ")) : ""}`, "bg-[#F6F2FD] border-[#E5DCF5]")}
     ${crTile("Lewat jatuh tempo", `<span class="${d.overdue_total ? "text-failed" : ""}">${apMoney(d.overdue_total)}</span>`, `${d.overdue_count} faktur${d.overdue_names.length ? " · " + esc(d.overdue_names.join(", ")) : ""}`, "bg-[#FDF1F1] border-[#F3D9D9]")}
@@ -12949,7 +12983,7 @@ function apRenderInvoices(d) {
       ${sel("apf-pay", "Status pembayaran", [["", "Semua status"], ["belum", "Belum bayar"], ["sebagian", "Sebagian"], ["lunas", "Lunas"]], f.pay_status)}
       ${sel("apf-due", "Jatuh tempo", [["", "Semua periode"], ["overdue", "Sudah lewat"], ["today", "Hari ini"], ["week", "7 hari ke depan"], ["month", "30 hari ke depan"]], f.due)}
       ${inp("apf-from", "Tanggal faktur dari", f.date_from, "date")}${inp("apf-to", "Tanggal faktur sampai", f.date_to, "date")}${inp("apf-po", "Nomor Purchase Order", f.po, "search", "PO-…")}
-      <label class="flex items-end gap-2 pb-2 text-sm text-ink"><input id="apf-out" type="checkbox" ${f.outstanding ? "checked" : ""} onchange="apFilter()" class="accent-[#D97757]" /> Hanya yang masih outstanding</label></div>
+      <label class="flex items-end gap-2 pb-2 text-sm text-ink"><input id="apf-out" type="checkbox" ${f.outstanding ? "checked" : ""} onchange="apFilter()" class="accent-[#EA580C]" /> Hanya yang masih outstanding</label></div>
     <div class="flex justify-end gap-2 mt-4">${apBtn("Reset", "apFilterReset()")}${apBtn("Terapkan Filter", "apFilter()", true)}</div></div></div>`;
   const sortTh = (k, label, right) => `<th class="${right ? AP_THR : AP_TH}"><button type="button" onclick="apSort('${k}')" class="uppercase tracking-wider hover:text-ink ${AP.sort === k ? "text-ink" : ""}">${label}${AP.sort === k ? (AP.dir === "asc" ? " ▲" : " ▼") : ""}</button></th>`;
   const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0 align-middle">
@@ -13024,7 +13058,7 @@ function apRenderDetail(d) {
   ].filter(Boolean).map(([k, n, js, sub]) => `<div class="flex items-center justify-between gap-3 border border-line rounded-lg px-3 py-2"><div><div class="font-mono text-sm font-semibold text-ink">${esc(n)}</div><div class="text-[11px] text-muted">${k} · ${esc(sub)}</div></div>${apSmallBtn("Lihat dokumen", js)}</div>`).join("")}</div>`;
   apBody().innerHTML = apHead("Detail Aging Payable", `${d.invoice_number} · ${d.supplier_name} · ${d.pay_status === "lunas" ? "lunas" : "dibayar " + (d.pay_status === "sebagian" ? "sebagian" : "belum")}`,
     apBtn("← Kembali", `apGo('${AP.tab}')`) + apBtn("Buka Faktur Pembelian", `openPurchaseInvoiceById(${d.id})`) + apBtn("Riwayat & Bukti", `apOpenPayments(${d.id})`) + (d.can_pay ? apBtn("Bayar Tagihan", `openPurchaseInvoiceById(${d.id})`, true) : ""))
-    + `<div class="${apGrid(5)}">${crTile("Total tagihan", apMoney(d.total), d.invoice_number, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("DP dialokasikan", apMoney(d.dp), "uang muka dari PO", "bg-[#F2F6FD] border-[#DCE6F6]")}${crTile("Transfer / tunai dibayar", apMoney(d.cash), "pembayaran supplier", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Credit Note", apMoney(d.credit), "nota kredit retur", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Sisa utang", `<span class="${d.outstanding ? "text-failed" : ""}">${apMoney(d.outstanding)}</span>`, d.outstanding ? "belum lunas" : "lunas", "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`
+    + `<div class="${apGrid(5)}">${crTile("Total tagihan", apMoney(d.total), d.invoice_number, "bg-[#FFF4ED] border-[#FED7AA]")}${crTile("DP dialokasikan", apMoney(d.dp), "uang muka dari PO", "bg-[#F2F6FD] border-[#DCE6F6]")}${crTile("Transfer / tunai dibayar", apMoney(d.cash), "pembayaran supplier", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Credit Note", apMoney(d.credit), "nota kredit retur", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Sisa utang", `<span class="${d.outstanding ? "text-failed" : ""}">${apMoney(d.outstanding)}</span>`, d.outstanding ? "belum lunas" : "lunas", "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`
     + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 mb-4 items-start">${idCard}${apPanel("Posisi utang saat ini", pos)}</div>`
     + `<div class="mb-4">${apPanel("Rincian barang dan penerimaan", items)}</div>`
     + `<div class="mb-4">${apPanel("Pencocokan PO ↔ Goods Receipt ↔ Faktur", matching, "Hanya untuk pengecekan; tidak mengubah faktur atau stok")}</div>`
@@ -13104,7 +13138,7 @@ function apRenderDue(d) {
     ${crTile("Sudah terlambat", `<span class="${k.overdue.total ? "text-failed" : ""}">${apMoney(k.overdue.total)}</span>`, `${k.overdue.count} faktur${k.overdue.max_days ? " · lewat " + k.overdue.max_days + " hari" : ""}`, "bg-[#FDF1F1] border-[#F3D9D9]")}
     ${crTile("Jatuh tempo hari ini", apMoney(k.today.total), `${k.today.count} faktur`, "bg-[#F6F2FD] border-[#E5DCF5]")}
     ${crTile("7 hari ke depan", apMoney(k.week.total), `${k.week.count} faktur`, "bg-[#F1F8F3] border-[#D9EBDE]")}
-    ${crTile("8–30 hari", apMoney(k.month.total), `${k.month.count} faktur`, "bg-[#FDF4EF] border-[#F3DDD2]")}
+    ${crTile("8–30 hari", apMoney(k.month.total), `${k.month.count} faktur`, "bg-[#FFF4ED] border-[#FED7AA]")}
     ${crTile("Total outstanding", apMoney(k.all.total), `${k.all.count} faktur`, "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
   const rows = d.priority.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${apInvLink(r)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.due_date)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.outstanding)}</td><td class="${AP_TD}">${apDueBadge(r)}</td><td class="${AP_TD}">${apSmallBtn("Detail", `apOpenDetail(${r.id})`)}</td></tr>`).join("");
   const [y, m] = d.month.split("-").map(Number);
@@ -13131,7 +13165,7 @@ function apRenderDue(d) {
 function apRenderDp(d) {
   const k = d.kpi;
   const tiles = `<div class="${apGrid(5)}">
-    ${crTile("DP supplier dibayar", apMoney(k.paid), "pada PO aktif", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah dialokasikan", apMoney(k.applied), "ke faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}
+    ${crTile("DP supplier dibayar", apMoney(k.paid), "pada PO aktif", "bg-[#FFF4ED] border-[#FED7AA]")}${crTile("Sudah dialokasikan", apMoney(k.applied), "ke faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}
     ${crTile("Sisa uang muka", apMoney(k.free), "dapat dipakai", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("DP PO dibatalkan", apMoney(k.cancelled), "menunggu refund", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Transaksi DP", String(k.count), "tercatat di PO", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
   const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD}"><div class="font-mono text-[13px] text-ink">${esc(r.reference_no || "—")}</div><div class="text-[11px] text-muted">${esc(r.bank_account || "")}</div></td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${apPoLink(r.supplier_po_id, r.po_number)}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.paid_at)}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.invoices.length ? r.invoices.map(i => `${apNum(i.invoice_number, `openPurchaseInvoiceById(${i.invoice_id})`)} <span class="text-xs text-muted">${apMoney(i.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${r.status === "batal" ? "—" : apMoney(r.free)}</td><td class="${AP_TD}">${crPill({ teralokasi: "bg-emerald-50 text-emerald-700", sebagian: "bg-amber-50 text-amber-700", tersedia: "bg-violet-50 text-violet-700", batal: "bg-rose-50 text-rose-700" }[r.status], r.status_label)}</td><td class="${AP_TD}">${r.free > 0 && r.status !== "batal" ? apSmallBtn("Alokasikan", `dpOpenAllocate(${r.id})`) : ""}</td></tr>`).join("");
   const flow = `<div class="px-4 py-4 text-sm"><div class="flex flex-wrap items-center gap-2 text-xs">${["DP dibayar di PO", "Saldo DP", "Dialokasikan saat faktur diposting"].map((t, i) => `${i ? '<span class="text-muted">→</span>' : ""}<span class="border border-line rounded-lg bg-bg2 px-3 py-2 font-semibold text-ink">${t}</span>`).join("")}</div>
@@ -13143,7 +13177,7 @@ function apRenderDp(d) {
 // ── Credit note ──
 function apRenderCredits(d) {
   const k = d.kpi;
-  const tiles = `<div class="${apGrid(3)}">${crTile("Nota kredit aktif", apMoney(k.total), `${k.count} dokumen`, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah dialokasikan", apMoney(k.allocated), "memotong faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Saldo kredit tersedia", apMoney(k.free), "belum dialokasikan", "bg-[#F6F2FD] border-[#E5DCF5]")}</div>`;
+  const tiles = `<div class="${apGrid(3)}">${crTile("Nota kredit aktif", apMoney(k.total), `${k.count} dokumen`, "bg-[#FFF4ED] border-[#FED7AA]")}${crTile("Sudah dialokasikan", apMoney(k.allocated), "memotong faktur", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Saldo kredit tersedia", apMoney(k.free), "belum dialokasikan", "bg-[#F6F2FD] border-[#E5DCF5]")}</div>`;
   const rows = d.items.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(r.cn_number || "—")}${r.supplier_cn_no ? `<div class="text-[11px] text-muted font-sans">Supplier: ${esc(r.supplier_cn_no)}</div>` : ""}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.po_number ? apPoLink(r.supplier_po_id, r.po_number) : "—"}</td><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${r.allocations.length ? r.allocations.map(a => `${apNum(a.invoice_number, `openPurchaseInvoiceById(${a.invoice_id})`)} <span class="text-xs text-muted">${apMoney(a.amount)}</span>`).join("<br>") : '<span class="text-muted">—</span>'}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(r.free)}</td><td class="${AP_TD}">${crPill(r.status !== "aktif" ? "bg-stone-100 text-stone-600" : r.free ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700", r.status_label)}</td><td class="${AP_TD}">${apSmallBtn("Detail", `apOpenCredit(${r.id})`)}</td></tr>`).join("");
   apBody().innerHTML = apHead("Credit Note dari Retur Supplier", "Nota kredit resmi menjadi pengurang tagihan tanpa transaksi kas ganda.", apBtn("Lihat Retur Supplier", "location.hash='/retur-supplier'", true)) + tiles
     + apPanel("Daftar nota kredit", apTable(`<th class="${AP_TH}">No. Credit Note</th><th class="${AP_TH}">Supplier</th><th class="${AP_TH}">Sumber</th><th class="${AP_TH}">Tanggal</th><th class="${AP_THR}">Nilai</th><th class="${AP_TH}">Dialokasikan ke faktur</th><th class="${AP_THR}">Saldo</th><th class="${AP_TH}">Status</th><th class="${AP_TH}">Aksi</th>`, rows, "Belum ada nota kredit."))
@@ -13153,7 +13187,7 @@ function apRenderCredits(d) {
 // ── Refund supplier ──
 function apRenderRefunds(d) {
   const k = d.kpi;
-  const tiles = `<div class="${apGrid(3)}">${crTile("Klaim refund / kredit", apMoney(k.claimed), "dari PO yang dibatalkan", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Sudah diterima", apMoney(k.settled), "uang masuk / kredit terkonfirmasi", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Piutang refund", `<span class="${k.open ? "text-failed" : ""}">${apMoney(k.open)}</span>`, `${k.open_count} klaim menunggu`, "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`;
+  const tiles = `<div class="${apGrid(3)}">${crTile("Klaim refund / kredit", apMoney(k.claimed), "dari PO yang dibatalkan", "bg-[#FFF4ED] border-[#FED7AA]")}${crTile("Sudah diterima", apMoney(k.settled), "uang masuk / kredit terkonfirmasi", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Piutang refund", `<span class="${k.open ? "text-failed" : ""}">${apMoney(k.open)}</span>`, `${k.open_count} klaim menunggu`, "bg-[#FDF1F1] border-[#F3D9D9]")}</div>`;
   const claimRows = d.claims.map(c => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-ink">${esc(c.claim_no)}</td><td class="${AP_TD} text-ink">${esc(c.supplier_name)}</td><td class="${AP_TD}">${apPoLink(c.supplier_po_id, c.po_number)}</td><td class="${AP_TD}">${c.kind === "refund" ? "Uang kembali" : "Kredit supplier"}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(c.settled_amount)}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(c.left)}</td><td class="${AP_TD}">${crPill(c.status === "menunggu" ? "bg-amber-50 text-amber-700" : c.status === "dibatalkan" ? "bg-stone-100 text-stone-600" : "bg-emerald-50 text-emerald-700", c.status === "menunggu" ? "Menunggu" : c.status === "dibatalkan" ? "Dibatalkan" : c.kind === "refund" ? "Diterima" : "Dikonfirmasi")}</td><td class="${AP_TD}">${apSmallBtn("Detail", `apOpenRefund(${c.id})`)}</td></tr>`).join("");
   const recRows = d.received.map(r => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-muted whitespace-nowrap">${apDate(r.issued_at)}</td><td class="${AP_TD} text-ink">${esc(r.supplier_name)}</td><td class="${AP_TD}">${r.return_id ? apRetLink(r.return_id, r.return_number) : r.claim_no ? esc(r.claim_no) + (r.po_number ? ` · ${esc(r.po_number)}` : "") : "—"}</td><td class="${AP_TD} text-muted">${esc(PAYMENT_METHOD_LABELS[r.method] || r.method || "")}${r.reference_no ? ` · ${esc(r.reference_no)}` : ""}</td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(r.amount)}</td><td class="${AP_TD}">${crPill(r.status === "aktif" ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-600", r.status === "aktif" ? "Diterima" : "Dibatalkan")}</td></tr>`).join("");
   apBody().innerHTML = apHead("Refund Supplier & Pembatalan", "Pembatalan PO, refund, dan nota kredit diproses sesuai persetujuan supplier.", apBtn("Buka Purchase Order", "location.hash='/supplier-po'", true)) + tiles
@@ -13165,7 +13199,7 @@ function apRenderRefunds(d) {
 // ── Rekonsiliasi ──
 function apRenderRecon(d) {
   const k = d.kpi;
-  const tiles = `<div class="${apGrid(6)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih + (k.tahan || 0)), "selisih GR / PO atau ditahan", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Bukti pembayaran pending", String(k.bukti || 0), "menunggu unggah / verifikasi", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Alokasi DP / kredit belum cocok", String(k.alokasi), "perlu keputusan admin", "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#FFF8E8] border-[#F2E3B8]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const tiles = `<div class="${apGrid(6)}">${crTile("Faktur cocok", String(k.cocok), "dari PO, tanpa selisih", "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Perlu klarifikasi", String(k.selisih + (k.tahan || 0)), "selisih GR / PO atau ditahan", "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Bukti pembayaran pending", String(k.bukti || 0), "menunggu unggah / verifikasi", "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Alokasi DP / kredit belum cocok", String(k.alokasi), "perlu keputusan admin", "bg-[#FFF4ED] border-[#FED7AA]")}${crTile("Faktur draft lama", String(k.draft), "belum diposting ≥ 7 hari", "bg-[#FFF8E8] border-[#F2E3B8]")}${crTile("Potensi duplikat", String(k.duplikat), "nomor faktur supplier sama", "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
   const open = (x) => x.ref_type === "invoice" ? `openPurchaseInvoiceById(${x.ref_id})` : x.ref_type === "po" ? (x.kind === "dp" ? "apGo('dp')" : `openSupplierPoFromFaktur('${esc(x.ref_id)}')`) : "apGo('credits')";
   const rows = d.items.map(x => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} font-mono text-[13px] text-accentDark">${esc(x.number || "—")}</td><td class="${AP_TD} text-ink">${esc(x.supplier)}</td><td class="${AP_TD}">${esc(x.category)}<div class="text-[11px] text-muted">${esc(x.detail || "")}</div></td><td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(x.value)}</td><td class="${AP_TD}">${apSmallBtn({ selisih: "Review Selisih", bukti: "Verifikasi Bukti", duplikat: "Cek Duplikasi", tahan: "Tinjau", dp: "Alokasikan DP" }[x.kind] || "Buka dokumen", open(x))}</td><td class="${AP_TD}">${crPill({ bukti: "bg-violet-50 text-violet-700", tahan: "bg-amber-50 text-amber-700", selisih: "bg-amber-50 text-amber-700", duplikat: "bg-violet-50 text-violet-700", draft: "bg-stone-100 text-stone-600", dp: "bg-sky-50 text-sky-700", kredit: "bg-sky-50 text-sky-700", refund: "bg-amber-50 text-amber-700" }[x.kind], x.status)}</td></tr>`).join("");
   apBody().innerHTML = apHead("Rekonsiliasi & Koreksi Tagihan", "Temukan selisih dengan jejak yang jelas, tanpa membuat pembayaran dua kali.", apBtn("Buka Log Aktivitas", "location.hash='/activity'")) + tiles
@@ -13177,7 +13211,7 @@ function apRenderRecon(d) {
 function apRenderAging(d) {
   const t = d.totals, c = d.composition;
   const pct = k => t.total ? `${c[k]}% dari total` : "—";
-  const tiles = `<div class="${apGrid(5)}">${crTile("Outstanding supplier", apMoney(t.total), `${d.open_count} faktur aktif`, "bg-[#FDF4EF] border-[#F3DDD2]")}${crTile("Belum jatuh tempo", apMoney(t.not_due), pct("not_due"), "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Jatuh tempo hari ini", apMoney(t.today), pct("today"), "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Overdue 1–30 hari", apMoney(t.overdue_1_30), pct("overdue_1_30"), "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Overdue > 30 hari", apMoney(t.overdue_30_plus), pct("overdue_30_plus"), "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
+  const tiles = `<div class="${apGrid(5)}">${crTile("Outstanding supplier", apMoney(t.total), `${d.open_count} faktur aktif`, "bg-[#FFF4ED] border-[#FED7AA]")}${crTile("Belum jatuh tempo", apMoney(t.not_due), pct("not_due"), "bg-[#F1F8F3] border-[#D9EBDE]")}${crTile("Jatuh tempo hari ini", apMoney(t.today), pct("today"), "bg-[#F6F2FD] border-[#E5DCF5]")}${crTile("Overdue 1–30 hari", apMoney(t.overdue_1_30), pct("overdue_1_30"), "bg-[#FDF1F1] border-[#F3D9D9]")}${crTile("Overdue > 30 hari", apMoney(t.overdue_30_plus), pct("overdue_30_plus"), "bg-[#F2F6FD] border-[#DCE6F6]")}</div>`;
   const rows = d.items.map(s => `<tr class="border-b border-line last:border-b-0"><td class="${AP_TD} text-ink">${esc(s.supplier)}</td>${["not_due", "today", "overdue_1_30", "overdue_30_plus"].map(k => `<td class="${AP_TD} text-right tabular-nums whitespace-nowrap ${s[k] && k.startsWith("overdue") ? "text-failed" : ""}">${apMoney(s[k])}</td>`).join("")}<td class="${AP_TD} text-right tabular-nums whitespace-nowrap font-semibold">${apMoney(s.total)}</td></tr>`).join("")
     + `<tr class="bg-bg2 font-semibold"><td class="${AP_TD}">TOTAL</td>${["not_due", "today", "overdue_1_30", "overdue_30_plus", "total"].map(k => `<td class="${AP_TD} text-right tabular-nums whitespace-nowrap">${apMoney(t[k])}</td>`).join("")}</tr>`;
   const bar = t.total ? `<div class="flex h-3 rounded-full overflow-hidden mt-3">${[["not_due", "bg-emerald-400"], ["today", "bg-violet-400"], ["overdue_1_30", "bg-orange-400"], ["overdue_30_plus", "bg-rose-500"]].map(([k, cl]) => `<div class="${cl}" style="width:${c[k]}%"></div>`).join("")}</div>` : "";
@@ -13223,7 +13257,7 @@ const odIcon = (name, size = 16, sw = 1.7) => `<svg width="${size}" height="${si
 // Tone → [card title, chip background, chip ink, card tint, card border]; the six colours of the KPI row.
 // The tint is an inline style so the app-wide nth-child card tints don't recolour the row out of order.
 const OD_TONES = {
-  coral: ["text-[#C4633F]", "bg-[#FBE6DD]", "text-[#C4633F]", "#FFF8F5", "#F4DDD3"],
+  coral: ["text-[#C2410C]", "bg-[#FBE6DD]", "text-[#C2410C]", "#FFF8F5", "#F4DDD3"],
   amber: ["text-[#A87612]", "bg-[#FBEFD3]", "text-[#C08A1C]", "#FFFAF0", "#F2E3BF"],
   blue: ["text-[#3F6EB5]", "bg-[#E1ECFA]", "text-[#3F6EB5]", "#F6F9FE", "#D8E5F6"],
   violet: ["text-[#6E4FB8]", "bg-[#ECE5FA]", "text-[#6E4FB8]", "#F9F7FE", "#E3DAF4"],
@@ -13234,7 +13268,7 @@ const OD_BADGE = {
   amber: "bg-[#FCF1DA] text-[#94650F] border-[#F3DFB2]", orange: "bg-[#FDEBDF] text-[#B4562A] border-[#F6D2BC]",
   blue: "bg-[#E6F0FC] text-[#2F5C9E] border-[#CFE0F6]", sky: "bg-[#E5F4FA] text-[#22708F] border-[#C9E6F2]",
   violet: "bg-[#EFE9FB] text-[#5E43A8] border-[#DDD2F5]", green: "bg-[#E4F4E9] text-[#2F6B43] border-[#C9E6D2]",
-  red: "bg-[#FBE7E7] text-[#A83B3B] border-[#F3CDCD]", stone: "bg-[#F0EEE6] text-[#5E5A52] border-[#E2DED3]",
+  red: "bg-[#FBE7E7] text-[#A83B3B] border-[#F3CDCD]", stone: "bg-[#EEF0F3] text-[#5E5A52] border-[#DEE2E7]",
 };
 const odBadge = (tone, label, extra = "") => `<span class="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap ${OD_BADGE[tone] || OD_BADGE.stone} ${extra}">${esc(label)}</span>`;
 const odMoney = n => esc(formatIDR(n || 0));
@@ -13266,7 +13300,7 @@ function odKpi(tone, icon, label, value, sub, js) {
 
 function odCard(title, icon, body, aside = "", extra = "") {
   return `<section class="bg-white border border-line rounded-xl overflow-hidden flex flex-col ${extra}">
-    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-line"><div class="flex items-center gap-2.5 min-w-0"><span class="w-8 h-8 rounded-lg grid place-items-center bg-[#FBEBE4] text-accentDark shrink-0">${odIcon(icon, 16)}</span><h3 class="text-[15px] font-semibold text-ink truncate">${title}</h3></div>${aside}</div>
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-line"><div class="flex items-center gap-2.5 min-w-0"><span class="w-8 h-8 rounded-lg grid place-items-center bg-[#FFEDD5] text-accentDark shrink-0">${odIcon(icon, 16)}</span><h3 class="text-[15px] font-semibold text-ink truncate">${title}</h3></div>${aside}</div>
     <div class="flex-1">${body}</div></section>`;
 }
 
@@ -13282,7 +13316,7 @@ function odDonut(parts, center, centerSub) {
     return arc;
   }).join("") : "";
   return `<div class="relative w-[150px] h-[150px] shrink-0"><svg viewBox="0 0 42 42" class="w-full h-full" role="img" aria-label="${esc(centerSub)}: ${total}">
-      <circle cx="21" cy="21" r="${r}" fill="none" stroke="#F0EEE6" stroke-width="6"/>${arcs}</svg>
+      <circle cx="21" cy="21" r="${r}" fill="none" stroke="#EEF0F3" stroke-width="6"/>${arcs}</svg>
     <div class="absolute inset-0 grid place-items-center text-center"><div><div class="font-sans text-[28px] font-semibold text-ink leading-none tabular-nums">${center}</div><div class="text-[11px] text-muted mt-1 leading-tight max-w-[80px]">${esc(centerSub)}</div></div></div></div>`;
 }
 const odLegend = (parts, total, js) => `<ul class="flex-1 min-w-0 space-y-2.5">${parts.map(p => `<li><button type="button" ${p.tab ? `onclick="${js}('${p.tab}')"` : "disabled"} class="w-full flex items-center gap-2.5 text-[13px] text-left ${p.tab ? "hover:text-ink" : "cursor-default"}">
@@ -13305,9 +13339,9 @@ function odPager(page, pages, shown, total, js) {
 
 function odProgress(done, total, unit, tone) {
   const pct = odPct(done, total);
-  const color = tone || (pct >= 100 ? "#3FAE6A" : pct > 0 ? "#3B8BD9" : "#D8D4C9");
+  const color = tone || (pct >= 100 ? "#3FAE6A" : pct > 0 ? "#3B8BD9" : "#D5DAE0");
   return `<div class="min-w-[130px]"><div class="flex items-center justify-between gap-2 text-[12px]"><span class="tabular-nums text-ink">${done}/${total} ${esc(unit)}</span><span class="tabular-nums text-[11px] text-muted">${pct}%</span></div>
-    <div class="h-1.5 rounded-full bg-[#EFEDE6] mt-1 overflow-hidden"><div class="h-full rounded-full" style="width:${Math.min(pct, 100)}%;background:${color}"></div></div></div>`;
+    <div class="h-1.5 rounded-full bg-[#EEF0F3] mt-1 overflow-hidden"><div class="h-full rounded-full" style="width:${Math.min(pct, 100)}%;background:${color}"></div></div></div>`;
 }
 
 function odWa(phone, text) {
@@ -13343,7 +13377,7 @@ const OD_SO_STATUS = {
   tiba_sebagian: ["sky", "Tiba sebagian"], dialokasikan: ["violet", "Dialokasikan"], siap: ["green", "Barang siap"],
   menunggu_lunas: ["stone", "Menunggu pelunasan"], menunggu_selesai: ["stone", "Menunggu selesai"], selesai: ["green", "Selesai"],
 };
-const OD_SO_STAGE_COLORS = { menunggu_po: "#F2A541", dalam_pengiriman: "#3B8BD9", tiba_sebagian: "#8A6FD1", siap: "#3FAE6A", lain: "#BDB9AE" };
+const OD_SO_STAGE_COLORS = { menunggu_po: "#F2A541", dalam_pengiriman: "#3B8BD9", tiba_sebagian: "#8A6FD1", siap: "#3FAE6A", lain: "#B6BCC6" };
 // Order of the follow-ups (the first one is what the "Perlu Tindakan" card shows for an order).
 const OD_SO_ACTION_RANK = { lengkapi_supplier: 0, terlambat: 1, po_draft: 2, harga_khusus: 3, dana_pending: 4, hubungi_customer: 5 };
 const OD_SO_ACTION_ICON = { lengkapi_supplier: ["alertc", "red"], terlambat: ["clock", "red"], po_draft: ["truck", "amber"],
@@ -13402,7 +13436,7 @@ function odSoRender() {
       <button type="button" onclick="odSoAction('${esc(r.id)}', '${a.kind}')" class="shrink-0 px-3 py-1.5 rounded-lg border border-[#F1CDBE] bg-white text-accentDark text-xs font-semibold hover:bg-accent/10 whitespace-nowrap">${esc(a.button)}</button></li>`;
   }).join("")}</ul>` : `<div class="px-4 py-10 text-center text-sm text-muted">${odIcon("check", 22)}<div class="mt-2">Tidak ada SO yang perlu ditindaklanjuti.</div></div>`;
   const todoCard = `<section class="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
-    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#F3DCD2] bg-[#FDF3EE]"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-lg grid place-items-center bg-[#FBDCCF] text-[#C04848]">${odIcon("alertc", 17)}</span><h3 class="text-[15px] font-semibold text-[#B4452A]">Perlu Tindakan Hari Ini</h3></div>
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#F3DCD2] bg-[#FFF4ED]"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-lg grid place-items-center bg-[#FBDCCF] text-[#C04848]">${odIcon("alertc", 17)}</span><h3 class="text-[15px] font-semibold text-[#B4452A]">Perlu Tindakan Hari Ini</h3></div>
       ${todo.length ? `<button type="button" onclick="odSoTab('tindakan')" class="text-xs font-semibold text-accentDark hover:underline whitespace-nowrap">Lihat Semua (${todo.length}) →</button>` : ""}</div>${todoList}</section>`;
 
   // Nilai Sales Order Aktif
@@ -13414,7 +13448,7 @@ function odSoRender() {
   const valueCard = odCard("Nilai Sales Order Aktif", "coins", `<div class="px-4 py-4">
       <div class="font-sans text-[28px] font-semibold text-ink tabular-nums leading-tight">${odMoney(total)}</div>
       <div class="text-xs text-muted mt-0.5">${scoped.length} SO ${OD_SO.scope === "bulan" ? "aktif dibuat bulan ini" : "aktif"}</div>
-      <div class="flex h-2.5 rounded-full overflow-hidden bg-[#EFEDE6] mt-4" role="img" aria-label="DP ${odPct(paid, total)}%">
+      <div class="flex h-2.5 rounded-full overflow-hidden bg-[#EEF0F3] mt-4" role="img" aria-label="DP ${odPct(paid, total)}%">
         <div style="width:${odPct(paid, total)}%" class="bg-[#F2A541]"></div><div style="width:${odPct(rest, total)}%" class="bg-[#3B8BD9]"></div></div>
       <dl class="mt-4 space-y-2.5 text-[13px]">
         <div class="flex items-center gap-2.5"><i class="w-2.5 h-2.5 rounded-full bg-[#F2A541]"></i><dt class="flex-1 text-muted">DP sudah diterima</dt><dd class="tabular-nums font-semibold text-ink">${odMoney(paid)}</dd><span class="w-9 text-right text-[11px] text-muted tabular-nums">${odPct(paid, total)}%</span></div>
@@ -13427,7 +13461,7 @@ function odSoRender() {
   const parts = [["menunggu_po", "Menunggu PO"], ["dalam_pengiriman", "Dalam Pengiriman"], ["tiba_sebagian", "Diterima Sebagian"], ["siap", "Barang Siap"], ["lain", "Status Lain"]]
     .map(([k, label]) => ({ label, value: cnt(k), color: OD_SO_STAGE_COLORS[k], tab: k === "lain" ? "" : k }));
   const donutCard = odCard("Status Pemenuhan SO", "pie", `<div class="px-4 py-4"><div class="flex flex-col sm:flex-row items-center gap-5">${odDonut(parts, active.length, "SO Aktif")}${odLegend(parts, active.length, "odSoTab")}</div>
-      <p class="mt-4 rounded-lg bg-[#FDF3EA] px-3 py-2 text-[11.5px] text-[#9A5A1F] text-center">Satu SO dihitung pada satu kategori utama saja. Status Lain = semua barang terpasang, invoice belum ditutup.</p></div>`,
+      <p class="mt-4 rounded-lg bg-[#FFF4ED] px-3 py-2 text-[11.5px] text-[#9A5A1F] text-center">Satu SO dihitung pada satu kategori utama saja. Status Lain = semua barang terpasang, invoice belum ditutup.</p></div>`,
     `<span class="text-xs text-muted border border-line rounded-lg px-2.5 py-1.5 whitespace-nowrap">${active.length} SO Aktif</span>`);
 
   document.getElementById("od-so-body").innerHTML =
@@ -13590,7 +13624,7 @@ function odPoRender() {
       <button type="button" onclick="odPoAction('${esc(r.id)}', '${a.kind}')" class="shrink-0 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accentDark whitespace-nowrap">${esc(a.button)}</button></li>`;
   }).join("")}</ul>` : `<div class="px-4 py-10 text-center text-sm text-muted">${odIcon("check", 22)}<div class="mt-2">Tidak ada PO yang perlu ditindaklanjuti.</div></div>`;
   const todoCard = `<section class="bg-white border border-line rounded-xl overflow-hidden flex flex-col">
-    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#F3DCD2] bg-[#FDF3EE]"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-full grid place-items-center bg-[#D9534F] text-white">${odIcon("alertc", 17, 2)}</span><h3 class="text-[15px] font-semibold text-[#B4452A]">Perlu Tindakan Hari Ini</h3></div>
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#F3DCD2] bg-[#FFF4ED]"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-full grid place-items-center bg-[#D9534F] text-white">${odIcon("alertc", 17, 2)}</span><h3 class="text-[15px] font-semibold text-[#B4452A]">Perlu Tindakan Hari Ini</h3></div>
       ${todo.length ? `<button type="button" onclick="odPoTab('tindakan')" class="text-xs font-semibold text-accentDark hover:underline whitespace-nowrap">Lihat Semua (${todo.length}) →</button>` : ""}</div>${todoList}</section>`;
 
   // Nilai Pembelian PO (goods value after line discounts, before PPN / ongkir).
@@ -13603,8 +13637,8 @@ function odPoRender() {
   const valueCard = odCard("Nilai Pembelian PO", "coins", `<div class="px-4 py-4">
       <div class="font-sans text-[28px] font-semibold text-ink tabular-nums leading-tight">${odMoney(total)}</div>
       <div class="text-xs text-muted mt-0.5">${scoped.length} PO · nilai barang sebelum PPN &amp; ongkir</div>
-      <div class="flex h-2.5 rounded-full overflow-hidden bg-[#EFEDE6] mt-4"><div style="width:${odPct(got, total)}%" class="bg-[#F2A541]"></div><div style="width:${odPct(moving, total)}%" class="bg-[#3B8BD9]"></div><div style="width:${odPct(notYet, total)}%" class="bg-[#C9C5BA]"></div></div>
-      <dl class="mt-4 space-y-2.5 text-[13px]">${vrow("#F2A541", "Sudah Diterima", got)}${vrow("#3B8BD9", "Dalam Pengiriman", moving)}${vrow("#C9C5BA", "Belum Diterima", notYet)}</dl></div>`,
+      <div class="flex h-2.5 rounded-full overflow-hidden bg-[#EEF0F3] mt-4"><div style="width:${odPct(got, total)}%" class="bg-[#F2A541]"></div><div style="width:${odPct(moving, total)}%" class="bg-[#3B8BD9]"></div><div style="width:${odPct(notYet, total)}%" class="bg-[#C5CBD3]"></div></div>
+      <dl class="mt-4 space-y-2.5 text-[13px]">${vrow("#F2A541", "Sudah Diterima", got)}${vrow("#3B8BD9", "Dalam Pengiriman", moving)}${vrow("#C5CBD3", "Belum Diterima", notYet)}</dl></div>`,
     `<select onchange="OD_PO.scope = this.value; odPoRender()" aria-label="Cakupan nilai" class="border border-line rounded-lg px-2.5 py-1.5 text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30">
       <option value="bulan" ${OD_PO.scope === "bulan" ? "selected" : ""}>Bulan Ini</option><option value="aktif" ${OD_PO.scope === "aktif" ? "selected" : ""}>Semua PO aktif</option></select>`);
 
@@ -13658,7 +13692,7 @@ function odPoRenderTable() {
       <button type="button" onclick="odPoReset()" class="px-3.5 py-2 rounded-lg border border-line bg-white text-[13px] text-ink hover:bg-bg2">Reset</button></div></div>`;
   const rows = shown.map(r => {
     const refs = r.so_refs.length ? `<div class="flex flex-wrap gap-1">${r.so_refs.slice(0, 2).map(s => `<button type="button" onclick="openPreorderFromDashboard('${esc(s.id)}')" title="${esc(s.customer_name)}" class="px-1.5 py-0.5 rounded-md bg-[#E6F0FC] text-[#2F5C9E] text-[11px] font-semibold hover:underline whitespace-nowrap">${esc(s.so_number.replace(/^SO-\d{8}-0*/, "SO-"))}</button>`).join("")}${r.so_refs.length > 2 ? `<span class="px-1.5 py-0.5 rounded-md bg-bg2 text-muted text-[11px]" title="${esc(r.so_refs.slice(2).map(s => s.so_number).join(", "))}">+${r.so_refs.length - 2}</span>` : ""}</div>` : `<span class="text-muted">—</span>`;
-    const [stone, dot] = OD_PO_SHIP[r.ship_key] || ["stone", "#BDB9AE"];
+    const [stone, dot] = OD_PO_SHIP[r.ship_key] || ["stone", "#B6BCC6"];
     const ship = r.ship_key ? `<div class="inline-flex items-start gap-1.5 px-2 py-1 rounded-lg border ${OD_BADGE[stone]}"><i class="w-2 h-2 rounded-full mt-1 shrink-0" style="background:${dot}"></i><span><span class="block text-[11.5px] font-semibold leading-tight whitespace-nowrap">${esc(r.ship_label)}</span>${r.packages.length ? `<span class="block text-[10.5px] opacity-80">${r.packages.length} paket</span>` : ""}</span></div>` : `<span class="text-muted text-[12px]">${r.order_status === "draft" ? "Belum dikirim ke supplier" : "—"}</span>`;
     const recvColor = r.qty_received >= r.qty_total && r.qty_total ? "#3FAE6A" : r.late ? "#D9534F" : "#3B8BD9";
     return `<tr class="border-b border-line last:border-b-0 hover:bg-bg/60">
@@ -14356,7 +14390,7 @@ function renderMasterItemsTable(data) {
         : '<span class="text-xs text-muted">Belum dapat dihitung</span>'}</td>
       <td class="px-2.5 py-3 text-right tabular-nums text-ink whitespace-nowrap">${item.sell_price > 0 ? formatIDR(item.sell_price) : '<span class="text-xs text-muted">Belum ada</span>'}</td>
       <td class="admin-only px-2.5 py-3 text-right tabular-nums whitespace-nowrap ${margin === null ? "text-muted" : margin >= 0 ? "text-done" : "text-failed"}">${margin === null ? "-" : margin.toFixed(2) + "%"}</td>
-      <td class="sticky right-0 bg-white px-3 py-3 shadow-[-6px_0_6px_-6px_rgba(20,20,19,0.12)]" onclick="event.stopPropagation()">
+      <td class="sticky right-0 bg-white px-3 py-3 shadow-[-6px_0_6px_-6px_rgba(17,24,39,0.12)]" onclick="event.stopPropagation()">
         <div class="flex items-center justify-end">
           <button type="button" onclick="openMasterRowMenu(event, ${item.id})" aria-label="Aksi barang" aria-haspopup="menu" title="Aksi"
             class="w-8 h-8 grid place-items-center rounded-lg border border-line bg-white text-ink hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
@@ -15637,9 +15671,9 @@ async function openArchiveModal() {
       </div>
       <div><div class="${lbl}">Tindakan Pengarsipan <span class="text-failed">*</span></div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <label class="flex items-start gap-2.5 border border-failed/40 bg-failed/5 rounded-xl p-3 cursor-pointer"><input type="radio" name="arch-mode" value="nonaktif" checked class="mt-1 accent-[#D97757]" />
+          <label class="flex items-start gap-2.5 border border-failed/40 bg-failed/5 rounded-xl p-3 cursor-pointer"><input type="radio" name="arch-mode" value="nonaktif" checked class="mt-1 accent-[#EA580C]" />
             <span><span class="block text-sm font-semibold text-ink">Nonaktifkan sekarang</span><span class="block text-xs text-muted">Produk langsung dinonaktifkan dan tidak dapat dijual. Data tetap ada di master (status: Nonaktif).</span></span></label>
-          <label class="flex items-start gap-2.5 border border-line rounded-xl p-3 cursor-pointer"><input type="radio" name="arch-mode" value="arsip" class="mt-1 accent-[#D97757]" />
+          <label class="flex items-start gap-2.5 border border-line rounded-xl p-3 cursor-pointer"><input type="radio" name="arch-mode" value="arsip" class="mt-1 accent-[#EA580C]" />
             <span><span class="block text-sm font-semibold text-ink">Arsipkan penuh</span><span class="block text-xs text-muted">Produk dipindahkan ke data arsip dan tidak tampil di daftar master barang aktif. Bisa dilihat lewat filter “Diarsipkan”.</span></span></label></div></div>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Batal</button>
@@ -16067,7 +16101,7 @@ function pgHead(eyebrow, title, sub, right = "") {
 }
 function pgTable(head, rows, empty = "Belum ada data.") {
   return `<div class="overflow-x-auto border border-line rounded-xl"><table class="w-full text-sm">
-    <thead class="bg-[#F7F5F0]"><tr>${head.map(h => typeof h === "string" ? `<th class="${GR_TH}">${h}</th>` : `<th class="${h.right ? GR_THR : GR_TH}">${h.label}</th>`).join("")}</tr></thead>
+    <thead class="bg-[#F3F4F6]"><tr>${head.map(h => typeof h === "string" ? `<th class="${GR_TH}">${h}</th>` : `<th class="${h.right ? GR_THR : GR_TH}">${h.label}</th>`).join("")}</tr></thead>
     <tbody class="divide-y divide-line">${rows.length ? rows.join("") : `<tr><td colspan="${head.length}" class="px-3 py-8 text-center text-sm text-muted">${empty}</td></tr>`}</tbody></table></div>`;
 }
 function pgField(label, value) {
@@ -16120,8 +16154,8 @@ function empEdit(id) {
     ${grField("Nama", `<input id="emp-name" class="${GR_IN}" maxlength="60" data-no-uppercase value="${esc(r.name)}">`, true)}
     ${grField("No. HP", `<input id="emp-phone" class="${GR_IN}" maxlength="20" value="${esc(r.phone || "")}">`)}
     <div><div class="${GR_LBL}">Peran <span class="text-failed">*</span></div><div class="flex gap-4 text-sm">
-      <label class="flex items-center gap-2"><input id="emp-tech" type="checkbox" class="accent-[#D97757]" ${r.is_technician ? "checked" : ""}> Teknisi</label>
-      <label class="flex items-center gap-2"><input id="emp-sales" type="checkbox" class="accent-[#D97757]" ${r.is_sales ? "checked" : ""}> Sales</label></div></div>
+      <label class="flex items-center gap-2"><input id="emp-tech" type="checkbox" class="accent-[#EA580C]" ${r.is_technician ? "checked" : ""}> Teknisi</label>
+      <label class="flex items-center gap-2"><input id="emp-sales" type="checkbox" class="accent-[#EA580C]" ${r.is_sales ? "checked" : ""}> Sales</label></div></div>
     ${grField("Akun login (opsional)", `<select id="emp-user" class="${GR_IN}"><option value="">— Tidak punya akun —</option>${users}</select>`)}
     ${grField("Catatan", `<input id="emp-note" class="${GR_IN}" maxlength="300" data-no-uppercase value="${esc(r.note || "")}">`)}
     <div class="flex justify-end gap-2 pt-1"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
@@ -16681,8 +16715,8 @@ async function insKoreksi(tab = "approval") {
       const d = await grApi(`/api/incentives/monitoring?date_from=${ymd(from)}&date_to=${ymd(today)}&status=menunggu`);
       const lines = d.lines;
       body = grCard("Insentif Menunggu Approval", (isOwner() ? "" : `<div class="mb-3">${grNote("amber", "Persetujuan hanya bisa dilakukan Admin bertanda Owner.")}</div>`)
-        + pgTable([isOwner() ? `<input type="checkbox" onchange="document.querySelectorAll('[data-ap]').forEach(c => c.checked = this.checked)" class="accent-[#D97757]">` : "", "Nota", "Produk", "Peran", "Penerima", { label: "Nilai", right: true }, ""], lines.map(ln => `<tr>
-          <td class="${GR_TD}">${isOwner() ? `<input type="checkbox" data-ap="${ln.id}" class="accent-[#D97757]">` : ""}</td>
+        + pgTable([isOwner() ? `<input type="checkbox" onchange="document.querySelectorAll('[data-ap]').forEach(c => c.checked = this.checked)" class="accent-[#EA580C]">` : "", "Nota", "Produk", "Peran", "Penerima", { label: "Nilai", right: true }, ""], lines.map(ln => `<tr>
+          <td class="${GR_TD}">${isOwner() ? `<input type="checkbox" data-ap="${ln.id}" class="accent-[#EA580C]">` : ""}</td>
           <td class="${GR_TD}"><button type="button" class="font-medium text-accentDark hover:underline" onclick="insInvoice('${ln.receipt_id}')">${esc(ln.receipt_no)}</button><div class="text-[11px] text-muted">${formatPoDate(ln.nota_date)}</div></td>
           <td class="${GR_TD}">${esc(ln.product_name)}</td><td class="${GR_TD}">${ln.role_label}</td>
           <td class="${GR_TD}">${ln.shares.map(s => `${esc(s.name)} ${formatIDR(s.amount).replace("Rp ", "")}${ln.shares.length > 1 ? ` (${s.share_label})` : ""}`).join("<br>")}</td>
@@ -16771,7 +16805,7 @@ const GR_TH = "text-left px-3 py-2.5 font-medium text-muted text-[11px] uppercas
 const GR_THR = "text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line whitespace-nowrap";
 const GR_TD = "px-3 py-2.5 align-middle";
 const GR_TINT = {
-  rose: "bg-[#FDF3EF] border-[#F2D9CE]", green: "bg-green-50/70 border-green-200", blue: "bg-blue-50/70 border-blue-200",
+  rose: "bg-[#FFF4ED] border-[#FED7AA]", green: "bg-green-50/70 border-green-200", blue: "bg-blue-50/70 border-blue-200",
   amber: "bg-amber-50/70 border-amber-200", violet: "bg-violet-50/70 border-violet-200", gray: "bg-bg2 border-line",
 };
 const GR_PILL = {
@@ -17057,7 +17091,7 @@ function grStepPo() {
     const on = f.po_ids.includes(po.id);
     const st = po.received_any ? grPill("blue", "Sebagian") : grPill("amber", "Belum diterima");
     return `<tr class="border-b border-line last:border-b-0 ${on ? "bg-accent/[0.03]" : ""}">
-      <td class="${GR_TD} w-12"><input type="checkbox" ${on ? "checked" : ""} onchange="grTogglePo('${esc(po.id)}', this.checked)" class="w-5 h-5 accent-[#D97757] cursor-pointer" aria-label="Pilih ${esc(po.po_number)}"></td>
+      <td class="${GR_TD} w-12"><input type="checkbox" ${on ? "checked" : ""} onchange="grTogglePo('${esc(po.id)}', this.checked)" class="w-5 h-5 accent-[#EA580C] cursor-pointer" aria-label="Pilih ${esc(po.po_number)}"></td>
       <td class="${GR_TD} font-mono text-xs font-semibold text-ink">${esc(po.po_number)}${po.open_drafts.filter(x => x.id !== f.id).length ? `<div class="font-sans font-normal text-[11px] text-amber-700 mt-0.5">Ada draft GR lain: ${po.open_drafts.filter(x => x.id !== f.id).map(x => esc(x.doc_number)).join(", ")}</div>` : ""}</td>
       <td class="${GR_TD} text-xs text-ink whitespace-nowrap">${esc(formatPoDate(String(po.created_at || "").slice(0, 10)))}</td>
       <td class="${GR_TD} text-xs text-ink">${esc(po.summary || "—")}</td>
@@ -17497,7 +17531,7 @@ function grConfirmPost() {
         ${grStat("green", "Total Diterima", formatInt(qty), d.lines.map(l => `${l.qty_in} ${esc(l.product_name)}`).join(" + "))}
         ${grStat("blue", "Stok Baik +", formatInt(qty - bad), `Karantina ${formatInt(bad)}`)}
         ${grStat("amber", "Nilai Penerimaan", formatIDR(value), "Tidak berarti sudah dibayar")}</div>
-      <div class="max-w-3xl mx-auto rounded-xl border border-[#F2D9CE] bg-[#FDF3EF] p-5">
+      <div class="max-w-3xl mx-auto rounded-xl border border-[#FED7AA] bg-[#FFF4ED] p-5">
         <h3 class="text-lg font-semibold text-ink mb-3">Konfirmasi Posting Barang Masuk</h3>
         ${grNote("amber", `Posting akan menambah stok baik sebanyak ${formatInt(qty - bad)}${bad ? `, memindahkan ${formatInt(bad)} ke Stok Karantina` : ""}, mengurangi sisa masing-masing PO, dan mengunci qty serta harga GR secara permanen.`)}
         <div class="space-y-2 mt-3">${lineRows}
@@ -17571,7 +17605,7 @@ async function grDetail() {
         <th class="${GR_TH}">Barang / SKU</th><th class="${GR_TH}">PO Asal</th><th class="${GR_TH}">Qty Diterima</th><th class="${GR_TH}">Harga Beli Aktual</th><th class="${GR_TH}">Nilai</th><th class="${GR_TH}">Sisa PO</th></tr></thead><tbody>${rows}</tbody></table></div>`)}
     ${posted ? grNote("green", "Stok masuk berhasil satu kali. Kode manual dan label disiapkan setelah posting, tanpa mengubah qty, harga, atau stok lagi.") : grNote("red", `Dibatalkan. ${canRecreate ? "Gunakan “Buat Ulang dari GR ini” untuk membuat draft koreksi dengan data yang sama." : ""}`)}
     ${posted ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-      <div class="rounded-xl border border-[#F2D9CE] bg-[#FDF3EF] p-4"><div class="font-semibold text-ink">▥ Cetak Barcode Barang Diterima</div>
+      <div class="rounded-xl border border-[#FED7AA] bg-[#FFF4ED] p-4"><div class="font-semibold text-ink">▥ Cetak Barcode Barang Diterima</div>
         <p class="text-xs text-muted mt-1">${bcItems ? bcItems.items.map(i => `${i.suggested} label ${esc(i.name)}`).join(", ") : ""}. Satu kode manual untuk setiap SKU, dipakai berulang untuk semua unitnya.</p>
         <button type="button" onclick="grBcStart(${d.id})" class="${GR_BTN} mt-3">Cetak Barcode · ${formatInt(suggested)} Label</button></div>
       <div class="rounded-xl border border-line bg-white p-4"><div class="font-semibold text-ink">↗ Lihat Hubungan PO &amp; Stok</div>
@@ -17691,7 +17725,7 @@ function grLegacy() {
       <th class="${GR_TH}">Barang</th><th class="${GR_TH}">PO</th><th class="${GR_TH}">Qty</th><th class="${GR_TH}">Kondisi</th><th class="${GR_THR}">Nilai</th></tr></thead><tbody>${rows}</tbody></table></div>`)}
     ${lg.kind === "po_lines" ? `<div class="flex justify-end mb-3"><button type="button" onclick="grLegacyContinue()" class="${GR_BTN}">Lanjutkan di Goods Receipt &rarr;</button></div>` : `
     ${grCard("Tindakan", `
-      <label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input id="gr-legacy-ok" type="checkbox" class="mt-0.5 w-4 h-4 accent-[#D97757]">
+      <label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input id="gr-legacy-ok" type="checkbox" class="mt-0.5 w-4 h-4 accent-[#EA580C]">
         <span>Saya sudah memeriksa temuan di atas dan memastikan barang ini belum tercatat di penerimaan lain.</span></label>
       ${needsReview ? `<div class="mt-2">${grNote("amber", "Draft manual harus ditandai diperiksa sebelum diposting.")}</div>` : ""}
       <div class="flex flex-wrap justify-end gap-2 mt-3">
@@ -17767,7 +17801,7 @@ function grBcSelect() {
   const b = grBc;
   const sel = grBcSel();
   const rows = b.items.map((i, k) => `<tr class="border-b border-line last:border-b-0">
-      <td class="${GR_TD} w-12"><input type="checkbox" ${i.on ? "checked" : ""} onchange="grBc.items[${k}].on=this.checked; grBcSelect()" class="w-5 h-5 accent-[#D97757]"></td>
+      <td class="${GR_TD} w-12"><input type="checkbox" ${i.on ? "checked" : ""} onchange="grBc.items[${k}].on=this.checked; grBcSelect()" class="w-5 h-5 accent-[#EA580C]"></td>
       <td class="${GR_TD}"><div class="font-semibold text-ink text-sm">${esc(i.name)}</div><div class="text-[11px] text-muted">${esc(i.sku)}</div></td>
       <td class="${GR_TD} font-mono text-xs">${esc(i.po_numbers.join(", ") || "—")}</td>
       <td class="${GR_TD} text-xs tabular-nums font-semibold">${i.qty_good} ${esc(i.unit)}${i.qty_so ? `<div class="text-[11px] font-normal text-muted">${i.qty_so} untuk Sales Order</div>` : ""}</td>
@@ -18519,7 +18553,7 @@ function renderPurchaseInvoiceKpis(filtered) {
   document.getElementById("pi-kpis").innerHTML =
     piKpi("Draft", drafts.length - ready, "Perlu dilengkapi / diverifikasi", "doc", "#F3F7FD", "#D8E5F6", "#3F6EB5")
     + piKpi("Belum diposting ke AP", drafts.length, `${ready} siap diposting ke Account Payable`, "clock", "#FFFAF0", "#F2E3BF", "#A87612")
-    + piKpi("Jatuh tempo minggu ini", week.length, `Total ${esc(formatIDR(sum(week, "outstanding")))}`, "calendar", "#FFF6F4", "#F4D9D2", "#C4633F")
+    + piKpi("Jatuh tempo minggu ini", week.length, `Total ${esc(formatIDR(sum(week, "outstanding")))}`, "calendar", "#FFF6F4", "#F4D9D2", "#C2410C")
     + piKpi("Belum lunas", open.length, `Total ${esc(formatIDR(sum(open, "outstanding")))}`, "card", "#F5FBF7", "#D3EADB", "#2F7A4B")
     + piKpi("Nilai tagihan", esc(formatIDR(sum(live, "total"))), `Dari ${live.length} faktur pembelian`, "chart", "#F9F7FE", "#E3DAF4", "#6E4FB8", "col-span-2 lg:col-span-1");
 }
@@ -19754,7 +19788,7 @@ function openNotaPrintSettings() {
       <div class="grid grid-cols-2 gap-3">${num("nps-top", "Margin atas (cm)", p.top)}${num("nps-bottom", "Margin bawah (cm)", p.bottom)}${num("nps-left", "Margin kiri (cm)", p.left)}${num("nps-right", "Margin kanan (cm)", p.right)}</div>
       <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Skala huruf (%)</label>
         <input id="nps-scale" type="number" step="5" min="70" max="130" value="${p.scale}" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></div>
-      <label id="nps-force-wrap" class="${NOTA_PAPERS[p.paper].driver ? "" : "hidden"} flex items-start gap-2 text-xs text-ink"><input id="nps-force" type="checkbox" class="mt-0.5 accent-[#D97757]" ${p.force ? "checked" : ""}> Paksa ukuran kertas dari aplikasi (biarkan tidak dicentang; centang hanya bila printer tidak punya kertas 9,5 × 5,5)</label>
+      <label id="nps-force-wrap" class="${NOTA_PAPERS[p.paper].driver ? "" : "hidden"} flex items-start gap-2 text-xs text-ink"><input id="nps-force" type="checkbox" class="mt-0.5 accent-[#EA580C]" ${p.force ? "checked" : ""}> Paksa ukuran kertas dari aplikasi (biarkan tidak dicentang; centang hanya bila printer tidak punya kertas 9,5 × 5,5)</label>
       <div id="nps-help-half" class="${NOTA_PAPERS[p.paper].driver ? "" : "hidden"} rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-[11px] text-blue-900 leading-relaxed">
         <b>Setengah continuous form (sekali saja per komputer):</b>
         <ol class="list-decimal pl-4 mt-1 space-y-0.5">
@@ -19763,7 +19797,7 @@ function openNotaPrintSettings() {
           <li>Saat mencetak dari Chrome: <b>More settings</b> → Paper size <b>NOTA 9.5x5.5</b>, Layout <b>Portrait</b>, Scale <b>Default</b>, Headers and footers <b>tidak dicentang</b>.</li>
           <li>Cetak Halaman Uji: tulisan "ATAS NOTA" harus di tepi atas lembar, tidak miring, dan tidak melewati garis sobekan.</li></ol></div>
       <div id="nps-help-other" class="${NOTA_PAPERS[p.paper].driver ? "hidden" : ""} rounded-lg bg-bg2 px-3 py-2 text-[11px] text-muted leading-relaxed">Di dialog cetak: pilih printer <b>EPSON LX-310</b>, ukuran kertas sesuai pilihan di atas, skala 100%, tanpa header/footer. Bila hasil miring atau terpotong, ubah orientasi (Portrait/Landscape) di driver, lalu cetak Halaman Uji lagi.</div>
-      <label class="flex items-start gap-2 text-xs text-ink"><input id="nps-tested" type="checkbox" class="mt-0.5 accent-[#D97757]" ${verified ? "checked" : ""}> Hasil Halaman Uji sudah saya periksa dan benar (arah, rotasi, ukuran) untuk pengaturan di atas.</label>
+      <label class="flex items-start gap-2 text-xs text-ink"><input id="nps-tested" type="checkbox" class="mt-0.5 accent-[#EA580C]" ${verified ? "checked" : ""}> Hasil Halaman Uji sudah saya periksa dan benar (arah, rotasi, ukuran) untuk pengaturan di atas.</label>
       <div class="flex flex-wrap justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Tutup</button>
         <button type="button" onclick="saveNotaPrintSettings(true)" class="px-4 py-1.5 border border-accent text-accentDark rounded-lg text-sm font-medium hover:bg-accent/10 transition-colors">Simpan &amp; Cetak Halaman Uji</button>
@@ -19928,31 +19962,31 @@ function purchaseInvoicePrintHtml(inv) {
 
   const rows = inv.items.map((item, idx) => `
     <tr>
-      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;">${idx + 1}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;">
-        ${esc(item.product_name)}${item.sku ? `<div style="font-size:8pt;color:#6B6B66;">${esc(item.sku)}</div>` : ""}
+      <td style="padding:5px 6px;border-bottom:1px solid #E3E6EB;">${idx + 1}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E3E6EB;">
+        ${esc(item.product_name)}${item.sku ? `<div style="font-size:8pt;color:#6B7280;">${esc(item.sku)}</div>` : ""}
       </td>
-      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;">${esc(item.unit)}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;text-align:right;">${item.qty}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;text-align:right;">${formatIDR(item.unit_price)}</td>
-      <td style="padding:5px 6px;border-bottom:1px solid #E5E3DC;text-align:right;">${formatIDR(item.line_total)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E3E6EB;">${esc(item.unit)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E3E6EB;text-align:right;">${item.qty}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E3E6EB;text-align:right;">${formatIDR(item.unit_price)}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid #E3E6EB;text-align:right;">${formatIDR(item.line_total)}</td>
     </tr>
   `).join("");
 
   const totalRow = (label, value, bold) => `
     <tr>
-      <td style="padding:3px 6px;text-align:right;color:#6B6B66;${bold ? "font-weight:600;color:#141413;" : ""}">${label}</td>
+      <td style="padding:3px 6px;text-align:right;color:#6B7280;${bold ? "font-weight:600;color:#111827;" : ""}">${label}</td>
       <td style="padding:3px 6px;text-align:right;white-space:nowrap;${bold ? "font-weight:600;" : ""}">${value}</td>
     </tr>`;
 
   return `
     <div style="font-size:10pt;line-height:1.45;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #141413;padding-bottom:8px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:8px;margin-bottom:12px;">
         <div>
           <div style="font-size:16pt;font-weight:700;letter-spacing:0.5px;">FAKTUR PEMBELIAN</div>
-          <div style="font-size:9pt;color:#6B6B66;">${esc(inv.invoice_number)}</div>
+          <div style="font-size:9pt;color:#6B7280;">${esc(inv.invoice_number)}</div>
         </div>
-        <div style="text-align:right;font-size:9pt;color:#6B6B66;">
+        <div style="text-align:right;font-size:9pt;color:#6B7280;">
           ${inv.status === "void" ? `<div style="color:#A83B3B;font-weight:700;font-size:11pt;">VOID</div>` : ""}
           <div>Tanggal: ${esc(inv.invoice_date)}</div>
           <div>Jatuh tempo: ${esc(inv.due_date)}</div>
@@ -19962,13 +19996,13 @@ function purchaseInvoicePrintHtml(inv) {
 
       <div style="display:flex;gap:24px;margin-bottom:14px;font-size:9pt;">
         <div style="flex:1;">
-          <div style="font-size:8pt;text-transform:uppercase;letter-spacing:1px;color:#6B6B66;margin-bottom:3px;">Dari (Supplier)</div>
+          <div style="font-size:8pt;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:3px;">Dari (Supplier)</div>
           <div style="font-weight:600;font-size:10pt;">${esc(inv.supplier_name_snapshot)}</div>
           ${supplierLines}
           ${inv.supplier_invoice_no ? `<div>No. faktur supplier: ${esc(inv.supplier_invoice_no)}</div>` : ""}
         </div>
         <div style="flex:1;">
-          <div style="font-size:8pt;text-transform:uppercase;letter-spacing:1px;color:#6B6B66;margin-bottom:3px;">Ditagihkan Kepada</div>
+          <div style="font-size:8pt;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:3px;">Ditagihkan Kepada</div>
           <div style="font-weight:600;font-size:10pt;">${esc(SHOP_PROFILE.name)}</div>
           ${shopLines}
         </div>
@@ -19976,13 +20010,13 @@ function purchaseInvoicePrintHtml(inv) {
 
       <table style="width:100%;border-collapse:collapse;font-size:9pt;">
         <thead>
-          <tr style="background:#F0EEE6;">
-            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #141413;width:24px;">#</th>
-            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #141413;">Barang</th>
-            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #141413;">Satuan</th>
-            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #141413;">Qty</th>
-            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #141413;">Harga</th>
-            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #141413;">Jumlah</th>
+          <tr style="background:#EEF0F3;">
+            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #111827;width:24px;">#</th>
+            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #111827;">Barang</th>
+            <th style="padding:5px 6px;text-align:left;border-bottom:1px solid #111827;">Satuan</th>
+            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #111827;">Qty</th>
+            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #111827;">Harga</th>
+            <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #111827;">Jumlah</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -19999,14 +20033,14 @@ function purchaseInvoicePrintHtml(inv) {
         ${totalRow("Sisa tagihan", formatIDR(inv.outstanding), true)}
       </table>
 
-      ${inv.notes ? `<div style="margin-top:14px;font-size:9pt;"><span style="color:#6B6B66;">Catatan:</span> ${esc(inv.notes)}</div>` : ""}
-      <div style="margin-top:6px;font-size:8pt;color:#6B6B66;">
+      ${inv.notes ? `<div style="margin-top:14px;font-size:9pt;"><span style="color:#6B7280;">Catatan:</span> ${esc(inv.notes)}</div>` : ""}
+      <div style="margin-top:6px;font-size:8pt;color:#6B7280;">
         Status: ${esc(PI_STATUS_LABELS[inv.status] || inv.status)} · ${esc(PI_PAYMENT_LABELS[inv.payment_status] || inv.payment_status)}
       </div>
 
       <div style="display:flex;justify-content:space-between;margin-top:36px;font-size:9pt;text-align:center;">
-        <div style="width:40%;"><div style="border-top:1px solid #141413;padding-top:4px;">Penerima</div></div>
-        <div style="width:40%;"><div style="border-top:1px solid #141413;padding-top:4px;">Hormat kami</div></div>
+        <div style="width:40%;"><div style="border-top:1px solid #111827;padding-top:4px;">Penerima</div></div>
+        <div style="width:40%;"><div style="border-top:1px solid #111827;padding-top:4px;">Hormat kami</div></div>
       </div>
     </div>
   `;
@@ -20236,7 +20270,7 @@ function renderPreorderList(rows) {
         <div class="flex items-center justify-end gap-1.5">
           ${poIconButton(PO_ICON_VIEW, "Lihat detail", `openPreorder('${esc(r.id)}')`)}
           ${r.cancelled_at ? "" : poIconButton(PO_ICON_EDIT, "Edit Sales Order", `openPreorderEdit('${esc(r.id)}')`)}
-          ${poIconButton(PO_ICON_PRINT, "Cetak nota", `openPreorderPrint('${esc(r.id)}', 'list')`)}
+          ${poIconButton(PO_ICON_PRINT, "Cetak invoice", `openPreorderPrint('${esc(r.id)}', 'list')`)}
         </div>
       </td>
     `;
@@ -20727,7 +20761,7 @@ function refreshPoSpecial(rowEl) {
       <input type="text" class="flex-1 min-w-[12rem] border border-line rounded-lg px-2.5 py-1 text-xs bg-white text-ink" data-no-uppercase maxlength="300"
         placeholder="Alasan harga khusus (wajib) — mis. hasil negosiasi" value="${esc(rowEl.dataset.priceReason || "")}"
         oninput="this.closest('.po-item-row').dataset.priceReason = this.value;">
-      ${below ? `<label class="flex items-center gap-1.5 text-xs text-failed font-medium"><input type="checkbox" class="accent-[#D97757]" ${rowEl.dataset.belowOk ? "checked" : ""}
+      ${below ? `<label class="flex items-center gap-1.5 text-xs text-failed font-medium"><input type="checkbox" class="accent-[#EA580C]" ${rowEl.dataset.belowOk ? "checked" : ""}
         onchange="if (this.checked) this.closest('.po-item-row').dataset.belowOk = '1'; else delete this.closest('.po-item-row').dataset.belowOk;"> Harga di bawah modal — izinkan</label>` : ""}
     </div>`;
 }
@@ -21286,7 +21320,7 @@ function openPoSplitModal() {
     const inv = byLine.get(it.id);
     const installed = it.status === "terpasang";
     return `<label class="flex items-start gap-2.5 border border-line rounded-lg px-3 py-2 ${installed ? "opacity-50" : "cursor-pointer hover:bg-bg2"}">
-      <input type="checkbox" class="mt-0.5 accent-[#D97757]" data-split-line="${it.id}" data-split-inv="${esc(inv ? inv.id : "")}" ${installed ? "disabled" : ""} onchange="poSplitChanged(this)">
+      <input type="checkbox" class="mt-0.5 accent-[#EA580C]" data-split-line="${it.id}" data-split-inv="${esc(inv ? inv.id : "")}" ${installed ? "disabled" : ""} onchange="poSplitChanged(this)">
       <span class="text-sm min-w-0"><span class="text-ink font-medium">${esc(it.product_name)}</span> <span class="text-muted tabular-nums">× ${it.quantity} · ${formatIDR(it.quantity * it.unit_price)}</span>
         <span class="block text-[11px] text-muted">${installed ? "Sudah terpasang, tidak bisa dipindah" : esc(preorderStatusLabel(it.status))}${inv ? ` · Invoice ${inv.invoice_seq}` : ""}</span></span></label>`;
   }).join("");
@@ -22237,7 +22271,7 @@ async function katSaveForm(again) {
 
 // ── Pop-up: Tambah Kategori Utama ────────────────────────────────────────────
 function katOpenMainModal(fromForm) {
-  const radio = (v, label, hint, checked) => `<label class="flex items-start gap-2 cursor-pointer"><input type="radio" name="kat-m-status" value="${v}" ${checked ? "checked" : ""} class="mt-1 accent-[#D97757]"><span><span class="text-sm text-ink">${label}</span><span class="block text-xs text-muted">${hint}</span></span></label>`;
+  const radio = (v, label, hint, checked) => `<label class="flex items-start gap-2 cursor-pointer"><input type="radio" name="kat-m-status" value="${v}" ${checked ? "checked" : ""} class="mt-1 accent-[#EA580C]"><span><span class="text-sm text-ink">${label}</span><span class="block text-xs text-muted">${hint}</span></span></label>`;
   openModal("Tambah Kategori Utama", `
     <div class="space-y-3">
       <p class="text-xs text-muted -mt-2">Buat kategori utama untuk mengelompokkan produk variasi mobil.</p>
@@ -22688,7 +22722,7 @@ function opConfirmApprove() {
   openModal("Setujui stock opname?", `<div class="space-y-3 text-sm">
     <p class="text-ink">Stok akan disesuaikan ke hasil hitung dan tercatat di riwayat stok dengan referensi <span class="font-mono">${esc(o.opname_no)}</span>.</p>
     <ul class="rounded-lg bg-bg2 px-3 py-2 space-y-1">${changes.length ? changes.map(i => `<li class="flex justify-between gap-3"><span>${esc(i.name)}</span><span class="tabular-nums">${i.current_qty} → <b>${i.counted_qty}</b></span></li>`).join("") : "<li>Semua barang sesuai, tidak ada perubahan stok.</li>"}</ul>
-    ${o.has_moved ? `<label class="flex items-start gap-2 text-pending"><input id="op-accept-moved" type="checkbox" class="mt-1 accent-[#D97757]"><span>Stok berubah sejak opname dikirim. Saya sudah memeriksa stok terbaru dan hasil hitung masih berlaku.</span></label>` : ""}
+    ${o.has_moved ? `<label class="flex items-start gap-2 text-pending"><input id="op-accept-moved" type="checkbox" class="mt-1 accent-[#EA580C]"><span>Stok berubah sejak opname dikirim. Saya sudah memeriksa stok terbaru dan hasil hitung masih berlaku.</span></label>` : ""}
     <div><label for="op-resolve-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Catatan <span class="normal-case font-normal">(opsional)</span></label>
       <textarea id="op-resolve-note" rows="2" maxlength="300" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm"></textarea></div>
     ${opModalButtons("Setujui & Sesuaikan Stok", "opApprove()", false)}</div>`);
@@ -22814,7 +22848,7 @@ function openPoPaymentModal() {
           <option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option></select>
       </div>
       <label id="po-pay-confirm-wrap" class="hidden flex items-start gap-2 rounded-lg border border-line bg-bg2 px-3 py-2.5 text-sm text-ink cursor-pointer">
-        <input id="po-pay-confirmed" type="checkbox" class="accent-[#D97757] mt-0.5" />
+        <input id="po-pay-confirmed" type="checkbox" class="accent-[#EA580C] mt-0.5" />
         <span>Dana sudah saya cek masuk<span class="block text-xs text-muted">Bila tidak dicentang, pembayaran dicatat <b>Pending</b> dan belum dihitung sebagai DP sampai dikonfirmasi.</span></span>
       </label>
       <div>
@@ -22908,7 +22942,6 @@ const PO_PAPERS = {
   a4: { widthIn: 8.27, page: 'A4' },
 };
 const PO_PRINT_PREFS_KEY = "po-print-prefs";
-const PO_MIN_COLUMNS = 60;
 
 function poPrintSettings() {
   const num = id => Math.max(0, parseFloat(document.getElementById(id).value) || 0);
@@ -22938,90 +22971,130 @@ function savePoPrintPrefs(settings) {
   try { localStorage.setItem(PO_PRINT_PREFS_KEY, JSON.stringify(settings)); } catch (_) {}
 }
 
-function poWrap(text, width) {
-  const lines = [];
-  for (const paragraph of String(text || "").split(/\r?\n/)) {
-    let line = "";
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      if (word.length > width) {
-        if (line) { lines.push(line); line = ""; }
-        for (let i = 0; i < word.length; i += width) lines.push(word.slice(i, i + width));
-        continue;
-      }
-      if (line && line.length + 1 + word.length > width) { lines.push(line); line = word; }
-      else line = line ? `${line} ${word}` : word;
-    }
-    lines.push(line);
-  }
-  return lines.length ? lines : [""];
+// Owner, 24-10-2026: the Sales Order prints as an INVOICE whose status box says UANG MUKA while money is
+// still owed and LUNAS once nothing is left. Shop identity and the transfer accounts come from
+// Pengaturan Perusahaan; a missing value is left off the paper rather than invented.
+let poPrintCompany = { settings: {}, accounts: [] };
+
+async function loadPoPrintCompany() {
+  try {
+    const [s, a] = await Promise.all([fetch("/api/company-settings"), fetch("/api/company-bank-accounts")]);
+    poPrintCompany = { settings: s.ok ? await s.json() : {}, accounts: a.ok ? await a.json() : [] };
+  } catch (_) {}
 }
 
-function poNotaText(po, settings, columns) {
-  const W = columns;
-  const shopName = SHOP_PROFILE.notaName || SHOP_PROFILE.name;
-  const rule = ch => (settings.lines ? ch.repeat(W) : "");
-  const center = s => " ".repeat(Math.max(0, Math.floor((W - s.length) / 2))) + s;
-  const spread = (left, right) => left + " ".repeat(Math.max(1, W - left.length - right.length)) + right;
+function poPayStatus(po) {
+  return po.total > 0 && po.remaining <= 0 ? "LUNAS" : "UANG MUKA";
+}
+
+function poInvoiceHtml(po, settings) {
+  const co = poPrintCompany.settings || {};
   const money = n => groupDigits(n) || "0";
-  const kv = (label, value) => `${label.padEnd(11)}: ${value}`;
-  const out = [];
-  const push = line => { if (line !== "" || settings.lines === false) out.push(line); };
-
-  push(rule("="));
-  out.push(center(shopName));
-  out.push(center("NOTA SALES ORDER"));
-  push(rule("="));
-  out.push(kv("No. SO", po.po_number));
-  out.push(kv("Tanggal", poDateTimeLabel(po)));
-  out.push(kv("Customer", po.customer_name));
-  out.push(kv("Plat Mobil", po.plate_full || "-"));
-  out.push(kv("No. Telp", po.customer_phone));
-  push(rule("-"));
-
-  // Column widths: No(2) + gap + name + gap + Qty(4) + gap + Harga(11) + gap + Subtotal(12).
-  const nameW = W - 2 - 1 - 1 - 4 - 1 - 11 - 1 - 12;
-  const row = (no, name, qty, price, sub) =>
-    `${no.padStart(2)} ${name.padEnd(nameW)} ${qty.padStart(4)} ${price.padStart(11)} ${sub.padStart(12)}`;
-  out.push(row("No", "Barang", "Qty", "Harga", "Subtotal"));
-  push(rule("-"));
-  po.items.forEach((item, idx) => {
-    const nameLines = poWrap(item.product_name, nameW);
-    out.push(row(String(idx + 1), nameLines[0], String(item.quantity), money(item.unit_price), money(item.quantity * item.unit_price)));
-    for (const extra of nameLines.slice(1)) out.push(`${" ".repeat(3)}${extra}`);
-    out.push(`${" ".repeat(3)}Status: ${preorderStatusLabel(item.status)}`);
-  });
-  push(rule("-"));
-  out.push(spread("TOTAL PESANAN", `Rp ${money(po.total)}`));
-  out.push(spread("DP DIBAYAR", `Rp ${money(po.deposit)}`));
-  out.push(spread("SISA TAGIHAN", `Rp ${money(po.remaining)}`));
-  push(rule("-"));
-  if (po.notes) {
-    out.push("Catatan:");
-    out.push(...poWrap(po.notes, W));
-  }
-  out.push("");
-  out.push(center("Terima kasih atas kepercayaan Anda."));
-  if (settings.footer) {
-    push(rule("="));
-    out.push(center(shopName));
-    if (SHOP_PROFILE.tagline) out.push(center(SHOP_PROFILE.tagline));
-    push(rule("="));
-  }
-  return out.join("\n");
+  const rule = settings.lines ? "border-top:1.5px solid #000;" : "";
+  const lines = (po.items || []).filter(it => it.status !== "dibatalkan");
+  const subtotal = lines.reduce((sum, it) => sum + it.quantity * it.unit_price, 0);
+  const cut = Math.max(subtotal - po.total, 0);
+  const paid = Math.max(po.total - po.remaining, 0);
+  const status = poPayStatus(po);
+  const lastPay = [...(po.payments || [])].filter(p => p.state === "sah" && p.amount > 0).pop();
+  const shopName = co.name || SHOP_PROFILE.name;
+  const shopAddr = co.address || SHOP_PROFILE.address;
+  const shopWa = co.phone || SHOP_PROFILE.phone;
+  const kv = (label, value, bold) => `<tr><td style="padding:1px 0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:1px 8px;vertical-align:top;">:</td><td style="padding:1px 0;vertical-align:top;${bold ? "font-weight:bold;" : ""}">${value}</td></tr>`;
+  const sum = (label, value, bold) => `<tr style="${bold ? "font-weight:bold;font-size:11pt;" : ""}"><td style="padding:1px 0;">${label}</td><td style="padding:1px 0 1px 18px;">Rp</td><td style="padding:1px 0;text-align:right;min-width:24mm;">${value}</td></tr>`;
+  const cell = "padding:2px 6px;";
+  const accounts = (poPrintCompany.accounts || []).filter(a => a.is_active !== false);
+  return `
+  <div style="font-family:'IBM Plex Mono','Courier New',Courier,monospace;font-size:9pt;color:#000;line-height:1.35;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div style="min-width:0;">
+        <div style="font-size:17pt;font-weight:bold;letter-spacing:0.01em;line-height:1.15;">${esc(shopName)}</div>
+        ${shopAddr ? `<div>${esc(shopAddr)}</div>` : ""}
+        ${shopWa ? `<div>WA ${esc(shopWa)}</div>` : ""}
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
+        <div style="font-size:24pt;font-weight:bold;letter-spacing:0.02em;">INVOICE</div>
+        <div style="border:1.5px solid #000;border-radius:4px;text-align:center;min-width:44mm;">
+          <div style="border-bottom:1.5px solid #000;padding:1px 8px;letter-spacing:0.08em;">STATUS PEMBAYARAN</div>
+          <div style="padding:2px 8px;font-size:17pt;font-weight:bold;letter-spacing:0.03em;">${status}</div>
+        </div>
+      </div>
+    </div>
+    <div style="${rule}margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;gap:14px;">
+      <table style="border-collapse:collapse;">
+        ${kv("No. Invoice", esc(po.receipt_no || po.po_number), true)}
+        ${kv("Tanggal", esc(poDateTimeLabel(po)))}
+        ${kv("Ref. SO", esc(po.po_number))}
+      </table>
+      <table style="border-collapse:collapse;">
+        ${kv("Kepada", esc(po.customer_name || "-"), true)}
+        ${kv("No. HP", esc(po.customer_phone || "-"))}
+        ${kv("No. Plat", esc(po.plate_full || "Belum dicatat"))}
+      </table>
+      <table style="border-collapse:collapse;">
+        ${kv("Sumber Order", po.order_source === "whatsapp" ? "WhatsApp" : "Walk-in")}
+        ${kv("Metode Pembayaran", esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-"))}
+        ${kv("Status Pesanan", esc(preorderStatusLabel(po.status)))}
+      </table>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;">
+      <thead style="display:table-header-group;">
+        <tr style="${rule}border-bottom:1.5px solid #000;font-weight:bold;">
+          <th style="${cell}width:8mm;text-align:left;">No</th>
+          <th style="${cell}text-align:left;">Nama Barang</th>
+          <th style="${cell}width:12mm;text-align:center;">Qty</th>
+          <th style="${cell}width:18mm;text-align:left;">Satuan</th>
+          <th style="${cell}width:30mm;text-align:right;">Harga Satuan</th>
+          <th style="${cell}width:30mm;text-align:right;">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>${lines.map((it, i) => `<tr>
+          <td style="${cell}">${i + 1}</td>
+          <td style="${cell}">${esc(it.product_name)}</td>
+          <td style="${cell}text-align:center;">${it.quantity}</td>
+          <td style="${cell}">${esc(it.unit || "")}</td>
+          <td style="${cell}text-align:right;">${money(it.unit_price)}</td>
+          <td style="${cell}text-align:right;">${money(it.quantity * it.unit_price)}</td>
+        </tr>`).join("")}</tbody>
+    </table>
+    <div style="${rule}margin-top:4px;padding-top:6px;display:flex;justify-content:space-between;gap:16px;">
+      <div style="min-width:0;">
+        ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:3px;">Pembayaran transfer dapat dilakukan ke rekening berikut:</div>
+          ${accounts.map(a => `<div style="margin-bottom:3px;">${esc(a.bank_name)}<br>${esc(a.account_number)}<br>a.n. ${esc(a.account_name)}</div>`).join("")}
+          <div style="margin-top:4px;">Mohon konfirmasi setelah melakukan transfer.</div>` : ""}
+        ${po.notes ? `<div style="margin-top:4px;">Catatan: ${esc(po.notes)}</div>` : ""}
+      </div>
+      <table style="border-collapse:collapse;flex-shrink:0;">
+        ${sum("Subtotal", money(subtotal))}
+        ${sum("Potongan", money(cut))}
+        <tr><td colspan="3" style="border-top:1px dashed #000;padding:0;height:3px;"></td></tr>
+        ${sum("Jumlah", money(po.total))}
+        ${sum(status === "LUNAS" ? "Dibayar" : "Dibayar (DP)", money(paid))}
+        ${sum("Sisa", money(Math.max(po.remaining, 0)), true)}
+      </table>
+    </div>
+    ${settings.footer ? `<div style="${rule}margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="text-align:center;">Penerima,<div style="margin-top:10mm;">(____________________)</div></div>
+      <div style="align-self:center;">Terima kasih atas kepercayaan Anda.</div>
+      <div style="text-align:center;">Hormat kami,<div style="margin-top:10mm;">(____________________)</div></div>
+    </div>` : ""}
+  </div>`;
 }
 
 function renderPoNotaPreview() {
   if (!currentPreorder) return;
   const settings = poPrintSettings();
-  const usableIn = PO_PAPERS[settings.paper].widthIn - (settings.left + settings.right) / 2.54;
-  const raw = Math.floor(usableIn * 10);
-  const columns = Math.min(96, Math.max(PO_MIN_COLUMNS, raw));
+  const paper = PO_PAPERS[settings.paper];
+  const usableIn = paper.widthIn - (settings.left + settings.right) / 2.54;
   const note = document.getElementById("po-print-note");
-  note.textContent = `Lebar cetak ${columns} kolom (10 cpi).${raw < PO_MIN_COLUMNS ? " Margin terlalu besar; teks bisa terpotong, kecilkan margin kiri/kanan." : ""}`;
+  note.textContent = `Status pembayaran tercetak: ${poPayStatus(currentPreorder)}. Lebar area cetak ${usableIn.toFixed(1).replace(".", ",")} inci.`;
   note.classList.remove("hidden");
-  document.getElementById("po-nota-preview").textContent = poNotaText(currentPreorder, settings, columns);
+  const box = document.getElementById("po-nota-preview");
+  box.style.width = `${paper.widthIn}in`;
+  box.style.padding = `${settings.top}cm ${settings.right}cm ${settings.bottom}cm ${settings.left}cm`;
+  box.innerHTML = poInvoiceHtml(currentPreorder, settings);
   savePoPrintPrefs(settings);
-  return { settings, columns };
+  return { settings };
 }
 
 async function openPreorderPrint(preorderId, origin) {
@@ -23030,6 +23103,7 @@ async function openPreorderPrint(preorderId, origin) {
   poPrintOrigin = origin || "detail";
   currentPreorder = detail;
   loadPoPrintPrefs();
+  await loadPoPrintCompany();
   showPreorderPanel("po-print-panel");
   renderPoNotaPreview();
 }
@@ -23043,12 +23117,7 @@ function printPreorderNota() {
   const rendered = renderPoNotaPreview();
   if (!rendered) return;
   const { settings } = rendered;
-  const pre = document.createElement("pre");
-  pre.textContent = document.getElementById("po-nota-preview").textContent;
-  pre.style.cssText = "font-family:'Courier New',Courier,monospace;font-size:12pt;line-height:12pt;margin:0;white-space:pre;color:#000;";
-  const area = document.getElementById("nota-print-area");
-  area.innerHTML = "";
-  area.appendChild(pre);
+  document.getElementById("nota-print-area").innerHTML = poInvoiceHtml(currentPreorder, settings);
   const margin = `${settings.top}cm ${settings.right}cm ${settings.bottom}cm ${settings.left}cm`;
   printWithPageRule(`@page { size: ${PO_PAPERS[settings.paper].page}; margin: ${margin}; }`, "print-nota");
 }
@@ -23800,7 +23869,7 @@ function openSpoItemShippingModal(itemId) {
         ${fld("spo-sh-eta", "Estimasi Tiba", `<input id="spo-sh-eta" type="date" value="${esc(it.eta_date || "")}" data-no-uppercase class="${SPO_INPUT}" />`, true)}</div>
       ${fld("spo-sh-transit", "Lokasi Transit", `<input id="spo-sh-transit" type="text" maxlength="100" value="${esc(it.transit_location || "")}" placeholder="mis. Pelabuhan Tanjung Priok, Jakarta" class="${SPO_INPUT}" />`)}
       ${fld("spo-sh-note", "Catatan Pengiriman", `<textarea id="spo-sh-note" rows="2" maxlength="500" data-no-uppercase class="${SPO_INPUT}"></textarea>`)}
-      <label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input id="spo-sh-notify" type="checkbox" class="accent-[#D97757] mt-0.5" /><span>Kirim notifikasi ke customer<span class="block text-xs text-muted">Mencatat bahwa customer terkait perlu diberi tahu tentang perubahan status item ini.</span></span></label>
+      <label class="flex items-start gap-2 text-sm text-ink cursor-pointer"><input id="spo-sh-notify" type="checkbox" class="accent-[#EA580C] mt-0.5" /><span>Kirim notifikasi ke customer<span class="block text-xs text-muted">Mencatat bahwa customer terkait perlu diberi tahu tentang perubahan status item ini.</span></span></label>
       <div class="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900/80"><b>Informasi Penting.</b> Status Purchase Order adalah status keseluruhan pesanan; status pengiriman diatur per item karena setiap item bisa berbeda jalur dan jadwal.</div>
       <div class="flex flex-wrap justify-end gap-2 pt-1">
         <button type="button" onclick="closeModal()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2">Batal</button>
@@ -24425,7 +24494,7 @@ function openSpoCancelItemModal(itemId) {
         <div class="${SPO_LABEL}">Tindakan Lanjutan</div>
         <div class="space-y-1.5">
           ${SPO_CANCEL_ACTIONS.map((a, idx) => `<label class="flex items-start gap-2 text-sm text-ink">
-            <input type="radio" name="spo-cx-action" value="${a.key}" ${(cancelledForCustomer ? a.key === "tidak_ada" : item.customer_po_number ? idx === 0 : idx === 1) ? "checked" : ""} class="mt-1 accent-[#D97757]" />
+            <input type="radio" name="spo-cx-action" value="${a.key}" ${(cancelledForCustomer ? a.key === "tidak_ada" : item.customer_po_number ? idx === 0 : idx === 1) ? "checked" : ""} class="mt-1 accent-[#EA580C]" />
             <span>${esc(a.label)}<span class="block text-xs text-muted">${esc(a.hint)}</span></span></label>`).join("")}
         </div>
       </div>
@@ -24934,7 +25003,7 @@ function renderSpoPicker() {
     return `
     <tr class="border-b border-line last:border-b-0 ${blocked ? "opacity-45" : "hover:bg-bg2/60"}" ${blocked ? `title="Supplier ${esc(row.supplier_name)} berbeda dari supplier PO ini"` : ""}>
       <td class="px-3 py-2">
-        <input type="checkbox" ${sel ? "checked" : ""} ${blocked ? "disabled" : ""} onchange="onSpoPickerToggle(${rid}, this.checked)" aria-label="Pilih ${esc(row.product_name)}" class="accent-[#D97757] w-4 h-4" />
+        <input type="checkbox" ${sel ? "checked" : ""} ${blocked ? "disabled" : ""} onchange="onSpoPickerToggle(${rid}, this.checked)" aria-label="Pilih ${esc(row.product_name)}" class="accent-[#EA580C] w-4 h-4" />
       </td>
       <td class="px-3 py-2 font-medium text-accentDark tabular-nums whitespace-nowrap">${esc(row.customer_po_number)}</td>
       <td class="px-3 py-2 text-ink">${esc(row.customer_name)}</td>
@@ -26756,7 +26825,7 @@ function svcSigInit() {
     if (c.dataset.ready) return;
     c.dataset.ready = "1"; c.dataset.inked = "";
     const ctx = c.getContext("2d");
-    ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#141413";
+    ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = "#111827";
     let down = false;
     const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
     c.addEventListener("pointerdown", e => { down = true; c.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...pos(e)); });
@@ -27853,9 +27922,9 @@ function renderUserRowHtml(u) {
       </td>
       <td class="px-3 py-2">${statusBadge}</td>
       <td class="px-3 py-2"><div class="flex flex-col gap-1">${u.role === "admin" ? `<label class="inline-flex items-center gap-1.5 text-xs text-ink cursor-pointer" title="Owner memberi persetujuan akhir penghapusan stok karantina">
-        <input type="checkbox" ${u.is_owner ? "checked" : ""} onchange="toggleUserOwner(${u.id}, this.checked, this)" class="accent-[#D97757]" /> Owner</label>` : ""}
+        <input type="checkbox" ${u.is_owner ? "checked" : ""} onchange="toggleUserOwner(${u.id}, this.checked, this)" class="accent-[#EA580C]" /> Owner</label>` : ""}
         <label class="inline-flex items-center gap-1.5 text-xs text-ink cursor-pointer whitespace-nowrap" title="Boleh memposting Barang Masuk (menambah stok) dan menerima barang pengganti Retur Supplier">
-        <input type="checkbox" ${u.can_post_inbound ? "checked" : ""} onchange="toggleUserPostInbound(${u.id}, this.checked, this)" class="accent-[#D97757]" /> Posting Barang Masuk</label></div></td>
+        <input type="checkbox" ${u.can_post_inbound ? "checked" : ""} onchange="toggleUserPostInbound(${u.id}, this.checked, this)" class="accent-[#EA580C]" /> Posting Barang Masuk</label></div></td>
       <td class="px-3 py-2 text-muted text-xs">${esc(u.created_at.slice(0, 10))}</td>
       <td class="px-3 py-2 text-right">
         <div class="flex items-center justify-end gap-1.5">
@@ -28767,8 +28836,8 @@ function cnPrint() {
   const td = "border border-stone-400 px-2 py-1";
   const lines = d.lines.map((l, i) => `<tr><td class="${td} text-center">${i + 1}</td><td class="${td}">${esc(l.product_name)}${l.sku ? ` <span style="font-size:10px">(${esc(l.sku)})</span>` : ""}</td><td class="${td} text-right">${l.kind === "ongkir" ? "—" : l.qty}</td><td class="${td} text-right">${cnMoney(l.unit_price)}</td><td class="${td} text-right">${cnMoney(l.subtotal)}</td><td class="${td} text-right">${cnMoney(l.tax)}</td><td class="${td} text-right">${cnMoney(l.amount)}</td></tr>`).join("");
   const allocs = d.allocations.filter(a => a.amount > 0 && !a.undone).map(a => `${esc(a.invoice_number)} ${cnMoney(a.amount)}`).join("; ");
-  document.getElementById("cn-print-wrap").innerHTML = `<div class="cr-print-target" style="font-size:12px;color:#141413">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #141413;padding-bottom:6px;margin-bottom:10px">
+  document.getElementById("cn-print-wrap").innerHTML = `<div class="cr-print-target" style="font-size:12px;color:#111827">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111827;padding-bottom:6px;margin-bottom:10px">
       <div><div style="font-size:18px;font-weight:700">${esc(shop)}</div><div>CREDIT NOTE SUPPLIER</div></div>
       <div style="text-align:right"><div style="font-size:16px;font-weight:700;font-family:monospace">${esc(d.cn_number || "")}</div><div>Status: ${esc(d.status_label)}</div></div></div>
     <table style="width:100%;margin-bottom:10px"><tr><td style="width:50%;vertical-align:top">
@@ -28779,7 +28848,7 @@ function cnPrint() {
     <div style="margin-top:10px"><b>Pemakaian:</b> dialokasikan ${cnMoney(d.allocated)}${allocs ? ` (${allocs})` : ""}; refund ${cnMoney(d.refunded)}; sisa kredit ${cnMoney(d.available)}.</div>
     ${d.note ? `<div style="margin-top:4px"><b>Catatan:</b> ${esc(d.note)}</div>` : ""}
     <table style="width:100%;margin-top:28px;text-align:center"><tr><td>Dibuat,<br><br><br>${esc(d.created_by || "")}</td><td>Diverifikasi,<br><br><br>${esc(d.reviewed_by || "")}</td><td>Diposting,<br><br><br>${esc(d.posted_by || "")}</td></tr></table>
-    <div style="margin-top:12px;font-size:10px;color:#6B6B66">Dicetak ${new Date().toLocaleString("id-ID")} · Credit Note tidak memutasi stok. Nilai faktur asli tidak diubah; pengurangan tagihan tercatat sebagai alokasi.</div></div>`;
+    <div style="margin-top:12px;font-size:10px;color:#6B7280">Dicetak ${new Date().toLocaleString("id-ID")} · Credit Note tidak memutasi stok. Nilai faktur asli tidak diubah; pengurangan tagihan tercatat sebagai alokasi.</div></div>`;
   crPrintNode("cn-print-wrap");
 }
 
@@ -29069,7 +29138,7 @@ function qtNaskahCard() {
     <div class="flex gap-5 border-b border-line mb-3 text-sm"><span class="pb-2 border-b-2 border-accent text-accentDark font-semibold">Otomatis</span><button type="button" onclick="qtNaskah()" class="pb-2 text-muted hover:text-ink">Edit Naskah</button></div>
     <p class="text-xs text-muted mb-2">Template ${tpl} terisi otomatis, tetap bisa diedit sebelum terbit.</p>
     ${tick(Boolean(d.opening_text), "Salam dan paragraf pembuka formal")}${tick(Boolean(d.closing_text && d.valid_until), `Penutup &amp; masa berlaku sampai ${qtTgl(d.valid_until)}`)}
-    <label class="flex items-center gap-3 py-1.5 text-sm text-ink cursor-pointer"><input type="checkbox" ${d.show_bank ? "checked" : ""} onchange="qtF('show_bank', this.checked); qtEditor()" class="accent-[#D97757] w-4 h-4">Tampilkan rekening resmi (opsional)</label>
+    <label class="flex items-center gap-3 py-1.5 text-sm text-ink cursor-pointer"><input type="checkbox" ${d.show_bank ? "checked" : ""} onchange="qtF('show_bank', this.checked); qtEditor()" class="accent-[#EA580C] w-4 h-4">Tampilkan rekening resmi (opsional)</label>
     ${d.show_bank ? qtBankSelect() : ""}
     <div class="flex flex-wrap gap-2 mt-3"><button type="button" onclick="qtNaskah()" class="${RTS_BTN3} font-semibold">Atur Naskah Surat</button><button type="button" onclick="qtPreview()" class="${RTS_BTN} font-semibold">Preview Surat</button></div>`);
 }
@@ -29189,7 +29258,7 @@ function qtLineModal(i) {
       <div>${qtLbl("Harga penawaran")}<input id="qtl-price" inputmode="numeric" value="${groupDigits(l.unit_price)}" oninput="qtLineCalc(${listP})" class="${RTS_IN} price-input text-right"></div>
       <div>${qtLbl("Diskon per baris (Rp)")}<input id="qtl-disc" inputmode="numeric" value="${groupDigits(l.line_discount || 0)}" oninput="qtLineCalc(${listP})" class="${RTS_IN} price-input text-right"></div>
       ${jasa ? "" : `<div id="qtl-reason-wrap" class="sm:col-span-2">${qtLbl("Alasan harga khusus")}<input id="qtl-reason" data-keep-case value="${esc(l._reason || "")}" placeholder="Mis. hasil negosiasi, pelanggan langganan" class="${RTS_IN}"></div>
-        ${isAdmin() ? `<label class="sm:col-span-2 flex items-center gap-2 text-xs text-ink"><input id="qtl-below" type="checkbox" ${l._allow_below ? "checked" : ""} class="accent-[#D97757]"> Izinkan di bawah modal (khusus Admin)</label>` : ""}`}
+        ${isAdmin() ? `<label class="sm:col-span-2 flex items-center gap-2 text-xs text-ink"><input id="qtl-below" type="checkbox" ${l._allow_below ? "checked" : ""} class="accent-[#EA580C]"> Izinkan di bawah modal (khusus Admin)</label>` : ""}`}
     </div>
     <div id="qtl-calc" class="mt-3 text-sm"></div>
     <div class="rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">${jasa ? "Jasa tidak memakai stok dan tidak memotong persediaan." : "Perubahan harga atau diskon di luar kewenangan staf memerlukan persetujuan Admin; Master Harga Jual tetap tidak berubah."}</div>
@@ -29323,7 +29392,7 @@ function qtNaskah() {
           <div class="flex items-center gap-3 text-sm text-ink mb-2"><span class="w-4 h-4 rounded bg-accent grid place-items-center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></span>Masa berlaku: ${qtTgl(d.valid_until)}</div>
           ${qtLbl("Ketentuan lain (satu per baris)")}${ta("terms_text", 4)}
           <div class="border-t border-line my-3"></div>
-          <label class="flex items-center gap-3 text-sm text-ink cursor-pointer mb-2"><input type="checkbox" ${d.show_bank ? "checked" : ""} onchange="qtF('show_bank', this.checked); qtNaskah()" class="accent-[#D97757] w-4 h-4">Tampilkan rekening dalam PDF</label>
+          <label class="flex items-center gap-3 text-sm text-ink cursor-pointer mb-2"><input type="checkbox" ${d.show_bank ? "checked" : ""} onchange="qtF('show_bank', this.checked); qtNaskah()" class="accent-[#EA580C] w-4 h-4">Tampilkan rekening dalam PDF</label>
           ${d.show_bank ? qtLbl("Rekening Resmi") + qtBankSelect() : ""}
           <div class="rounded-lg border-l-4 border-accent bg-accent/5 px-3 py-2 text-xs text-accentDark mt-3">Tidak ada nomor rekening yang diisi otomatis. Hanya rekening resmi aktif dari Pengaturan Perusahaan yang boleh dicetak pada PDF.</div>`)}
         ${qtCard("Penanggung Jawab", `<div class="space-y-3"><div>${qtLbl("Nama / Penanda Tangan")}<input value="${esc(d.signer_name || "")}" oninput="qtF('signer_name', this.value)" class="${RTS_IN}"></div>
@@ -29387,22 +29456,22 @@ function qtLetterHtml(s, screen) {
     ? `<div style="position:relative;height:30px;background:#C8302A;margin:${screen ? "-40px -48px 18px" : "0 0 14px"};overflow:hidden"><div style="position:absolute;right:0;top:0;width:36%;height:100%;background:#F3A93B;border-bottom-left-radius:100% 70%"></div></div>`
     : `<div style="position:absolute;inset:0 0 auto 0;height:${screen ? "96px" : "84px"};background:#FDEEE8;overflow:hidden;z-index:0"><div style="position:absolute;right:0;top:0;width:40%;height:100%;background:#F8BE9F;clip-path:polygon(0 0,100% 0,100% 30%,22% 100%)"></div></div>`;
   const right = [`${co.city}${co.region ? ", " + co.region : ""}`.toUpperCase(), co.tagline, co.address, [co.phone, co.email].filter(Boolean).join(" · ")].filter(Boolean)
-    .map((t, i) => `<div style="font-size:${i ? 8.5 : 9}px;${i ? "color:#6B6B66" : "font-weight:600;letter-spacing:.3px"}">${esc(t)}</div>`).join("");
-  const td = "padding:6px 8px;border-bottom:1px solid #ECEAE4;vertical-align:top";
+    .map((t, i) => `<div style="font-size:${i ? 8.5 : 9}px;${i ? "color:#6B7280" : "font-weight:600;letter-spacing:.3px"}">${esc(t)}</div>`).join("");
+  const td = "padding:6px 8px;border-bottom:1px solid #EBEDF0;vertical-align:top";
   const rows = s.lines.map((l, i) => `<tr style="background:${i % 2 ? "#F7F7F9" : "#fff"};break-inside:avoid">
-      <td style="${td};text-align:center">${l.no}</td><td style="${td}"><div style="font-weight:600">${esc(l.name)}</div>${l.sku ? `<div style="font-size:8.5px;color:#6B6B66">${esc(l.sku)}</div>` : ""}</td>
+      <td style="${td};text-align:center">${l.no}</td><td style="${td}"><div style="font-weight:600">${esc(l.name)}</div>${l.sku ? `<div style="font-size:8.5px;color:#6B7280">${esc(l.sku)}</div>` : ""}</td>
       <td style="${td};text-align:center;white-space:nowrap">${l.qty} ${esc(l.unit)}</td><td style="${td};text-align:right;white-space:nowrap">${qtM(l.price).replace("Rp", "Rp ")}</td>
       ${hasDisc ? `<td style="${td};text-align:right;white-space:nowrap">${l.discount ? qtM(l.discount).replace("Rp", "Rp ") : "-"}</td>` : ""}
       <td style="${td};text-align:right;white-space:nowrap">${qtM(l.total).replace("Rp", "Rp ")}</td></tr>`).join("");
   const span = hasDisc ? 5 : 4, money = n => qtM(n).replace("Rp", "Rp ");
   const totals = (s.discount ? `<tr style="break-inside:avoid"><td colspan="${span}" style="padding:6px 8px;text-align:right">Subtotal</td><td style="padding:6px 8px;text-align:right;white-space:nowrap">${money(s.subtotal)}</td></tr>
       <tr style="break-inside:avoid"><td colspan="${span}" style="padding:6px 8px;text-align:right">Diskon</td><td style="padding:6px 8px;text-align:right;white-space:nowrap">−${money(s.discount)}</td></tr>` : "")
-    + `<tr style="background:#FDEEE8;break-inside:avoid"><td colspan="${span}" style="padding:9px 8px;font-weight:700;color:#C4633F;letter-spacing:.3px">TOTAL PENAWARAN</td><td style="padding:9px 8px;text-align:right;font-weight:700;color:#C4633F;white-space:nowrap">${money(s.total)}</td></tr>`;
+    + `<tr style="background:#FDEEE8;break-inside:avoid"><td colspan="${span}" style="padding:9px 8px;font-weight:700;color:#C2410C;letter-spacing:.3px">TOTAL PENAWARAN</td><td style="padding:9px 8px;text-align:right;font-weight:700;color:#C2410C;white-space:nowrap">${money(s.total)}</td></tr>`;
   const meta = [["Nomor", s.doc_number], ["Tanggal", `${s.issue_city}, ${qtTgl(s.issue_date)}`], ["Perihal", s.subject]]
     .map(([k, v]) => `<tr><td style="width:62px;font-weight:600;padding:1px 0">${k}</td><td style="padding:1px 6px">:</td><td style="padding:1px 0">${esc(v)}</td></tr>`).join("");
-  const bank = s.bank ? `<div style="margin:10px 0 0;padding:8px 10px;border:1px solid #ECEAE4;border-radius:6px;break-inside:avoid"><div style="font-weight:700;margin-bottom:2px">Rekening Resmi Pembayaran</div>
-      ${esc(s.bank.bank_name)} · <b>${esc(s.bank.account_number)}</b> · a.n. ${esc(s.bank.account_name)}<div style="font-size:8.5px;color:#6B6B66;margin-top:2px">Penyebutan rekening bukan tagihan atau bukti pembayaran.</div></div>` : "";
-  const outer = screen ? "width:794px;min-height:1123px;padding:40px 48px 56px;box-shadow:0 2px 14px rgba(20,20,19,.12);margin:0 auto;"
+  const bank = s.bank ? `<div style="margin:10px 0 0;padding:8px 10px;border:1px solid #EBEDF0;border-radius:6px;break-inside:avoid"><div style="font-weight:700;margin-bottom:2px">Rekening Resmi Pembayaran</div>
+      ${esc(s.bank.bank_name)} · <b>${esc(s.bank.account_number)}</b> · a.n. ${esc(s.bank.account_name)}<div style="font-size:8.5px;color:#6B7280;margin-top:2px">Penyebutan rekening bukan tagihan atau bukti pembayaran.</div></div>` : "";
+  const outer = screen ? "width:794px;min-height:1123px;padding:40px 48px 56px;box-shadow:0 2px 14px rgba(17,24,39,.12);margin:0 auto;"
                        : "width:100%;";
   return `<div class="qt-letter" style="${outer}position:relative;background:#fff;color:#1F1F1E;font-family:Inter,Arial,Helvetica,sans-serif;font-size:10.5px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden">
     ${formal ? band : band}
@@ -29425,16 +29494,16 @@ function qtLetterHtml(s, screen) {
         <ol style="margin:0 0 8px;padding-left:18px;list-style:decimal">${s.terms.map(t => `<li style="margin:1px 0">${esc(t)}</li>`).join("")}</ol>${bank}</div>
       <div style="break-inside:avoid;margin-top:10px">${paras(s.texts.closing)}
         <div style="margin-top:12px">Hormat kami,</div><div style="font-weight:700;margin-top:2px">${esc(co.name)}</div>
-        <div style="height:46px"></div><div style="font-weight:700;text-decoration:underline">${esc(s.signer.name)}</div>${s.signer.title ? `<div style="color:#6B6B66">${esc(s.signer.title)}</div>` : ""}</div>
-      ${screen ? `<div style="position:absolute;left:0;right:0;bottom:-36px;display:flex;justify-content:space-between;border-top:1px solid #F0C9BA;padding-top:5px;font-size:8px;color:#6B6B66"><span>Surat penawaran harga · Bukan faktur atau bukti pembayaran</span><span>${esc(s.doc_number)}</span></div>` : ""}
+        <div style="height:46px"></div><div style="font-weight:700;text-decoration:underline">${esc(s.signer.name)}</div>${s.signer.title ? `<div style="color:#6B7280">${esc(s.signer.title)}</div>` : ""}</div>
+      ${screen ? `<div style="position:absolute;left:0;right:0;bottom:-36px;display:flex;justify-content:space-between;border-top:1px solid #F0C9BA;padding-top:5px;font-size:8px;color:#6B7280"><span>Surat penawaran harga · Bukan faktur atau bukti pembayaran</span><span>${esc(s.doc_number)}</span></div>` : ""}
     </div></div>`;
 }
 // Prints / saves as PDF from the snapshot. The footer and page numbers ride in the @page margin boxes (A4).
 function qtPrintSnapshot(s, qid, vid) {
   const rule = document.getElementById("print-page-rule"), before = rule.textContent, title = document.title;
   rule.textContent = `@page { size: A4 portrait; margin: 14mm 15mm 16mm;
-    @bottom-left { content: "Surat penawaran harga · Bukan faktur atau bukti pembayaran · ${s.doc_number}"; font: 7.5pt Arial, sans-serif; color: #6B6B66; }
-    @bottom-right { content: "Halaman " counter(page) " / " counter(pages); font: 7.5pt Arial, sans-serif; color: #6B6B66; } }`;
+    @bottom-left { content: "Surat penawaran harga · Bukan faktur atau bukti pembayaran · ${s.doc_number}"; font: 7.5pt Arial, sans-serif; color: #6B7280; }
+    @bottom-right { content: "Halaman " counter(page) " / " counter(pages); font: 7.5pt Arial, sans-serif; color: #6B7280; } }`;
   const root = document.createElement("div");
   root.id = "cr-print-root";
   root.innerHTML = qtLetterHtml(s, false);
@@ -29676,7 +29745,7 @@ function coAccountModal(id) {
       <div>${qtLbl("Nama bank", true)}<input id="coa-bank" value="${esc(a.bank_name)}" placeholder="Mis. BCA" class="${RTS_IN}"></div>
       <div>${qtLbl("Nomor rekening", true)}<input id="coa-num" inputmode="numeric" value="${esc(a.account_number)}" class="${RTS_IN} font-mono"></div>
       <div>${qtLbl("Atas nama", true)}<input id="coa-name" value="${esc(a.account_name)}" class="${RTS_IN}"></div>
-      <label class="flex items-center gap-2 text-sm"><input id="coa-active" type="checkbox" ${a.is_active ? "checked" : ""} class="accent-[#D97757]"> Aktif (boleh dipilih di surat)</label></div>
+      <label class="flex items-center gap-2 text-sm"><input id="coa-active" type="checkbox" ${a.is_active ? "checked" : ""} class="accent-[#EA580C]"> Aktif (boleh dipilih di surat)</label></div>
     <div class="flex justify-end gap-2 mt-4"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="coAccountSave(${id || "null"})" class="${RTS_BTN}">Simpan</button></div>`);
 }
 async function coAccountSave(id) {

@@ -40,18 +40,18 @@ python main.py --query "toko plastik" --show-browser
 - Google Maps DOM selectors can change; selectors live in `scraper.py` and may need updating.
 
 ## Theme Style
-The "Claude/Anthropic" aesthetic, roughly
-The recognizable feel is: warm cream backgrounds, a coral/clay accent, dark warm (not pure-black) text, generous whitespace, restrained and editorial. Here's a palette that captures it (these approximate the look — they're not official brand assets):
---bg:          #FAF9F5;  /* warm cream, main background */
---bg-subtle:   #F0EEE6;  /* slightly deeper cream for cards/sections */
---text:        #141413;  /* warm near-black */
---text-muted:  #6B6B66;  /* warm gray */
---accent:      #D97757;  /* the coral / clay — the signature color */
---accent-hover:#C4633F;
---border:      #E5E3DC;  /* soft warm border */
-Typography — Anthropic pairs a serif for display/headings with a clean sans for body/UI. Their actual fonts are proprietary, but close free substitutes:
-
-Serif (headings): Tiempos, Lora, Fraunces, or Georgia
-Sans (body/UI): Inter, or system-ui
-
-And the feel rules that make it read as "Claude" rather than generic: soft rounded corners (~8–12px), lots of breathing room, low-contrast subtle borders instead of hard shadows, calm/minimal motion.
+"Navy Bengkel" (owner's choice, 24-10-2026), replacing the earlier cream/coral look:
+--sidebar:     #0F1B2D;  /* navy sidebar, light text (#F1F5F9 / muted #94A3B8) */
+--bg:          #F6F7F9;  /* light grey canvas */
+--bg-subtle:   #EEF0F3;  /* table heads, chips, read-only fields */
+--card:        #FFFFFF;
+--text:        #111827;
+--text-muted:  #6B7280;
+--accent:      #EA580C;  /* orange: primary actions (Pembayaran, Pesanan Baru, Simpan) */
+--accent-hover:#C2410C;
+--border:      #E3E6EB;
+Typography: Inter for everything (headings included); IBM Plex Mono for codes/numbers.
+Tokens live in the Tailwind config at the top of frontend/index.html (bg, bg2, ink, muted, accent, accentDark, line);
+the navy sidebar is the `#drawer-panel` block in the <style>. Kasir buttons keep colour-by-role: accent = transaction,
+blue #1D4ED8 = operations/status, green #15803D = print, red #DC2626 = void/delete, slate #334155 = standard.
+Feel: soft rounded corners (~8–12px), subtle borders instead of heavy shadows, calm/minimal motion.

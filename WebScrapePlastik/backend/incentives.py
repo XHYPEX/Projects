@@ -500,6 +500,27 @@ def set_item_work(receipt_id: str, item_id: int, status: str, user: dict) -> dic
     return work_order_detail(receipt_id)
 
 
+def _follow_nota_work(con, rec, by: str | None) -> None:
+    """Owner, 24-10-2026: a line's work state follows the nota's Status Pengerjaan, there is no per-item control.
+    Dalam Pengerjaan moves queued lines to Dikerjakan; back to Belum Dikerjakan puts them in the queue again.
+    Pengerjaan Selesai is finish_assigned_items."""
+    if rec["status"] == "void":
+        return
+    frm, to = {"pengerjaan": ("antrian", "dikerjakan"), "belum": ("dikerjakan", "antrian"),
+               "menunggu": ("dikerjakan", "antrian")}.get(rec["work_status"], (None, None))
+    if not frm:
+        return
+    rows = con.execute("""SELECT w.receipt_item_id FROM receipt_item_work w
+                          WHERE w.receipt_id=? AND w.work_status=?
+                            AND EXISTS (SELECT 1 FROM receipt_item_technicians t WHERE t.receipt_item_id=w.receipt_item_id)""",
+                       (rec["id"], frm)).fetchall()
+    now = db._now()
+    for r in rows:
+        con.execute("""UPDATE receipt_item_work SET work_status=?, updated_at=?, updated_by=?,
+                           work_started_at=CASE WHEN ?='dikerjakan' THEN COALESCE(work_started_at, ?) ELSE NULL END
+                       WHERE receipt_item_id=?""", (to, now, by, to, now, r["receipt_item_id"]))
+
+
 def finish_assigned_items(con, receipt_id: str, by: str | None) -> list[str]:
     """Pengerjaan Selesai on the whole nota: every line that has technicians and is not finished yet is marked
     Selesai with it (logged), because the nota's own status says the work is done."""
@@ -625,6 +646,7 @@ def sync_receipt(con, receipt_id: str, by: str | None, assign: dict | None = Non
     if assign:
         apply_assignments(con, receipt_id, assign, by)
         rec = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
+    _follow_nota_work(con, rec, by)
     lines = [dict(r) for r in con.execute("SELECT * FROM incentive_lines WHERE receipt_id=?", (receipt_id,)).fetchall()]
     for ln in lines:
         if ln["state"] == "aktif" and ln["receipt_item_id"] not in ids:

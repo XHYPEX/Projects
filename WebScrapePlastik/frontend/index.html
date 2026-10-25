@@ -690,6 +690,44 @@
 
     /* Table header cells: a quieter band. */
     thead.bg-bg2 { background: #F3F5F8; }
+
+    /* ── Kasir visual 03 "Balanced" (owner 25-10-2026) ───────────────────────────────────────────────
+       Colour, border, shadow and radius only: no size, padding, margin or font size changes, so every button,
+       panel and column keeps its exact place (measured: 0 px shift over 580 elements). The sidebar and top bar
+       take it only while the Kasir page is open; other pages stay as they are until this look is approved for them. */
+    body:has(#page-cashier:not(.hidden)), body:has(#page-cashier:not(.hidden)) > main, #page-cashier, #page-cashier .cashier-strip { background-color: #F8F9FA; }
+    #page-cashier .cashier-strip { border-bottom-color: #E6E8EB; }
+    body:has(#page-cashier:not(.hidden)) header.h-\[72px\] { background-color: #FFFFFF; border-color: #E6E8EB; }
+    body:has(#page-cashier:not(.hidden)) #drawer-panel .nav-link.is-active, body:has(#page-cashier:not(.hidden)) #drawer-panel .nav-sublink.is-active,
+    body:has(#page-cashier:not(.hidden)) #drawer-panel .nav-sublink.is-active:hover { background-color: rgba(235,106,76,.22); color: #FFFFFF; box-shadow: inset 3px 0 0 #EB6A4C; }
+    body:has(#page-cashier:not(.hidden)) #drawer-panel .nav-link[data-route$="-group"].is-active { background-color: transparent; box-shadow: none; }
+    body:has(#page-cashier:not(.hidden)) #drawer-panel .nav-link.is-active > svg:first-child { color: #FDA48F; }
+    #page-cashier .border-line { border-color: #E6E8EB; }
+    #page-cashier .shadow-\[0_1px_2px_rgba\(17\,24\,39\,0\.03\)\] { box-shadow: 0 1px 2px rgba(17,24,39,.04), 0 2px 8px -4px rgba(17,24,39,.06); }
+    #page-cashier .text-ink { color: #22252A; }
+    #page-cashier .text-muted { color: #69717D; }
+    #page-cashier .bg-accent { background-color: #EB6A4C; }
+    #page-cashier .bg-accent\/10 { background-color: #FDF0EC; }
+    #page-cashier .text-accentDark { color: #BF4B30; }
+    #page-cashier .kb-primary { --kb: #EB6A4C; --kb-h: #D95A3D; --kb-tint: rgba(235,106,76,.07); --kb-press: rgba(235,106,76,.14); }
+    #page-cashier .kb-ops { --kb: #2F55A4; --kb-h: #244383; --kb-tint: rgba(47,85,164,.06); }
+    #page-cashier .kb-print { --kb: #26794B; --kb-h: #1E623C; --kb-tint: rgba(38,121,75,.06); }
+    #page-cashier .kb-solid { box-shadow: 0 1px 2px rgba(217,90,61,.25); }
+    #page-cashier .kasir-grid-head { background-color: #F3F4F6; color: #5F6773; }
+    #page-cashier #item-rows > .item-row { transition: background-color .12s; }
+    #page-cashier #item-rows > .item-row:hover { background-color: #FFFAF8; }
+    #page-cashier input:not([type=checkbox]):not([type=radio]):not(.item-name), #page-cashier select, #page-cashier textarea { border-color: #DEE1E5; }
+    #page-cashier input:focus, #page-cashier select:focus, #page-cashier textarea:focus { border-color: #EB6A4C; box-shadow: 0 0 0 3px rgba(235,106,76,.16); outline: none; }
+    #page-cashier input:disabled:not(#item-rows input), #page-cashier select:disabled:not(#item-rows select), #page-cashier textarea:disabled { background-color: #F4F5F7; color: #959CA6; cursor: not-allowed; }
+    /* Status chips: an inset ring instead of a border, so the chip keeps its exact size. */
+    #page-cashier .rounded-full.text-\[11px\] { box-shadow: inset 0 0 0 1px var(--chip-ring, rgba(17,24,39,.08)); }
+    #page-cashier .bg-pending\/10 { background-color: #FEF5E2; color: #85540A; --chip-ring: #F7DDA6; }
+    #page-cashier .bg-done\/10 { background-color: #E9F6EE; color: #226A41; --chip-ring: #C3E5D0; }
+    #page-cashier .bg-failed\/10 { background-color: #FDEEEB; color: #A23C27; --chip-ring: #F4CDC4; }
+    #page-cashier .bg-bg2 { background-color: #F3F4F6; }
+    #page-cashier :has(> #cashier-summary-total) { background-color: #FDEEE9; box-shadow: inset 0 0 0 1px #F8D3C8; }
+    #page-cashier #cashier-summary-total { color: #B9442A; }
+    #page-cashier #cashier-summary-progress { background-color: #EB6A4C; }
   </style>
   <style id="print-page-rule">@page { size: 58mm 40mm; margin: 0; }</style>
 </head>
@@ -12828,8 +12866,8 @@ async function crRenderPrint(keepForm) {
             <div class="text-xs text-right leading-5">Periode: ${esc(period)}<br>Dicetak: ${esc(when)}<br>Dokumen: READ ONLY</div></div>
           <div class="grid grid-cols-3 gap-3 my-4">
             ${[["Penerimaan Bruto", s.gross], ["Refund / Pembalikan", s.refund], ["Penerimaan Bersih", s.net]].map(([l, v]) => `<div class="border border-black/70 px-3 py-2"><div class="text-[11px]">${l}</div><div class="text-lg font-bold tabular-nums">${esc(formatIDR(v))}</div></div>`).join("")}</div>
-          <table class="w-full text-[11px] border-collapse"><thead><tr class="bg-stone-100">${["Tgl / Jam", "No. Receipt", "Customer", "No. Invoice / SO", "Metode", "Rekening / Kas", "Nominal"].map((h, i) => `<th class="${i === 6 ? "text-right" : "text-left"} px-2 py-1.5 uppercase tracking-wide">${h}</th>`).join("")}</tr></thead>
-            <tbody>${rows.map(e => `<tr class="border-b border-stone-300"><td class="px-2 py-1.5 whitespace-nowrap">${esc(crWhen(e.paid_local))}</td><td class="px-2 py-1.5 font-mono">${esc(e.no)}</td><td class="px-2 py-1.5">${esc(e.customer_name)}</td><td class="px-2 py-1.5">${esc(e.invoice_no || e.so_no || "—")}${e.is_dp ? " (DP)" : ""}</td><td class="px-2 py-1.5">${esc(e.method_label)}</td><td class="px-2 py-1.5">${esc(e.dest)}</td><td class="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">${e.kind === "masuk" ? "" : "−"}${esc(String(e.amount).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}${e.status === "pending" ? " (pending)" : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="px-2 py-6 text-center">Tidak ada transaksi pada filter ini.</td></tr>'}</tbody></table>
+          <table class="w-full text-[11px] border-collapse"><thead><tr class="bg-stone-100">${["No. Receipt", "No. Invoice / SO", "Tgl / Jam", "Customer", "Metode", "Rekening / Kas", "Nominal"].map((h, i) => `<th class="${i === 6 ? "text-right" : "text-left"} px-2 py-1.5 uppercase tracking-wide">${h}</th>`).join("")}</tr></thead>
+            <tbody>${rows.map(e => `<tr class="border-b border-stone-300"><td class="px-2 py-1.5 font-mono">${esc(e.no)}</td><td class="px-2 py-1.5">${esc(e.invoice_no || e.so_no || "—")}${e.is_dp ? " (DP)" : ""}</td><td class="px-2 py-1.5 whitespace-nowrap">${esc(crWhen(e.paid_local))}</td><td class="px-2 py-1.5">${esc(e.customer_name)}</td><td class="px-2 py-1.5">${esc(e.method_label)}</td><td class="px-2 py-1.5">${esc(e.dest)}</td><td class="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">${e.kind === "masuk" ? "" : "−"}${esc(String(e.amount).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}${e.status === "pending" ? " (pending)" : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="px-2 py-6 text-center">Tidak ada transaksi pada filter ini.</td></tr>'}</tbody></table>
           <div class="flex flex-wrap justify-between gap-2 border-t border-black mt-3 pt-3 text-[11px]">
             <div><b>Total metode:</b> Tunai ${esc(String(m.cash.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))} • Transfer ${esc(String(m.transfer.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))} • QRIS ${esc(String(m.qris.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}${m.debit.gross ? ` • Debit ${esc(String(m.debit.gross).replace(/\B(?=(\d{3})+(?!\d))/g, "."))}` : ""}</div>
             <div><b>Total Bruto ${esc(formatIDR(s.gross))}</b></div></div>

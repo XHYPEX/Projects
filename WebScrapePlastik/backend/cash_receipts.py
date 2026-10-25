@@ -306,10 +306,11 @@ def export_csv(filters: dict, sort: str = "paid_at", desc: bool = True) -> str:
     data = list_cash_receipts(filters, sort, desc, 1, 0)
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
-    w.writerow(["No. Receipt", "Tanggal", "Customer", "No. HP", "No. Invoice", "No. SO", "No. Plat", "Jenis", "Metode",
+    # Same order as the list on screen: the invoice / SO sits right after the receipt number.
+    w.writerow(["No. Receipt", "No. Invoice", "No. SO", "Tanggal", "Customer", "No. HP", "No. Plat", "Jenis", "Metode",
                 "Rekening / Kas Tujuan", "Nominal", "Arah", "Status", "Petugas", "Catatan"])
     for e in data["items"]:
-        w.writerow([e["no"], e["paid_local"], e["customer_name"], e["customer_phone"] or "", e["invoice_no"] or "", e["so_no"] or "",
+        w.writerow([e["no"], e["invoice_no"] or "", e["so_no"] or "", e["paid_local"], e["customer_name"], e["customer_phone"] or "",
                     e["plate"] or "", e["kind_label"], e["method_label"], e["dest"], e["amount"],
                     "Masuk" if e["kind"] == "masuk" else "Keluar", e["status_label"], e["cashier"] or "", e["note"] or ""])
     s = data["summary"]

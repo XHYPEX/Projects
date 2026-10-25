@@ -15401,9 +15401,17 @@ def service_print_text(order_id: int, doc: str, user: dict) -> dict:
         L += [rule, f"Barang   : {o['product_name'][:34]}  Merek: {(o['brand_name'] or '-')[:12]}  Tipe: {(o['model'] or '-')[:14]}"[:80],
               f"No. Seri : {(o['serial_no'] or '-'):<22}Qty  : {o['qty']} {o['unit'] or 'PCS'}"[:80]]
         L += _svc_wrap("Kondisi  : ", o["condition_in"]) + _svc_wrap("Keluhan  : ", o["complaint"]) + ["Kelengkapan:"]
-        items = [f"[{'x' if a['brought'] else ' '}] {a['name']}" for a in acc]
-        for i in range(0, len(items), 5):
-            L.append(("  " + "  ".join(f"{x:<14}" for x in items[i:i + 5])).rstrip()[:80])
+        # Fill each 80-column line with whole items and start a new line when the next one does not fit, so a long
+        # name is never cut off at the paper edge (was: 5 per line, then clipped at 80).
+        line = ""
+        for item in (f"[{'x' if a['brought'] else ' '}] {a['name']}" for a in acc):
+            for part in _svc_wrap("", item, 76):
+                if line and len(line) + 2 + len(part) > 78:
+                    L.append(line)
+                    line = ""
+                line = f"{line}  {part}" if line else f"  {part}"
+        if line:
+            L.append(line)
         L += [rule, "Biaya    : BELUM DITENTUKAN - menunggu hasil pemeriksaan. Customer dihubungi",
               "           dan diminta persetujuan sebelum ada biaya.", f"Estimasi : {o['est_days'] or '-'}"]
         if o["reset_consent"]:

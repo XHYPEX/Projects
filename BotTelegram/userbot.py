@@ -3,11 +3,18 @@ import io
 import logging
 import logging.handlers
 import os
+import sys
 
 from telegram import Bot
 from telegram.error import BadRequest, RetryAfter
 from telegram.request import HTTPXRequest
 from telethon import TelegramClient, events, utils
+from telethon.errors import (
+    AuthKeyDuplicatedError,
+    AuthKeyUnregisteredError,
+    SessionExpiredError,
+    SessionRevokedError,
+)
 
 import config
 import state
@@ -67,6 +74,32 @@ routes_by_chat_id: dict[int, config.Route] = {}
 sent_message_map: dict[tuple[int, int], int] = state.load_message_map()
 
 MAX_FLOOD_RETRIES = 3
+
+# Error yang artinya session Telethon udah mati (mis. "Terminate all other sessions"
+# di Telegram). Restart gak bakal nolong -- harus login ulang manual.
+SESSION_DEAD_ERRORS = (
+    AuthKeyUnregisteredError,
+    SessionRevokedError,
+    SessionExpiredError,
+    AuthKeyDuplicatedError,
+)
+
+# Exit code khusus buat session mati. bottelegram.service nge-set
+# RestartPreventExitStatus=3 supaya systemd gak restart-loop sia-sia.
+EXIT_SESSION_DEAD = 3
+
+RELOGIN_HINT = (
+    "Session Telegram userbot udah gak valid (kemungkinan semua session di-terminate). "
+    "Login ulang manual di VPS: sudo systemctl stop bottelegram && "
+    "sudo -u bottelegram .venv/bin/python3 userbot.py (masukin nomor HP + OTP), "
+    "Ctrl+C, lalu sudo systemctl start bottelegram."
+)
+
+
+async def _exit_session_dead(reason: str) -> None:
+    logger.error("%s Detail: %s", RELOGIN_HINT, reason)
+    await alert_admin(f"{RELOGIN_HINT}\nDetail: {reason}")
+    sys.exit(EXIT_SESSION_DEAD)
 
 
 async def alert_admin(text: str) -> None:
@@ -216,6 +249,11 @@ if config.DEBUG_LOG_ALL_CHATS:
 
 
 async def main():
+    # client.start() bakal minta nomor HP via input() kalau belum authorized -- di
+    # systemd itu cuma EOFError. Jadi cek dulu; prompt login cuma kalau ada terminal.
+    await client.connect()
+    if not await client.is_user_authorized() and not sys.stdin.isatty():
+        await _exit_session_dead("session belum/gak lagi authorized saat startup.")
     await client.start()
 
     me = await client.get_me()
@@ -252,6 +290,8 @@ async def main():
     await alert_admin(f"Bot aktif, listening {len(ROUTES)} pasangan channel.")
     try:
         await client.run_until_disconnected()
+    except SESSION_DEAD_ERRORS as e:
+        await _exit_session_dead(f"{type(e).__name__}: {e}")
     except Exception as e:
         logger.exception("Userbot berhenti karena error tak terduga.")
         await alert_admin(f"Bot CRASH dan berhenti: {e}")

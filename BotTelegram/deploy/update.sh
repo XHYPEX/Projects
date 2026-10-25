@@ -13,8 +13,32 @@ SERVICE_USER="bottelegram"
 
 cd "$PROJECT_DIR"
 
+# WebScrapePlastik/data/scraper.db dulu di-track git, terus sengaja di-untrack biar
+# update gak numpuk/ngerusak data user. Efek sampingnya: `git pull` yang ngelewatin
+# commit itu bakal NGEHAPUS file-nya dari working tree, padahal itu database live.
+# Jadi: backup sebelum pull, balikin lagi kalau kehapus.
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")"
+SCRAPER_DB="$REPO_ROOT/WebScrapePlastik/data/scraper.db"
+SCRAPER_DB_BACKUP=""
+if [ -f "$SCRAPER_DB" ]; then
+  SCRAPER_DB_BACKUP="$(mktemp "${TMPDIR:-/tmp}/scraper.db.XXXXXX")"
+  cp -p "$SCRAPER_DB" "$SCRAPER_DB_BACKUP"
+  echo "==> Backup scraper.db ke $SCRAPER_DB_BACKUP (git pull bisa ngehapus file ini)..."
+fi
+
 echo "==> git pull..."
 git pull
+
+# Balikin scraper.db kalau git pull tadi ngehapusnya. File-nya sudah gak di-track,
+# jadi restore-an ini gak bikin working tree jadi dirty.
+if [ -n "$SCRAPER_DB_BACKUP" ]; then
+  if [ ! -f "$SCRAPER_DB" ]; then
+    echo "==> scraper.db kehapus sama git pull, dibalikin dari backup..."
+    mkdir -p "$(dirname "$SCRAPER_DB")"
+    cp -p "$SCRAPER_DB_BACKUP" "$SCRAPER_DB"
+  fi
+  rm -f "$SCRAPER_DB_BACKUP"
+fi
 
 echo "==> Install ulang dependency (kalau ada perubahan)..."
 "$PROJECT_DIR/.venv/bin/pip" install -r "$PROJECT_DIR/requirements.txt"

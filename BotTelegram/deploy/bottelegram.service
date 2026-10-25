@@ -2,6 +2,10 @@
 Description=BotTelegram - Signal Forwarder with Claude polishing
 After=network-online.target
 Wants=network-online.target
+# Harus di [Unit] -- kalau ditaruh di [Service], systemd diam-diam nge-ignore dan
+# restart-loop-nya gak pernah berhenti.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -14,8 +18,9 @@ ExecStart=/opt/bottelegram/.venv/bin/python3 /opt/bottelegram/userbot.py
 # Auto-restart kalau crash, tapi jangan restart-loop tanpa henti kalau memang rusak.
 Restart=on-failure
 RestartSec=10
-StartLimitIntervalSec=300
-StartLimitBurst=5
+# Exit 3 = session Telegram mati (lihat EXIT_SESSION_DEAD di userbot.py). Restart gak
+# bakal nolong, harus login ulang manual -- jadi jangan di-restart.
+RestartPreventExitStatus=3
 
 # Batasi resource biar aman di VPS kecil.
 MemoryMax=512M

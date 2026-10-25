@@ -278,3 +278,56 @@ async def test_send_failure_after_retries_is_reported_without_crashing(
     await userbot_module.on_new_message(make_event(msg_id=1))
 
     assert (-100111, 1) not in userbot_module.sent_message_map
+
+
+@pytest.fixture
+def fake_client(userbot_module, monkeypatch):
+    fake = AsyncMock()
+    fake.is_user_authorized.return_value = True
+    fake.get_me.return_value = SimpleNamespace(id=1, username="me", first_name="A", last_name="")
+    fake.get_entity.return_value = SimpleNamespace(title="src", username=None)
+    monkeypatch.setattr(userbot_module, "client", fake)
+    monkeypatch.setattr(userbot_module.utils, "get_peer_id", lambda entity: -100111)
+    return fake
+
+
+async def test_unauthorized_session_without_terminal_exits_without_prompting(
+    userbot_module, bot, fake_client, monkeypatch
+):
+    fake_client.is_user_authorized.return_value = False
+    monkeypatch.setattr(userbot_module.sys.stdin, "isatty", lambda: False)
+    alert = AsyncMock()
+    monkeypatch.setattr(userbot_module, "alert_admin", alert)
+
+    with pytest.raises(SystemExit) as exc:
+        await userbot_module.main()
+
+    assert exc.value.code == userbot_module.EXIT_SESSION_DEAD
+    fake_client.start.assert_not_called()
+    assert "Login ulang" in alert.call_args.args[0]
+
+
+async def test_session_revoked_at_runtime_exits_with_relogin_alert(
+    userbot_module, bot, fake_client, monkeypatch
+):
+    from telethon.errors import AuthKeyUnregisteredError
+
+    fake_client.run_until_disconnected.side_effect = AuthKeyUnregisteredError(request=None)
+    alert = AsyncMock()
+    monkeypatch.setattr(userbot_module, "alert_admin", alert)
+
+    with pytest.raises(SystemExit) as exc:
+        await userbot_module.main()
+
+    assert exc.value.code == userbot_module.EXIT_SESSION_DEAD
+    assert "AuthKeyUnregisteredError" in alert.call_args.args[0]
+
+
+async def test_other_runtime_errors_still_crash_normally(
+    userbot_module, bot, fake_client, monkeypatch
+):
+    fake_client.run_until_disconnected.side_effect = RuntimeError("boom")
+    monkeypatch.setattr(userbot_module, "alert_admin", AsyncMock())
+
+    with pytest.raises(RuntimeError):
+        await userbot_module.main()

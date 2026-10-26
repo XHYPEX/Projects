@@ -9822,6 +9822,8 @@ async function openReceiptPaymentModal(receiptId) {
     plate: detail.plate_full,
   };
   receiptPayCtx.max = Math.max(receiptPayCtx.remaining - receiptPayCtx.pending, 0);
+  // Paid from a Sales Order's detail: "Simpan & Cetak" prints the Nota SO, not the Kasir nota.
+  if (currentRoute() === "/sales-order" && currentPreorder) receiptPayCtx.fromSoId = currentPreorder.id;
   openPaymentForm({
     title: "Pembayaran Nota", infoTitle: "Informasi Nota",
     lead: "Input pembayaran untuk nota ini. Anda dapat melakukan pembayaran penuh atau sebagian.",
@@ -10047,7 +10049,8 @@ async function submitReceiptPayment(forcePrint) {
   const wasPending = (method === "transfer" || method === "qris") && !confirmedIn;
   showToast(wasPending ? `Pembayaran ${formatIDR(amount)} dicatat PENDING. Konfirmasi setelah dana masuk.`
     : lunas ? `Nota ${detail.plate_full} lunas.` : `Pembayaran ${formatIDR(amount)} dicatat. Sisa ${formatIDR(Math.max(detail.total - detail.amount_paid, 0))}.`, "success");
-  if (print) printReceiptNota(detail.id);
+  if (print && ctx.fromSoId && currentRoute() === "/sales-order") openPreorderPrint(ctx.fromSoId, "detail");
+  else if (print) printReceiptNota(detail.id);
 }
 
 // Riwayat Pembayaran: every payment taken against one nota.

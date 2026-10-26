@@ -1,4 +1,4 @@
-# Cara Menjalankan Aplikasi Toko Plastik
+# Cara Menjalankan Sinar Galaksi ERP
 
 ## Pertama kali (sekali saja)
 

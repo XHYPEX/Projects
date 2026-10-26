@@ -11,7 +11,7 @@ the server when done. Port 8000 may belong to another project on this machine (W
 ## 1. A database to test on
 
 ```bash
-S=.claude/skills/run-and-verify/scripts          # from the WebScrapePlastik folder
+S=.claude/skills/run-and-verify/scripts          # from the SinarGalaksiERP folder
 T=${TMPDIR:-/tmp}/sg-qa && mkdir -p $T
 python3 $S/qa_db.py data/scraper.db $T/test.db   # or any older copy; the schema is migrated on the copy
 ```

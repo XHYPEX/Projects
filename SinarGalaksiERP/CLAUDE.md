@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-POS & inventory web app for **SINAR GALAKSI VARIASI MOBIL** (car accessories and installation shop, Balikpapan).
+**Sinar Galaksi ERP**: a small ERP (POS, inventory, purchasing, payables, service) for **SINAR GALAKSI VARIASI MOBIL**
+(car accessories and installation shop, Balikpapan). The folder was called `WebScrapePlastik` until 26-10-2026; the
+shop PCs still keep their data in `%LOCALAPPDATA%\TokoPlastik` and the install in `%USERPROFILE%\TokoPlastik`.
 Modules: Kasir (nota penjualan, pembayaran, pengerjaan), Sales Order, Purchase Order, Barang Masuk / Goods Receipt,
 Account Payable (Faktur Pembelian, Aging, Debit Note), Retur Supplier, Stok Karantina, Service / Garansi,
 Penawaran Harga, Cash Receipt / Kas Keluar, Insentif, dashboards, master data.
@@ -67,7 +69,7 @@ of the script decide which `page-*` div shows and which init function runs.
 ## Git
 
 The repository root is the parent folder (`/Users/0xd0kk/Projects`, several projects). Commit only
-`WebScrapePlastik/` files, never `WebScrapePlastik/data/` (live database, uploads, payment proofs).
+`SinarGalaksiERP/` files, never `SinarGalaksiERP/data/` (live database, uploads, payment proofs).
 
 ## Theme Style
 "Navy Bengkel" (owner's choice, 24-10-2026), replacing the earlier cream/coral look:

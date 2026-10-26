@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Google Maps Scraper", lifespan=lifespan)
+app = FastAPI(title="Sinar Galaksi ERP", lifespan=lifespan)
 
 # Added before CORS so it wraps the outermost layer and sees every request
 # that reaches the app, including ones rejected further in.

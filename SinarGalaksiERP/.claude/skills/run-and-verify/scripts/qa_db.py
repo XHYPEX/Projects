@@ -17,7 +17,7 @@ dest.parent.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(src, dest)
 
 os.environ["DB_PATH"] = str(dest)
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # the WebScrapePlastik folder
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # the SinarGalaksiERP folder
 from backend import database as db  # noqa: E402  (DB_PATH must be set first)
 from backend.auth import hash_password  # noqa: E402
 

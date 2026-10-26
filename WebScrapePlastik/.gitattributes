@@ -1,0 +1,2 @@
+# Keep the CRLF bytes of Start.bat exactly as committed (see the note inside it).
+Start.bat -text

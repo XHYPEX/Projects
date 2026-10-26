@@ -1,27 +1,28 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Pemasangan Aplikasi Toko Plastik
+title Pemasangan Sinar Galaksi ERP
 
 REM ===========================================================================
 REM  PEMASANGAN AWAL - jalankan SEKALI saja di komputer baru.
 REM
 REM  Script ini memasang Python + Git, mengunduh aplikasi, lalu membuat ikon di
-REM  Desktop. Setelah ini, cukup pakai ikon "Aplikasi Toko Plastik" di Desktop.
+REM  Desktop. Setelah ini, cukup pakai ikon "Sinar Galaksi ERP" di Desktop.
 REM
 REM  Aman dijalankan berulang kali: kalau sesuatu sudah ada, dilewati.
 REM ---------------------------------------------------------------------------
-REM  UNTUK DEVELOPER: kalau WebScrapePlastik sudah dipisah jadi repo sendiri,
+REM  UNTUK DEVELOPER: kalau SinarGalaksiERP sudah dipisah jadi repo sendiri,
 REM  ubah REPO_URL dan KOSONGKAN APP_SUBDIR (set "APP_SUBDIR=").
 REM ===========================================================================
 
 set "REPO_URL=https://github.com/XHYPEX/Projects.git"
-set "APP_SUBDIR=WebScrapePlastik"
+set "APP_SUBDIR=SinarGalaksiERP"
+REM TARGET tetap "TokoPlastik" (nama lama): PC yang sudah terpasang memakai folder ini.
 set "TARGET=%USERPROFILE%\TokoPlastik"
-set "SHORTCUT_NAME=Aplikasi Toko Plastik"
+set "SHORTCUT_NAME=Sinar Galaksi ERP"
 
 echo.
 echo   ==================================================
-echo     PEMASANGAN APLIKASI TOKO PLASTIK
+echo     PEMASANGAN SINAR GALAKSI ERP
 echo   ==================================================
 echo.
 echo   Proses ini butuh koneksi internet dan sekitar
@@ -134,7 +135,7 @@ REM di banyak komputer Desktop dialihkan ke OneDrive.
 echo   [..] Membuat ikon di Desktop...
 set "SC_APP_DIR=!APP_DIR!"
 set "SC_NAME=%SHORTCUT_NAME%"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d ($env:SC_NAME + '.lnk'))); $s.TargetPath=(Join-Path $env:SC_APP_DIR 'Start.bat'); $s.WorkingDirectory=$env:SC_APP_DIR; $s.Description='Aplikasi Toko Plastik'; $s.IconLocation=(Join-Path $env:SystemRoot 'System32\SHELL32.dll') + ',13'; $s.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d ($env:SC_NAME + '.lnk'))); $s.TargetPath=(Join-Path $env:SC_APP_DIR 'Start.bat'); $s.WorkingDirectory=$env:SC_APP_DIR; $s.Description='Sinar Galaksi ERP'; $s.IconLocation=(Join-Path $env:SystemRoot 'System32\SHELL32.dll') + ',13'; $s.Save()"
 if errorlevel 1 (
   echo   ^(ikon gagal dibuat - aplikasi tetap bisa dijalankan dari Start.bat^)
 ) else (

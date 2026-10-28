@@ -12488,7 +12488,7 @@ def _sr_checklist(con: sqlite3.Connection, ret: dict, items: list[dict]) -> list
     add(all(i["reason_code"] != "tidak_berfungsi" or i["test_result"] for i in items), "blok",
         "Barang “Tidak berfungsi” punya hasil uji")
     add(all(i["reason_code"] != "lainnya" or i["reason_detail"] for i in items), "blok", "Alasan “Lainnya” dijelaskan")
-    add(_sr_photo_count(con, ret["id"], "bukti") > 0, "blok", "Foto bukti barang (sebelum dikemas) sudah diunggah")
+    add(_sr_photo_count(con, ret["id"], "bukti") > 0, "blok", "Foto bukti barang (sebelum dikemas) diunggah")
     pk = json.loads(ret["packages"] or "[]")
     add(pk, "blok", "Packing note: minimal satu koli")
     add(ret["method"], "blok", "Metode pengembalian dipilih")
@@ -12512,7 +12512,7 @@ def submit_supplier_return(return_id: int, note: str | None, user: dict) -> dict
         items = _sr_items(con, return_id)
         bad = [c["text"] for c in _sr_checklist(con, ret, items) if c["level"] == "blok" and not c["ok"]]
         if bad:
-            raise ValueError("Belum bisa diajukan: " + "; ".join(bad) + ".")
+            raise ValueError("Belum bisa diajukan, belum terpenuhi: " + "; ".join(bad) + ".")
         _sr_validate_items(con, return_id, ret["supplier_id"], [
             {**i, "quarantine_lot_id": i["source_lot_id"]} for i in items])
         n = con.execute("UPDATE supplier_returns SET doc_status='menunggu_persetujuan', submitted_by=?, submitted_at=?, approver_note=? "
@@ -12556,7 +12556,7 @@ def approve_supplier_return(return_id: int, shortage_ack: bool, note: str | None
         items = _sr_items(con, return_id)
         bad = [c["text"] for c in _sr_checklist(con, ret, items) if c["level"] == "blok" and not c["ok"]]
         if bad:
-            raise ValueError("Belum bisa disetujui: " + "; ".join(bad) + ".")
+            raise ValueError("Belum bisa disetujui, belum terpenuhi: " + "; ".join(bad) + ".")
         _sr_validate_items(con, return_id, ret["supplier_id"], [{**i, "quarantine_lot_id": i["source_lot_id"]} for i in items])
         short = _sr_shortage(con, items)
         if short and not shortage_ack:

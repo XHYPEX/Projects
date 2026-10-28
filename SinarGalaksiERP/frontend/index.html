@@ -92,6 +92,8 @@
     body .grid.gap-3[class*="mb-"] > .border.rounded-xl:nth-child(6n+4) { background: #FCF5E4; border-color: #F1E0B5; }
     body .grid.gap-3[class*="mb-"] > .border.rounded-xl:nth-child(6n+5) { background: #F4EFFB; border-color: #E0D5F2; }
     body .grid.gap-3[class*="mb-"] > .border.rounded-xl:nth-child(6n+6) { background: #FBEDEE; border-color: #F0CFD2; }
+    /* A tile that counts a problem keeps the red tint wherever it lands in the cycle (Stok Habis). */
+    body .grid.gap-3[class*="mb-"] > .border.rounded-xl.kpi-bad { background: #FBEDEE; border-color: #F0CFD2; }
     #sh-kpis > div:nth-child(n), #ph-kpis > div:nth-child(n) { background-image: none; }
 
     #rts-print-root { display: none; }
@@ -405,6 +407,8 @@
       pointer-events: none;
       z-index: 5;
     }
+    /* On a phone the bar is full (title, avatar, Keluar): the running sprite would sit behind the buttons. */
+    @media (max-width: 640px) { .header-sprite-track { display: none; } }
     .header-sprite {
       position: absolute;
       top: 50%;
@@ -661,7 +665,7 @@
     .po-frow > label { font-size: 13px; color: #4a4a46; font-weight: 500; }
     @media (max-width: 640px) { .po-frow { grid-template-columns: 1fr; gap: 0.25rem; } }
     .po-table { min-width: 1180px; }
-    .po-grid { display: grid; grid-template-columns: minmax(170px, 1.8fr) 62px 54px 140px 130px 142px minmax(130px, 0.8fr) 138px 112px 32px; gap: 0.5rem; align-items: center; }
+    .po-grid { display: grid; grid-template-columns: minmax(240px, 2fr) 62px 54px 128px 112px 168px minmax(130px, 0.8fr) 138px 112px 32px; gap: 0.5rem; align-items: center; }
     .po-head { padding: 0.45rem 0.25rem; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B7280; border-bottom: 1px solid #E3E6EB; }
     .po-item-row { padding: 0.45rem 0.25rem; border-bottom: 1px solid #EEF0F3; }
     .po-item-row:last-child { border-bottom: 0; }
@@ -1352,7 +1356,7 @@
             <div class="flex items-end gap-1 px-3 sm:px-4 pt-3 border-b border-line" role="tablist">
               <button id="kasir-tab-items" type="button" role="tab" aria-selected="true" onclick="kasirTab('items')" class="kasir-tab is-active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2L21 7H6"/></svg><span id="cashier-items-title">Daftar Item</span></button>
               <button id="kasir-tab-notes" type="button" role="tab" aria-selected="false" onclick="kasirTab('notes')" class="kasir-tab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Catatan Pengerjaan <span class="font-normal text-muted">(Opsional)</span></button>
-              <span id="cashier-work-pill" class="ml-auto self-center pb-2"></span>
+              <span id="cashier-work-pill" class="hidden sm:block ml-auto self-center pb-2"></span>
             </div>
 
             <div id="kasir-panel-items">
@@ -2315,7 +2319,7 @@
             <div class="px-4 pb-4 min-w-0 text-sm">
               <div id="po-sum-no" class="font-mono text-sm font-semibold text-accentDark tabular-nums mb-1 break-all"></div>
               <div class="text-xs text-muted flex flex-wrap gap-x-2"><span id="po-sum-plate" class="font-medium">Plat belum diisi</span><span id="po-sum-date" class="tabular-nums"></span></div>
-              <div id="po-sum-customer" class="text-xs text-muted truncate">-</div>
+              <div id="po-sum-customer" class="text-xs text-muted truncate"></div>
               <dl class="mt-2">
                 <div class="flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Jumlah Item</dt><dd id="po-sum-count" class="text-ink tabular-nums">0</dd></div>
                 <div class="flex items-baseline justify-between gap-3 py-2"><dt class="text-muted">Subtotal</dt><dd id="po-sum-subtotal" class="text-ink font-semibold tabular-nums">Rp 0</dd></div>
@@ -3343,11 +3347,11 @@
           <span class="ov-ico" style="--c:#2563EB;--b:#DBEAFE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg></span>
           <div class="min-w-0"><div class="ov-tile-label">Nilai Persediaan</div><div id="ov-total-value" class="ov-tile-value">Rp 0</div><div class="ov-tile-sub">Nilai modal stok saat ini</div></div>
         </div>
-        <div class="ov-tile" style="background:#F4FBF6;border-color:#D5F0DD" title="Uang masuk yang sah bulan ini (termasuk DP), sudah dikurangi refund. Panah membandingkan dengan tanggal yang sama bulan lalu.">
+        <div class="ov-tile admin-only" style="background:#F4FBF6;border-color:#D5F0DD" title="Uang masuk yang sah bulan ini (termasuk DP), sudah dikurangi refund. Panah membandingkan dengan tanggal yang sama bulan lalu.">
           <span class="ov-ico" style="--c:#15803D;--b:#DCFCE7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg></span>
           <div class="min-w-0"><div class="ov-tile-label">Penerimaan Kas Bulan Ini</div><div id="ov-sales-month-revenue" class="ov-tile-value">Rp 0</div><div id="ov-sales-month-trend" class="ov-tile-sub"></div></div>
         </div>
-        <div class="ov-tile" style="background:#FFFAEF;border-color:#F8EACB" title="Total nota yang tutup (Lunas + Pengerjaan Selesai) bulan ini. Panah membandingkan dengan tanggal yang sama bulan lalu.">
+        <div class="ov-tile admin-only" style="background:#FFFAEF;border-color:#F8EACB" title="Total nota yang tutup (Lunas + Pengerjaan Selesai) bulan ini. Panah membandingkan dengan tanggal yang sama bulan lalu.">
           <span class="ov-ico" style="--c:#D97706;--b:#FEF3C7"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 20v-6M12 20V8M17 20v-9"/></svg></span>
           <div class="min-w-0"><div class="ov-tile-label">Penjualan Bulan Ini</div><div id="ov-sales-closed-revenue" class="ov-tile-value">Rp 0</div><div id="ov-sales-closed-trend" class="ov-tile-sub"></div></div>
         </div>
@@ -3723,7 +3727,7 @@
                 <div id="mk-aktif-sub" class="text-[11px] text-muted">dijual</div>
               </div>
             </button>
-            <button type="button" onclick="applyMasterTile('habis')" class="text-left flex items-center gap-3 bg-white border border-line rounded-xl px-4 py-3 hover:bg-bg2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+            <button type="button" onclick="applyMasterTile('habis')" class="kpi-bad text-left flex items-center gap-3 bg-white border border-line rounded-xl px-4 py-3 hover:bg-bg2/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
               <span class="shrink-0 grid place-items-center w-10 h-10 rounded-lg bg-failed/10 text-failed" aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
               </span>
@@ -3867,7 +3871,7 @@
                   <option value="stock_desc">Stok tertinggi</option>
                   <option value="sell_desc">Harga jual tertinggi</option>
                   <option value="sell_asc">Harga jual terendah</option>
-                  <option class="admin-only" value="margin_desc">Margin tertinggi</option>
+                  <option class="admin-only" value="margin_desc">Markup tertinggi</option>
                 </select>
               </label>
               <div class="flex items-center gap-1.5 text-sm text-muted">
@@ -3909,7 +3913,7 @@
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
                     <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal Rata-rata</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th>
-                    <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Margin</th>
+                    <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Markup</th>
                     <th class="sticky right-0 bg-bg2 text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line shadow-[-6px_0_6px_-6px_rgba(17,24,39,0.12)]">Aksi</th>
                   </tr>
                 </thead>
@@ -4039,7 +4043,7 @@
                 <div id="dt-sell-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
                   <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
-                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Estimasi Margin</div>
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Markup</div>
                 <div id="dt-margin" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-margin-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
@@ -15169,7 +15173,7 @@ function onNewItemStockInput() {
     : "Isi jumlah yang ada sekarang. Kosongkan atau 0 jika belum ada stok.";
 }
 
-// Live margin under the two price fields, same sell-minus-cost the list's Margin column shows.
+// Live margin under the two price fields, same sell-minus-cost the list's Markup column shows.
 function updateNewItemMarginHint() {
   const costEl = document.getElementById("new-item-cost-price");
   const sellEl = document.getElementById("new-item-sell-price");
@@ -15178,7 +15182,7 @@ function updateNewItemMarginHint() {
   if (!costEl.value && !sellEl.value) { hint.textContent = ""; return; }
   const margin = priceValue(sellEl) - priceValue(costEl);
   const pct = priceValue(costEl) > 0 ? ` (${(margin / priceValue(costEl) * 100).toFixed(2)}% dari modal)` : "";
-  hint.textContent = `Estimasi margin per satuan: ${formatIDR(margin)}${pct}`;
+  hint.textContent = `Estimasi laba per satuan: ${formatIDR(margin)}${pct}`;
   hint.classList.toggle("text-failed", margin < 0);
   hint.classList.toggle("text-muted", margin >= 0);
 }
@@ -16054,7 +16058,7 @@ function renderMasterPriceHistory() {
   g("ph-kpis").innerHTML =
     mhKpi("tag", "bg-orange-100 text-orange-600", "Harga Jual Aktif", formatIDR(it.sell_price), "Harga jual saat ini")
     + (isAdmin() ? mhKpi("coins", "bg-pending/15 text-pending", "Harga Modal Rata-rata", formatIDR(it.avg_cost_price), "Harga modal rata-rata saat ini")
-    + mhKpi("pct", "bg-done/10 text-done", "Margin Saat Ini", margin === null ? "-" : `${margin.toFixed(1)}%`, "Dihitung dari harga aktif") : "")
+    + mhKpi("pct", "bg-done/10 text-done", "Markup Saat Ini", margin === null ? "-" : `${margin.toFixed(1)}%`, "Dihitung dari harga aktif") : "")
     + mhKpi("truck", "bg-purple-100 text-purple-600", "Supplier Utama", esc(prim ? prim.name : "-"), "Pemasok utama barang ini");
   const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" class="w-full h-full object-cover" />` : `<span class="text-muted">${mhIcon("box", 40)}</span>`;
   const row = (icon, tint, title, desc) => `<button type="button" onclick="backToMasterDetail()" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-bg2/60 border-t border-line first:border-t-0 transition-colors">
@@ -21010,7 +21014,7 @@ function poFormSummary(total = null, deposit = null) {
   document.getElementById("po-sum-no").textContent = v("po-number");
   document.getElementById("po-sum-plate").textContent = plate || "Plat belum diisi";
   document.getElementById("po-sum-date").textContent = v("po-date") ? formatPoDate(v("po-date")) : "";
-  document.getElementById("po-sum-customer").textContent = [v("po-customer-name"), v("po-customer-phone")].filter(Boolean).join(" · ") || "-";
+  document.getElementById("po-sum-customer").textContent = [v("po-customer-name"), v("po-customer-phone")].filter(Boolean).join(" · ");
   document.getElementById("po-sum-count").textContent = rows.filter(r => r.product_name).reduce((n, r) => n + (Number(r.quantity) || 0), 0);
   document.getElementById("po-sum-subtotal").textContent = formatIDR(total);
   document.getElementById("po-sum-paid").textContent = formatIDR(deposit);

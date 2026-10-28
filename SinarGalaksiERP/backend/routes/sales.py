@@ -8,6 +8,8 @@ from backend.database import get_notices, get_sales_summary, list_cash_outs, lis
 from backend.schemas import SalesSummaryOut
 
 router = APIRouter()
+# Mounted for every signed-in user (the sales router is admin-only): staff see the Notice Center too, without supplier debt.
+notices_router = APIRouter()
 
 
 @router.get("/sales/summary", response_model=SalesSummaryOut)
@@ -59,7 +61,7 @@ async def price_events(scope: str, doc_id: str):
     return await asyncio.get_event_loop().run_in_executor(None, list_price_events, scope, doc_id)
 
 
-@router.get("/notices")
+@notices_router.get("/notices")
 async def notices(user: dict = Depends(get_current_user)):
     """Notice Center: what needs attention, computed from the documents (read-only). Supplier debt is admin-only."""
     return await asyncio.get_event_loop().run_in_executor(None, get_notices, user.get("role") == "admin")

@@ -7587,8 +7587,9 @@ def create_user(username: str, password_hash: str, role: str = "staff") -> dict:
         dup = con.execute("SELECT 1 FROM users WHERE username_normalized=?", (username_normalized,)).fetchone()
         if dup is not None:
             raise ValueError(f"Username '{username}' sudah ada")
-        # The very first account (setup) can post Barang Masuk; everyone after is given it on the Pengguna page.
-        first = con.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 0
+        # The very first account (setup) can post Barang Masuk; so can a new admin (owner 28-10-2026: on by default,
+        # still switched off per user on the Pengguna page). Staff are given it there.
+        first = con.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 0 or role == "admin"
         cur = con.execute(
             """INSERT INTO users (username, username_normalized, password_hash, role, is_active, created_at, updated_at, can_post_inbound)
                VALUES (?, ?, ?, ?, 1, ?, ?, ?)""",

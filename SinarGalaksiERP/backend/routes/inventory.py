@@ -1074,9 +1074,12 @@ async def create_new_stock_adjustment(req: StockAdjustmentRequest, user: dict = 
 
 
 @router.get("/inventory/overview", response_model=InventoryOverviewOut)
-async def inventory_overview():
+async def inventory_overview(user: dict = Depends(get_current_user)):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, get_inventory_overview)
+    if user.get("role") != "admin":
+        # Owner 28-10-2026: stock value, cash in and sales of the month are for admins only (like Cash Receipt).
+        result.update(total_inventory_value=0, sales_month_revenue=0, sales_closed_month_revenue=0)
     return InventoryOverviewOut(
         active_sku_count=result["active_sku_count"],
         total_inventory_value=result["total_inventory_value"],

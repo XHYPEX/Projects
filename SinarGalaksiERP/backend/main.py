@@ -28,7 +28,7 @@ from backend.routes.supplier_pos import router as supplier_pos_router
 from backend.routes.purchase_invoices import router as purchase_invoices_router
 from backend.routes.receipts import router as receipts_router
 from backend.routes.results import router as results_router
-from backend.routes.sales import router as sales_router
+from backend.routes.sales import notices_router, router as sales_router
 from backend.routes.cash_receipts import router as cash_receipts_router
 from backend.routes.account_payable import router as account_payable_router
 from backend.routes.credit_notes import router as credit_notes_router
@@ -94,6 +94,7 @@ app.include_router(purchase_invoices_router, prefix="/api", dependencies=[Depend
 app.include_router(receipts_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(results_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(sales_router, prefix="/api", dependencies=[Depends(require_admin)])
+app.include_router(notices_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(cash_receipts_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(account_payable_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(credit_notes_router, prefix="/api", dependencies=[Depends(require_admin)])

@@ -20609,9 +20609,15 @@ function poRowLockSupplier(rowEl) {
   const locked = known && Number(avail) >= qty;
   opt.disabled = locked;
   opt.textContent = locked ? `Pesan Supplier (stok masih ada ${avail})` : SO_SOURCE_LABELS.supplier;
+  // Owner 28-10-2026: with nothing free on the shelf "Stok + Pesan Supplier" is just Pesan Supplier.
+  const empty = known && Number(avail) <= 0;
   const mixOpt = sourceEl.querySelector('option[value="campur"]');
-  if (mixOpt) mixOpt.disabled = !rowEl.dataset.masterItemId;
+  if (mixOpt) {
+    mixOpt.disabled = !rowEl.dataset.masterItemId || empty;
+    mixOpt.textContent = empty ? `${SO_SOURCE_LABELS.campur} (stok kosong)` : SO_SOURCE_LABELS.campur;
+  }
   if (locked && (sourceEl.value === "supplier" || sourceEl.value === "campur")) { sourceEl.value = "stok"; applyPoRowSource(rowEl); }
+  else if (empty && sourceEl.value === "campur") { sourceEl.value = "supplier"; applyPoRowSource(rowEl); }
   // Owner 25-10-2026: stock covers only part of the line, so take that part and order the rest. Done for the user until
   // they pick a source themselves.
   else if (known && Number(avail) > 0 && Number(avail) < qty && rowEl.dataset.srcTouched !== "1"

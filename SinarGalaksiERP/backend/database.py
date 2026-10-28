@@ -8025,9 +8025,29 @@ def _require_stock_free(con: sqlite3.Connection, item: dict, own_line_id: int | 
         held -= next((ln["reserved"] for ln in _reservation_lines(con, [mid]) if ln["id"] == own_line_id), 0)
     free = max(max(mi["stock_qty"], 0) - held, 0)
     if item["quantity"] > free:
+        if free == 0:
+            raise ValueError(
+                f"“{item['product_name']}”: stok yang bebas kosong. Ubah sumbernya ke Pesan Supplier.")
         raise ValueError(
             f"“{item['product_name']}”: stok yang bebas hanya {free} {mi['unit'] or 'unit'}, kurang dari {item['quantity']} yang dipesan. "
             "Ubah sumbernya ke Stok + Pesan Supplier (sisanya dibuatkan PO), atau kurangi jumlahnya.")
+
+
+def _campur_without_stock(con: sqlite3.Connection, item: dict, own_line_id: int | None = None) -> dict:
+    """Owner 28-10-2026: 'Stok + Pesan Supplier' with nothing free on the shelf is just 'Pesan Supplier'
+    (the whole quantity is bought), so the line is saved as that."""
+    mid = item.get("master_item_id")
+    if item.get("source") != "campur" or not mid:
+        return item
+    mi = con.execute("SELECT stock_qty FROM master_items WHERE id=?", (mid,)).fetchone()
+    if mi is None:
+        return item
+    held = _reserved_by_item(con, [mid]).get(mid, 0)
+    if own_line_id:
+        held -= next((ln["reserved"] for ln in _reservation_lines(con, [mid]) if ln["id"] == own_line_id), 0)
+    if max(mi["stock_qty"], 0) - held > 0:
+        return item
+    return {**item, "source": "supplier"}
 
 
 def _forbid_supplier_when_stocked(con: sqlite3.Connection, item: dict) -> None:
@@ -8047,6 +8067,7 @@ def _forbid_supplier_when_stocked(con: sqlite3.Connection, item: dict) -> None:
 
 
 def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict, position: int, now: str) -> int:
+    item = _campur_without_stock(con, item)
     _require_stock_free(con, item)
     _forbid_supplier_when_stocked(con, item)
     price = _price_review(
@@ -9307,6 +9328,8 @@ def update_preorder(
                     new_status = item.get("status") or prev["status"]
                     if new_status == PO_LINE_CANCELLED:
                         raise ValueError("Barang hanya bisa dibatalkan lewat tombol Batalkan Sales Order / Pembatalan Khusus.")
+                    if prev.get("source") != "campur":
+                        item = _campur_without_stock(con, item, item_id)
                     source, supplier_id = _preorder_item_source(con, item)
                     if source == "stok" and (prev.get("source") != "stok" or item["quantity"] > prev["quantity"]
                                              or item.get("master_item_id") != prev.get("master_item_id")):

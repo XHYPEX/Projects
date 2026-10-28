@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from backend.auth import get_current_user, require_admin
 from backend.database import (
+    shop_today,
     allocate_spo_dp,
     get_payment_row,
     set_payment_proof,
@@ -168,7 +169,7 @@ def _row_to_invoice(row: dict) -> PurchaseInvoiceOut:
         amount_paid=row["amount_paid"],
         outstanding=outstanding,
         payment_status=compute_payment_status(row["total"], row["amount_paid"]),
-        is_overdue=row["status"] == "posted" and outstanding > 0 and row["due_date"] < date.today().isoformat(),
+        is_overdue=row["status"] == "posted" and outstanding > 0 and row["due_date"] < shop_today().isoformat(),
         status=row["status"],
         notes=row["notes"],
         void_reason=row["void_reason"],

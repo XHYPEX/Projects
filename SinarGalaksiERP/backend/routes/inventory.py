@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from backend import product_images
 from backend.auth import get_current_user, require_admin, require_inbound_poster
 from backend.database import (
+    shop_today,
     reserved_qty_by_item,
     get_stock_reservations,
     category_subtree_ids,
@@ -127,7 +128,7 @@ def _validate_received_date(received_date: str) -> None:
         rd = date.fromisoformat(received_date)
     except ValueError:
         raise HTTPException(status_code=422, detail="Tanggal terima tidak valid, gunakan format YYYY-MM-DD.")
-    today = date.today()
+    today = shop_today()
     if rd > today:
         raise HTTPException(status_code=422, detail="Tanggal terima tidak boleh di masa depan.")
     if (today - rd).days > 30:

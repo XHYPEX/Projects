@@ -3,7 +3,7 @@ admin approves it, and then through the stock ledger like every other movement."
 import sqlite3
 from datetime import datetime
 
-from backend.database import _conn, _now, _promote_shelf_ready_lines, _reserved_by_item, get_master_item_usage
+from backend.database import shop_today, _conn, _now, _promote_shelf_ready_lines, _reserved_by_item, get_master_item_usage
 
 REASONS = ("Susut / Hilang", "Rusak", "Salah catat / input", "Ditemukan lebih", "Retur belum tercatat", "Lainnya")
 STATUSES = ("draft", "menunggu_verifikasi", "disetujui", "ditolak", "dibatalkan")
@@ -124,7 +124,7 @@ def list_opnames(status: str | None = None, q: str | None = None) -> list[dict]:
 def opname_summary() -> dict:
     with _conn() as con:
         c = {r["status"]: r["n"] for r in con.execute("SELECT status, COUNT(*) AS n FROM stock_opnames GROUP BY status")}
-        month = datetime.now().strftime("%Y-%m")
+        month = shop_today().strftime("%Y-%m")
         approved_month = con.execute(
             "SELECT COUNT(*) AS n FROM stock_opnames WHERE status='disetujui' AND resolved_at LIKE ?", (month + "%",)
         ).fetchone()["n"]

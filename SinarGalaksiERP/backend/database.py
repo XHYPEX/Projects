@@ -5479,7 +5479,7 @@ def get_inventory_overview() -> dict:
         ).fetchall()
 
         # Top-selling products (last 30 days, by units sold) from paid receipts.
-        sales_cutoff = (date.today() - timedelta(days=30)).isoformat()
+        sales_cutoff = (shop_today() - timedelta(days=30)).isoformat()
         top_selling_rows = con.execute(
             """SELECT ri.product_name,
                       SUM(ri.quantity) AS units_sold,
@@ -5513,7 +5513,7 @@ def get_inventory_overview() -> dict:
         preorders_open = [r for r in preorders_open if r["status"] not in PO_CLOSED_LINE_STATUSES]
 
         # Sales this calendar month (paid receipts).
-        month_start = date.today().replace(day=1).isoformat()
+        month_start = shop_today().replace(day=1).isoformat()
         shift = f"{SHOP_UTC_OFFSET_MINUTES:+d} minutes"
         sales_month = con.execute(
             "SELECT COALESCE(SUM(p.amount), 0) AS revenue, COUNT(DISTINCT p.receipt_id) AS c "
@@ -5748,7 +5748,7 @@ def create_inbound_document(
     created_at = _now()
     total_value = sum(i["qty_in"] * i["cost_price"] for i in items)
     with _conn() as con:
-        today_str = date.today().strftime("%Y%m%d")
+        today_str = shop_today().strftime("%Y%m%d")
         doc_number = _next_doc_number(con, today_str)
         cur = con.execute(
             """INSERT INTO inbound_documents
@@ -6022,7 +6022,7 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
             raise ValueError(f"Dokumen barang masuk {document_id} tidak ditemukan.")
         if header["status"] != "draft":
             raise ValueError(
-                f"Dokumen barang masuk {document_id} tidak bisa diposting: statusnya '{header['status']}', hanya dokumen draft yang bisa diposting"
+                f"Dokumen barang masuk {header['doc_number']} sudah tidak berstatus draft, jadi tidak bisa diposting lagi."
             )
         if header["source"] == "manual" and not header["reviewed_at"]:
             raise ValueError("Barang Masuk manual (tanpa PO) harus diperiksa dulu sebelum diposting.")
@@ -6037,7 +6037,7 @@ def post_inbound_document(document_id: int, by: str | None = None, accept_over: 
             rd = date.fromisoformat(received_date)
         except ValueError:
             raise ValueError(f"Tanggal terima '{received_date}' pada dokumen {document_id} tidak valid")
-        today = date.today()
+        today = shop_today()
         if rd > today:
             raise ValueError(f"Tanggal terima {received_date} ada di masa depan")
         if (today - rd).days > 30:
@@ -6928,7 +6928,7 @@ def create_purchase_invoice(
     with _conn() as con:
         snapshot = _supplier_snapshot(con, supplier_id)
         _check_supplier_invoice_no(con, supplier_id, supplier_invoice_no)
-        invoice_number = _next_purchase_invoice_number(con, date.today().strftime("%Y%m%d"))
+        invoice_number = _next_purchase_invoice_number(con, shop_today().strftime("%Y%m%d"))
         cur = con.execute(
             """INSERT INTO purchase_invoices
                (invoice_number, supplier_id, supplier_invoice_no, supplier_name_snapshot,
@@ -6989,8 +6989,7 @@ def update_purchase_invoice(
             raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Faktur pembelian {invoice_id} tidak bisa diubah: statusnya '{row['status']}', "
-                "hanya faktur draft yang bisa diubah"
+                f"Faktur {row['invoice_number']} sudah tidak berstatus draft, jadi tidak bisa diubah."
             )
         snapshot = _supplier_snapshot(con, supplier_id)
         _check_supplier_invoice_no(con, supplier_id, supplier_invoice_no, invoice_id)
@@ -7184,7 +7183,7 @@ def delete_purchase_invoice(invoice_id: int) -> None:
             raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "draft":
             raise ValueError(
-                f"Faktur pembelian {invoice_id} tidak bisa dihapus: statusnya '{row['status']}'. "
+                f"Faktur {row['invoice_number']} sudah tidak berstatus draft, jadi tidak bisa dihapus. "
                 "Batalkan (void) saja agar nomornya tetap tercatat."
             )
         con.execute("DELETE FROM purchase_invoice_items WHERE invoice_id=?", (invoice_id,))
@@ -7240,8 +7239,8 @@ def record_purchase_invoice_payment(
             raise ValueError(f"Faktur pembelian {invoice_id} tidak ditemukan.")
         if row["status"] != "posted":
             raise ValueError(
-                f"Pembayaran tidak bisa dicatat pada faktur pembelian {invoice_id}: statusnya '{row['status']}', "
-                "hanya faktur yang sudah diposting yang bisa dibayar"
+                f"Faktur {row['invoice_number']} belum diposting, jadi pembayarannya belum bisa dicatat. "
+                "Posting fakturnya dulu."
             )
         if amount == 0:
             raise ValueError("Jumlah pembayaran tidak boleh nol")
@@ -7553,7 +7552,7 @@ def list_po_received_for_faktur(supplier_id: int | None) -> list[dict]:
 
 def get_purchase_payable_summary() -> dict:
     """Totals across posted, non-void invoices — what the shop still owes."""
-    today = date.today().isoformat()
+    today = shop_today().isoformat()
     with _conn() as con:
         rows = [
             dict(r)
@@ -11383,7 +11382,7 @@ def receive_supplier_po(
                 slot = by_master.setdefault(item["master_item_id"], {"master_item_id": item["master_item_id"], "qty_in": 0, "cost_price": cost})
                 slot["qty_in"] += qty
             if by_master:
-                doc_number = _next_doc_number(con, date.today().strftime("%Y%m%d"))
+                doc_number = _next_doc_number(con, shop_today().strftime("%Y%m%d"))
                 notes_txt = f"Dari Purchase Order {row['po_number']}" + (f", surat jalan {surat_jalan_no}" if surat_jalan_no else "")
                 doc = con.execute(
                     """INSERT INTO inbound_documents

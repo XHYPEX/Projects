@@ -1407,6 +1407,9 @@ def init_db() -> None:
             """UPDATE preorders SET published_at=(SELECT r.created_at FROM receipts r WHERE r.id=preorders.receipt_id)
                WHERE published_at IS NULL AND receipt_id IS NOT NULL""")
         con.execute("CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)")
+        if not con.execute("SELECT 1 FROM app_migrations WHERE name='campur_no_stock'").fetchone():
+            _migrate_campur_no_stock(con)
+            con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('campur_no_stock', ?)", (_now(),))
         if not con.execute("SELECT 1 FROM app_migrations WHERE name='k01_install_point'").fetchone():
             _migrate_k01_install_point(con)
             con.execute("INSERT INTO app_migrations (name, applied_at) VALUES ('k01_install_point', ?)", (_now(),))
@@ -8064,6 +8067,25 @@ def _forbid_supplier_when_stocked(con: sqlite3.Connection, item: dict) -> None:
         raise ValueError(
             f"“{item['product_name']}”: stok gudang masih ada {free} {mi['unit'] or 'unit'}, cukup untuk {item['quantity']} yang dipesan. "
             "Pilih sumber Stok Tersedia, bukan Pesan Supplier.")
+
+
+def _migrate_campur_no_stock(con: sqlite3.Connection) -> None:
+    """One-off (owner 28-10-2026, SO-20261027-0001): open 'Stok + Pesan Supplier' lines saved before the rule
+    that hold nothing from the shelf become 'Pesan Supplier'. The supplier and any Purchase Order stay as they are."""
+    rows = con.execute(
+        f"""SELECT pi.id, pi.master_item_id, p.is_draft FROM preorder_items pi JOIN preorders p ON p.id = pi.preorder_id
+            WHERE pi.source='campur' AND pi.status NOT IN ({_placeholders(PO_CLOSED_LINE_STATUSES)})""",
+        PO_CLOSED_LINE_STATUSES).fetchall()
+    if not rows:
+        return
+    held = {ln["id"]: ln["reserved"] for ln in _reservation_lines(con, [r["master_item_id"] for r in rows])}
+    for r in rows:
+        if r["is_draft"]:
+            if _campur_without_stock(con, {"source": "campur", "master_item_id": r["master_item_id"]})["source"] != "supplier":
+                continue
+        elif held.get(r["id"], 0) > 0:
+            continue
+        con.execute("UPDATE preorder_items SET source='supplier' WHERE id=?", (r["id"],))
 
 
 def _insert_preorder_item(con: sqlite3.Connection, preorder_id: str, item: dict, position: int, now: str) -> int:

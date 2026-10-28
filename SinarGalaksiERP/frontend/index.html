@@ -21011,7 +21011,7 @@ function poFormSummary(total = null, deposit = null) {
   document.getElementById("po-sum-plate").textContent = plate || "Plat belum diisi";
   document.getElementById("po-sum-date").textContent = v("po-date") ? formatPoDate(v("po-date")) : "";
   document.getElementById("po-sum-customer").textContent = [v("po-customer-name"), v("po-customer-phone")].filter(Boolean).join(" · ") || "-";
-  document.getElementById("po-sum-count").textContent = rows.reduce((n, r) => n + (Number(r.quantity) || 0), 0);
+  document.getElementById("po-sum-count").textContent = rows.filter(r => r.product_name).reduce((n, r) => n + (Number(r.quantity) || 0), 0);
   document.getElementById("po-sum-subtotal").textContent = formatIDR(total);
   document.getElementById("po-sum-paid").textContent = formatIDR(deposit);
   poSumProgress("po-sum", total, deposit);

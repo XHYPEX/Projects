@@ -414,7 +414,7 @@ async def get_receipt_detail(receipt_id: str):
     loop = asyncio.get_event_loop()
     row = await loop.run_in_executor(None, get_receipt, receipt_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     items = await loop.run_in_executor(None, get_receipt_items, receipt_id)
     payments = await loop.run_in_executor(None, get_receipt_payments, receipt_id)
     return ReceiptDetail(**row, item_count=len(items), items=[_row_to_item(i) for i in items],
@@ -426,7 +426,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
     loop = asyncio.get_event_loop()
     existing = await loop.run_in_executor(None, get_receipt, receipt_id)
     if existing is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     if req.expected_revision and existing.get("revision") and req.expected_revision != existing["revision"]:
         raise HTTPException(
             status_code=409,
@@ -635,7 +635,7 @@ async def settle_receipt_route(receipt_id: str, req: ReceiptSettleRequest, user:
     Only the payment columns change -- never items, totals, stock or the work status (Pengerjaan)."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     payment_method = req.payment_method
     if payment_method is not None and payment_method not in VALID_PAYMENT_METHODS:
         raise HTTPException(
@@ -660,7 +660,7 @@ async def list_receipt_payments(receipt_id: str):
     """Riwayat Pembayaran: every payment taken against the nota, oldest first."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     return [ReceiptPaymentOut(**p) for p in await loop.run_in_executor(None, get_receipt_payments, receipt_id)]
 
 
@@ -799,7 +799,7 @@ async def list_receipt_events(receipt_id: str):
     """Catatan & Riwayat: the nota's timeline (created, status moves, items added, void)."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     return [ReceiptEventOut(**e) for e in await loop.run_in_executor(None, get_receipt_events, receipt_id)]
 
 
@@ -916,7 +916,7 @@ async def return_receipt_item_route(receipt_id: str, req: ReceiptReturnRequest, 
 async def list_receipt_returns(receipt_id: str):
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     return [ReceiptReturnOut(**r) for r in await loop.run_in_executor(None, get_receipt_returns, receipt_id)]
 
 
@@ -925,7 +925,7 @@ async def list_receipt_preorders(receipt_id: str):
     """Terkait Sales Order: pesanan yang menjadi sumber barang atau DP nota ini."""
     loop = asyncio.get_event_loop()
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     return await loop.run_in_executor(None, get_receipt_preorders, receipt_id)
 
 
@@ -945,7 +945,7 @@ async def delete_receipt_route(receipt_id: str):
     loop = asyncio.get_event_loop()
     existing = await loop.run_in_executor(None, get_receipt, receipt_id)
     if existing is None:
-        raise HTTPException(status_code=404, detail="Struk tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     _refuse_if_paid(existing)
     try:
         await loop.run_in_executor(None, delete_receipt, receipt_id)

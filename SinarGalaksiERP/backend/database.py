@@ -3493,7 +3493,7 @@ def settle_receipt(
     with _conn() as con:
         row = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
         if row is None:
-            raise ValueError("Struk tidak ditemukan.")
+            raise ValueError("Nota tidak ditemukan.")
         if row["status"] == "void":
             raise ValueError("Struk sudah dibatalkan (void), jadi tidak bisa ditandai selesai.")
         if row["status"] == "done":

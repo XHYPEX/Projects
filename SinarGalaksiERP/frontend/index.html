@@ -4454,7 +4454,7 @@
             </div>
           </div>
 
-          <div class="sticky bottom-3 sm:bottom-4 z-10 mt-5 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg2/95 backdrop-blur px-4 py-3">
+          <div class="sticky -bottom-1.5 z-10 mt-5 flex items-center justify-between gap-3 rounded-t-xl border border-b-0 border-line bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.06)]">
             <p class="hidden sm:block text-xs text-muted"><span class="text-failed">*</span> wajib diisi</p>
             <div class="flex items-center gap-2 ml-auto">
               <button id="mf-adjust-btn" type="button" onclick="openStockAdjustModal(masterFormItem)" class="hidden admin-only px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Penyesuaian Stok</button>
@@ -4862,7 +4862,7 @@
             </div>
           </div>
 
-          <div class="sticky bottom-3 sm:bottom-4 z-10 mt-5 flex items-center justify-between gap-3 rounded-xl border border-line bg-bg2/95 backdrop-blur px-4 py-3">
+          <div class="sticky -bottom-1.5 z-10 mt-5 flex items-center justify-between gap-3 rounded-t-xl border border-b-0 border-line bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.06)]">
             <p class="hidden sm:block text-xs text-muted"><span class="text-failed">*</span> wajib diisi</p>
             <div class="flex items-center gap-2 ml-auto">
               <button type="button" onclick="cancelCustomerForm()" class="px-4 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Batal</button>
@@ -14681,7 +14681,7 @@ async function editMasterItemFromRow(id) {
 }
 
 // Duplikasi: only master data is copied (name, brand, supplier, unit, prices, description, shelf).
-// Stock starts at 0 and no history comes along. Saving the name unchanged is rejected by the API as
+// Stock is not copied (the form takes its own Stok Awal, owner 31-10-2026) and no history comes along. Saving the name unchanged is rejected by the API as
 // a duplicate for that supplier and brand, which the banner says.
 function duplicateMasterItem(id) {
   const item = (currentMasterItem && currentMasterItem.id === id ? currentMasterItem : null) || findMasterListItem(id);
@@ -15083,7 +15083,7 @@ function openMasterForm(mode, item, prefillName) {
   g("new-item-cost-label").textContent = !isEdit ? "Harga Modal Awal" : costOpen ? "Harga Modal (stok 0, boleh diisi)" : "Harga Modal Rata-rata";
   const stockEl = g("new-item-stock-initial");
   stockEl.value = isEdit ? String(item.stock_qty) : "0";
-  stockEl.disabled = isEdit || isDup;
+  stockEl.disabled = isEdit;  // Owner 31-10-2026: a duplicate takes its own Stok Awal, like a new item
   g("new-item-stock-label").textContent = isEdit ? "Stok Saat Ini" : "Stok Awal";
   g("new-item-description").value = item ? (item.description || "") : "";
   g("new-item-min-stock").value = item ? String(item.min_stock ?? 5) : "5";
@@ -15105,7 +15105,7 @@ function openMasterForm(mode, item, prefillName) {
     : "Tambahkan produk baru ke master barang inventori.";
   const banner = g("mf-banner");
   const bannerText = isEdit ? "SKU dan merek tidak dapat diubah karena membentuk kode SKU barang. Supplier hanya dapat diganti oleh admin; SKU tetap sama. Harga modal dihitung otomatis dari barang masuk; selama stok 0, Admin boleh mengisinya."
-    : isDup ? "Hanya data master yang disalin. Stok, riwayat transaksi, dan data pergerakan barang tidak ikut disalin. Ubah nama sebelum menyimpan: nama yang sama untuk supplier dan merek ini sudah ada."
+    : isDup ? "Hanya data master yang disalin. Stok, riwayat transaksi, dan data pergerakan barang tidak ikut disalin; isi Stok Awal sendiri jika ada. Ubah nama sebelum menyimpan: nama yang sama untuk supplier dan merek ini sudah ada."
     : "";
   banner.textContent = bannerText;
   banner.classList.toggle("hidden", !bannerText);
@@ -15173,10 +15173,9 @@ function newItemStockValue() {
 // Digits only; shows the stock's value at cost so an over-large count stands out while typing.
 function onNewItemStockInput() {
   const el = document.getElementById("new-item-stock-initial");
-  if (masterFormMode !== "new") {
-    document.getElementById("new-item-stock-hint").textContent = masterFormMode === "edit"
-      ? "Stok tidak dapat diubah lewat form ini. Gunakan Penyesuaian Stok untuk menambah atau mengurangi stok."
-      : "Stok awal diset ke 0 dan tidak disalin dari barang sumber.";
+  if (masterFormMode === "edit") {
+    document.getElementById("new-item-stock-hint").textContent =
+      "Stok tidak dapat diubah lewat form ini. Gunakan Penyesuaian Stok untuk menambah atau mengurangi stok.";
     return;
   }
   const digits = el.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
@@ -15300,7 +15299,7 @@ async function submitNewMasterItem(keepAdding) {
   const unit = document.getElementById("new-item-unit").value.trim();
   const sellPrice = priceValue(document.getElementById("new-item-sell-price"));
   const costPrice = priceValue(document.getElementById("new-item-cost-price"));
-  const stockQty = masterFormMode === "duplicate" ? 0 : newItemStockValue();
+  const stockQty = newItemStockValue();
   const minStock = masterFormMinStock();
 
   if (minStock === null) { showToast("Stok minimum wajib diisi."); return; }

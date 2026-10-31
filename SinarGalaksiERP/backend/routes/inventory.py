@@ -6,7 +6,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from backend import product_images
+from backend import product_images, warehouses
 from backend.auth import get_current_user, require_admin, require_inbound_poster
 from backend.database import (
     shop_today,
@@ -217,6 +217,9 @@ def _row_to_master_item(row: dict, reserved: dict[int, int] | None = None) -> Ma
         description=row.get("description"),
         min_stock=row.get("min_stock") if row.get("min_stock") is not None else 5,
         location=row.get("location"),
+        warehouse_id=row.get("warehouse_id"),
+        rack_id=row.get("rack_id"),
+        location_legacy=row.get("location_legacy"),
         archived_reason=row.get("archived_reason"),
         archived_note=row.get("archived_note"),
         archived_at=row.get("archived_at"),
@@ -616,6 +619,11 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
         raise HTTPException(status_code=422, detail=f"Merek dengan ID {req.brand_id} tidak ditemukan.")
     if await loop.run_in_executor(None, get_unit_by_name, req.unit) is None:
         raise HTTPException(status_code=422, detail=f"Satuan '{req.unit}' tidak valid.")
+    if req.warehouse_id or req.rack_id:
+        try:
+            await loop.run_in_executor(None, warehouses.check_pair, req.warehouse_id, req.rack_id)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     try:
         row = await loop.run_in_executor(
@@ -625,6 +633,8 @@ async def create_new_master_item(req: MasterItemCreateRequest, user: dict = Depe
         )
     except ValueError as e:
         _raise_from_value_error(e)
+    if req.warehouse_id:
+        await loop.run_in_executor(None, warehouses.set_item_location, row["id"], req.warehouse_id, req.rack_id, user["username"])
     return _row_to_master_item(await loop.run_in_executor(None, get_master_item, row["id"]))
 
 
@@ -651,7 +661,11 @@ async def list_master_items_route(
     sort: str = "newest",
     category_id: int | None = None,
     archived: bool = False,
+    warehouse: str | None = None,  # Master Gudang filter: a gudang id, or "none" = Belum diatur
+    rack_id: int | None = None,
 ):
+    if warehouse not in (None, "", "none") and not str(warehouse).isdigit():
+        raise HTTPException(status_code=422, detail="Filter gudang tidak valid.")
     if stock_status is not None and stock_status not in MASTER_STOCK_CLAUSES:
         raise HTTPException(status_code=422, detail=f"stock_status harus salah satu dari: {', '.join(MASTER_STOCK_CLAUSES)}.")
     if sort not in MASTER_SORTS:
@@ -670,7 +684,7 @@ async def list_master_items_route(
             page, page_size, search, supplier_id, brand_id, is_active,
             stock_status=stock_status, stock_min=stock_min, stock_max=stock_max, no_price=no_price, sort=sort,
             category_ids=(category_subtree_ids(category_id) if category_id is not None else None),
-            archived=archived,
+            archived=archived, warehouse=warehouse or None, rack_id=rack_id,
         ),
     )
     return MasterItemListOut(
@@ -747,6 +761,11 @@ async def patch_master_item(master_item_id: int, req: MasterItemUpdateRequest, u
     set_category = "category_id" in req.model_fields_set
     if set_category and req.category_id != current.get("category_id"):
         await _require_assignable_category(loop, req.category_id)
+    if "warehouse_id" in req.model_fields_set or "rack_id" in req.model_fields_set:
+        try:
+            await loop.run_in_executor(None, warehouses.set_item_location, master_item_id, req.warehouse_id, req.rack_id, user["username"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     if req.cost_price is not None:
         try:
             await loop.run_in_executor(None, set_master_item_cost, master_item_id, req.cost_price, user["username"])

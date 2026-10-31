@@ -594,6 +594,10 @@ class MasterItemOut(BaseModel):
     description: str | None = None
     min_stock: int = 5
     location: str | None = None
+    # Master Gudang (31-10-2026): the item's home; `location` then reads that place, `location_legacy` is the old text.
+    warehouse_id: int | None = None
+    rack_id: int | None = None
+    location_legacy: str | None = None
     archived_reason: str | None = None
     archived_note: str | None = None
     archived_at: str | None = None
@@ -624,6 +628,8 @@ class MasterItemCreateRequest(BaseModel):
     description: str | None = None
     min_stock: int = 5
     location: str | None = None
+    warehouse_id: int | None = None  # Master Gudang; optional
+    rack_id: int | None = None
     category_id: int | None = None
     is_active: bool = True
 
@@ -637,6 +643,9 @@ class MasterItemUpdateRequest(BaseModel):
     description: str | None = None
     min_stock: int | None = None
     location: str | None = None
+    # Master Gudang: send both (null clears) to change the item's home; leave them out to keep it.
+    warehouse_id: int | None = None
+    rack_id: int | None = None
     price_note: str | None = None
     # Admin only, and only while the product holds no stock (otherwise the cost is the Barang Masuk average).
     cost_price: int | None = None
@@ -1907,6 +1916,8 @@ class OpnameRequest(BaseModel):
     officer: str
     opname_at: str | None = None
     location: str | None = None
+    warehouse_id: int | None = None  # Master Gudang: the place counted (location then reads its name)
+    rack_id: int | None = None
     note: str | None = None
     items: list[OpnameItemRequest]
     submit: bool = False
@@ -1948,6 +1959,8 @@ class OpnameOut(BaseModel):
     opname_at: str
     officer: str
     location: str | None = None
+    warehouse_id: int | None = None  # Master Gudang (31-10-2026)
+    rack_id: int | None = None
     kind: str
     note: str | None = None
     status: str

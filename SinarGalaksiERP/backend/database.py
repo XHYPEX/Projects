@@ -1462,6 +1462,8 @@ def init_db() -> None:
         from backend import company, quotations
         company.migrate(con)
         quotations.migrate(con)
+        from backend import warehouses
+        warehouses.migrate(con)  # Master Gudang (owner 31-10-2026)
         sr_cols = {r["name"] for r in con.execute("PRAGMA table_info(supplier_returns)").fetchall()}
         if "origin" not in sr_cols:  # 'barang_masuk' = made from a posted Goods Receipt (potong tagihan)
             con.execute("ALTER TABLE supplier_returns ADD COLUMN origin TEXT")
@@ -5348,6 +5350,8 @@ def list_master_items(
     sort: str = "newest",
     category_ids: list[int] | None = None,
     archived: bool = False,
+    warehouse: str | None = None,
+    rack_id: int | None = None,
 ) -> dict:
     offset = (page - 1) * page_size
     where_clauses = []
@@ -5383,6 +5387,14 @@ def list_master_items(
     if category_ids is not None:
         where_clauses.append(f"mi.category_id IN ({','.join('?' * len(category_ids)) or 'NULL'})")
         params.extend(category_ids)
+    if warehouse == "none":
+        where_clauses.append("mi.warehouse_id IS NULL")
+    elif warehouse:
+        where_clauses.append("mi.warehouse_id=?")
+        params.append(int(warehouse))
+    if rack_id is not None:
+        where_clauses.append("mi.rack_id=?")
+        params.append(rack_id)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     with _conn() as con:

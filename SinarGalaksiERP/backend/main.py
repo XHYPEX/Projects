@@ -36,6 +36,7 @@ from backend.routes.quotations import router as quotations_router
 from backend.routes.order_dashboards import router as order_dashboards_router
 from backend.routes.scrape import router as scrape_router
 from backend.routes.users import router as users_router
+from backend.routes.warehouses import router as warehouses_router
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
@@ -83,6 +84,7 @@ app.include_router(goods_receipts_router, prefix="/api", dependencies=[Depends(g
 app.include_router(work_orders_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(incentives_router, prefix="/api", dependencies=[Depends(require_admin)])
 app.include_router(categories_router, prefix="/api", dependencies=[Depends(get_current_user)])
+app.include_router(warehouses_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(opname_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(preorders_router, prefix="/api", dependencies=[Depends(get_current_user)])
 app.include_router(quarantine_router, prefix="/api", dependencies=[Depends(get_current_user)])

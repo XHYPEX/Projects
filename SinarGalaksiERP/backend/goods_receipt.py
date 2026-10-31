@@ -18,7 +18,7 @@ import re
 import sqlite3
 from datetime import date, datetime
 
-from backend import database as db
+from backend import database as db, warehouses
 
 ARRIVAL_METHODS = {"diantar_supplier": "Diantar langsung supplier", "ekspedisi": "Lewat ekspedisi / kurir",
                    "ambil_sendiri": "Diambil sendiri"}
@@ -74,12 +74,14 @@ def _open_po_lines(con: sqlite3.Connection, po_id: str) -> list[dict]:
                      "remaining": next(l["remaining"] for l in p["lines"] if l["item_id"] == i["id"])}
                     for p in db._spo_packages(con, po_id)
                     if not p["cancelled"] and any(l["item_id"] == i["id"] and l["remaining"] > 0 for l in p["lines"])]
-        mi = con.execute("SELECT sku, unit, manual_code, sell_price FROM master_items WHERE id=?",
+        mi = con.execute("SELECT sku, unit, manual_code, sell_price, warehouse_id, rack_id FROM master_items WHERE id=?",
                          (i["master_item_id"],)).fetchone() if i["master_item_id"] else None
         out.append({
             "spo_item_id": i["id"], "master_item_id": i["master_item_id"], "product_name": i["product_name"],
             "sku": (mi["sku"] if mi else None) or i.get("sku"), "unit": (mi["unit"] if mi else None) or i.get("unit") or "PCS",
             "manual_code": mi["manual_code"] if mi else None, "sell_price": mi["sell_price"] if mi else None,
+            # Master Gudang: the item's home, which prefills where this line is put away.
+            "home_warehouse_id": mi["warehouse_id"] if mi else None, "home_rack_id": mi["rack_id"] if mi else None,
             "qty_po": i["quantity"] - i["qty_cancelled"], "qty_received": i["qty_received"], "qty_left": left,
             "po_price": db._po_net_price(i), "customer_po_number": i.get("customer_po_number"),
             "customer_name": i.get("customer_name"), "item_status": i.get("item_status"), "packages": packages,
@@ -197,11 +199,17 @@ def save_draft(document_id: int | None, data: dict, by: str | None) -> int:
                 raise ValueError("Jenis masalah harus Rusak atau Tidak sesuai.")
             cost = _int(it.get("cost_price"), f"Harga beli {spi['product_name']}", 0)
             pkg = it.get("spo_package_id") or None
+            try:
+                wid, rid, place = warehouses.resolve(con, it.get("warehouse_id"), it.get("rack_id"),
+                                                     keep=(it.get("warehouse_id"), it.get("rack_id")) if document_id else (None, None))
+            except ValueError as e:
+                raise ValueError(f"“{spi['product_name']}”: {e}")
             rows.append({
                 "spo_item_id": sid, "master_item_id": spi["master_item_id"], "qty_in": qty, "cost_price": cost,
                 "qty_bad": bad, "bad_condition": cond if bad else None, "bad_note": _text(it.get("bad_note")) if bad else None,
                 "check_note": _text(it.get("check_note")), "price_reason": _text(it.get("price_reason")),
                 "po_unit_price": db._po_net_price(spi), "spo_package_id": int(pkg) if pkg else None,
+                "warehouse_id": wid, "rack_id": rid, "location": place,
             })
         if not rows:
             raise ValueError("Isi qty datang minimal untuk satu barang.")
@@ -240,10 +248,11 @@ def save_draft(document_id: int | None, data: dict, by: str | None) -> int:
                         [(document_id, p) for p in po_ids])
         con.executemany(
             """INSERT INTO inbound_items (document_id, master_item_id, qty_in, cost_price, spo_item_id, spo_package_id,
-                   qty_bad, bad_condition, bad_note, check_note, price_reason, po_unit_price)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   qty_bad, bad_condition, bad_note, check_note, price_reason, po_unit_price, warehouse_id, rack_id, location)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [(document_id, r["master_item_id"], r["qty_in"], r["cost_price"], r["spo_item_id"], r["spo_package_id"], r["qty_bad"],
-              r["bad_condition"], r["bad_note"], r["check_note"], r["price_reason"], r["po_unit_price"]) for r in rows])
+              r["bad_condition"], r["bad_note"], r["check_note"], r["price_reason"], r["po_unit_price"],
+              r["warehouse_id"], r["rack_id"], r["location"]) for r in rows])
         if before is not None:
             fp_old, doc = before
             fp_new = _fingerprints(rows)

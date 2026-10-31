@@ -2,7 +2,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend import opname as op
+from backend import opname as op, warehouses
 from backend.auth import get_current_user, require_admin
 from backend.schemas import OpnameOut, OpnameRequest, OpnameResolveRequest
 
@@ -43,14 +43,20 @@ async def opname_reasons():
 
 
 @router.get("/stock-opnames/load-items")
-async def opname_load_items(location: str | None = None, limit: int = 500):
-    """Active master items on one shelf/location (substring match), or the whole warehouse when
-    `location` is blank: the starting list of a per-location / full-warehouse count."""
+async def opname_load_items(location: str | None = None, limit: int = 500, warehouse_id: int | None = None, rack_id: int | None = None):
+    """Active master items in one gudang / rak (Master Gudang), on one shelf typed as text (substring match, items
+    without a gudang), or the whole shop when nothing is given: the starting list of a per-location / full count."""
     limit = max(1, min(limit, 1000))
 
     def work():
         where, params = ["m.is_active=1"], []
-        if (location or "").strip():
+        if warehouse_id is not None:
+            where.append("m.warehouse_id=?")
+            params.append(warehouse_id)
+            if rack_id is not None:
+                where.append("m.rack_id=?")
+                params.append(rack_id)
+        elif (location or "").strip():
             where.append("UPPER(IFNULL(m.location,'')) LIKE ?")
             params.append(f"%{location.strip().upper()}%")
         with op._conn() as con:
@@ -100,7 +106,12 @@ async def get_stock_opname(opname_id: int):
 @router.post("/stock-opnames", response_model=OpnameOut, status_code=201)
 async def create_stock_opname(req: OpnameRequest, user: dict = Depends(get_current_user)):
     try:
-        return await _run(op.create_opname, req.officer, req.opname_at, req.location, req.note, _items(req), req.submit, user["username"])
+        _, _, label = await _run(warehouses.check_pair, req.warehouse_id, req.rack_id)
+        row = await _run(op.create_opname, req.officer, req.opname_at, label or req.location, req.note, _items(req), req.submit, user["username"])
+        if req.warehouse_id:
+            await _run(warehouses.stamp_opname, row["id"], req.warehouse_id, req.rack_id)
+            row = await _run(op.get_opname, row["id"])
+        return row
     except ValueError as e:
         _raise(e)
 
@@ -108,9 +119,22 @@ async def create_stock_opname(req: OpnameRequest, user: dict = Depends(get_curre
 @router.patch("/stock-opnames/{opname_id}", response_model=OpnameOut)
 async def update_stock_opname(opname_id: int, req: OpnameRequest, user: dict = Depends(get_current_user)):
     try:
-        return await _run(op.update_opname, opname_id, req.officer, req.opname_at, req.location, req.note, _items(req), req.submit, user["username"])
+        cur = await _run(op.get_opname, opname_id)
+        keep = (cur.get("warehouse_id"), cur.get("rack_id")) if cur else (None, None)
+        _, _, label = await _run(warehouses.check_pair, req.warehouse_id, req.rack_id, keep)
+        await _run(op.update_opname, opname_id, req.officer, req.opname_at, label or req.location, req.note, _items(req), req.submit, user["username"])
+        await _run(warehouses.stamp_opname, opname_id, req.warehouse_id, req.rack_id)
+        if not req.warehouse_id and req.location:
+            await _run(_keep_text_location, opname_id, req.location)
+        return await _run(op.get_opname, opname_id)
     except ValueError as e:
         _raise(e)
+
+
+def _keep_text_location(opname_id: int, location: str) -> None:
+    """An opname saved with only typed text (made before Master Gudang) keeps that text."""
+    with op._conn() as con:
+        con.execute("UPDATE stock_opnames SET location=? WHERE id=?", (location.strip() or None, opname_id))
 
 
 @router.post("/stock-opnames/{opname_id}/submit", response_model=OpnameOut)

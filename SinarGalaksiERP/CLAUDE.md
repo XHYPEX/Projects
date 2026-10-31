@@ -40,7 +40,7 @@ agent uses both.
 | `backend/schemas.py` | Pydantic request/response models |
 | `backend/routes/*.py` | Thin HTTP layer per module (validation, auth, `run_in_executor` around database calls) |
 | `backend/order_dashboards.py` | Dashboard SO / PO and the Ringkasan overview (`/api/dashboards/*`) |
-| `backend/goods_receipt.py`, `credit_notes.py`, `account_payable.py`, `cash_receipts.py`, `incentives.py`, `quotations.py` | Larger modules kept out of `database.py` (`credit_notes` = **Debit Note** in the UI) |
+| `backend/goods_receipt.py`, `credit_notes.py`, `account_payable.py`, `cash_receipts.py`, `incentives.py`, `quotations.py`, `warehouses.py` | Larger modules kept out of `database.py` (`credit_notes` = **Debit Note** in the UI; `warehouses` = **Master Gudang**: Gudang → Rak list only, stock stays one number per item) |
 | `frontend/index.html` | The whole SPA in one file: Tailwind CDN config, `<style>`, markup for every `page-*`, and all JS |
 | `docs/` | Owner-approved designs (service, retur supplier, flowcharts, LX-310 print test) |
 

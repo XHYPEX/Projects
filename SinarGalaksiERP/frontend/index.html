@@ -854,6 +854,8 @@
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Satuan</a>
           <a href="#/master-kategori" data-route="/master-kategori"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Kategori</a>
+          <a href="#/master-gudang" data-route="/master-gudang"
+            class="admin-only nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Master Gudang</a>
           <a href="#/stock-opname" data-route="/stock-opname"
             class="nav-sublink block px-2.5 py-1.5 rounded-lg text-[13px] text-muted hover:bg-bg hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">Stock Opname</a>
           <a href="#/karantina" data-route="/karantina"
@@ -1588,6 +1590,7 @@
   <div id="page-pengerjaan" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="wo-root" class="w-full"></div></div>
   <!-- PAGE: MASTER KARYAWAN (emp* functions) -->
   <div id="page-karyawan" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="emp-root" class="w-full"></div></div>
+  <div id="page-gudang" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="wh-root" class="w-full"></div></div>
   <!-- PAGE: INSENTIF (ins* functions; Master / Monitoring / Riwayat & Koreksi share it). Admin only, the API refuses everyone else. -->
   <div id="page-insentif" class="hidden flex-1 overflow-auto p-3 sm:p-4 bg-white"><div id="ins-root" class="w-full"></div></div>
 
@@ -3294,9 +3297,11 @@
                 <input id="op-f-time" type="time" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink"></div></div>
               <div><label for="op-f-officer" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Petugas <span class="text-failed">*</span></label>
                 <input id="op-f-officer" type="text" maxlength="60" data-no-uppercase autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"></div>
-              <div><label for="op-f-location" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Lokasi / Rak</label>
-                <input id="op-f-location" type="text" maxlength="60" autocomplete="off" placeholder="Contoh: RAK A-03" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
-                <p class="text-xs text-muted mt-1">Lokasi di mana barang akan dihitung.</p></div>
+              <div><label for="op-f-wh" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Lokasi: Gudang / Rak</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <select id="op-f-wh" onchange="whPairChanged(this, document.getElementById('op-f-rack'))" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted"></select>
+                  <select id="op-f-rack" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted"></select></div>
+                <p id="op-f-location-hint" class="text-xs text-muted mt-1">Lokasi di mana barang akan dihitung (dari Master Gudang).</p></div>
               <div><label class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Jenis Opname</label>
                 <div class="flex gap-2">
                   <select id="op-f-kind" onchange="opKindChange()" class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink">
@@ -3826,6 +3831,18 @@
                   <option value="aman">Aman</option>
                 </select>
               </div>
+              <div class="min-w-40 flex-1 sm:flex-none sm:w-48">
+                <label for="master-filter-warehouse" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Gudang</label>
+                <select id="master-filter-warehouse" onchange="onMasterWarehouseFilter()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                  <option value="">Semua gudang</option>
+                </select>
+              </div>
+              <div id="master-filter-rack-wrap" class="hidden min-w-36 flex-1 sm:flex-none sm:w-44">
+                <label for="master-filter-rack" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Rak</label>
+                <select id="master-filter-rack" onchange="onMasterFilterChange()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                  <option value="">Semua rak</option>
+                </select>
+              </div>
               <button id="master-advanced-btn" type="button" onclick="toggleMasterAdvanced()" aria-expanded="false" aria-controls="master-advanced"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4L3 5Z"/></svg>
@@ -3908,6 +3925,7 @@
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">SKU</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Nama Barang</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Merek / Kategori</th>
+                    <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Gudang / Rak</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Produk</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Persediaan</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
@@ -4373,22 +4391,32 @@
                   </div>
                 </div>
                 <p class="text-xs text-muted -mt-2 flex items-center gap-1.5"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Data kategori diambil dari Master Kategori. Kategori dan subkategori tidak dapat diisi manual.</p>
-                <div>
-                  <label for="new-item-status" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Status Produk <span class="text-failed">*</span></label>
-                  <select id="new-item-status" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select>
-                  <p class="text-xs text-muted mt-1.5">Produk nonaktif tidak bisa dijual di kasir, tapi tetap tampil di daftar untuk dilihat stok dan harganya.</p>
-                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label for="new-item-status" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Status Produk <span class="text-failed">*</span></label>
+                    <select id="new-item-status" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select>
+                    <p class="text-xs text-muted mt-1.5">Produk nonaktif tidak bisa dijual di kasir, tapi tetap tampil di daftar untuk dilihat stok dan harganya.</p>
+                  </div>
                   <div>
                     <label for="new-item-min-stock" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Stok Minimum <span class="text-failed">*</span></label>
                     <input id="new-item-min-stock" type="text" inputmode="numeric" value="5" data-no-uppercase class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted disabled:cursor-not-allowed transition-colors tabular-nums text-right" />
                     <p class="text-xs text-muted mt-1.5">Stok di bawah batas ini ditandai Menipis.</p>
                   </div>
-                  <div>
-                    <label for="new-item-location" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Lokasi Rak / Gudang</label>
-                    <input id="new-item-location" type="text" maxlength="60" autocomplete="off" placeholder="Contoh: Rak A1 - Wiper" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted disabled:cursor-not-allowed transition-colors" />
-                    <p class="text-xs text-muted mt-1.5">Opsional. Membantu mencari barang di gudang.</p>
+                </div>
+                <!-- Master Gudang (owner 31-10-2026): the item's home, picked from the list; optional. -->
+                <div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label for="new-item-warehouse" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Gudang <span class="normal-case font-normal">(opsional)</span></label>
+                      <select id="new-item-warehouse" onchange="whPairChanged(this, document.getElementById('new-item-rack'))" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors"></select>
+                    </div>
+                    <div>
+                      <label for="new-item-rack" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Rak <span class="normal-case font-normal">(opsional)</span></label>
+                      <select id="new-item-rack" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-bg2 disabled:text-muted transition-colors"></select>
+                    </div>
                   </div>
+                  <p class="text-xs text-muted mt-1.5">Diambil dari Master Gudang. Membantu mencari barang dan menyusun stock opname per lokasi.</p>
+                  <p id="new-item-location-legacy" class="hidden text-xs text-pending mt-1"></p>
                 </div>
               </div>
             </section>
@@ -5192,6 +5220,7 @@ const ROUTES = {
   "/master-supplier": { title: "Master Supplier", page: "page-inventory", section: "inv-tab-supplier", data: "supplier" },
   "/master-satuan": { title: "Master Satuan", page: "page-inventory", section: "inv-tab-unit", data: "unit" },
   "/master-kategori": { title: "Master Kategori", page: "page-kategori" },
+  "/master-gudang": { title: "Master Gudang", page: "page-gudang" },
   "/stock-opname": { title: "Stock Opname", page: "page-opname" },
   "/karantina": { title: "Stok Karantina", page: "page-karantina" },
   "/retur-supplier": { title: "Retur Supplier", page: "page-retur-supplier" },
@@ -5221,7 +5250,7 @@ const INVENTORY_ROUTES = new Set(
 // being immediately undone by it.
 let pendingInventoryAction = null;
 
-const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/company-settings", "/kas-keluar", "/cash-receipt", "/account-payable", "/credit-notes", "/master-karyawan",
+const ADMIN_ONLY_ROUTES = new Set(["/users", "/activity", "/company-settings", "/kas-keluar", "/cash-receipt", "/account-payable", "/credit-notes", "/master-karyawan", "/master-gudang",
   "/insentif-master", "/insentif-monitoring", "/insentif-koreksi"]);
 
 // /scraper stays in ROUTES even when disabled so renderRoute() keeps hiding
@@ -5264,7 +5293,7 @@ function renderRoute() {
   document.querySelectorAll(".nav-link").forEach(el => {
     el.classList.toggle("is-active", el.dataset.route === route);
   });
-  if ((INVENTORY_ROUTES.has(route) && route !== "/inventory") || route === "/master-kategori" || route === "/stock-opname" || route === "/karantina" || route === "/master-service" || route === "/master-karyawan") {
+  if ((INVENTORY_ROUTES.has(route) && route !== "/inventory") || route === "/master-kategori" || route === "/stock-opname" || route === "/karantina" || route === "/master-service" || route === "/master-karyawan" || route === "/master-gudang") {
     // Keep the parent "Inventori" entry lit on every one of its child routes.
     document.querySelector('.nav-link[data-route="/inventory-group"]')?.classList.add("is-active");
     document.getElementById("nav-inventory-submenu").classList.remove("hidden");
@@ -5283,6 +5312,7 @@ function renderRoute() {
   }
   if (route === "/pengerjaan") woInit();
   if (route === "/master-karyawan") empInit();
+  if (route === "/master-gudang") whInit();
   if (route.startsWith("/insentif-")) insInit(route);
   if (route === "/dashboard-so") odSoInit();
   if (route === "/dashboard-po") odPoInit();
@@ -5341,6 +5371,7 @@ document.addEventListener("click", e => {
   if (r.startsWith("/insentif-")) insInit(r);
   else if (r === "/pengerjaan") woBack();
   else if (r === "/master-karyawan") empInit();
+  else if (r === "/master-gudang") whInit();
   else if (r === "/credit-notes") cnInit(true);
   else if (r === "/quotations") qtInit(true);
   else if (r === "/quotation-new") qtNew();
@@ -5393,6 +5424,10 @@ const ROUTE_META = {
   "/pengerjaan": {
     subtitle: "Nota yang sedang berjalan: progres pekerjaan per item dan pembayaran, masing-masing terpisah.",
     icon: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6Z"/>',
+  },
+  "/master-gudang": {
+    subtitle: "Gudang dan rak tempat barang disimpan, untuk dipilih di Master Barang, Stock Opname dan Barang Masuk.",
+    icon: '<path d="M3 21V9l9-6 9 6v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
   },
   "/master-karyawan": {
     subtitle: "Teknisi dan sales yang bisa dipilih di Kasir. Karyawan nonaktif tetap tampil di histori lama.",
@@ -10946,7 +10981,7 @@ function goToInventoryRoute(route, after) {
 // goAddMasterItem) still win — their panel calls run after this returns.
 function refreshInventoryTab(tab) {
   if (tab === "inbound") grInit();
-  else if (tab === "master") { showMasterListPanel(); loadMasterItems(); }
+  else if (tab === "master") { showMasterListPanel(); fillMasterWarehouseFilter(); loadMasterItems(); }
   else if (tab === "brand") loadBrands();
   else if (tab === "supplier") { closeSupplierForm(); loadSuppliers(); }
   else if (tab === "unit") loadUnits();
@@ -14260,7 +14295,31 @@ function clearMasterSearch() {
 const MASTER_FILTER_IDS = [
   "master-search-input", "master-filter-supplier", "master-filter-brand", "master-filter-status",
   "master-filter-stock-status", "master-filter-stock-min", "master-filter-stock-max",
+  "master-filter-warehouse", "master-filter-rack",
 ];
+
+// Gudang filter of the list: "none" = Belum diatur; a gudang reveals its rak filter.
+async function fillMasterWarehouseFilter() {
+  const sel = document.getElementById("master-filter-warehouse");
+  const keep = sel.value;
+  await whLoad(true);
+  sel.innerHTML = `<option value="">Semua gudang</option><option value="none">Belum diatur</option>`
+    + (whCache || []).map(w => `<option value="${w.id}">${esc(w.code)} · ${esc(w.name)}${w.is_active ? "" : " (nonaktif)"}</option>`).join("");
+  sel.value = keep;
+  syncMasterRackFilter(document.getElementById("master-filter-rack").value);
+}
+function syncMasterRackFilter(keepRack) {
+  const wid = document.getElementById("master-filter-warehouse").value;
+  const w = wid && wid !== "none" ? whFind(wid) : null;
+  const rack = document.getElementById("master-filter-rack");
+  rack.innerHTML = `<option value="">Semua rak</option>` + (w ? w.racks.map(r => `<option value="${r.id}">${esc(r.code)} · ${esc(r.name)}</option>`).join("") : "");
+  rack.value = w && keepRack && w.racks.some(r => String(r.id) === String(keepRack)) ? keepRack : "";
+  document.getElementById("master-filter-rack-wrap").classList.toggle("hidden", !w);
+}
+function onMasterWarehouseFilter() {
+  syncMasterRackFilter("");
+  onMasterFilterChange();
+}
 
 function hasActiveMasterFilters() {
   return MASTER_FILTER_IDS.some(id => document.getElementById(id).value.trim() !== "")
@@ -14270,6 +14329,7 @@ function hasActiveMasterFilters() {
 function resetMasterFilters() {
   MASTER_FILTER_IDS.forEach(id => { document.getElementById(id).value = ""; });
   document.getElementById("master-filter-noprice").checked = false;
+  syncMasterRackFilter("");
   updateMasterSearchClear();
   masterListState.page = 1;
   loadMasterItems();
@@ -14286,6 +14346,7 @@ function toggleMasterAdvanced(force) {
 function applyMasterTile(kind) {
   MASTER_FILTER_IDS.forEach(id => { document.getElementById(id).value = ""; });
   document.getElementById("master-filter-noprice").checked = false;
+  syncMasterRackFilter("");
   updateMasterSearchClear();
   if (kind === "aktif") document.getElementById("master-filter-status").value = "true";
   if (kind === "arsip") document.getElementById("master-filter-status").value = "false";
@@ -14380,6 +14441,10 @@ async function loadMasterItems() {
   const stockMax = document.getElementById("master-filter-stock-max").value;
   if (stockMax !== "") params.set("stock_max", stockMax);
   if (document.getElementById("master-filter-noprice").checked) params.set("no_price", "true");
+  const whFilter = document.getElementById("master-filter-warehouse").value;
+  if (whFilter) params.set("warehouse", whFilter);
+  const rackFilter = document.getElementById("master-filter-rack").value;
+  if (whFilter && whFilter !== "none" && rackFilter) params.set("rack_id", rackFilter);
   params.set("sort", document.getElementById("master-sort").value);
 
   loadMasterSummary();
@@ -14421,6 +14486,12 @@ function masterStockState(qty, minStock = 5) {
 function masterMarginText(item) {
   if (item.avg_cost_price <= 0 || item.sell_price <= 0) return null;
   return (item.sell_price - item.avg_cost_price) / item.avg_cost_price * 100;
+}
+
+// "GUDANG UTAMA › RAK A1" split into gudang and rak for the list column (Master Gudang, 31-10-2026).
+function masterPlaceParts(item) {
+  const parts = String(item.location || "").split(" › ");
+  return [parts[0] || "", parts.slice(1).join(" › ")];
 }
 
 function renderMasterItemsTable(data) {
@@ -14509,6 +14580,8 @@ function renderMasterItemsTable(data) {
         <div class="text-ink leading-snug">${esc(item.brand_name || "-")}</div>
         <div class="text-xs text-muted leading-snug">${esc(item.category_name ? (item.category_parent_name ? item.category_parent_name + " › " + item.category_name : item.category_name) : "Tanpa kategori")}</div>
       </td>
+      <td class="px-2.5 py-3">${item.warehouse_id ? `<div class="text-ink leading-snug">${esc(masterPlaceParts(item)[0])}</div><div class="text-xs text-muted leading-snug">${esc(masterPlaceParts(item)[1] || "Tanpa rak")}</div>`
+        : `<div class="text-xs text-muted">Belum diatur</div>${item.location ? `<div class="text-[11px] text-pending leading-snug">Lama: ${esc(item.location)}</div>` : ""}`}</td>
       <td class="px-2.5 py-3">${activePillHtml(item.is_active)}</td>
       <td class="px-2.5 py-3">${statusPillHtml(stock.dot, stock.label, stock.tint)}</td>
       <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}<div class="text-[11px] font-normal text-muted">${esc(item.unit || "")}</div>${item.reserved_qty > 0
@@ -15090,7 +15163,7 @@ function openMasterForm(mode, item, prefillName) {
   fillItemCategorySelect(item ? item.category_id : null, item ? item.category_name : null,
     item ? item.category_parent_id : null, item ? item.category_parent_name : null);
   g("new-item-status").value = isEdit && item.is_active === false ? "nonaktif" : "aktif";
-  g("new-item-location").value = item ? (item.location || "") : "";
+  masterFormFillPlace(item);
   g("new-item-sku-badge").textContent = "";
   g("new-item-duplicate-note").classList.add("hidden");
 
@@ -15122,6 +15195,22 @@ function openMasterForm(mode, item, prefillName) {
   if (isDup) { g("new-item-name").focus(); g("new-item-name").select(); }
 }
 
+// Gudang / Rak of the item form (Master Gudang, 31-10-2026). A duplicate starts in the source item's place. Text typed
+// before Master Gudang existed is shown as "Lokasi lama" until a gudang is chosen; nothing is converted.
+function masterFormFillPlace(item) {
+  const w = document.getElementById("new-item-warehouse"), r = document.getElementById("new-item-rack");
+  const wid = item ? item.warehouse_id : null, rid = item ? item.rack_id : null;
+  const legacy = document.getElementById("new-item-location-legacy");
+  const old = item && !item.warehouse_id ? (item.location_legacy || item.location || "") : "";
+  legacy.textContent = old ? `Lokasi lama: ${old}. Pilih gudang/rak untuk menggantinya.` : "";
+  legacy.classList.toggle("hidden", !old || masterFormMode === "duplicate");
+  whFillPair(w, r, wid, rid);
+  whLoad(true).then(() => { whFillPair(w, r, wid, rid); updateMasterFormSummary(); });
+}
+function masterFormPlace() {
+  return { warehouse_id: whNum(document.getElementById("new-item-warehouse").value), rack_id: whNum(document.getElementById("new-item-rack").value) };
+}
+
 // Right-hand cards: a live read-back of what will be saved and which required fields are still open.
 function updateMasterFormSummary() {
   const g = id => document.getElementById(id);
@@ -15131,7 +15220,7 @@ function updateMasterFormSummary() {
   const unit = g("new-item-unit").value.trim();
   const sell = priceValue(g("new-item-sell-price"));
   const minStock = g("new-item-min-stock").value.trim();
-  const loc = g("new-item-location").value.trim();
+  const loc = whLabel(g("new-item-warehouse").value, g("new-item-rack").value);
   const sku = masterFormMode === "edit" && masterFormItem ? masterFormItem.sku : (g("new-item-sku-badge").querySelector("span")?.textContent || "");
   const row = (k, v) => `<dt class="text-muted">${esc(k)}</dt><dd class="text-ink break-words">${v ? esc(v) : '<span class="text-muted">-</span>'}</dd>`;
   g("mf-preview").innerHTML =
@@ -15259,7 +15348,7 @@ async function submitMasterFormEdit() {
         name, unit, sell_price: sellPrice, cost_price: costPrice, min_stock: minStock, expected_updated_at: item.updated_at || undefined,
         supplier_id: isAdmin() ? (Number(document.getElementById("new-item-supplier").dataset.selectedId) || undefined) : undefined,
         description: document.getElementById("new-item-description").value,
-        location: document.getElementById("new-item-location").value,
+        ...masterFormPlace(),
         category_id: selectedItemCategoryId(),
         price_note: "Ubah harga jual lewat Edit Barang",
       }),
@@ -15324,7 +15413,7 @@ async function submitNewMasterItem(keepAdding) {
       body: JSON.stringify({
         supplier_id: supplierId, brand_id: brandId, name, unit, sell_price: sellPrice, cost_price: costPrice, stock_qty: stockQty,
         description: document.getElementById("new-item-description").value, min_stock: minStock,
-        location: document.getElementById("new-item-location").value,
+        ...masterFormPlace(),
         category_id: selectedItemCategoryId(),
         is_active: document.getElementById("new-item-status").value === "aktif",
       }),
@@ -16303,6 +16392,137 @@ async function empToggle(id, on) {
   try { await grApi(`/api/employees/${id}`, "PATCH", { is_active: on }); kasirEmployees = null; empInit(); } catch (e) { showToast(e.message); }
 }
 
+// ── Master Gudang (owner 31-10-2026) ─────────────────────────────────────────
+// A list of places (Gudang → Rak) to pick from; stock stays one number per item. Admin edits; everyone reads the
+// list (dropdowns on Master Barang, Stock Opname, Barang Masuk). A place in use can only be set Nonaktif.
+let whCache = null;          // [{ id, code, name, is_active, item_count, racks: [...] }]
+let whState = { q: "", showInactive: false };
+async function whLoad(force = false) {
+  if (whCache && !force) return whCache;
+  try { whCache = await grApi("/api/warehouses"); } catch (_) { whCache = whCache || []; }
+  return whCache;
+}
+function whFind(id) { return (whCache || []).find(w => w.id === Number(id)) || null; }
+function whRackFind(id) { for (const w of whCache || []) { const r = w.racks.find(x => x.id === Number(id)); if (r) return r; } return null; }
+function whLabel(wid, rid) {
+  const w = whFind(wid); if (!w) return "";
+  const r = rid ? w.racks.find(x => x.id === Number(rid)) : null;
+  return r ? `${w.name} › ${r.name}` : w.name;
+}
+// <option>s for a gudang <select>. Inactive ones are offered only when already chosen (`keep`).
+function whOptions(selected, emptyLabel = "— Belum diatur —") {
+  return `<option value="">${esc(emptyLabel)}</option>` + (whCache || []).filter(w => w.is_active || w.id === Number(selected))
+    .map(w => `<option value="${w.id}" ${w.id === Number(selected) ? "selected" : ""}>${esc(w.code)} · ${esc(w.name)}${w.is_active ? "" : " (nonaktif)"}</option>`).join("");
+}
+function whRackOptions(wid, selected, emptyLabel = "— Tanpa rak —") {
+  const w = whFind(wid);
+  return `<option value="">${esc(w ? emptyLabel : "Pilih gudang dulu")}</option>` + (w ? w.racks.filter(r => r.is_active || r.id === Number(selected))
+    .map(r => `<option value="${r.id}" ${r.id === Number(selected) ? "selected" : ""}>${esc(r.code)} · ${esc(r.name)}${r.is_active ? "" : " (nonaktif)"}</option>`).join("") : "");
+}
+// Fill a gudang + rak <select> pair; the rak list follows the chosen gudang.
+function whFillPair(wSel, rSel, wid, rid) {
+  wSel.innerHTML = whOptions(wid);
+  rSel.innerHTML = whRackOptions(wid, rid);
+  rSel.disabled = !wid;
+}
+function whPairChanged(wSel, rSel) {
+  rSel.innerHTML = whRackOptions(wSel.value, null);
+  rSel.disabled = !wSel.value;
+}
+function whNum(v) { return v ? Number(v) : null; }
+
+async function whInit() {
+  pgLoading("wh-root");
+  try {
+    const [rows, sum] = await Promise.all([grApi("/api/warehouses"), grApi("/api/warehouses/summary")]);
+    whCache = rows; whState.summary = sum;
+    whRender();
+  } catch (e) { pgError("wh-root", e.message, "whInit()"); }
+}
+function whRender() {
+  const q = whState.q.trim().toUpperCase();
+  const sum = whState.summary || {};
+  const match = (x) => !q || x.code.includes(q) || x.name.includes(q);
+  const list = (whCache || []).filter(w => (whState.showInactive || w.is_active) && (match(w) || w.racks.some(match)));
+  const status = (on) => on ? grPill("green", "Aktif") : grPill("gray", "Nonaktif");
+  const rows = [];
+  for (const w of list) {
+    rows.push(`<tr class="bg-bg2/40">
+      <td class="${GR_TD} font-mono font-semibold text-ink">${esc(w.code)}</td>
+      <td class="${GR_TD} font-semibold text-ink">${esc(w.name)}<div class="text-[11px] font-normal text-muted">Gudang · ${w.racks.filter(r => r.is_active).length} rak aktif</div></td>
+      <td class="${GR_TD} text-right tabular-nums">${formatInt(w.item_count)}</td>
+      <td class="${GR_TD}">${status(w.is_active)}</td>
+      <td class="${GR_TD} whitespace-nowrap text-right">
+        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit('gudang', ${w.id})">Edit</button>
+        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit('rak', null, ${w.id})" ${w.is_active ? "" : "disabled"}>+ Rak</button>
+        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whToggle('gudang', ${w.id}, ${!w.is_active})">${w.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
+        ${w.item_count ? "" : `<button type="button" class="${GR_BTND} !py-1.5" onclick="whDelete('gudang', ${w.id})">Hapus</button>`}</td></tr>`);
+    for (const r of w.racks.filter(r => whState.showInactive || r.is_active)) {
+      rows.push(`<tr>
+        <td class="${GR_TD} font-mono text-ink pl-8">${esc(r.code)}</td>
+        <td class="${GR_TD} text-ink pl-8"><span class="text-muted mr-1">↳</span>${esc(r.name)}</td>
+        <td class="${GR_TD} text-right tabular-nums">${formatInt(r.item_count)}</td>
+        <td class="${GR_TD}">${status(r.is_active)}</td>
+        <td class="${GR_TD} whitespace-nowrap text-right">
+          <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit('rak', ${r.id}, ${w.id})">Edit</button>
+          <button type="button" class="${GR_BTN3} !py-1.5" onclick="whToggle('rak', ${r.id}, ${!r.is_active})">${r.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
+          ${r.item_count ? "" : `<button type="button" class="${GR_BTND} !py-1.5" onclick="whDelete('rak', ${r.id})">Hapus</button>`}</td></tr>`);
+    }
+  }
+  const admin = isAdmin();
+  document.getElementById("wh-root").innerHTML = pgHead("Master Data", "Master Gudang",
+    "Daftar gudang dan rak tempat barang disimpan. Stok tetap satu angka per barang; gudang/rak hanya menunjukkan letaknya.",
+    admin ? `<button type="button" class="${GR_BTN}" onclick="whEdit('gudang')">+ Tambah Gudang</button>` : "")
+    + `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">${grStat("blue", "Gudang aktif", formatInt(sum.warehouses || 0), "Bisa dipilih")}
+       ${grStat("violet", "Rak aktif", formatInt(sum.racks || 0), "Di gudang aktif")}
+       ${grStat("green", "Barang sudah diatur", formatInt(sum.items_placed || 0), "Punya gudang")}
+       ${grStat("amber", "Barang belum diatur", formatInt(sum.items_unplaced || 0), "Barang aktif tanpa gudang")}</div>`
+    + grCard("Daftar Gudang &amp; Rak", `<div class="mb-3 flex flex-wrap items-center gap-3"><input id="wh-search" type="search" placeholder="Cari kode atau nama…" class="${GR_IN} max-w-sm" oninput="whState.q=this.value; whRender(); const el=document.getElementById('wh-search'); el.focus(); el.setSelectionRange(el.value.length, el.value.length)">
+        <label class="flex items-center gap-2 text-sm text-ink"><input type="checkbox" class="accent-[#EA580C]" ${whState.showInactive ? "checked" : ""} onchange="whState.showInactive=this.checked; whRender()"> Tampilkan nonaktif</label></div>`
+      + pgTable(["Kode", "Nama", { label: "Jumlah Barang", right: true }, "Status", { label: "Aksi", right: true }], rows,
+        whCache && whCache.length ? "Tidak ada yang cocok." : "Belum ada gudang. Tambahkan gudang, lalu rak di dalamnya."))
+    + grNote("blue", "Gudang atau rak yang sudah dipakai barang, stock opname, atau Barang Masuk tidak bisa dihapus, hanya dinonaktifkan. Yang nonaktif tidak muncul di pilihan, tetapi tetap tampil di data lama.");
+  const s = document.getElementById("wh-search"); if (s) s.value = whState.q;
+}
+function whEdit(kind, id = null, warehouseId = null) {
+  const isRak = kind === "rak";
+  const row = id ? (isRak ? whRackFind(id) : whFind(id)) : null;
+  const parent = isRak ? whFind(warehouseId) : null;
+  openModal(`${row ? "Edit" : "Tambah"} ${isRak ? "Rak" : "Gudang"}`, `<div class="space-y-3">
+    ${isRak ? `<p class="text-sm text-muted -mt-1">Gudang: <b class="text-ink">${esc(parent ? parent.name : "")}</b></p>` : ""}
+    ${grField("Kode", `<input id="wh-code" class="${GR_IN} font-mono" maxlength="12" autocomplete="off" placeholder="${isRak ? "Contoh: A1" : "Contoh: GU"}">`, true)}
+    ${grField("Nama", `<input id="wh-name" class="${GR_IN}" maxlength="60" autocomplete="off" placeholder="${isRak ? "Contoh: RAK A1 - WIPER" : "Contoh: GUDANG UTAMA"}">`, true)}
+    <p class="text-xs text-muted">Kode 1-12 karakter tanpa spasi. ${row && row.item_count ? "Mengganti nama juga memperbarui lokasi di barang yang memakainya." : ""}</p>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
+      <button type="button" class="${GR_BTN}" onclick="whSave('${kind}', ${id || "null"}, ${warehouseId || "null"})">Simpan</button></div></div>`);
+  if (row) { document.getElementById("wh-code").value = row.code; document.getElementById("wh-name").value = row.name; }
+  document.getElementById(row ? "wh-name" : "wh-code").focus();
+}
+async function whSave(kind, id, warehouseId) {
+  const body = { code: document.getElementById("wh-code").value, name: document.getElementById("wh-name").value };
+  const url = kind === "rak" ? (id ? `/api/warehouse-racks/${id}` : `/api/warehouses/${warehouseId}/racks`) : (id ? `/api/warehouses/${id}` : "/api/warehouses");
+  try {
+    await grApi(url, id ? "PATCH" : "POST", body);
+    closeModal(); showToast(`${kind === "rak" ? "Rak" : "Gudang"} disimpan.`, "success"); whInit();
+  } catch (e) { showToast(e.message); }
+}
+async function whToggle(kind, id, on) {
+  try { await grApi(kind === "rak" ? `/api/warehouse-racks/${id}` : `/api/warehouses/${id}`, "PATCH", { is_active: on }); whInit(); }
+  catch (e) { showToast(e.message); }
+}
+function whDelete(kind, id) {
+  const row = kind === "rak" ? whRackFind(id) : whFind(id);
+  if (!row) return;
+  openModal(`Hapus ${kind === "rak" ? "Rak" : "Gudang"}`, `<div class="space-y-3">
+    <p class="text-sm text-ink">Hapus <b>${esc(row.code)} · ${esc(row.name)}</b>${kind === "gudang" && row.racks.length ? ` beserta ${row.racks.length} raknya` : ""}? Ini tidak bisa dibatalkan.</p>
+    <div class="flex justify-end gap-2"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
+      <button type="button" class="${GR_BTND}" onclick="whDeleteConfirm('${kind}', ${id})">Hapus</button></div></div>`);
+}
+async function whDeleteConfirm(kind, id) {
+  try { await grApi(kind === "rak" ? `/api/warehouse-racks/${id}` : `/api/warehouses/${id}`, "DELETE"); closeModal(); showToast("Dihapus.", "success"); whInit(); }
+  catch (e) { closeModal(); showToast(e.message); }
+}
+
 // ── Proses Pengerjaan (mockups 08 / 09) ───────────────────────────────────────
 // Owner, 24-10-2026: monitoring only. Work status, items and payments are changed in the Kasir, never here.
 let woState = { scope: "aktif", q: "", from: "", to: "", openId: null, sort: null, dir: 1, data: null };
@@ -17113,6 +17333,7 @@ async function grSaveSettings() {
 
 // ── Open a GR: wizard (draft), legacy check (old draft) or final detail ─────
 async function grOpen(id) {
+  whCache = null;  // Master Gudang list read fresh for this GR
   const my = ++grSeq;
   let d;
   try { d = await grApi(`/api/goods-receipts/${id}`); } catch (e) { showToast(e.message); return; }
@@ -17131,6 +17352,7 @@ async function grOpen(id) {
 function grStartFromPo(poId) { goToInventoryRoute("/inventory", () => grNew(poId)); }
 
 async function grNew(poId) {
+  whCache = null;  // Master Gudang list read fresh for this GR
   const my = ++grSeq;
   grDoc = null;
   const now = new Date();
@@ -17168,7 +17390,9 @@ async function grPickSupplier(supplierId, preselect = [], quiet = false) {
 function grLineFrom(po, l) {
   const pk = (l.packages || [])[0];
   return { ...l, po_id: po.id, po_number: po.po_number, qty_in: l.qty_left, cost_price: l.po_price, qty_bad: 0, bad_condition: "", bad_note: "",
-    check_note: "", price_reason: "", spo_package_id: pk ? pk.id : null };
+    check_note: "", price_reason: "", spo_package_id: pk ? pk.id : null,
+    // Master Gudang: where this line is put away, prefilled from the item's home (owner 31-10-2026).
+    warehouse_id: l.home_warehouse_id || null, rack_id: l.home_rack_id || null };
 }
 function grTogglePo(poId, on, quiet = false) {
   const f = grForm;
@@ -17199,7 +17423,8 @@ async function grLoadForm(d) {
       if (!s && l.qty_left <= 0) continue;
       const line = grLineFrom(po, l);
       if (s) Object.assign(line, { qty_in: s.qty_in, cost_price: s.cost_price, qty_bad: s.qty_bad || 0, bad_condition: s.bad_condition || "",
-        bad_note: s.bad_note || "", check_note: s.check_note || "", price_reason: s.price_reason || "", spo_package_id: s.spo_package_id || line.spo_package_id, line_id: s.id });
+        bad_note: s.bad_note || "", check_note: s.check_note || "", price_reason: s.price_reason || "", spo_package_id: s.spo_package_id || line.spo_package_id, line_id: s.id,
+        warehouse_id: s.warehouse_id || null, rack_id: s.rack_id || null });
       else line.qty_in = 0;  // on the PO but not in this delivery
       grForm.lines[l.spo_item_id] = line;
     }
@@ -17215,7 +17440,8 @@ function grPayload() {
     arrival_method: f.arrival_method, surat_jalan_no: f.surat_jalan_no, courier: f.courier, tracking_no: f.tracking_no, package_count: f.package_count,
     notes: f.notes, items: grArrived().map(l => ({ spo_item_id: l.spo_item_id, qty_in: l.qty_in, cost_price: l.cost_price, qty_bad: l.qty_bad || 0,
       bad_condition: l.qty_bad ? (l.bad_condition || null) : null, bad_note: l.qty_bad ? l.bad_note : null, check_note: l.check_note,
-      price_reason: l.cost_price !== l.po_price ? l.price_reason : null, spo_package_id: l.spo_package_id })) };
+      price_reason: l.cost_price !== l.po_price ? l.price_reason : null, spo_package_id: l.spo_package_id,
+      warehouse_id: l.warehouse_id || null, rack_id: l.warehouse_id ? (l.rack_id || null) : null })) };
 }
 async function grSave() {
   const body = grPayload();
@@ -17408,6 +17634,7 @@ function grShipNext() {
 
 // ── Step 3a: Pemeriksaan kondisi ─────────────────────────────────────────────
 function grStepCheck() {
+  if (!whCache) { whLoad().then(grStepCheck); return; }
   ++grSeq;
   const arrived = grArrived();
   const checked = !!(grDoc && grDoc.reviewed_at);
@@ -17423,13 +17650,15 @@ function grStepCheck() {
           <option value="">${l.qty_bad ? "Pilih masalah…" : "—"}</option>${Object.entries(GR_BAD).map(([k, v]) => `<option value="${k}" ${k === l.bad_condition ? "selected" : ""}>${v} → Karantina</option>`).join("")}</select></td>
       <td class="${GR_TD} min-w-[220px]"><input type="text" value="${esc(l.check_note || "")}" placeholder="Fungsi normal · kemasan baik" data-no-uppercase class="${GR_IN} !py-1.5 !text-xs" oninput="grCheckSet(${l.spo_item_id}, 'check_note', this.value)">
         ${l.qty_bad ? `<input type="text" value="${esc(l.bad_note || "")}" placeholder="Alasan rusak / tidak sesuai (wajib)" data-no-uppercase class="${GR_IN} !py-1.5 !text-xs mt-1.5 ${(l.bad_note || "").trim() ? "" : "!border-failed"}" oninput="grCheckSet(${l.spo_item_id}, 'bad_note', this.value)">` : ""}</td>
+      <td class="${GR_TD} min-w-[200px]"><select class="${GR_IN} !py-1.5 !text-xs" onchange="grCheckSet(${l.spo_item_id}, 'warehouse_id', whNum(this.value), true)">${whOptions(l.warehouse_id, "— Gudang —")}</select>
+        <select class="${GR_IN} !py-1.5 !text-xs mt-1.5" ${l.warehouse_id ? "" : "disabled"} onchange="grCheckSet(${l.spo_item_id}, 'rack_id', whNum(this.value))">${whRackOptions(l.warehouse_id, l.rack_id)}</select></td>
       <td class="${GR_TD}">${checked && okLine(l) ? grPill("green", "Selesai diperiksa") : okLine(l) ? grPill("gray", "Belum disimpan") : grPill("red", "Lengkapi")}</td></tr>`).join("");
   grRender(`
     ${grHead("Pemeriksaan Kondisi Barang", "Pisahkan barang layak jual dan barang bermasalah.")}
     ${grStepper(3)}
     ${grCard(`Pemeriksaan Qty dan Kondisi Setiap Item <span class="font-mono text-xs text-muted ml-2">${esc(grForm.doc_number || "")}</span>`, `
-      <div class="overflow-x-auto border border-line rounded-lg"><table class="w-full text-sm min-w-[980px]"><thead class="bg-bg2"><tr>
-        <th class="${GR_TH}">Produk</th><th class="${GR_TH}">Qty Datang</th><th class="${GR_TH}">Qty Baik</th><th class="${GR_TH}">Qty Rusak ✎</th><th class="${GR_TH}">Jenis Masalah</th><th class="${GR_TH}">Keterangan</th><th class="${GR_TH}">Status</th></tr></thead>
+      <div class="overflow-x-auto border border-line rounded-lg"><table class="w-full text-sm min-w-[1180px]"><thead class="bg-bg2"><tr>
+        <th class="${GR_TH}">Produk</th><th class="${GR_TH}">Qty Datang</th><th class="${GR_TH}">Qty Baik</th><th class="${GR_TH}">Qty Rusak ✎</th><th class="${GR_TH}">Jenis Masalah</th><th class="${GR_TH}">Keterangan</th><th class="${GR_TH}">Lokasi Simpan</th><th class="${GR_TH}">Status</th></tr></thead>
         <tbody>${rows}</tbody></table></div>
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
         ${grStat("rose", "Datang Fisik", formatInt(total), `${arrived.length} SKU dari ${grForm.po_ids.length} PO`)}
@@ -17446,6 +17675,7 @@ function grCheckSet(id, key, value, rerender) {
   if (!l) return;
   l[key] = value;
   if (key === "qty_bad" && !value) { l.bad_condition = ""; l.bad_note = ""; }
+  if (key === "warehouse_id") l.rack_id = null;
   if (rerender) grStepCheck();
 }
 async function grCheckNext(go) {
@@ -17633,7 +17863,7 @@ function grStepReview() {
   const d = grDoc;
   const rows = d.lines.map(l => `<tr class="border-b border-line last:border-b-0">
       <td class="${GR_TD} font-mono text-xs">${esc(l.po_number || "")}</td>
-      <td class="${GR_TD}"><div class="font-semibold text-xs text-ink uppercase">${esc(l.product_name)}</div>${grLineSplit(l, d.needs)}</td>
+      <td class="${GR_TD}"><div class="font-semibold text-xs text-ink uppercase">${esc(l.product_name)}</div>${grLineSplit(l, d.needs)}${l.location ? `<div class="text-[11px] text-muted">Lokasi: ${esc(l.location)}</div>` : ""}</td>
       <td class="${GR_TD} text-xs tabular-nums">${l.qty_in} ${grUnit(l)}</td>
       <td class="${GR_TD} text-xs tabular-nums text-done font-semibold">${l.qty_in - (l.qty_bad || 0)} ${grUnit(l)}</td>
       <td class="${GR_TD} text-xs tabular-nums ${l.qty_bad ? "text-failed font-semibold" : ""}">${l.qty_bad || 0} ${grUnit(l)}${l.qty_bad ? `<div class="text-[11px] font-normal">${esc(GR_BAD[l.bad_condition] || "")}: ${esc(l.bad_note || "")}</div>` : ""}</td>
@@ -22897,8 +23127,22 @@ async function opItemFromMaster(id) {
     fetch(`/api/stock-opnames/item-activity/${id}`).then(r => opJson(r, "")).catch(() => ({})),
   ]);
   return { master_item_id: it.id, sku: it.sku, name: it.name, unit: it.unit, brand: it.brand_name, is_active: it.is_active,
+    warehouse_id: it.warehouse_id, rack_id: it.rack_id,
     category: it.category_parent_name ? `${it.category_parent_name} › ${it.category_name}` : (it.category_name || "-"),
     location: it.location, system_qty: it.stock_qty, counted: "", reason: "", note: "", activity: act, image_url: it.image_url };
+}
+
+// Gudang / Rak of the opname form (Master Gudang, 31-10-2026). A draft saved with typed text before Master Gudang
+// keeps that text until a gudang is chosen.
+async function opFillPlace(wid, rid) {
+  await whLoad(true);
+  whFillPair(document.getElementById("op-f-wh"), document.getElementById("op-f-rack"), wid, rid);
+  const hint = document.getElementById("op-f-location-hint");
+  hint.textContent = opForm.legacyLocation ? `Lokasi lama: ${opForm.legacyLocation}. Pilih gudang untuk menggantinya.` : "Lokasi di mana barang akan dihitung (dari Master Gudang).";
+}
+function opFormLocationLabel() {
+  const wid = document.getElementById("op-f-wh").value;
+  return wid ? whLabel(wid, document.getElementById("op-f-rack").value) : (opForm.legacyLocation || "");
 }
 
 async function opNewForm(itemId) {
@@ -22909,14 +23153,15 @@ async function opNewForm(itemId) {
   g("op-f-date").value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   g("op-f-time").value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   g("op-f-officer").value = (currentUser && currentUser.username) || "";
-  g("op-f-location").value = ""; g("op-f-note").value = "";
+  g("op-f-note").value = ""; opForm.legacyLocation = null;
+  await opFillPlace(null, null);
   g("op-f-kind").value = "tertentu"; opKindChange();
   g("op-back-label").textContent = typeof itemId === "number" && opOrigin === "detail" ? "Kembali ke detail barang" : "Kembali ke daftar";
   try {
     if (typeof itemId === "number") {
       const item = await opItemFromMaster(itemId);
       opForm.items.push(item);
-      g("op-f-location").value = item.location || "";
+      if (item.warehouse_id) await opFillPlace(item.warehouse_id, item.rack_id);
     }
   } catch (e) { opErr(e); }
   opRefreshNumber(); opRenderItems(); opShow("op-form-panel");
@@ -22924,7 +23169,7 @@ async function opNewForm(itemId) {
 
 const OP_KIND_HINT = {
   tertentu: "Stock opname untuk satu atau beberapa barang tertentu.",
-  lokasi: "Isi Lokasi / Rak lalu klik Muat Barang: semua barang aktif di lokasi itu masuk daftar hitung.",
+  lokasi: "Pilih Gudang (dan Rak) lalu klik Muat Barang: semua barang aktif di lokasi itu masuk daftar hitung.",
   gudang: "Klik Muat Barang untuk memasukkan semua barang aktif (maks. 500 per opname).",
 };
 function opKindChange() {
@@ -22934,10 +23179,11 @@ function opKindChange() {
 }
 async function opLoadByKind() {
   const k = document.getElementById("op-f-kind").value;
-  const loc = document.getElementById("op-f-location").value.trim();
-  if (k === "lokasi" && !loc) { showToast("Isi Lokasi / Rak terlebih dahulu."); document.getElementById("op-f-location").focus(); return; }
+  const wid = document.getElementById("op-f-wh").value, rid = document.getElementById("op-f-rack").value;
+  if (k === "lokasi" && !wid) { showToast("Pilih gudang terlebih dahulu."); document.getElementById("op-f-wh").focus(); return; }
+  const where = k === "lokasi" ? `warehouse_id=${encodeURIComponent(wid)}${rid ? `&rack_id=${encodeURIComponent(rid)}` : ""}&` : "";
   try {
-    const res = await fetch(`/api/stock-opnames/load-items?location=${k === "lokasi" ? encodeURIComponent(loc) : ""}&limit=500`).then(r => opJson(r, "Gagal memuat barang."));
+    const res = await fetch(`/api/stock-opnames/load-items?${where}limit=500`).then(r => opJson(r, "Gagal memuat barang."));
     const have = new Set(opForm.items.map(i => i.master_item_id));
     let added = 0;
     for (const it of res.items) {
@@ -22954,17 +23200,24 @@ async function opLoadByKind() {
 function opPrintCountSheet() {
   if (!opForm.items.length) { showToast("Belum ada barang di daftar hitung."); return; }
   const g = id => document.getElementById(id).value.trim();
-  const rows = [...opForm.items].sort((a, b) => (a.location || "").localeCompare(b.location || "") || a.name.localeCompare(b.name))
-    .map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.sku)}</td><td>${esc(it.name)}</td><td>${esc(it.location || "-")}</td><td>${esc(it.unit || "")}</td><td class="box"></td><td class="box"></td></tr>`).join("");
+  // Grouped by place (Gudang › Rak), so the counter walks one rak at a time.
+  let lastLoc = null;
+  const rows = [...opForm.items].sort((a, b) => (a.location || "\uffff").localeCompare(b.location || "\uffff") || a.name.localeCompare(b.name))
+    .map((it, i) => {
+      const loc = it.location || "Belum diatur";
+      const head = loc !== lastLoc ? `<tr class="grp"><td colspan="6">${esc(loc)}</td></tr>` : "";
+      lastLoc = loc;
+      return `${head}<tr><td>${i + 1}</td><td>${esc(it.sku)}</td><td>${esc(it.name)}</td><td>${esc(it.unit || "")}</td><td class="box"></td><td class="box"></td></tr>`;
+    }).join("");
   const w = window.open("", "_blank");
   if (!w) { showToast("Pop-up diblokir browser. Izinkan pop-up untuk mencetak."); return; }
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Lembar Hitung Stock Opname</title><style>
     body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#111}h1{font-size:16px;margin:0 0 4px}
     .meta{margin-bottom:10px;color:#444}table{width:100%;border-collapse:collapse}th,td{border:1px solid #888;padding:5px 6px;text-align:left}
-    th{background:#eee}td.box{width:90px}</style></head><body>
+    th{background:#eee}td.box{width:90px}tr.grp td{font-weight:bold;background:#f5f5f5}</style></head><body>
     <h1>Lembar Hitung Stock Opname</h1>
-    <div class="meta">Tanggal: ${esc(g("op-f-date"))} &nbsp; Petugas: ${esc(g("op-f-officer"))} &nbsp; Lokasi: ${esc(g("op-f-location") || "Semua")} &nbsp; Jumlah barang: ${opForm.items.length}</div>
-    <table><thead><tr><th>No</th><th>SKU</th><th>Nama Barang</th><th>Lokasi</th><th>Satuan</th><th>Hitung Fisik</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="meta">Tanggal: ${esc(g("op-f-date"))} &nbsp; Petugas: ${esc(g("op-f-officer"))} &nbsp; Lokasi: ${esc(opFormLocationLabel() || "Semua")} &nbsp; Jumlah barang: ${opForm.items.length}</div>
+    <table><thead><tr><th>No</th><th>SKU</th><th>Nama Barang</th><th>Satuan</th><th>Hitung Fisik</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>
     <p style="margin-top:24px">Petugas: ____________ &nbsp;&nbsp; Verifikator: ____________</p></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
 }
@@ -22980,7 +23233,9 @@ async function opEditDraft(id) {
     g("op-f-kind").value = "tertentu"; opKindChange();
     g("op-f-no").value = o.opname_no;
     g("op-f-date").value = o.opname_at.slice(0, 10); g("op-f-time").value = (o.opname_at.slice(11, 16) || "00:00");
-    g("op-f-officer").value = o.officer; g("op-f-location").value = o.location || ""; g("op-f-note").value = o.note || "";
+    g("op-f-officer").value = o.officer; g("op-f-note").value = o.note || "";
+    opForm.legacyLocation = o.warehouse_id ? null : (o.location || null);
+    await opFillPlace(o.warehouse_id, o.rack_id);
     g("op-back-label").textContent = "Kembali ke daftar"; opOrigin = "list";
     opRenderItems(); opShow("op-form-panel");
   } catch (e) { opErr(e); }
@@ -23095,7 +23350,8 @@ async function opSave(submit) {
     if (submit && counted !== it.system_qty && !it.reason) { showToast(`Pilih alasan selisih untuk ${it.sku}.`); return; }
     items.push({ master_item_id: it.master_item_id, counted_qty: counted, reason: it.reason || null, note: it.note || null });
   }
-  const body = { officer, opname_at: `${g("op-f-date").value}T${g("op-f-time").value || "00:00"}:00`, location: g("op-f-location").value.trim() || null,
+  const body = { officer, opname_at: `${g("op-f-date").value}T${g("op-f-time").value || "00:00"}:00`, warehouse_id: whNum(g("op-f-wh").value), rack_id: whNum(g("op-f-rack").value),
+    location: g("op-f-wh").value ? null : (opForm.legacyLocation || null),
     note: g("op-f-note").value.trim() || null, items, submit };
   try {
     const resp = await fetch(opForm.id ? `/api/stock-opnames/${opForm.id}` : "/api/stock-opnames", { method: opForm.id ? "PATCH" : "POST",

@@ -22,6 +22,8 @@ class GrLine(BaseModel):
     check_note: str | None = None
     price_reason: str | None = None
     spo_package_id: int | None = None
+    warehouse_id: int | None = None  # Master Gudang: where this line is put away (recorded on the GR only)
+    rack_id: int | None = None
 
 
 class GrDraft(BaseModel):

@@ -9828,6 +9828,22 @@ async function openReceiptPaymentModal(receiptId) {
   receiptPayCtx.max = Math.max(receiptPayCtx.remaining - receiptPayCtx.pending, 0);
   // Paid from a Sales Order's detail: "Simpan & Cetak" prints the Nota SO, not the Kasir nota.
   if (currentRoute() === "/sales-order" && currentPreorder) receiptPayCtx.fromSoId = currentPreorder.id;
+  // Owner 31-10-2026: from a Sales Order the pop-up reads like the draft SO one ("Tambah DP / Pembayaran"),
+  // with the SO number next to the invoice it is paid into. The money still goes to the invoice.
+  if (receiptPayCtx.fromSoId) {
+    const so = currentPreorder;
+    openPaymentForm({
+      title: "Tambah DP / Pembayaran", infoTitle: "Informasi Sales Order",
+      lead: "Input DP atau pembayaran untuk Sales Order ini. Anda dapat membayar penuh atau sebagian.",
+      info: [["No. Sales Order", so.po_number], ["No. Invoice", detail.receipt_no],
+             ["Nama Pelanggan", so.customer_name || detail.customer_full_name || detail.customer_name],
+             ["No. Plat Kendaraan", so.plate_full || detail.plate_full],
+             ["Sumber Order", so.order_source === "whatsapp" ? "WhatsApp" : "Walk-in"]],
+      printLabel: "Cetak invoice SO setelah pembayaran", printHint: "Halaman cetak invoice Sales Order dibuka setelah pembayaran disimpan.",
+      notePlaceholder: "Contoh: DP awal, pelunasan, atau catatan lainnya…",
+    }, lists);
+    return;
+  }
   openPaymentForm({
     title: "Pembayaran Nota", infoTitle: "Informasi Nota",
     lead: "Input pembayaran untuk nota ini. Anda dapat melakukan pembayaran penuh atau sebagian.",

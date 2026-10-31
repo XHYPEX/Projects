@@ -7945,6 +7945,8 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | N
         and i["status"] not in PO_ARRIVED_STATUSES
     )
     out["line_suppliers"] = sorted({i["supplier_name"] for i in live if i.get("supplier_name")})
+    # Owner 31-10-2026: the list says "Stok Toko" for goods taken from the shelf instead of "Otomatis".
+    out["line_sources"] = sorted({i.get("source") or "auto" for i in live})
     return out
 
 

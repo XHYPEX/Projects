@@ -20341,6 +20341,16 @@ function poIconButton(icon, title, onclick, danger = false) {
     class="p-1.5 border border-line rounded-lg text-muted ${danger ? "hover:text-failed hover:border-failed" : "hover:text-ink hover:bg-bg2"} transition-colors">${icon}</button>`;
 }
 
+// Supplier column when no line names a supplier (owner 31-10-2026): shelf goods read "Stok Toko",
+// service-only orders "Jasa"; "Otomatis" is left for lines whose source is still open.
+function soNoSupplierLabel(r) {
+  if (r.is_draft) return "—";
+  const src = r.line_sources || [];
+  if (src.some(x => x === "stok" || x === "campur")) return "Stok Toko";
+  if (src.length && src.every(x => x === "jasa")) return "Jasa";
+  return "Otomatis";
+}
+
 function renderPreorderList(rows) {
   const tbody = document.getElementById("po-list-tbody");
   const emptyEl = document.getElementById("po-list-empty");
@@ -20369,7 +20379,8 @@ function renderPreorderList(rows) {
     const suppliers = r.line_suppliers?.length ? r.line_suppliers : (r.supplier_name ? [r.supplier_name] : []);
     const supplierHtml = (suppliers.length
       ? `<span class="block truncate text-ink">${esc(suppliers[0])}</span>${suppliers.length > 1 ? `<span class="text-[11px] text-muted">+${suppliers.length - 1} supplier</span>` : ""}`
-      : `<span class="text-muted">${r.is_draft ? "—" : "Otomatis"}</span>`)
+      : `<span class="${soNoSupplierLabel(r) === "Stok Toko" ? "text-ink" : "text-muted"}">${soNoSupplierLabel(r)}</span>`)
+      + (suppliers.length && (r.line_sources || []).some(x => x === "stok" || x === "campur") ? `<span class="block text-[11px] text-muted">+ stok toko</span>` : "")
       + (r.missing_supplier_count ? `<span class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-failed/10 text-failed whitespace-nowrap">${r.missing_supplier_count} barang belum ada supplier</span>` : "");
     const pay = r.payment_status || "belum";
     tr.innerHTML = `

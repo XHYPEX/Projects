@@ -1370,6 +1370,7 @@ class PreorderOut(BaseModel):
     # 'Pesan Supplier' lines that still have no supplier, and the suppliers chosen on the lines.
     missing_supplier_count: int = 0
     line_suppliers: list[str] = []
+    line_sources: list[str] = []  # supplier | stok | campur | jasa | auto (no source set)
     invoice_count: int = 1
     pending_amount: int = 0  # K-18: transfer/QRIS recorded but not yet confirmed
 

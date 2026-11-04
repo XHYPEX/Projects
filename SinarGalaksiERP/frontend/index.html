@@ -16453,8 +16453,8 @@ function whRender() {
       <td class="${GR_TD} text-right tabular-nums">${formatInt(w.item_count)}</td>
       <td class="${GR_TD}">${status(w.is_active)}</td>
       <td class="${GR_TD} whitespace-nowrap text-right">
-        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit('gudang', ${w.id})">Edit</button>
-        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit('rak', null, ${w.id})" ${w.is_active ? "" : "disabled"}>+ Rak</button>
+        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit(${w.id})">Edit</button>
+        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit(${w.id}, true)" ${w.is_active ? "" : "disabled"}>+ Rak</button>
         <button type="button" class="${GR_BTN3} !py-1.5" onclick="whToggle('gudang', ${w.id}, ${!w.is_active})">${w.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
         ${w.item_count ? "" : `<button type="button" class="${GR_BTND} !py-1.5" onclick="whDelete('gudang', ${w.id})">Hapus</button>`}</td></tr>`);
     for (const r of w.racks.filter(r => whState.showInactive || r.is_active)) {
@@ -16464,7 +16464,7 @@ function whRender() {
         <td class="${GR_TD} text-right tabular-nums">${formatInt(r.item_count)}</td>
         <td class="${GR_TD}">${status(r.is_active)}</td>
         <td class="${GR_TD} whitespace-nowrap text-right">
-          <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit('rak', ${r.id}, ${w.id})">Edit</button>
+          <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit(${w.id})">Edit</button>
           <button type="button" class="${GR_BTN3} !py-1.5" onclick="whToggle('rak', ${r.id}, ${!r.is_active})">${r.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
           ${r.item_count ? "" : `<button type="button" class="${GR_BTND} !py-1.5" onclick="whDelete('rak', ${r.id})">Hapus</button>`}</td></tr>`);
     }
@@ -16472,7 +16472,7 @@ function whRender() {
   const admin = isAdmin();
   document.getElementById("wh-root").innerHTML = pgHead("Master Data", "Master Gudang",
     "Daftar gudang dan rak tempat barang disimpan. Stok tetap satu angka per barang; gudang/rak hanya menunjukkan letaknya.",
-    admin ? `<button type="button" class="${GR_BTN}" onclick="whEdit('gudang')">+ Tambah Gudang</button>` : "")
+    admin ? `<button type="button" class="${GR_BTN}" onclick="whEdit()">+ Tambah Gudang</button>` : "")
     + `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">${grStat("blue", "Gudang aktif", formatInt(sum.warehouses || 0), "Bisa dipilih")}
        ${grStat("violet", "Rak aktif", formatInt(sum.racks || 0), "Di gudang aktif")}
        ${grStat("green", "Barang sudah diatur", formatInt(sum.items_placed || 0), "Punya gudang")}
@@ -16480,30 +16480,54 @@ function whRender() {
     + grCard("Daftar Gudang &amp; Rak", `<div class="mb-3 flex flex-wrap items-center gap-3"><input id="wh-search" type="search" placeholder="Cari kode atau nama…" class="${GR_IN} max-w-sm" oninput="whState.q=this.value; whRender(); const el=document.getElementById('wh-search'); el.focus(); el.setSelectionRange(el.value.length, el.value.length)">
         <label class="flex items-center gap-2 text-sm text-ink"><input type="checkbox" class="accent-[#EA580C]" ${whState.showInactive ? "checked" : ""} onchange="whState.showInactive=this.checked; whRender()"> Tampilkan nonaktif</label></div>`
       + pgTable(["Kode", "Nama", { label: "Jumlah Barang", right: true }, "Status", { label: "Aksi", right: true }], rows,
-        whCache && whCache.length ? "Tidak ada yang cocok." : "Belum ada gudang. Tambahkan gudang, lalu rak di dalamnya."))
+        whCache && whCache.length ? "Tidak ada yang cocok." : "Belum ada gudang. Tambahkan gudang beserta raknya."))
     + grNote("blue", "Gudang atau rak yang sudah dipakai barang, stock opname, atau Barang Masuk tidak bisa dihapus, hanya dinonaktifkan. Yang nonaktif tidak muncul di pilihan, tetapi tetap tampil di data lama.");
   const s = document.getElementById("wh-search"); if (s) s.value = whState.q;
 }
-function whEdit(kind, id = null, warehouseId = null) {
-  const isRak = kind === "rak";
-  const row = id ? (isRak ? whRackFind(id) : whFind(id)) : null;
-  const parent = isRak ? whFind(warehouseId) : null;
-  openModal(`${row ? "Edit" : "Tambah"} ${isRak ? "Rak" : "Gudang"}`, `<div class="space-y-3">
-    ${isRak ? `<p class="text-sm text-muted -mt-1">Gudang: <b class="text-ink">${esc(parent ? parent.name : "")}</b></p>` : ""}
-    ${grField("Kode", `<input id="wh-code" class="${GR_IN} font-mono" maxlength="12" autocomplete="off" placeholder="${isRak ? "Contoh: A1" : "Contoh: GU"}">`, true)}
-    ${grField("Nama", `<input id="wh-name" class="${GR_IN}" maxlength="60" autocomplete="off" placeholder="${isRak ? "Contoh: RAK A1 - WIPER" : "Contoh: GUDANG UTAMA"}">`, true)}
-    <p class="text-xs text-muted">Kode 1-12 karakter tanpa spasi. ${row && row.item_count ? "Mengganti nama juga memperbarui lokasi di barang yang memakainya." : ""}</p>
+// Owner 04-11-2026: the racks are typed in the Gudang form and saved with it; codes are generated by the server.
+function whEdit(id = null, addRack = false) {
+  const w = id ? whFind(id) : null;
+  openModal(`${w ? "Edit" : "Tambah"} Gudang`, `<div class="space-y-3">
+    ${grField("Nama Gudang", `<input id="wh-name" class="${GR_IN}" maxlength="60" autocomplete="off" placeholder="Contoh: GUDANG UTAMA">`, true)}
+    <p class="text-xs text-muted">Kode gudang: <b class="font-mono text-ink">${w ? esc(w.code) : "dibuat otomatis"}</b></p>
+    <div>
+      <div class="text-sm font-medium text-ink mb-1.5">Rak di gudang ini <span class="font-normal text-muted">(opsional, kode rak dibuat otomatis)</span></div>
+      <div id="wh-racks" class="space-y-2 max-h-[40vh] overflow-y-auto pr-1"></div>
+      <button type="button" class="${GR_BTN3} !py-1.5 mt-2" onclick="whRackRow().focus()">+ Tambah Rak</button>
+    </div>
+    ${w && w.item_count ? `<p class="text-xs text-muted">Mengganti nama juga memperbarui lokasi di barang yang memakainya.</p>` : ""}
     <div class="flex justify-end gap-2 pt-1"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
-      <button type="button" class="${GR_BTN}" onclick="whSave('${kind}', ${id || "null"}, ${warehouseId || "null"})">Simpan</button></div></div>`);
-  if (row) { document.getElementById("wh-code").value = row.code; document.getElementById("wh-name").value = row.name; }
-  document.getElementById(row ? "wh-name" : "wh-code").focus();
+      <button type="button" class="${GR_BTN}" onclick="whSave(${id || "null"})">Simpan</button></div></div>`);
+  if (w) {
+    document.getElementById("wh-name").value = w.name;
+    w.racks.forEach(whRackRow);
+  }
+  const added = !w || addRack ? whRackRow() : null;
+  (addRack ? added : document.getElementById("wh-name")).focus();
 }
-async function whSave(kind, id, warehouseId) {
-  const body = { code: document.getElementById("wh-code").value, name: document.getElementById("wh-name").value };
-  const url = kind === "rak" ? (id ? `/api/warehouse-racks/${id}` : `/api/warehouses/${warehouseId}/racks`) : (id ? `/api/warehouses/${id}` : "/api/warehouses");
+// One rack line of the form; returns its name input. An existing rack is deactivated or deleted from the list, so only a
+// new line has a remove button. The name is set as a value because esc() does not make text safe inside an attribute.
+function whRackRow(rack = null) {
+  const box = document.getElementById("wh-racks");
+  box.insertAdjacentHTML("beforeend", `<div class="wh-rack-row flex items-center gap-2" data-id="${rack ? rack.id : ""}">
+    <span class="w-20 shrink-0 font-mono text-xs ${rack ? "text-ink" : "text-muted"}">${rack ? esc(rack.code) : "Otomatis"}</span>
+    <input class="${GR_IN} flex-1 min-w-0" maxlength="60" autocomplete="off" placeholder="Contoh: RAK A1" onkeydown="if (event.key === 'Enter') { event.preventDefault(); whRackRow().focus(); }">
+    ${rack ? (rack.is_active ? "" : `<span class="shrink-0">${grPill("gray", "Nonaktif")}</span>`)
+      : `<button type="button" class="shrink-0 w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bg2" aria-label="Hapus baris" onclick="this.parentElement.remove()">&times;</button>`}</div>`);
+  const input = box.lastElementChild.querySelector("input");
+  if (rack) input.value = rack.name;
+  return input;
+}
+async function whSave(id) {
+  const racks = [];
+  for (const row of document.querySelectorAll("#wh-racks .wh-rack-row")) {
+    const name = row.querySelector("input").value, rackId = whNum(row.dataset.id);
+    if (rackId || name.trim()) racks.push({ id: rackId, name });  // an empty new line is just ignored
+  }
+  const body = { name: document.getElementById("wh-name").value, racks };
   try {
-    await grApi(url, id ? "PATCH" : "POST", body);
-    closeModal(); showToast(`${kind === "rak" ? "Rak" : "Gudang"} disimpan.`, "success"); whInit();
+    await grApi(id ? `/api/warehouses/${id}` : "/api/warehouses", id ? "PATCH" : "POST", body);
+    closeModal(); showToast("Gudang disimpan.", "success"); whInit();
   } catch (e) { showToast(e.message); }
 }
 async function whToggle(kind, id, on) {

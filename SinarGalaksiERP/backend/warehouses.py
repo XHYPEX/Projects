@@ -8,6 +8,9 @@ Owner decisions 31-10-2026:
   * a gudang/rak that anything points to can only be set Nonaktif, never deleted; an unused one may be deleted;
   * text typed earlier in 'Lokasi Rak / Gudang' is kept as "Lokasi lama" until a gudang/rak is chosen; nothing guessed.
 
+Owner 04-11-2026: racks are typed inside the Gudang form and saved with it, and codes are generated (GD-01; R-01 per
+gudang), never typed. Codes that already exist stay as they are.
+
 The readable place ("GUDANG UTAMA › RAK A1") is also written to the old `location` text columns, so every screen and
 printout that already shows a location keeps working; renaming a gudang/rak rewrites those labels.
 """
@@ -18,7 +21,8 @@ import sqlite3
 
 from backend import database as db
 
-CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9._-]{0,11}$")
+WAREHOUSE_PREFIX = "GD-"
+RACK_PREFIX = "R-"
 
 
 def migrate(con: sqlite3.Connection) -> None:
@@ -61,11 +65,9 @@ def migrate(con: sqlite3.Connection) -> None:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _code(v) -> str:
-    c = re.sub(r"\s+", "", (v or "").strip().upper())
-    if not CODE_RE.match(c):
-        raise ValueError("Kode 1-12 karakter: huruf, angka, titik, garis bawah atau tanda minus, tanpa spasi.")
-    return c
+def _next_code(existing: list[str], prefix: str) -> str:
+    numbers = [int(m.group(1)) for c in existing if (m := re.fullmatch(re.escape(prefix) + r"(\d+)", c))]
+    return f"{prefix}{max(numbers, default=0) + 1:02d}"
 
 
 def _name(v) -> str:
@@ -162,17 +164,48 @@ def _warehouse_out(con, wid: int) -> dict:
     return w
 
 
+def _add_rack(con, wid: int, name: str, by: str) -> None:
+    codes = [r["code"] for r in con.execute("SELECT code FROM warehouse_racks WHERE warehouse_id=?", (wid,))]
+    now = db._now()
+    con.execute("""INSERT INTO warehouse_racks (warehouse_id, code, name, is_active, created_at, created_by, updated_at, updated_by)
+                   VALUES (?, ?, ?, 1, ?, ?, ?, ?)""", (wid, _next_code(codes, RACK_PREFIX), name, now, by, now, by))
+
+
+def _save_racks(con, wid: int, rows: list[dict], by: str) -> None:
+    """Rename the racks sent with an id and add those without one. A rack left out is untouched: nothing is removed
+    here. Names are compared as they will end up, so two racks can swap names in one save."""
+    current = {r["id"]: r["name"] for r in con.execute("SELECT id, name FROM warehouse_racks WHERE warehouse_id=?", (wid,))}
+    renames, new_names = {}, []
+    for row in rows:
+        rid, name = row.get("id"), _name(row.get("name"))
+        if rid is None:
+            new_names.append(name)
+        elif rid not in current:
+            raise ValueError("Rak tidak ada di gudang ini.")
+        else:
+            renames[rid] = name
+    final = [renames.get(rid, name) for rid, name in current.items()] + new_names
+    duplicate = next((n for n in final if final.count(n) > 1), None)
+    if duplicate:
+        raise ValueError(f"Rak bernama {duplicate} lebih dari satu di gudang ini.")
+    for rid, name in renames.items():
+        if name != current[rid]:
+            con.execute("UPDATE warehouse_racks SET name=?, updated_at=?, updated_by=? WHERE id=?", (name, db._now(), by, rid))
+    for name in new_names:
+        _add_rack(con, wid, name, by)
+
+
 def create_warehouse(data: dict, by: str) -> dict:
-    code, name = _code(data.get("code")), _name(data.get("name"))
+    name = _name(data.get("name"))
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
-        if con.execute("SELECT 1 FROM warehouses WHERE code=?", (code,)).fetchone():
-            raise ValueError(f"Kode gudang {code} sudah dipakai.")
         if con.execute("SELECT 1 FROM warehouses WHERE name=?", (name,)).fetchone():
             raise ValueError(f"Gudang bernama {name} sudah ada.")
+        code = _next_code([r["code"] for r in con.execute("SELECT code FROM warehouses")], WAREHOUSE_PREFIX)
         now = db._now()
         cur = con.execute("INSERT INTO warehouses (code, name, is_active, created_at, created_by, updated_at, updated_by) VALUES (?, ?, 1, ?, ?, ?, ?)",
                           (code, name, now, by, now, by))
+        _save_racks(con, cur.lastrowid, data.get("racks") or [], by)
         return _warehouse_out(con, cur.lastrowid)
 
 
@@ -182,17 +215,14 @@ def update_warehouse(wid: int, data: dict, by: str) -> dict:
         w = con.execute("SELECT * FROM warehouses WHERE id=?", (wid,)).fetchone()
         if w is None:
             raise LookupError("Gudang tidak ditemukan.")
-        code = _code(data["code"]) if data.get("code") is not None else w["code"]
         name = _name(data["name"]) if data.get("name") is not None else w["name"]
         active = bool(data["is_active"]) if data.get("is_active") is not None else bool(w["is_active"])
-        if con.execute("SELECT 1 FROM warehouses WHERE code=? AND id<>?", (code, wid)).fetchone():
-            raise ValueError(f"Kode gudang {code} sudah dipakai.")
         if con.execute("SELECT 1 FROM warehouses WHERE name=? AND id<>?", (name, wid)).fetchone():
             raise ValueError(f"Gudang bernama {name} sudah ada.")
-        con.execute("UPDATE warehouses SET code=?, name=?, is_active=?, updated_at=?, updated_by=? WHERE id=?",
-                    (code, name, int(active), db._now(), by, wid))
-        if name != w["name"]:
-            _refresh_labels(con, wid)
+        con.execute("UPDATE warehouses SET name=?, is_active=?, updated_at=?, updated_by=? WHERE id=?",
+                    (name, int(active), db._now(), by, wid))
+        _save_racks(con, wid, data.get("racks") or [], by)
+        _refresh_labels(con, wid)
         return _warehouse_out(con, wid)
 
 
@@ -224,41 +254,12 @@ def _rack_out(con, rid: int) -> dict:
     return r
 
 
-def create_rack(wid: int, data: dict, by: str) -> dict:
-    code, name = _code(data.get("code")), _name(data.get("name"))
+def set_rack_active(rid: int, active: bool, by: str) -> dict:
     with db._conn() as con:
         con.execute("BEGIN IMMEDIATE")
-        w = con.execute("SELECT * FROM warehouses WHERE id=?", (wid,)).fetchone()
-        if w is None:
-            raise LookupError("Gudang tidak ditemukan.")
-        if con.execute("SELECT 1 FROM warehouse_racks WHERE warehouse_id=? AND code=?", (wid, code)).fetchone():
-            raise ValueError(f"Kode rak {code} sudah ada di gudang {w['name']}.")
-        if con.execute("SELECT 1 FROM warehouse_racks WHERE warehouse_id=? AND name=?", (wid, name)).fetchone():
-            raise ValueError(f"Rak bernama {name} sudah ada di gudang {w['name']}.")
-        now = db._now()
-        cur = con.execute("""INSERT INTO warehouse_racks (warehouse_id, code, name, is_active, created_at, created_by, updated_at, updated_by)
-                             VALUES (?, ?, ?, 1, ?, ?, ?, ?)""", (wid, code, name, now, by, now, by))
-        return _rack_out(con, cur.lastrowid)
-
-
-def update_rack(rid: int, data: dict, by: str) -> dict:
-    with db._conn() as con:
-        con.execute("BEGIN IMMEDIATE")
-        r = con.execute("SELECT * FROM warehouse_racks WHERE id=?", (rid,)).fetchone()
-        if r is None:
+        if con.execute("SELECT 1 FROM warehouse_racks WHERE id=?", (rid,)).fetchone() is None:
             raise LookupError("Rak tidak ditemukan.")
-        wid = r["warehouse_id"]
-        code = _code(data["code"]) if data.get("code") is not None else r["code"]
-        name = _name(data["name"]) if data.get("name") is not None else r["name"]
-        active = bool(data["is_active"]) if data.get("is_active") is not None else bool(r["is_active"])
-        if con.execute("SELECT 1 FROM warehouse_racks WHERE warehouse_id=? AND code=? AND id<>?", (wid, code, rid)).fetchone():
-            raise ValueError(f"Kode rak {code} sudah ada di gudang ini.")
-        if con.execute("SELECT 1 FROM warehouse_racks WHERE warehouse_id=? AND name=? AND id<>?", (wid, name, rid)).fetchone():
-            raise ValueError(f"Rak bernama {name} sudah ada di gudang ini.")
-        con.execute("UPDATE warehouse_racks SET code=?, name=?, is_active=?, updated_at=?, updated_by=? WHERE id=?",
-                    (code, name, int(active), db._now(), by, rid))
-        if name != r["name"]:
-            _refresh_labels(con, wid)
+        con.execute("UPDATE warehouse_racks SET is_active=?, updated_at=?, updated_by=? WHERE id=?", (int(active), db._now(), by, rid))
         return _rack_out(con, rid)
 
 

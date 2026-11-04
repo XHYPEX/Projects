@@ -19,10 +19,19 @@ async def _run(fn, *args):
         raise HTTPException(status_code=409, detail=str(e))
 
 
-class PlaceIn(BaseModel):
-    code: str | None = None
+class RackIn(BaseModel):
+    id: int | None = None  # empty = a new rack
+    name: str
+
+
+class WarehouseIn(BaseModel):
     name: str | None = None
     is_active: bool | None = None
+    racks: list[RackIn] = []
+
+
+class RackActiveIn(BaseModel):
+    is_active: bool
 
 
 @router.get("/warehouses")
@@ -36,12 +45,12 @@ async def warehouses_summary():
 
 
 @router.post("/warehouses", status_code=201, dependencies=[Depends(require_admin)])
-async def create_warehouse(req: PlaceIn, user: dict = Depends(get_current_user)):
+async def create_warehouse(req: WarehouseIn, user: dict = Depends(get_current_user)):
     return await _run(wh.create_warehouse, req.model_dump(), user["username"])
 
 
 @router.patch("/warehouses/{warehouse_id}", dependencies=[Depends(require_admin)])
-async def update_warehouse(warehouse_id: int, req: PlaceIn, user: dict = Depends(get_current_user)):
+async def update_warehouse(warehouse_id: int, req: WarehouseIn, user: dict = Depends(get_current_user)):
     return await _run(wh.update_warehouse, warehouse_id, req.model_dump(exclude_unset=True), user["username"])
 
 
@@ -50,14 +59,9 @@ async def delete_warehouse(warehouse_id: int):
     return await _run(wh.delete_warehouse, warehouse_id)
 
 
-@router.post("/warehouses/{warehouse_id}/racks", status_code=201, dependencies=[Depends(require_admin)])
-async def create_rack(warehouse_id: int, req: PlaceIn, user: dict = Depends(get_current_user)):
-    return await _run(wh.create_rack, warehouse_id, req.model_dump(), user["username"])
-
-
 @router.patch("/warehouse-racks/{rack_id}", dependencies=[Depends(require_admin)])
-async def update_rack(rack_id: int, req: PlaceIn, user: dict = Depends(get_current_user)):
-    return await _run(wh.update_rack, rack_id, req.model_dump(exclude_unset=True), user["username"])
+async def set_rack_active(rack_id: int, req: RackActiveIn, user: dict = Depends(get_current_user)):
+    return await _run(wh.set_rack_active, rack_id, req.is_active, user["username"])
 
 
 @router.delete("/warehouse-racks/{rack_id}", dependencies=[Depends(require_admin)])

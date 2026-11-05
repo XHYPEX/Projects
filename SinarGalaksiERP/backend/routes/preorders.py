@@ -15,6 +15,7 @@ from backend.database import (
     so_mark_received,
     so_mark_shipped,
     so_shipment_proof,
+    so_shipment_step,
     so_shipping_charge,
     decide_price_request,
     price_actor,
@@ -59,6 +60,7 @@ from backend.database import (
 from backend.schemas import (
     PreorderShipmentReceivedRequest,
     PreorderShipmentRequest,
+    PreorderShipmentStepRequest,
     PreorderPartialHandoverRequest,
     PriceDecisionRequest,
     PaymentFailRequest,
@@ -215,6 +217,7 @@ def _row_to_item(row: dict) -> PreorderItemOut:
         reserved_qty=row.get("reserved_qty") or 0,
         coming_qty=row.get("coming_qty") or 0,
         shortfall_qty=row.get("shortfall_qty") or 0,
+        procurement=row.get("procurement"),
         cancelled_at=row.get("cancelled_at"),
         cancelled_by=row.get("cancelled_by"),
         cancel_kind=row.get("cancel_kind"),
@@ -319,6 +322,7 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
                 plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
                 deposit_confirmed=req.deposit_confirmed, price_actor=price_actor(user), order_source=req.order_source,
                 deposit_proof=proof, fulfillment_method=req.fulfillment_method, shipping=shipping,
+                install_schedule=req.install_schedule,
             ),
         )
     except ValueError as e:
@@ -407,6 +411,7 @@ async def update_preorder_route(
                 set_supplier=set_supplier, supplier_id=req.supplier_id, price_actor=price_actor(user),
                 order_source=req.order_source, set_fulfillment="fulfillment_method" in req.model_fields_set,
                 fulfillment_method=req.fulfillment_method, shipping=req.shipping.model_dump() if req.shipping else None,
+                install_schedule=req.install_schedule,
             ),
         )
     except ValueError as e:
@@ -419,6 +424,18 @@ async def mark_preorder_shipped(preorder_id: str, req: PreorderShipmentRequest, 
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, so_mark_shipped, preorder_id, req.model_dump(), user["username"])
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\""))
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/shipment/step", response_model=PreorderDetail)
+async def preorder_shipment_step(preorder_id: str, req: PreorderShipmentStepRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, so_shipment_step, preorder_id, req.action, user["username"])
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\""))
     except ValueError as e:

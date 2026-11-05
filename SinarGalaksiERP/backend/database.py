@@ -1369,6 +1369,8 @@ def init_db() -> None:
                 con.execute(f"ALTER TABLE preorders ADD COLUMN {col} {ddl}")
         if "is_shipping" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
             con.execute("ALTER TABLE receipt_items ADD COLUMN is_shipping INTEGER NOT NULL DEFAULT 0")
+        if "ship_handed" not in {r["name"] for r in con.execute("PRAGMA table_info(preorder_items)").fetchall()}:
+            con.execute("ALTER TABLE preorder_items ADD COLUMN ship_handed INTEGER NOT NULL DEFAULT 0")
         if "preorder_item_id" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
             con.execute("ALTER TABLE receipt_items ADD COLUMN preorder_item_id INTEGER")
         # --- Additive migration: Retur Barang ---
@@ -2523,7 +2525,7 @@ _SO_SHIPPING_DDL = (
     ("ship_forwarder_name", "TEXT"), ("ship_service", "TEXT"), ("ship_fee_payer", "TEXT"),
     ("ship_fee", "INTEGER NOT NULL DEFAULT 0"), ("ship_fee_unknown", "INTEGER NOT NULL DEFAULT 0"),
     ("ship_status", "TEXT"), ("ship_tracking_no", "TEXT"), ("ship_sent_date", "TEXT"), ("ship_received_date", "TEXT"),
-    ("ship_proof_file", "TEXT"), ("ship_proof_name", "TEXT"),
+    ("ship_proof_file", "TEXT"), ("ship_proof_name", "TEXT"), ("ship_packing", "TEXT"), ("install_schedule", "TEXT"),
 )
 
 
@@ -3840,6 +3842,14 @@ def change_receipt_work_status(
             raise ValueError("Nota sudah berstatus itu.")
         if to_status not in _WORK_TRANSITIONS.get(current, set()):
             raise ValueError("Perpindahan status itu tidak diizinkan.")
+        # Owner 05-11-2026: Pemasangan di Toko starts only once every barang of the order is at the shop.
+        if to_status in ("pengerjaan", "selesai") and row["preorder_id"]:
+            so = con.execute("SELECT fulfillment_method FROM preorders WHERE id=?", (row["preorder_id"],)).fetchone()
+            if so is not None and so["fulfillment_method"] == "pasang":
+                waiting = _so_lines_not_ready(con, [dict(r) for r in con.execute(
+                    "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>?", (row["preorder_id"], PO_LINE_CANCELLED))])
+                if waiting:
+                    raise ValueError("Barang belum lengkap untuk mulai pemasangan: " + ", ".join(waiting) + ".")
         # Owner, 22-10-2026: plate and phone may wait until the work on the vehicle really starts.
         if to_status in ("pengerjaan", "selesai") and not row["preorder_id"] and con.execute(
                 "SELECT 1 FROM receipt_item_technicians WHERE receipt_id=? LIMIT 1", (receipt_id,)).fetchone():
@@ -7987,7 +7997,7 @@ def _so_shipping_columns(con: sqlite3.Connection, method: str | None, shipping: 
     """What the order stores for its method. Leaving Kirim ke Alamat clears the details, and with them the ongkir."""
     if method != "kirim":
         return {**{c: None for c in _SO_SHIP_TEXT_LIMITS}, "ship_forwarder_id": None, "ship_forwarder_name": None,
-                "ship_fee_payer": None, "ship_fee": 0, "ship_fee_unknown": 0}
+                "ship_fee_payer": None, "ship_fee": 0, "ship_fee_unknown": 0, "ship_packing": None}
     data = shipping or {}
     out = {}
     for col, limit in _SO_SHIP_TEXT_LIMITS.items():
@@ -8001,6 +8011,45 @@ def _so_shipping_columns(con: sqlite3.Connection, method: str | None, shipping: 
     out["ship_recipient_phone"] = phone or None
     out["ship_forwarder_id"], out["ship_forwarder_name"] = _so_forwarder(con, data.get("ship_forwarder_id"))
     return {**out, **_so_fee_columns(data)}
+
+
+def _so_install_schedule(method: str | None, value: str | None) -> str | None:
+    """Jadwal Pemasangan: for Pemasangan di Toko only, optional. A date, or a date and time."""
+    value = (value or "").strip()
+    if method != "pasang" or not value:
+        return None
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?", value):
+        raise ValueError("Jadwal pemasangan tidak valid.")
+    return value
+
+
+def _so_ship_stage(row: dict, ready: bool) -> str | None:
+    """Pengiriman Customer of a Kirim ke Alamat order (owner 05-11-2026). Menunggu Barang and Siap Dipacking follow the
+    goods; staff move packing, Dikirim and Diterima. It stands apart from each line's Pengadaan."""
+    if row.get("fulfillment_method") != "kirim" or row.get("is_draft") or row.get("cancelled_at"):
+        return None
+    if row.get("ship_status") == "diterima":
+        return "diterima"
+    if row.get("ship_status") == "dikirim":
+        return "sudah_dikirim"
+    if not ready:
+        return "menunggu_barang"
+    return {"sedang": "sedang_dipacking", "selesai": "siap_dikirim"}.get(row.get("ship_packing"), "siap_dipacking")
+
+
+def _so_item_procurement(item: dict) -> str | None:
+    """Pengadaan Barang of one line, read from its stock and Purchase Orders; nobody sets it by hand. A line that takes
+    both shelf stock and a Purchase Order shows the part still under way."""
+    if item["status"] == PO_LINE_CANCELLED or item.get("source") == "jasa":
+        return None
+    links = item.get("supplier_pos") or []
+    if item["status"] in PO_ARRIVED_STATUSES:
+        return "diterima_toko" if links else "stok_dialokasikan"
+    if links:
+        return "dipesan" if any(l["po_status"] != "draft" for l in links) else "draft_po"
+    if item.get("reserved_qty", 0) >= item["quantity"] and not item.get("coming_qty"):
+        return "stok_dialokasikan"
+    return "belum_dipesan"
 
 
 def _so_require_shipping(row: dict) -> None:
@@ -8064,6 +8113,8 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | N
     out["line_suppliers"] = sorted({i["supplier_name"] for i in live if i.get("supplier_name")})
     # Owner 31-10-2026: the list says "Stok Toko" for goods taken from the shelf instead of "Otomatis".
     out["line_sources"] = sorted({i.get("source") or "auto" for i in live})
+    out["ship_stage"] = _so_ship_stage(row, bool(live) and all(
+        i["status"] in PO_ARRIVED_STATUSES or i.get("source") == "jasa" or i.get("_allocated") for i in live))
     return out
 
 
@@ -8373,6 +8424,7 @@ def create_preorder(
     deposit_proof: tuple[str, str | None] | None = None,
     fulfillment_method: str | None = None,
     shipping: dict | None = None,
+    install_schedule: str | None = None,
 ) -> dict:
     """A deposit given at creation is recorded as the first payment ("DP awal"); on a published PO it
     is booked straight onto the PO's invoice, which is created here too. `deposit_proof` = (stored file, original
@@ -8392,7 +8444,8 @@ def create_preorder(
         )
         method = _so_fulfillment(fulfillment_method)
         ship_columns = _so_shipping_columns(con, method, shipping)
-        _so_set_columns(con, preorder_id, {"fulfillment_method": method, **ship_columns})
+        _so_set_columns(con, preorder_id, {"fulfillment_method": method, **ship_columns,
+                                           "install_schedule": _so_install_schedule(method, install_schedule)})
         if not is_draft:
             _so_require_shipping({"fulfillment_method": method, **ship_columns})
         if deposit > 0:
@@ -8443,6 +8496,8 @@ def get_preorder(preorder_id: str) -> dict | None:
         ).fetchone()["paid"]
         invoice = po_invoices(con, [row["receipt_id"]]).get(row["receipt_id"])
         out = _preorder_row({**dict(row), "draft_pending": _preorder_pending_by_order(con).get(preorder_id, 0)}, items, paid, invoice)
+        live = [i for i in items if i["status"] != PO_LINE_CANCELLED]
+        out["ship_stage"] = _so_ship_stage(out, bool(live) and not _so_lines_not_ready(con, live))
         out["invoices"] = [{
             "id": i["id"], "receipt_no": i["receipt_no"], "invoice_seq": i["invoice_seq"], "total": i["total"],
             "amount_paid": i["amount_paid"], "status": i["status"], "work_status": i["work_status"],
@@ -8493,6 +8548,7 @@ def get_preorder_items(preorder_id: str) -> list[dict]:
             it["reserved_qty"] = ln["reserved"] if ln else 0
             it["coming_qty"] = ln["coming"] if ln else 0
             it["shortfall_qty"] = ln["shortfall"] if ln else 0
+            it["procurement"] = _so_item_procurement(it)
         return items
 
 
@@ -8877,6 +8933,9 @@ def _po_invoice_sync(
     # A line taken back from Terpasang means the goods did not leave after all: the order is no longer Dikirim.
     if po.get("ship_status") and any(pi["status"] not in PO_INSTALLED_STATUSES for pi in po_items):
         _so_set_columns(con, preorder_id, {"ship_status": None, "ship_received_date": None})
+    # Goods no longer complete (a new line, a line taken back): whatever was packed has to be packed again.
+    elif po.get("ship_packing") and not po.get("ship_status") and _so_lines_not_ready(con, po_items):
+        _so_set_columns(con, preorder_id, {"ship_packing": None})
     active_ids = {i["id"] for i in invoices}
     mine: dict[str, list[dict]] = {i["id"]: [] for i in invoices}
     for pi in po_items:
@@ -9453,6 +9512,7 @@ def update_preorder(
     set_fulfillment: bool = False,
     fulfillment_method: str | None = None,
     shipping: dict | None = None,
+    install_schedule: str | None = None,
 ) -> dict:
     """Items are matched by id rather than deleted and re-inserted (the pattern
     receipts use), because a line item owns its stage and its status history —
@@ -9492,7 +9552,11 @@ def update_preorder(
             method = _so_fulfillment(fulfillment_method)
             if existing.get("ship_status") and method != "kirim":
                 raise ValueError("Paket Sales Order ini sudah dikirim, jadi metode pemenuhannya tidak bisa diganti.")
-            _so_set_columns(con, preorder_id, {"fulfillment_method": method, **_so_shipping_columns(con, method, shipping)})
+            ship_columns = _so_shipping_columns(con, method, shipping)
+            if method == "kirim":  # editing the address must not undo the packing
+                ship_columns["ship_packing"] = existing.get("ship_packing")
+            _so_set_columns(con, preorder_id, {"fulfillment_method": method, **ship_columns,
+                                               "install_schedule": _so_install_schedule(method, install_schedule)})
         final = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
         if not final["is_draft"] and (set_fulfillment or existing["is_draft"]):
             _so_require_shipping(final)
@@ -9729,6 +9793,8 @@ def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
             waiting = _so_lines_not_ready(con, [ln for ln in lines if ln["status"] not in PO_INSTALLED_STATUSES])
             if waiting:
                 raise ValueError("Barang ini belum siap: " + ", ".join(waiting) + ". Tunggu sampai semua barang ada di toko.")
+            if po.get("ship_packing") != "selesai":
+                raise ValueError("Selesaikan packing dulu sebelum menandai paket dikirim.")
         now = _now()
         before = _po_invoice_snapshot(con, preorder_id)
         tracking = (data.get("ship_tracking_no") or "").strip()[:80] or None
@@ -9738,7 +9804,7 @@ def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
             "ship_sent_date": sent_date, "updated_at": now})
         for ln in lines:
             if ln["status"] not in PO_INSTALLED_STATUSES:
-                con.execute("UPDATE preorder_items SET status='terpasang' WHERE id=?", (ln["id"],))
+                con.execute("UPDATE preorder_items SET status='terpasang', ship_handed=1 WHERE id=?", (ln["id"],))
                 _log_preorder_status(con, preorder_id, ln["id"], ln["product_name"], "terpasang", now, by, ln["status"])
         invoice_id = _po_invoice_sync(con, preorder_id, by, before)
         _log_receipt_event(con, invoice_id, "status",
@@ -9762,6 +9828,47 @@ def so_mark_received(preorder_id: str, received_date: str | None, proof: tuple[s
         if po.get("receipt_id"):
             _log_receipt_event(con, po["receipt_id"], "status", "Paket diterima customer", by)
     return get_preorder(preorder_id), (po.get("ship_proof_file") if proof else None)
+
+
+def so_shipment_step(preorder_id: str, action: str, by: str | None) -> dict:
+    """Mulai Packing, Selesai Packing, or one step back (owner: the steps go in order, and a wrong click can be undone).
+    Back from Sudah Dikirim returns exactly the lines this shipment handed over, and their stock."""
+    with _conn() as con:
+        po = _so_load_shipment(con, preorder_id)
+        lines = [dict(r) for r in con.execute("SELECT * FROM preorder_items WHERE preorder_id=? AND status<>?",
+                                              (preorder_id, PO_LINE_CANCELLED))]
+        stage = _so_ship_stage(po, bool(lines) and not _so_lines_not_ready(con, lines))
+        now = _now()
+        columns: dict
+        if action == "mulai" and stage == "siap_dipacking":
+            columns, note = {"ship_packing": "sedang"}, "Packing dimulai"
+        elif action == "selesai" and stage == "sedang_dipacking":
+            columns, note = {"ship_packing": "selesai"}, "Packing selesai, paket siap dikirim"
+        elif action == "mundur" and stage == "sedang_dipacking":
+            columns, note = {"ship_packing": None}, "Status kembali ke Siap Dipacking"
+        elif action == "mundur" and stage == "siap_dikirim":
+            columns, note = {"ship_packing": "sedang"}, "Status kembali ke Sedang Dipacking"
+        elif action == "mundur" and stage == "diterima":
+            columns, note = {"ship_status": "dikirim", "ship_received_date": None}, "Status kembali ke Sudah Dikirim"
+        elif action == "mundur" and stage == "sudah_dikirim":
+            invoice = con.execute("SELECT * FROM receipts WHERE id=?", (po["receipt_id"],)).fetchone()
+            if invoice is not None and _is_closed(invoice):
+                raise ValueError("Invoice Sales Order ini sudah lunas dan selesai (ditutup). Minta admin membukanya kembali di Kasir dulu.")
+            before = _po_invoice_snapshot(con, preorder_id)
+            for ln in lines:
+                if ln["ship_handed"] and ln["status"] in PO_INSTALLED_STATUSES:
+                    con.execute("UPDATE preorder_items SET status='sampai_di_toko', ship_handed=0 WHERE id=?", (ln["id"],))
+                    _log_preorder_status(con, preorder_id, ln["id"], ln["product_name"], "sampai_di_toko", now, by, ln["status"])
+            _so_set_columns(con, preorder_id, {"ship_status": None, "ship_received_date": None, "updated_at": now})
+            _po_invoice_sync(con, preorder_id, by, before)
+            _log_receipt_event(con, po["receipt_id"], "status", "Status kembali ke Siap Dikirim; stok barang dikembalikan", by)
+            return get_preorder(preorder_id)
+        else:
+            raise ValueError("Langkah itu tidak bisa dilakukan pada status pengiriman sekarang. Muat ulang halaman.")
+        _so_set_columns(con, preorder_id, {**columns, "updated_at": now})
+        if po.get("receipt_id"):
+            _log_receipt_event(con, po["receipt_id"], "status", note, by)
+    return get_preorder(preorder_id)
 
 
 def so_shipment_proof(preorder_id: str) -> str | None:

@@ -1158,6 +1158,10 @@ class PreorderShipmentRequest(BaseModel):
     ship_fee_unknown: bool = False
 
 
+class PreorderShipmentStepRequest(BaseModel):
+    action: str  # mulai | selesai | mundur
+
+
 class PreorderShipmentReceivedRequest(BaseModel):
     received_date: str | None = None
     # Photo of the goods received {name, content_type, data (base64)}; optional.
@@ -1189,6 +1193,7 @@ class PreorderRequest(BaseModel):
     order_source: str = "walk_in"  # walk_in | whatsapp: where the order came in
     fulfillment_method: str | None = None  # ambil | kirim | pasang
     shipping: PreorderShippingInfo | None = None  # for kirim
+    install_schedule: str | None = None  # for pasang: YYYY-MM-DD or YYYY-MM-DDTHH:MM
 
 
 class PreorderUpdateRequest(BaseModel):
@@ -1208,6 +1213,7 @@ class PreorderUpdateRequest(BaseModel):
     order_source: str | None = None  # omitted = keep
     fulfillment_method: str | None = None  # omitted = keep (with its shipping details)
     shipping: PreorderShippingInfo | None = None
+    install_schedule: str | None = None
 
 
 class PreorderItemStatusRequest(BaseModel):
@@ -1357,6 +1363,8 @@ class PreorderItemOut(BaseModel):
     reserved_qty: int = 0
     coming_qty: int = 0
     shortfall_qty: int = 0
+    # Pengadaan Barang: stok_dialokasikan | draft_po | dipesan | diterima_toko | belum_dipesan; null = jasa / cancelled
+    procurement: str | None = None
     # K-13: set when the line was cancelled (status 'dibatalkan').
     cancelled_at: str | None = None
     cancelled_by: str | None = None
@@ -1401,6 +1409,10 @@ class PreorderOut(BaseModel):
     ship_sent_date: str | None = None
     ship_received_date: str | None = None
     ship_proof_name: str | None = None
+    ship_packing: str | None = None  # null | sedang | selesai
+    # Pengiriman Customer: menunggu_barang | siap_dipacking | sedang_dipacking | siap_dikirim | sudah_dikirim | diterima
+    ship_stage: str | None = None
+    install_schedule: str | None = None
     shipping_charge: int = 0  # the ongkir inside `total`
     supplier_id: int | None = None
     supplier_name: str | None = None

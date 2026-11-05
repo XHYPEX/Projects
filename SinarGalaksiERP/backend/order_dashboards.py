@@ -58,6 +58,11 @@ def _ymd(value: str | None) -> str | None:
 
 # ── Sales Order ──────────────────────────────────────────────────────────────
 
+SO_SHIP_STAGE_STATUS = {"siap_dipacking": ("siap_dipacking", "Siap dipacking"), "sedang_dipacking": ("sedang_dipacking", "Sedang dipacking"),
+                        "siap_dikirim": ("siap_dikirim", "Siap dikirim"), "sudah_dikirim": ("dikirim", "Sudah dikirim"),
+                        "diterima": ("diterima", "Diterima")}
+
+
 def _so_line_links(con: sqlite3.Connection) -> dict[int, list[dict]]:
     """preorder_item_id → its live Purchase Order lines, each with the best ETA known for what is still open."""
     pkg_eta: dict[int, str] = {}
@@ -179,12 +184,7 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
 
     # Owner 05-11-2026: a Kirim ke Alamat order is sent, not picked up.
     if row.get("fulfillment_method") == "kirim":
-        if row.get("ship_status") == "diterima":
-            status_key, status_label = "diterima", "Diterima"
-        elif row.get("ship_status") == "dikirim":
-            status_key, status_label = "dikirim", "Dikirim"
-        elif status_key in ("siap", "dialokasikan"):
-            status_key, status_label = "siap_dikirim", "Siap dikirim"
+        status_key, status_label = SO_SHIP_STAGE_STATUS.get(row.get("ship_stage"), (status_key, status_label))
 
     actions: list[dict] = []
     if stage != "selesai":
@@ -208,7 +208,7 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
         if stage == "siap" and work_status not in ("pengerjaan", "selesai") and status_key != "dititipkan":
             what = summary if len(lines) == 1 else f"{len(lines)} jenis barang"
             actions.append({"kind": "hubungi_customer", "button": "Hubungi Customer",
-                            "text": f"{what} siap dikirim — lengkapi ongkir dan kirim paketnya" if row.get("fulfillment_method") == "kirim"
+                            "text": f"{what} siap — lanjutkan packing dan pengiriman" if row.get("fulfillment_method") == "kirim"
                             else f"{what} siap — hubungi customer untuk pemasangan / pengambilan"})
 
     due = row["invoice_total"] if row["invoice_total"] is not None else row["total"]

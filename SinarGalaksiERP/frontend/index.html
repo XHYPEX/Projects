@@ -1299,7 +1299,7 @@
                     <label for="customer-phone" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nomor HP <span class="normal-case font-normal">(wajib saat mulai pemasangan)</span></label>
                     <input id="customer-phone" type="tel" inputmode="tel" placeholder="0812xxxxxxxx" autocomplete="off"
                     class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    oninput="this.value=this.value.replace(/[^0-9+\s\-.()]/g,''); markActiveTabDirty(); onCashierPhoneEdited();" />
+                    oninput="markActiveTabDirty(); onCashierPhoneEdited();" />
                   </div>
                   <div>
                     <label for="customer-name" class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Nama <span class="normal-case font-normal">(opsional)</span></label>
@@ -5087,6 +5087,30 @@ function shouldUppercase(el) {
   return true;
 }
 
+// Owner 05-11-2026: a phone number field takes digits only, in every module. A number pasted from WhatsApp
+// (+62 831-7872-1764) becomes 083178721764. Runs in the capture phase, so a field's own oninput (customer lookup,
+// recipient following the customer) already sees the clean value. Pengaturan Perusahaan keeps its own format: the
+// shop's number prints on the letterhead as typed there (data-free-phone).
+function isPhoneField(el) {
+  if (el.tagName !== "INPUT" || el.dataset.freePhone !== undefined) return false;
+  return el.type === "tel" || el.inputMode === "tel" || /phone/i.test(el.id);
+}
+function phoneDigitsOnly(raw, pasted) {
+  const text = raw.trim();
+  const digits = text.replace(/\D/g, "");
+  return (/^\+\s*62/.test(text) || (pasted && digits.startsWith("62"))) ? "0" + digits.slice(2) : digits;
+}
+document.addEventListener("input", (event) => {
+  const el = event.target;
+  if (!isPhoneField(el)) return;
+  const clean = phoneDigitsOnly(el.value, event.inputType === "insertFromPaste");
+  if (clean === el.value) return;
+  // The caret stays after the same digit it was after; a pasted number just ends at its end.
+  const kept = event.inputType === "insertFromPaste" ? clean.length : el.value.slice(0, el.selectionStart ?? 0).replace(/\D/g, "").length;
+  el.value = clean;
+  try { el.setSelectionRange(kept, kept); } catch (_) {}
+}, true);
+
 document.addEventListener("input", (event) => {
   const el = event.target;
   if (!shouldUppercase(el)) return;
@@ -7774,7 +7798,7 @@ function validateReceiptForm(payload, starting = false) {
     return false;
   }
   if (phoneDigits && !/^\+?\d{7,15}$/.test(phoneDigits)) {
-    showToast("Nomor HP harus 7-15 digit (boleh diawali +).");
+    showToast("Nomor HP harus 7-15 digit angka.");
     return false;
   }
   if (payload.items.length === 0) {
@@ -11965,7 +11989,7 @@ async function deleteCustomer(id) {
 }
 
 // ── Master Customer: Tambah / Ubah form ──────────────────────────────────────
-const CUSTOMER_FIELD_HINTS = { phone: "7-15 digit, boleh diawali +." };
+const CUSTOMER_FIELD_HINTS = { phone: "7-15 digit angka." };
 
 function readCustomerForm() {
   const val = (id) => document.getElementById(id).value.trim();
@@ -11989,7 +12013,7 @@ function customerFieldError(key, v) {
     case "phone": {
       const phone = normalizePhone(v.phone);
       if (!phone) return "No. telp wajib diisi.";
-      return PHONE_PATTERN.test(phone) ? "" : "No. telp harus 7-15 digit (boleh diawali +).";
+      return PHONE_PATTERN.test(phone) ? "" : "No. telp harus 7-15 digit angka.";
     }
     case "email":
       return !v.email || EMAIL_PATTERN.test(v.email) ? "" : "Format email belum benar.";
@@ -31121,7 +31145,7 @@ function coRender() {
       <p class="text-sm text-muted mt-1">Identitas resmi toko dan rekening yang boleh dicetak pada Surat Penawaran Harga. Hanya Admin yang dapat mengubah.</p></div></div>
     <div class="grid xl:grid-cols-2 gap-4 items-start">
       ${qtCard("Identitas Toko", `<div class="grid sm:grid-cols-2 gap-3">${f("name", "Nama toko", true)}${f("tagline", "Bidang usaha")}${f("city", "Kota surat", true)}${f("region", "Provinsi")}
-        <div class="sm:col-span-2">${f("address", "Alamat")}</div>${f("phone", "Telepon / WhatsApp")}${f("email", "Email", false, 'type="email"')}
+        <div class="sm:col-span-2">${f("address", "Alamat")}</div>${f("phone", "Telepon / WhatsApp", false, "data-free-phone")}${f("email", "Email", false, 'type="email"')}
         ${f("signer_name", "Penanda tangan default", true)}${f("signer_title", "Jabatan penanda tangan", false, "data-keep-case")}${f("quote_valid_days", "Masa berlaku penawaran (hari)", true, 'inputmode="numeric"')}</div>
         <div class="flex justify-end mt-4"><button type="button" onclick="coSave()" class="${RTS_BTN} font-semibold">Simpan Identitas</button></div>`)}
       ${qtCard("Rekening Resmi", `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-bg2/70 text-left text-[11px] uppercase tracking-wider text-muted"><th class="px-3 py-2">Bank</th><th class="px-3 py-2">Nomor</th><th class="px-3 py-2">Atas nama</th><th class="px-3 py-2">Status</th><th></th></tr></thead>

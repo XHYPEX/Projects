@@ -105,7 +105,7 @@ def _validate_phone(raw: str) -> str:
     if not PHONE_RE.match(phone):
         raise HTTPException(
             status_code=422,
-            detail="Nomor HP pelanggan harus 7-15 digit (boleh diawali tanda +).",
+            detail="Nomor HP pelanggan harus 7-15 digit angka.",
         )
     return phone
 

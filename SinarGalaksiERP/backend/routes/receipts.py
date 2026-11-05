@@ -283,7 +283,7 @@ async def create_new_receipt(req: ReceiptRequest, user: dict = Depends(get_curre
     if not customer_phone and req.customer_id is None and installing:
         raise HTTPException(status_code=422, detail="Nomor HP wajib diisi untuk mulai pengerjaan (ada barang yang dipasang teknisi).")
     if customer_phone and not PHONE_RE.match(customer_phone):
-        raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit (boleh diawali tanda +).")
+        raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit angka.")
     customer_name = _clean_name(req.customer_name)
     if req.customer_id is not None:
         await _require_customer(loop, req.customer_id)
@@ -488,7 +488,7 @@ async def update_receipt_route(receipt_id: str, req: ReceiptUpdateRequest, user:
             # Blank next to a picked customer: take that customer's number. Blank on a walk-in nota: no phone.
             customer_phone = None if req.customer_id is not None else ""
         elif not PHONE_RE.match(customer_phone):
-            raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit (boleh diawali tanda +).")
+            raise HTTPException(status_code=422, detail="Nomor HP harus 7-15 digit angka.")
     if req.customer_id is not None:
         # Echoing back the receipt's current customer is always fine, even if they
         # have since been deactivated; only picking a *different* one is checked.

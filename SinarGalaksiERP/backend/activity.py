@@ -66,6 +66,7 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
     (re.compile(r"^/api/preorders/[^/]+/items/\d+/status$"), "PATCH", "Ubah status Sales Order", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/status$"), "PATCH", "Ubah status Sales Order", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/shipment$"), "POST", "Tandai paket Sales Order dikirim", "preorder"),
+    (re.compile(r"^/api/preorders/[^/]+/notes$"), "POST", "Tambah catatan perkembangan Sales Order", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/shipment/step$"), "POST", "Ubah status pengiriman Sales Order", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/shipment/received$"), "POST", "Tandai paket Sales Order diterima", "preorder"),
     (re.compile(r"^/api/preorders/[^/]+/items/\d+/price/approve$"), "POST", "Setujui harga khusus Sales Order", "preorder"),

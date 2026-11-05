@@ -58,9 +58,9 @@ def _ymd(value: str | None) -> str | None:
 
 # ── Sales Order ──────────────────────────────────────────────────────────────
 
-SO_SHIP_STAGE_STATUS = {"siap_dipacking": ("siap_dipacking", "Siap dipacking"), "sedang_dipacking": ("sedang_dipacking", "Sedang dipacking"),
+SO_SHIP_STAGE_STATUS = {"barang_tersedia": ("barang_tersedia", "Barang sudah tersedia"), "sedang_dipacking": ("sedang_dipacking", "Sedang dipacking"),
                         "siap_dikirim": ("siap_dikirim", "Siap dikirim"), "sudah_dikirim": ("dikirim", "Sudah dikirim"),
-                        "diterima": ("diterima", "Diterima")}
+                        "dalam_perjalanan": ("dalam_perjalanan", "Dalam perjalanan"), "diterima": ("diterima", "Sudah diterima")}
 
 
 def _so_line_links(con: sqlite3.Connection) -> dict[int, list[dict]]:

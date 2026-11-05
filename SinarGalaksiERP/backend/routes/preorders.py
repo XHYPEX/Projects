@@ -12,6 +12,8 @@ from backend import payment_proofs
 from backend.auth import get_current_user, require_admin
 from backend.routes.quotations import guard_conversion, record_conversion
 from backend.database import (
+    add_preorder_note,
+    get_preorder_timeline,
     so_mark_received,
     so_mark_shipped,
     so_shipment_proof,
@@ -60,6 +62,7 @@ from backend.database import (
 from backend.schemas import (
     PreorderShipmentReceivedRequest,
     PreorderShipmentRequest,
+    PreorderNoteRequest,
     PreorderShipmentStepRequest,
     PreorderPartialHandoverRequest,
     PriceDecisionRequest,
@@ -269,6 +272,7 @@ async def _detail(preorder_id: str) -> PreorderDetail:
         dp_unallocated=dp_free,
         items=[_row_to_item(i) for i in items],
         history=[PreorderHistoryOut(**h) for h in history],
+        timeline=await loop.run_in_executor(None, get_preorder_timeline, preorder_id),
         payments=[PreorderPaymentOut(**p) for p in payments],
     )
 
@@ -424,6 +428,18 @@ async def mark_preorder_shipped(preorder_id: str, req: PreorderShipmentRequest, 
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(None, so_mark_shipped, preorder_id, req.model_dump(), user["username"])
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\""))
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/notes", response_model=PreorderDetail, status_code=201)
+async def add_preorder_progress_note(preorder_id: str, req: PreorderNoteRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, add_preorder_note, preorder_id, req.text, user["username"])
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e).strip("'\""))
     except ValueError as e:

@@ -1159,7 +1159,11 @@ class PreorderShipmentRequest(BaseModel):
 
 
 class PreorderShipmentStepRequest(BaseModel):
-    action: str  # mulai | selesai | mundur
+    action: str  # mulai | selesai | perjalanan | mundur
+
+
+class PreorderNoteRequest(BaseModel):
+    text: str
 
 
 class PreorderShipmentReceivedRequest(BaseModel):
@@ -1404,14 +1408,15 @@ class PreorderOut(BaseModel):
     ship_fee_payer: str | None = None
     ship_fee: int = 0
     ship_fee_unknown: bool = False
-    ship_status: str | None = None  # null | dikirim | diterima
+    ship_status: str | None = None  # null | dikirim | perjalanan | diterima
     ship_tracking_no: str | None = None
     ship_sent_date: str | None = None
     ship_received_date: str | None = None
     ship_proof_name: str | None = None
     ship_packing: str | None = None  # null | sedang | selesai
-    # Pengiriman Customer: menunggu_barang | siap_dipacking | sedang_dipacking | siap_dikirim | sudah_dikirim | diterima
+    # Pengiriman Customer: menunggu_barang | barang_tersedia | sedang_dipacking | siap_dikirim | sudah_dikirim | dalam_perjalanan | diterima
     ship_stage: str | None = None
+    goods_ready: bool = False  # Kesiapan Barang: every line of the order is at the shop or needs no goods
     install_schedule: str | None = None
     shipping_charge: int = 0  # the ongkir inside `total`
     supplier_id: int | None = None
@@ -1468,6 +1473,8 @@ class PreorderDetail(PreorderOut):
     cancel_check: dict | None = None
     # K-19: the order's invoices (main first); one entry in the normal flow.
     invoices: list[PreorderInvoiceOut] = []
+    # Oldest first: {at, by, kind, text}.
+    timeline: list[dict] = []
 
 
 class PreorderCancelRequest(BaseModel):

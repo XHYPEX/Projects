@@ -1362,6 +1362,11 @@ def init_db() -> None:
         # Owner, 24-10-2026: where the order came in (walk-in at the shop or by WhatsApp).
         if "order_source" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
             con.execute("ALTER TABLE preorders ADD COLUMN order_source TEXT NOT NULL DEFAULT 'walk_in'")
+        # Owner 05-11-2026: what happened on the order besides its lines' stages (packing, resi, notes), for the timeline.
+        con.execute("""CREATE TABLE IF NOT EXISTS preorder_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, preorder_id TEXT NOT NULL, at TEXT NOT NULL, by_user TEXT,
+            kind TEXT NOT NULL, note TEXT NOT NULL)""")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_preorder_events_preorder ON preorder_events(preorder_id)")
         # Owner 05-11-2026: how the order reaches the customer, and the delivery details of a Kirim ke Alamat order.
         preorder_cols = {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}
         for col, ddl in _SO_SHIPPING_DDL:
@@ -3843,8 +3848,8 @@ def change_receipt_work_status(
         if to_status not in _WORK_TRANSITIONS.get(current, set()):
             raise ValueError("Perpindahan status itu tidak diizinkan.")
         # Owner 05-11-2026: Pemasangan di Toko starts only once every barang of the order is at the shop.
-        if to_status in ("pengerjaan", "selesai") and row["preorder_id"]:
-            so = con.execute("SELECT fulfillment_method FROM preorders WHERE id=?", (row["preorder_id"],)).fetchone()
+        so = con.execute("SELECT fulfillment_method FROM preorders WHERE id=?", (row["preorder_id"],)).fetchone() if row["preorder_id"] else None
+        if to_status in ("pengerjaan", "selesai"):
             if so is not None and so["fulfillment_method"] == "pasang":
                 waiting = _so_lines_not_ready(con, [dict(r) for r in con.execute(
                     "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>?", (row["preorder_id"], PO_LINE_CANCELLED))])
@@ -3886,6 +3891,10 @@ def change_receipt_work_status(
         labels = {"belum": "Belum Dikerjakan", "pengerjaan": "Dalam Pengerjaan", "selesai": "Pengerjaan Selesai"}
         text = f"Status: {labels[to_status]}" + (f" — {note}" if note else "")
         _log_receipt_event(con, receipt_id, "status", text, changed_by)
+        if so is not None and so["fulfillment_method"] == "pasang":
+            _so_event(con, row["preorder_id"], "pemasangan", {
+                "pengerjaan": "Pemasangan dimulai" if current != "selesai" else "Pemasangan dibuka kembali",
+                "selesai": "Pemasangan selesai", "belum": "Status kembali ke Menunggu Pemasangan"}[to_status], changed_by)
         _incentives().sync_receipt(con, receipt_id, changed_by)
         return dict(con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone())
 
@@ -7961,6 +7970,7 @@ def _preorder_source(source: str | None) -> str:
 SO_FULFILLMENT_METHODS = ("ambil", "kirim", "pasang")
 SO_FEE_PAYERS = ("customer", "toko", "tujuan")
 SO_SHIPPING_LINE_NAME = "ONGKOS KIRIM"
+SO_FULFILLMENT_LABELS = {"ambil": "Ambil di Toko (Tanpa Pemasangan)", "kirim": "Kirim ke Alamat Customer", "pasang": "Pemasangan di Toko"}
 _SO_SHIP_TEXT_LIMITS = {"ship_recipient_name": 120, "ship_recipient_phone": 20, "ship_province": 80, "ship_city": 80,
                         "ship_district": 80, "ship_village": 80, "ship_postal_code": 10, "ship_landmark": 200,
                         "ship_address": 500, "ship_service": 80}
@@ -8023,18 +8033,25 @@ def _so_install_schedule(method: str | None, value: str | None) -> str | None:
     return value
 
 
+def _so_event(con: sqlite3.Connection, preorder_id: str, kind: str, note: str, by: str | None) -> None:
+    con.execute("INSERT INTO preorder_events (preorder_id, at, by_user, kind, note) VALUES (?, ?, ?, ?, ?)",
+                (preorder_id, _now(), by, kind, note))
+
+
 def _so_ship_stage(row: dict, ready: bool) -> str | None:
-    """Pengiriman Customer of a Kirim ke Alamat order (owner 05-11-2026). Menunggu Barang and Siap Dipacking follow the
-    goods; staff move packing, Dikirim and Diterima. It stands apart from each line's Pengadaan."""
+    """Pengiriman Customer of a Kirim ke Alamat order (owner 05-11-2026). Menunggu Barang and Barang Sudah Tersedia follow
+    the goods; staff move packing, Dikirim, Dalam Perjalanan and Diterima. It stands apart from each line's Pengadaan."""
     if row.get("fulfillment_method") != "kirim" or row.get("is_draft") or row.get("cancelled_at"):
         return None
     if row.get("ship_status") == "diterima":
         return "diterima"
+    if row.get("ship_status") == "perjalanan":
+        return "dalam_perjalanan"
     if row.get("ship_status") == "dikirim":
         return "sudah_dikirim"
     if not ready:
         return "menunggu_barang"
-    return {"sedang": "sedang_dipacking", "selesai": "siap_dikirim"}.get(row.get("ship_packing"), "siap_dipacking")
+    return {"sedang": "sedang_dipacking", "selesai": "siap_dikirim"}.get(row.get("ship_packing"), "barang_tersedia")
 
 
 def _so_item_procurement(item: dict) -> str | None:
@@ -8052,16 +8069,40 @@ def _so_item_procurement(item: dict) -> str | None:
     return "belum_dipesan"
 
 
+def _so_log_shipping_changes(con: sqlite3.Connection, preorder_id: str, before: dict, after: dict, by: str | None) -> None:
+    """What a save changed on the fulfilment, in the words of the timeline. Filling a brand new order logs nothing."""
+    if before.get("fulfillment_method") != after.get("fulfillment_method"):
+        _so_event(con, preorder_id, "pemenuhan", f"Metode pemenuhan: {SO_FULFILLMENT_LABELS.get(after.get('fulfillment_method'), 'belum diatur')}", by)
+    if after.get("fulfillment_method") != "kirim":
+        return
+    if any((before.get(c) or None) != (after.get(c) or None) for c in _SO_SHIP_TEXT_LIMITS if c != "ship_service"):
+        _so_event(con, preorder_id, "pengiriman", "Detail penerima dan alamat diperbarui", by)
+    if (before.get("ship_forwarder_id"), before.get("ship_service")) != (after.get("ship_forwarder_id"), after.get("ship_service")) and after.get("ship_forwarder_name"):
+        _so_event(con, preorder_id, "pengiriman", "Ekspedisi: " + " / ".join(x for x in (after["ship_forwarder_name"], after.get("ship_service")) if x), by)
+    fee = lambda r: (r.get("ship_fee_payer"), r.get("ship_fee") or 0, bool(r.get("ship_fee_unknown")))
+    if before.get("fulfillment_method") == "kirim" and fee(before) != fee(after) or (before.get("fulfillment_method") != "kirim" and not after.get("ship_fee_unknown") and after.get("ship_fee")):
+        text = "belum ditentukan" if after.get("ship_fee_unknown") else _rp(after.get("ship_fee") or 0)
+        payer = {"customer": "ditagih ke customer", "toko": "ditanggung toko", "tujuan": "bayar di tujuan"}.get(after.get("ship_fee_payer"), "")
+        _so_event(con, preorder_id, "pengiriman", f"Ongkir: {text}" + (f" ({payer})" if payer else ""), by)
+
+
+def _so_require_method(row: dict) -> None:
+    """Owner 05-11-2026: Sumber Order says where the order came from and decides nothing; the method is chosen on purpose."""
+    if not row.get("fulfillment_method"):
+        raise ValueError("Pilih metode pemenuhan sebelum Sales Order diterbitkan. Draft boleh dikosongkan.")
+
+
 def _so_require_shipping(row: dict) -> None:
-    """Drafts may stay empty; a published Kirim ke Alamat order must say who gets the goods and where."""
+    """Owner 05-11-2026: the address may follow after the order is published (customers often send it later), but a
+    package does not leave without it."""
     if row.get("fulfillment_method") != "kirim":
         return
     if not row.get("ship_recipient_name"):
-        raise ValueError("Nama penerima wajib diisi untuk Kirim ke Alamat.")
+        raise ValueError("Nama penerima wajib diisi sebelum paket dikirim.")
     if not row.get("ship_recipient_phone"):
-        raise ValueError("No. HP penerima wajib diisi untuk Kirim ke Alamat.")
+        raise ValueError("No. HP penerima wajib diisi sebelum paket dikirim.")
     if not row.get("ship_address"):
-        raise ValueError("Alamat lengkap wajib diisi untuk Kirim ke Alamat.")
+        raise ValueError("Alamat lengkap wajib diisi sebelum paket dikirim.")
 
 
 def _so_set_columns(con: sqlite3.Connection, preorder_id: str, columns: dict) -> None:
@@ -8113,8 +8154,9 @@ def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | N
     out["line_suppliers"] = sorted({i["supplier_name"] for i in live if i.get("supplier_name")})
     # Owner 31-10-2026: the list says "Stok Toko" for goods taken from the shelf instead of "Otomatis".
     out["line_sources"] = sorted({i.get("source") or "auto" for i in live})
-    out["ship_stage"] = _so_ship_stage(row, bool(live) and all(
-        i["status"] in PO_ARRIVED_STATUSES or i.get("source") == "jasa" or i.get("_allocated") for i in live))
+    out["goods_ready"] = bool(live) and all(
+        i["status"] in PO_ARRIVED_STATUSES or i.get("source") == "jasa" or i.get("_allocated") for i in live)
+    out["ship_stage"] = _so_ship_stage(row, out["goods_ready"])
     return out
 
 
@@ -8447,7 +8489,7 @@ def create_preorder(
         _so_set_columns(con, preorder_id, {"fulfillment_method": method, **ship_columns,
                                            "install_schedule": _so_install_schedule(method, install_schedule)})
         if not is_draft:
-            _so_require_shipping({"fulfillment_method": method, **ship_columns})
+            _so_require_method({"fulfillment_method": method})
         if deposit > 0:
             con.execute(
                 "INSERT INTO preorder_payments (preorder_id, paid_at, amount, note, created_by, proof_file, proof_name, proof_by, proof_at) "
@@ -8497,7 +8539,8 @@ def get_preorder(preorder_id: str) -> dict | None:
         invoice = po_invoices(con, [row["receipt_id"]]).get(row["receipt_id"])
         out = _preorder_row({**dict(row), "draft_pending": _preorder_pending_by_order(con).get(preorder_id, 0)}, items, paid, invoice)
         live = [i for i in items if i["status"] != PO_LINE_CANCELLED]
-        out["ship_stage"] = _so_ship_stage(out, bool(live) and not _so_lines_not_ready(con, live))
+        out["goods_ready"] = bool(live) and not _so_lines_not_ready(con, live)
+        out["ship_stage"] = _so_ship_stage(out, out["goods_ready"])
         out["invoices"] = [{
             "id": i["id"], "receipt_no": i["receipt_no"], "invoice_seq": i["invoice_seq"], "total": i["total"],
             "amount_paid": i["amount_paid"], "status": i["status"], "work_status": i["work_status"],
@@ -9558,8 +9601,10 @@ def update_preorder(
             _so_set_columns(con, preorder_id, {"fulfillment_method": method, **ship_columns,
                                                "install_schedule": _so_install_schedule(method, install_schedule)})
         final = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
-        if not final["is_draft"] and (set_fulfillment or existing["is_draft"]):
-            _so_require_shipping(final)
+        if existing["is_draft"] and not final["is_draft"]:
+            _so_require_method(final)
+        if set_fulfillment:
+            _so_log_shipping_changes(con, preorder_id, existing, final, changed_by)
         new_plate = split_plate(plate_full) if plate_full else None
         if new_plate and plate_full != existing["plate_full"]:
             # A plate typed later on the Sales Order reaches its open invoices that still have none.
@@ -9795,11 +9840,12 @@ def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
                 raise ValueError("Barang ini belum siap: " + ", ".join(waiting) + ". Tunggu sampai semua barang ada di toko.")
             if po.get("ship_packing") != "selesai":
                 raise ValueError("Selesaikan packing dulu sebelum menandai paket dikirim.")
+            _so_require_shipping(po)
         now = _now()
         before = _po_invoice_snapshot(con, preorder_id)
         tracking = (data.get("ship_tracking_no") or "").strip()[:80] or None
         _so_set_columns(con, preorder_id, {
-            **fee, "ship_status": "dikirim", "ship_forwarder_id": forwarder_id, "ship_forwarder_name": forwarder_name,
+            **fee, "ship_status": po.get("ship_status") or "dikirim", "ship_forwarder_id": forwarder_id, "ship_forwarder_name": forwarder_name,
             "ship_service": (data.get("ship_service") or "").strip()[:80] or None, "ship_tracking_no": tracking,
             "ship_sent_date": sent_date, "updated_at": now})
         for ln in lines:
@@ -9809,6 +9855,14 @@ def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
         invoice_id = _po_invoice_sync(con, preorder_id, by, before)
         _log_receipt_event(con, invoice_id, "status",
                            f"Paket {'dikirim' if first else 'diperbarui'}: {forwarder_name}" + (f", resi {tracking}" if tracking else ""), by)
+        if first:
+            _so_event(con, preorder_id, "pengiriman", f"Paket dikirim melalui {forwarder_name}", by)
+        elif forwarder_id != po.get("ship_forwarder_id"):
+            _so_event(con, preorder_id, "pengiriman", f"Ekspedisi diganti menjadi {forwarder_name}", by)
+        if tracking and tracking != po.get("ship_tracking_no"):
+            _so_event(con, preorder_id, "pengiriman", f"Nomor resi dimasukkan: {tracking}", by)
+        if (po.get("ship_fee") or 0) != fee["ship_fee"] or po.get("ship_fee_unknown") or po.get("ship_fee_payer") != fee["ship_fee_payer"]:
+            _so_event(con, preorder_id, "pengiriman", f"Ongkir: {_rp(fee['ship_fee'])}", by)
     return get_preorder(preorder_id)
 
 
@@ -9827,6 +9881,7 @@ def so_mark_received(preorder_id: str, received_date: str | None, proof: tuple[s
         _so_set_columns(con, preorder_id, columns)
         if po.get("receipt_id"):
             _log_receipt_event(con, po["receipt_id"], "status", "Paket diterima customer", by)
+        _so_event(con, preorder_id, "pengiriman", "Paket diterima customer", by)
     return get_preorder(preorder_id), (po.get("ship_proof_file") if proof else None)
 
 
@@ -9840,12 +9895,16 @@ def so_shipment_step(preorder_id: str, action: str, by: str | None) -> dict:
         stage = _so_ship_stage(po, bool(lines) and not _so_lines_not_ready(con, lines))
         now = _now()
         columns: dict
-        if action == "mulai" and stage == "siap_dipacking":
-            columns, note = {"ship_packing": "sedang"}, "Packing dimulai"
+        if action == "mulai" and stage == "barang_tersedia":
+            columns, note = {"ship_packing": "sedang"}, "Barang sedang dipacking"
         elif action == "selesai" and stage == "sedang_dipacking":
             columns, note = {"ship_packing": "selesai"}, "Packing selesai, paket siap dikirim"
+        elif action == "perjalanan" and stage == "sudah_dikirim":
+            columns, note = {"ship_status": "perjalanan"}, "Paket dalam perjalanan ke customer"
+        elif action == "mundur" and stage == "dalam_perjalanan":
+            columns, note = {"ship_status": "dikirim"}, "Status kembali ke Sudah Dikirim"
         elif action == "mundur" and stage == "sedang_dipacking":
-            columns, note = {"ship_packing": None}, "Status kembali ke Siap Dipacking"
+            columns, note = {"ship_packing": None}, "Status kembali ke Barang Sudah Tersedia"
         elif action == "mundur" and stage == "siap_dikirim":
             columns, note = {"ship_packing": "sedang"}, "Status kembali ke Sedang Dipacking"
         elif action == "mundur" and stage == "diterima":
@@ -9862,13 +9921,77 @@ def so_shipment_step(preorder_id: str, action: str, by: str | None) -> dict:
             _so_set_columns(con, preorder_id, {"ship_status": None, "ship_received_date": None, "updated_at": now})
             _po_invoice_sync(con, preorder_id, by, before)
             _log_receipt_event(con, po["receipt_id"], "status", "Status kembali ke Siap Dikirim; stok barang dikembalikan", by)
+            _so_event(con, preorder_id, "pengiriman", "Status kembali ke Siap Dikirim; stok barang dikembalikan", by)
             return get_preorder(preorder_id)
         else:
             raise ValueError("Langkah itu tidak bisa dilakukan pada status pengiriman sekarang. Muat ulang halaman.")
         _so_set_columns(con, preorder_id, {**columns, "updated_at": now})
         if po.get("receipt_id"):
             _log_receipt_event(con, po["receipt_id"], "status", note, by)
+        _so_event(con, preorder_id, "pengiriman", note, by)
     return get_preorder(preorder_id)
+
+
+def add_preorder_note(preorder_id: str, text: str, by: str | None) -> None:
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("Isi catatan perkembangan dulu.")
+    if len(text) > 500:
+        raise ValueError("Catatan maksimal 500 huruf.")
+    with _conn() as con:
+        if con.execute("SELECT 1 FROM preorders WHERE id=?", (preorder_id,)).fetchone() is None:
+            raise LookupError("Sales Order tidak ditemukan.")
+        _so_event(con, preorder_id, "catatan", text, by)
+        con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (_now(), preorder_id))
+
+
+def get_preorder_timeline(preorder_id: str) -> list[dict]:
+    """The order from start to finish, oldest first (owner 05-11-2026): its own events, what its lines went through, and
+    the Draft PO made for them. Read from what is already recorded, so older orders have a timeline too. Payments keep
+    their own tab."""
+    with _conn() as con:
+        po = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+        if po is None:
+            return []
+        events = [dict(r) for r in con.execute("SELECT * FROM preorder_events WHERE preorder_id=? ORDER BY id", (preorder_id,))]
+        pos = [dict(r) for r in con.execute(
+            """SELECT DISTINCT e.at, e.by_user, sp.po_number FROM spo_events e JOIN supplier_pos sp ON sp.id=e.supplier_po_id
+               JOIN supplier_po_items spi ON spi.supplier_po_id=sp.id JOIN preorder_items pi ON pi.id=spi.preorder_item_id
+               WHERE pi.preorder_id=? AND e.kind='created'""", (preorder_id,))]
+        sources = {r["id"]: r["source"] for r in con.execute("SELECT id, source FROM preorder_items WHERE preorder_id=?", (preorder_id,))}
+    history = get_preorder_history(preorder_id)
+    method = po["fulfillment_method"]
+    first_by = next((h["changed_by"] for h in sorted(history, key=lambda h: h["changed_at"])), None)
+    out = [{"at": po["created_at"], "by": first_by, "kind": "dibuat", "text": "Sales Order dibuat"}]
+    if po["published_at"] and po["published_at"][:16] != po["created_at"][:16]:
+        out.append({"at": po["published_at"], "by": None, "kind": "dibuat", "text": "Sales Order diterbitkan"})
+    if po["cancelled_at"]:
+        out.append({"at": po["cancelled_at"], "by": po["cancelled_by"], "kind": "batal", "text": f"Sales Order dibatalkan: {po['cancel_reason'] or '-'}"})
+    out += [{"at": p["at"], "by": p["by_user"], "kind": "pengadaan", "text": f"Draft PO {p['po_number']} dibuat"} for p in pos]
+    finished = any(e["kind"] == "pemasangan" and e["note"] == "Pemasangan selesai" for e in events)
+    for h in history:
+        status, old, name = h["status"], h.get("old_status"), h["product_name"]
+        if sources.get(h["preorder_item_id"]) == "jasa" and status != PO_LINE_CANCELLED:
+            continue  # a service has no goods to order or receive
+        if status == "sudah_dipesankan":
+            text, kind = f"Barang dipesan ke supplier: {name}", "pengadaan"
+        elif status == "dalam_pengiriman":
+            text, kind = f"Barang dalam pengiriman dari supplier: {name}", "pengadaan"
+        elif status == "sampai_di_toko" and old != "terpasang":
+            text, kind = (f"Stok dialokasikan: {name}" if sources.get(h["preorder_item_id"]) == "stok" else f"Barang diterima toko: {name}"), "pengadaan"
+        elif status == "dititipkan":
+            text, kind = f"Barang dititipkan di toko: {name}", "pemenuhan"
+        elif status == PO_LINE_CANCELLED:
+            text, kind = f"Barang dibatalkan: {name}", "batal"
+        elif status == "terpasang" and method == "ambil":
+            text, kind = f"Barang diambil customer: {name}", "pemenuhan"
+        elif status == "terpasang" and method != "kirim" and not finished:
+            text, kind = f"Barang diserahkan / terpasang: {name}", "pemenuhan"
+        else:
+            continue  # the first stage, and what a shipment or its undo already says in its own event
+        out.append({"at": h["changed_at"], "by": h["changed_by"], "kind": kind, "text": text})
+    out += [{"at": e["at"], "by": e["by_user"], "kind": e["kind"], "text": e["note"]} for e in events]
+    return sorted(out, key=lambda x: x["at"])
 
 
 def so_shipment_proof(preorder_id: str) -> str | None:

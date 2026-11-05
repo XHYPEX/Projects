@@ -2185,9 +2185,9 @@
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Barang</th>
-                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Supplier</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Total</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Pengadaan</th>
+                <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Pemenuhan</th>
                 <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Pembayaran</th>
                 <th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Aksi</th>
               </tr>
@@ -2275,7 +2275,7 @@
               </div>
               <div class="po-frow">
                 <label for="po-source">Sumber Order <span class="text-failed">*</span></label>
-                <select id="po-source" onchange="poSourceChanged()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                <select id="po-source" onchange="poDepositMethodChanged()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
                   <option value="walk_in">Walk-in (datang ke toko)</option>
                   <option value="whatsapp">WhatsApp</option>
                 </select>
@@ -2308,15 +2308,15 @@
           <div class="card-title mb-1"><span class="chip font-semibold text-sm">4</span><h3>Metode Pemenuhan Customer</h3></div>
           <p class="text-xs text-muted mb-3">Bagaimana pesanan diserahkan kepada customer?</p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <label data-fulfill-card="ambil" class="flex items-start gap-2.5 rounded-lg border border-line bg-white px-3 py-2.5 cursor-pointer transition-colors">
-                <input type="radio" name="po-fulfill" value="ambil" class="accent-[#EA580C] mt-0.5" onchange="poFulfillSelect('ambil', true)" />
-                <span class="min-w-0"><span class="block text-sm font-semibold text-ink">Ambil di Toko</span><span class="block text-xs text-muted">Customer mengambil barang setelah siap</span></span></label>
-              <label data-fulfill-card="kirim" class="flex items-start gap-2.5 rounded-lg border border-line bg-white px-3 py-2.5 cursor-pointer transition-colors">
-                <input type="radio" name="po-fulfill" value="kirim" class="accent-[#EA580C] mt-0.5" onchange="poFulfillSelect('kirim', true)" />
-                <span class="min-w-0"><span class="block text-sm font-semibold text-ink">Kirim ke Alamat</span><span class="block text-xs text-muted">Barang dikirim via ekspedisi / cargo</span></span></label>
               <label data-fulfill-card="pasang" class="flex items-start gap-2.5 rounded-lg border border-line bg-white px-3 py-2.5 cursor-pointer transition-colors">
-                <input type="radio" name="po-fulfill" value="pasang" class="accent-[#EA580C] mt-0.5" onchange="poFulfillSelect('pasang', true)" />
-                <span class="min-w-0"><span class="block text-sm font-semibold text-ink">Pemasangan di Toko</span><span class="block text-xs text-muted">Customer datang untuk pemasangan</span></span></label>
+                <input type="radio" name="po-fulfill" value="pasang" class="accent-[#EA580C] mt-0.5" onchange="poFulfillSelect('pasang')" />
+                <span class="min-w-0"><span class="block text-sm font-semibold text-ink">Pemasangan di Toko</span><span class="block text-xs text-muted">Customer datang ke toko untuk dipasang</span></span></label>
+              <label data-fulfill-card="kirim" class="flex items-start gap-2.5 rounded-lg border border-line bg-white px-3 py-2.5 cursor-pointer transition-colors">
+                <input type="radio" name="po-fulfill" value="kirim" class="accent-[#EA580C] mt-0.5" onchange="poFulfillSelect('kirim')" />
+                <span class="min-w-0"><span class="block text-sm font-semibold text-ink">Kirim ke Alamat Customer</span><span class="block text-xs text-muted">Dikirim via ekspedisi, termasuk luar kota</span></span></label>
+              <label data-fulfill-card="ambil" class="flex items-start gap-2.5 rounded-lg border border-line bg-white px-3 py-2.5 cursor-pointer transition-colors">
+                <input type="radio" name="po-fulfill" value="ambil" class="accent-[#EA580C] mt-0.5" onchange="poFulfillSelect('ambil')" />
+                <span class="min-w-0"><span class="block text-sm font-semibold text-ink">Ambil di Toko (Tanpa Pemasangan)</span><span class="block text-xs text-muted">Customer hanya mengambil barang</span></span></label>
           </div>
           <p id="po-fulfill-note" class="hidden mt-3 rounded-lg bg-bg2 px-3 py-2 text-xs text-muted"></p>
           <div id="po-install-panel" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
@@ -2326,27 +2326,25 @@
         </div>
 
         <div id="po-ship-card" class="hidden bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="card-title mb-1"><span class="chip font-semibold text-sm">5</span><h3>Informasi Pengiriman Customer</h3></div>
-          <p class="text-xs text-muted mb-3">Tujuan paket dan ekspedisinya.</p>
+          <div class="card-title mb-1"><span class="chip font-semibold text-sm">5</span><h3>Detail Pengiriman</h3></div>
+          <p class="text-xs text-muted mb-3">Boleh dilengkapi nanti di Detail Sales Order; wajib lengkap sebelum paket dikirim.</p>
           <div class="flex items-center justify-between gap-3 mb-2">
             <div class="text-sm font-semibold text-ink">Penerima dan alamat tujuan</div>
             <button type="button" onclick="poShipCopyCustomer()" class="text-xs font-medium text-accentDark hover:underline">Salin nama &amp; HP customer</button>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label for="po-ship-name" class="block text-xs font-medium text-ink mb-1">Nama penerima <span class="text-failed">*</span></label><input id="po-ship-name" oninput="poShipFollow=false" type="text" placeholder="Nama penerima paket" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
-            <div><label for="po-ship-phone" class="block text-xs font-medium text-ink mb-1">No. HP penerima <span class="text-failed">*</span></label><input id="po-ship-phone" oninput="poShipFollow=false" type="text" placeholder="08xxxxxxxxxx" autocomplete="off" inputmode="tel" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
+            <div><label for="po-ship-name" class="block text-xs font-medium text-ink mb-1">Nama penerima</label><input id="po-ship-name" oninput="poShipFollow=false" type="text" placeholder="Nama penerima paket" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
+            <div><label for="po-ship-phone" class="block text-xs font-medium text-ink mb-1">No. HP penerima</label><input id="po-ship-phone" oninput="poShipFollow=false" type="text" placeholder="08xxxxxxxxxx" autocomplete="off" inputmode="tel" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-province" class="block text-xs font-medium text-ink mb-1">Provinsi</label><input id="po-ship-province" type="text" placeholder="Provinsi tujuan" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-city" class="block text-xs font-medium text-ink mb-1">Kota/Kabupaten</label><input id="po-ship-city" type="text" placeholder="Kota / kabupaten" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-district" class="block text-xs font-medium text-ink mb-1">Kecamatan</label><input id="po-ship-district" type="text" placeholder="Kecamatan" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-village" class="block text-xs font-medium text-ink mb-1">Kelurahan/Desa</label><input id="po-ship-village" type="text" placeholder="Kelurahan / desa" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-postal" class="block text-xs font-medium text-ink mb-1">Kode Pos</label><input id="po-ship-postal" type="text" placeholder="Kode pos" autocomplete="off" inputmode="numeric" maxlength="10" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-landmark" class="block text-xs font-medium text-ink mb-1">Patokan alamat</label><input id="po-ship-landmark" type="text" placeholder="Contoh: sebelah bengkel" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
-            <div class="sm:col-span-2"><label for="po-ship-address" class="block text-xs font-medium text-ink mb-1">Alamat lengkap <span class="text-failed">*</span></label><textarea id="po-ship-address" rows="2" placeholder="Nama jalan, nomor rumah/ruko, RT/RW" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea></div>
+            <div class="sm:col-span-2"><label for="po-ship-address" class="block text-xs font-medium text-ink mb-1">Alamat lengkap</label><textarea id="po-ship-address" rows="2" placeholder="Nama jalan, nomor rumah/ruko, RT/RW" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></textarea></div>
           </div>
-          <div class="flex items-center justify-between gap-3 mt-5 mb-2 pt-4 border-t border-line">
-            <div class="text-sm font-semibold text-ink">Ekspedisi dan ongkir</div>
-            <span class="text-[11px] text-muted border border-line rounded-full px-2 py-0.5">Boleh diisi belakangan</span>
-          </div>
+          <details id="po-ship-more" class="mt-5 pt-4 border-t border-line">
+          <summary class="cursor-pointer text-sm font-semibold text-ink mb-2">Ekspedisi dan ongkir <span class="ml-1 text-[11px] font-normal text-muted border border-line rounded-full px-2 py-0.5">Boleh diisi belakangan</span></summary>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label for="po-ship-forwarder" class="block text-xs font-medium text-ink mb-1">Ekspedisi</label><select id="po-ship-forwarder" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="">Belum ditentukan</option></select></div>
             <div><label for="po-ship-service" class="block text-xs font-medium text-ink mb-1">Layanan</label><input id="po-ship-service" type="text" placeholder="Reguler / Cargo / lainnya" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
@@ -2354,6 +2352,7 @@
             <div><label for="po-ship-fee" class="block text-xs font-medium text-ink mb-1">Ongkir (Rp)</label><input id="po-ship-fee" type="text" inputmode="numeric" value="0" oninput="updatePreorderTotals()" class="price-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors text-right tabular-nums disabled:bg-bg2 disabled:text-muted" /></div>
           </div>
           <label class="flex items-center gap-2 mt-3 text-sm text-ink"><input id="po-ship-fee-unknown" type="checkbox" class="accent-[#EA580C]" onchange="poShipFeeChanged()" /> Ongkir belum diketahui, tentukan setelah barang siap dikirim</label>
+          </details>
           <p class="mt-3 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">Nomor resi, tanggal kirim, dan bukti penerimaan diisi di Detail Sales Order setelah paket dikirim.</p>
         </div>
 
@@ -2369,21 +2368,18 @@
             </div>
           </div>
 
-          <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-            <div class="card-title mb-1"><span class="chip font-semibold text-sm">7</span><h3>Proses Setelah Sales Order Disimpan</h3></div>
-            <p class="text-xs text-muted mb-3">Status pengadaan dan pengiriman berdiri sendiri.</p>
+          <details class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
+            <summary class="cursor-pointer list-none"><div class="card-title"><span class="chip font-semibold text-sm">7</span><h3>Proses Setelah Sales Order Disimpan</h3><span class="ml-2 text-xs font-normal text-muted">Lihat alur</span></div></summary>
+            <p class="text-xs text-muted mt-3 mb-3">Pengadaan, kesiapan barang, pemenuhan, dan pembayaran dipantau terpisah di Detail Sales Order.</p>
             <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Pengadaan Barang (per item)</div>
             <div class="flex flex-wrap gap-1.5">
               <span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Stok Dialokasikan</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Draft PO</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Dipesan ke Supplier</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Diterima Toko</span>
             </div>
             <div id="po-proc-ship-row" class="hidden mt-4 pt-4 border-t border-line">
-              <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Pengiriman Customer</div>
-              <div class="flex flex-wrap gap-1.5">
-                <span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Menunggu Barang</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Siap Dipacking</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Sedang Dipacking</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Siap Dikirim</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Sudah Dikirim</span><span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">Diterima</span>
-              </div>
+              <div id="po-proc-ship-title" class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2"></div>
+              <div id="po-proc-ship-chips" class="flex flex-wrap gap-1.5"></div>
             </div>
-            <p class="mt-3 text-xs text-muted">Status diperbarui di halaman detail pesanan. Pengadaan terbaca otomatis dari stok, PO, dan Barang Masuk.</p>
-          </div>
+          </details>
           </div>
           <aside class="xl:sticky xl:top-0 bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(17,24,39,0.03)]" aria-label="Ringkasan transaksi Sales Order">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-4 pb-2">
@@ -2507,14 +2503,16 @@
         <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
           <div class="min-w-0">
         <div class="bg-white border border-line rounded-xl p-4 sm:p-5 mb-4">
-          <div class="flex flex-wrap items-start justify-between gap-4">
-            <table class="text-sm">
-              <tbody id="po-detail-info"></tbody>
-            </table>
-            <div class="flex items-center gap-2 text-sm text-muted">Status Sales Order: <span id="po-detail-status"></span></div>
-          </div>
+          <table class="text-sm">
+            <tbody id="po-detail-info"></tbody>
+          </table>
+          <!-- Owner 05-11-2026: four statuses side by side, never merged into one. -->
+          <div id="po-detail-status-strip" class="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2"></div>
+          <p id="po-detail-last-update" class="mt-2 text-xs text-muted"></p>
           <div id="po-detail-cancel-note" class="hidden mt-3 border-t border-line pt-3 text-sm"></div>
         </div>
+
+        <div id="po-detail-ship-card" class="hidden bg-white border border-line rounded-xl p-4 mb-4"></div>
 
         <div class="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 px-1">Daftar Barang</div>
         <div class="bg-white border border-line rounded-xl overflow-x-auto mb-4">
@@ -2538,13 +2536,11 @@
         <!-- Owner 25-10-2026: payments and status history in one tabbed card, like Kasir's "Catatan & Riwayat Perubahan". -->
         <section class="bg-white border border-line rounded-xl mb-4" aria-labelledby="po-tl-title">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 sm:px-5 pt-4 pb-2">
-            <h2 id="po-tl-title" class="font-serif text-base font-semibold text-ink">Catatan &amp; Riwayat Perubahan</h2>
+            <h2 id="po-tl-title" class="font-serif text-base font-semibold text-ink">Perkembangan &amp; Riwayat</h2>
           </div>
           <div id="po-tl-tabs" class="flex flex-wrap gap-x-5 px-4 sm:px-5 border-b border-line" role="tablist"></div>
           <div id="po-timeline" class="px-4 sm:px-5 py-4 text-sm"></div>
         </section>
-
-        <div id="po-detail-ship-card" class="hidden bg-white border border-line rounded-xl p-4 mb-4"></div>
 
         <div id="po-detail-invoice-card" class="hidden bg-white border border-line rounded-xl p-4 mb-4">
           <div class="flex flex-wrap items-center justify-between gap-2">
@@ -13595,7 +13591,7 @@ const OD_SO_TABS = [["semua", "Semua"], ["tindakan", "Perlu Tindakan"], ["menung
 const OD_SO_STATUS = {
   menunggu_supplier: ["orange", "Menunggu supplier"], menunggu_po: ["amber", "Menunggu PO"], dalam_pengiriman: ["blue", "Dalam pengiriman"],
   tiba_sebagian: ["sky", "Tiba sebagian"], dialokasikan: ["violet", "Dialokasikan"], siap: ["green", "Barang siap"], dititipkan: ["violet", "Dititipkan di toko"],
-  siap_dipacking: ["green", "Siap dipacking"], sedang_dipacking: ["blue", "Sedang dipacking"], siap_dikirim: ["green", "Siap dikirim"], dikirim: ["blue", "Sudah dikirim"], diterima: ["green", "Diterima"],
+  barang_tersedia: ["green", "Barang sudah tersedia"], sedang_dipacking: ["blue", "Sedang dipacking"], siap_dikirim: ["green", "Siap dikirim"], dikirim: ["blue", "Sudah dikirim"], dalam_perjalanan: ["blue", "Dalam perjalanan"], diterima: ["green", "Sudah diterima"],
   menunggu_lunas: ["stone", "Menunggu pelunasan"], menunggu_selesai: ["stone", "Menunggu selesai"], selesai: ["green", "Selesai"],
 };
 const OD_SO_LINE_GROUPS = {
@@ -20522,7 +20518,8 @@ const PREORDER_STATUSES = [
 ];
 // Owner 05-11-2026: a Kirim ke Alamat order is sent, not picked up or installed.
 const SO_KIRIM_STATUS_LABELS = { sampai_di_toko: "Barang Siap", dititipkan: "Dititipkan di Toko", terpasang: "Sudah Dikirim" };
-const SO_METHOD_STATUS_LABELS = { kirim: SO_KIRIM_STATUS_LABELS, pasang: { sampai_di_toko: "Siap Dipasang", terpasang: "Terpasang" } };
+const SO_METHOD_STATUS_LABELS = { kirim: SO_KIRIM_STATUS_LABELS, ambil: { sampai_di_toko: "Siap Diambil", terpasang: "Sudah Diambil" },
+  pasang: { sampai_di_toko: "Menunggu Pemasangan", terpasang: "Pemasangan Selesai" } };
 const preorderStatusOptions = (cur, method = null) => PREORDER_STATUSES.map(s =>
   `<option value="${esc(s.key)}" ${s.key === cur ? "selected" : ""} ${s.hidden ? "hidden" : ""}>${esc(SO_METHOD_STATUS_LABELS[method]?.[s.key] || s.label)}</option>`).join("");
 
@@ -20589,11 +20586,9 @@ const SO_PAY_LABELS = { belum: "Belum Dibayar", dp: "DP Diterima", lunas: "Lunas
 const SO_PAY_TINTS = { belum: "bg-failed/10 text-failed", dp: "bg-pending/10 text-ink", lunas: "bg-done/10 text-done" };
 let preorderAll = [];   // the unfiltered list (counts on the chips come from it)
 
-function soProcPill(key, row = null) {
-  let label = SO_PROC_LABELS[key] || key;
-  // Once the goods are in, a delivery reads as where the package is (Menunggu Barang keeps the goods' own progress).
-  if (row?.ship_stage && row.ship_stage !== "menunggu_barang") label = SO_SHIP_STAGES[row.ship_stage];
-  return `<span class="po-pill is-proc-${esc(key)}">${esc(label)}</span>`;
+// In the list "selesai" reads as what happened to the goods: Pemenuhan beside it says whether the order is really done.
+function soProcPill(key) {
+  return `<span class="po-pill is-proc-${esc(key)}">${esc(key === "selesai" ? "Barang Diserahkan" : SO_PROC_LABELS[key] || key)}</span>`;
 }
 
 function renderPreorderStatusFilters() {
@@ -20731,10 +20726,10 @@ function renderPreorderList(rows) {
         <div class="text-ink">${esc(r.customer_name)}</div>
         <div class="text-[11px] text-muted whitespace-nowrap tabular-nums">${esc(r.plate_full || "—")} · ${esc(r.customer_phone)}</div></td>
       <td class="px-3 py-2.5 text-muted whitespace-nowrap tabular-nums">${esc(formatPoDate(r.po_date))}</td>
-      <td class="px-3 py-2.5 text-ink max-w-[15rem]" title="${esc((r.item_names || []).join(", "))}">${poItemNamesHtml(r.item_names)}</td>
-      <td class="px-3 py-2.5 max-w-[13rem]">${supplierHtml}</td>
+      <td class="px-3 py-2.5 text-ink max-w-[15rem]" title="${esc((r.item_names || []).join(", "))}">${poItemNamesHtml(r.item_names)}<div class="mt-0.5 text-[11px]">${supplierHtml}</div></td>
       <td class="px-3 py-2.5 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(r.invoice_total ?? r.total)}</td>
-      <td class="px-3 py-2.5">${soProcPill(r.procurement_status || "menunggu", r)}</td>
+      <td class="px-3 py-2.5">${soProcPill(r.procurement_status || "menunggu")}</td>
+      <td class="px-3 py-2.5 whitespace-nowrap"><div class="text-ink">${esc(SO_STAGE_LABELS[soFulfilStage(r)] || "—")}</div><div class="text-[11px] text-muted">${esc(SO_FULFILL_SHORT[r.fulfillment_method] || "Belum diatur")}</div></td>
       <td class="px-3 py-2.5 whitespace-nowrap">
         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SO_PAY_TINTS[pay]}">${SO_PAY_LABELS[pay]}</span>
         <div class="text-[11px] mt-0.5 tabular-nums ${r.remaining > 0 ? "text-failed" : "text-muted"}">${r.remaining > 0 ? "Sisa " + formatIDR(r.remaining) : "Tidak ada sisa"}</div></td>
@@ -21413,7 +21408,8 @@ document.getElementById("po-form-panel")?.addEventListener("input", e => {
 });
 
 // ── Sales Order: Metode Pemenuhan & pengiriman (owner 05-11-2026) ────────────
-const SO_FULFILL_LABELS = { ambil: "Ambil di Toko", kirim: "Kirim ke Alamat", pasang: "Pemasangan di Toko" };
+const SO_FULFILL_LABELS = { ambil: "Ambil di Toko (Tanpa Pemasangan)", kirim: "Kirim ke Alamat Customer", pasang: "Pemasangan di Toko" };
+const SO_FULFILL_SHORT = { ambil: "Ambil di Toko", kirim: "Kirim ke Alamat", pasang: "Pemasangan" };
 const SO_FEE_PAYER_LABELS = { customer: "Customer", toko: "Ditanggung toko", tujuan: "Bayar di tujuan" };
 // Owner 05-11-2026: Pengadaan (per line, read from stock and POs) and Pengiriman (per order) stand apart.
 const SO_PROCURE = { stok_dialokasikan: ["Stok Dialokasikan", "is-proc_stok"], draft_po: ["Draft PO", "is-proc_po"], dipesan: ["Dipesan ke Supplier", "is-proc_po"],
@@ -21422,19 +21418,34 @@ function soProcureHtml(item) {
   const [label, cls] = SO_PROCURE[item.procurement] || ["Tanpa PO", "is-proc_none"];
   return `<span class="po-pill ${cls}">${esc(label)}</span>`;
 }
-const SO_SHIP_STAGES = { menunggu_barang: "Menunggu Barang", siap_dipacking: "Siap Dipacking", sedang_dipacking: "Sedang Dipacking",
-  siap_dikirim: "Siap Dikirim", sudah_dikirim: "Sudah Dikirim", diterima: "Diterima" };
-const SO_FULFILL_NOTES = {
-  ambil: "Customer mengambil barang di toko setelah barang siap.",
-  kirim: "Pengiriman diproses setelah barang siap. Ekspedisi dan ongkir bisa dilengkapi di detail SO.",
-  pasang: "Customer datang ke toko untuk pemasangan setelah barang siap.",
+// Pemenuhan per method (owner 05-11-2026). Ambil and Pasang read from the goods and the invoice's Pengerjaan.
+const SO_STAGE_LABELS = { menunggu_barang: "Menunggu Barang", barang_tersedia: "Barang Sudah Tersedia", sedang_dipacking: "Sedang Dipacking",
+  siap_dikirim: "Siap Dikirim", sudah_dikirim: "Sudah Dikirim", dalam_perjalanan: "Dalam Perjalanan", diterima: "Sudah Diterima",
+  siap_diambil: "Siap Diambil", sudah_diambil: "Sudah Diambil",
+  menunggu_pemasangan: "Menunggu Pemasangan", sedang_dipasang: "Sedang Dipasang", pemasangan_selesai: "Pemasangan Selesai" };
+const SO_STAGE_STEPS = {
+  kirim: ["menunggu_barang", "barang_tersedia", "sedang_dipacking", "siap_dikirim", "sudah_dikirim", "dalam_perjalanan", "diterima"],
+  ambil: ["menunggu_barang", "siap_diambil", "sudah_diambil"],
+  pasang: ["menunggu_barang", "menunggu_pemasangan", "sedang_dipasang", "pemasangan_selesai"],
 };
-let poFulfillTouched = false;   // staff chose the method: the Sumber Order no longer changes it
+const SO_STAGE_GROUP = { kirim: "Pengiriman Customer", ambil: "Pengambilan", pasang: "Pemasangan" };
+function soFulfilStage(po) {
+  if (!po.fulfillment_method || po.is_draft || po.cancelled_at) return null;
+  if (po.fulfillment_method === "kirim") return po.ship_stage;
+  if (po.fulfillment_method === "ambil") return po.status === "terpasang" ? "sudah_diambil" : po.goods_ready ? "siap_diambil" : "menunggu_barang";
+  if (po.status === "terpasang" || po.invoice_work_status === "selesai") return "pemasangan_selesai";
+  if (po.invoice_work_status === "pengerjaan") return "sedang_dipasang";
+  return po.goods_ready ? "menunggu_pemasangan" : "menunggu_barang";
+}
+const SO_FULFILL_NOTES = {
+  ambil: "Tidak perlu alamat atau ekspedisi. Setelah barang siap, statusnya menjadi Siap Diambil.",
+  kirim: "Alamat, ekspedisi, ongkir, dan resi bisa dilengkapi nanti di Detail Sales Order.",
+  pasang: "Pengerjaan bisa dimulai setelah semua barang tersedia. Statusnya diperbarui di Detail Sales Order.",
+};
 let poForwardersCache = null;
 
 function poFulfillSelected() { return document.querySelector('input[name="po-fulfill"]:checked')?.value || null; }
-function poFulfillSelect(method, manual = false) {
-  if (manual) poFulfillTouched = true;
+function poFulfillSelect(method) {
   for (const input of document.querySelectorAll('input[name="po-fulfill"]')) input.checked = input.value === method;
   for (const card of document.querySelectorAll("[data-fulfill-card]")) {
     const on = card.dataset.fulfillCard === method;
@@ -21447,14 +21458,13 @@ function poFulfillSelect(method, manual = false) {
   note.classList.toggle("hidden", !method);
   document.getElementById("po-ship-card").classList.toggle("hidden", method !== "kirim");
   document.getElementById("po-install-panel").classList.toggle("hidden", method !== "pasang");
-  document.getElementById("po-proc-ship-row").classList.toggle("hidden", method !== "kirim");
+  document.getElementById("po-proc-ship-row").classList.toggle("hidden", !method);
+  if (method) {
+    document.getElementById("po-proc-ship-title").textContent = SO_STAGE_GROUP[method];
+    document.getElementById("po-proc-ship-chips").innerHTML = SO_STAGE_STEPS[method].map(k => `<span class="rounded-md bg-bg2 px-2 py-1 text-xs text-ink">${esc(SO_STAGE_LABELS[k])}</span>`).join("");
+  }
   if (method === "kirim") poShipFollowCustomer();
   updatePreorderTotals();
-}
-// A new order starts from where it came in: WhatsApp is sent, walk-in is picked up. Staff can still change it.
-function poSourceChanged() {
-  poDepositMethodChanged();
-  if (!currentPreorder && !poFulfillTouched) poFulfillSelect(document.getElementById("po-source").value === "whatsapp" ? "kirim" : "ambil");
 }
 // The recipient follows the customer until someone types a different one.
 let poShipFollow = true;
@@ -21508,7 +21518,6 @@ const PO_SHIP_FIELDS = { "po-ship-name": "ship_recipient_name", "po-ship-phone":
   "po-ship-city": "ship_city", "po-ship-district": "ship_district", "po-ship-village": "ship_village", "po-ship-postal": "ship_postal_code",
   "po-ship-landmark": "ship_landmark", "po-ship-address": "ship_address", "po-ship-service": "ship_service" };
 function poShipFill(detail) {
-  poFulfillTouched = !!detail;
   poShipFollow = !detail?.ship_recipient_name;
   document.getElementById("po-install-schedule").value = detail?.install_schedule || "";
   for (const [id, key] of Object.entries(PO_SHIP_FIELDS)) document.getElementById(id).value = detail?.[key] || "";
@@ -21519,7 +21528,9 @@ function poShipFill(detail) {
   soForwarders().then(rows => {
     document.getElementById("po-ship-forwarder").innerHTML = soForwarderOptions(rows, detail?.ship_forwarder_id, detail?.ship_forwarder_name);
   }).catch(() => {});
-  poFulfillSelect(detail ? detail.fulfillment_method : (document.getElementById("po-source").value === "whatsapp" ? "kirim" : "ambil"));
+  // Owner 05-11-2026: Sumber Order decides nothing here; a new order starts with no method chosen.
+  poFulfillSelect(detail ? detail.fulfillment_method : null);
+  document.getElementById("po-ship-more").open = !!(detail?.ship_forwarder_id || detail?.ship_service || detail?.ship_fee);
   poShipFeeChanged();
   const sent = !!detail?.ship_status;
   for (const input of document.querySelectorAll('input[name="po-fulfill"]')) input.disabled = sent;
@@ -21539,37 +21550,84 @@ function soScheduleText(value) {
   const [day, time] = value.split("T");
   return `${formatPoDate(day)}${time ? ` ${time}` : ""}`;
 }
+// The four statuses of the order, each from its own source (owner 05-11-2026: paid does not mean arrived).
+function renderSoStatusStrip(po) {
+  const live = (po.items || []).filter(i => i.status !== "dibatalkan");
+  const goods = live.filter(i => i.source !== "jasa");
+  const order = ["belum_dipesan", "draft_po", "dipesan", "diterima_toko", "stok_dialokasikan"];
+  const least = goods.map(i => i.procurement).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b))[0];
+  const same = goods.filter(i => i.procurement === least).length;
+  const ready = live.filter(i => i.source === "jasa" || ["sampai_di_toko", "dititipkan", "terpasang"].includes(i.status) || i.procurement === "stok_dialokasikan").length;
+  const stage = soFulfilStage(po);
+  const pay = po.payment_status || "belum";
+  const tile = (label, value, sub) => `<div class="rounded-lg border border-line bg-bg2/40 px-3 py-2 min-w-0"><div class="text-[11px] font-medium text-muted uppercase tracking-wider">${label}</div>
+    <div class="text-sm font-semibold text-ink leading-snug mt-0.5">${esc(value)}</div>${sub ? `<div class="text-[11px] text-muted mt-0.5">${esc(sub)}</div>` : ""}</div>`;
+  document.getElementById("po-detail-status-strip").innerHTML =
+    tile("Pengadaan Barang", least ? SO_PROCURE[least][0] : "Tanpa Pengadaan", least && goods.length > 1 && same < goods.length ? `${same} dari ${goods.length} barang, sisanya lebih maju` : "")
+    + tile("Kesiapan Barang", po.goods_ready ? "Semua barang siap" : ready ? "Sebagian siap" : "Belum siap", live.length ? `${ready} dari ${live.length} baris` : "")
+    + tile(SO_STAGE_GROUP[po.fulfillment_method] || "Pemenuhan", po.cancelled_at ? "Dibatalkan" : po.is_draft ? "Draft" : SO_STAGE_LABELS[stage] || "Belum diatur", SO_FULFILL_SHORT[po.fulfillment_method] || "")
+    + tile("Pembayaran", SO_PAY_LABELS[pay] || pay, po.remaining > 0 ? `Sisa ${formatIDR(po.remaining)}` : "Tidak ada sisa");
+  const last = (po.timeline || []).at(-1);
+  document.getElementById("po-detail-last-update").textContent = last
+    ? `Terakhir diperbarui ${formatDateTimeSeconds(last.at).slice(0, 16)}${last.by ? ` oleh ${last.by}` : ""}: ${last.text}` : "";
+}
+function soTimelineHtml(po) {
+  const dots = { pengadaan: "bg-blue-600", pengiriman: "bg-accent", pemasangan: "bg-accent", pemenuhan: "bg-accent", catatan: "bg-slate-500", batal: "bg-failed", dibuat: "bg-done" };
+  const items = (po.timeline || []).map(e => `<li class="relative pl-5 pb-3 last:pb-0 border-l border-line ml-1">
+      <span class="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full ${dots[e.kind] || "bg-slate-500"}" aria-hidden="true"></span>
+      <div class="text-sm text-ink break-words">${e.kind === "catatan" ? `<span class="text-muted">Catatan:</span> ` : ""}${esc(e.text)}</div>
+      <div class="text-[11px] text-muted tabular-nums">${esc(formatDateTimeSeconds(e.at).slice(0, 16))}${e.by ? ` · ${esc(e.by)}` : ""}</div></li>`).join("");
+  return (po.cancelled_at ? "" : `<div class="flex gap-2 mb-4"><input id="so-note-input" maxlength="500" autocomplete="off" placeholder="Tambah catatan perkembangan, mis. customer minta kirim tanggal 2" class="flex-1 min-w-0 border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" onkeydown="if (event.key === 'Enter') soAddNote()">
+      <button type="button" onclick="soAddNote()" class="shrink-0 px-3 py-2 border border-line rounded-lg text-sm font-medium text-ink bg-white hover:bg-bg2">Tambah</button></div>`)
+    + `<ol>${items}</ol>`;
+}
+async function soAddNote() {
+  const input = document.getElementById("so-note-input");
+  try { renderPreorderDetail(await grApi(`/api/preorders/${currentPreorder.id}/notes`, "POST", { text: input.value })); showToast("Catatan ditambahkan.", "success"); }
+  catch (e) { showToast(e.message); }
+}
+function soScheduleText(value) {
+  if (!value) return "Belum dijadwalkan";
+  const [day, time] = value.split("T");
+  return `${formatPoDate(day)}${time ? ` ${time}` : ""}`;
+}
 function renderSoShipCard(po) {
   const card = document.getElementById("po-detail-ship-card");
-  const live = !po.is_draft && !po.cancelled_at;
   const method = po.fulfillment_method;
   card.classList.toggle("hidden", !method);
   if (!method) { card.innerHTML = ""; return; }
+  const live = !po.is_draft && !po.cancelled_at;
+  const stage = soFulfilStage(po);
   const btn = (label, action, main = true) => `<button type="button" onclick="${action}" class="px-3 py-1.5 rounded-lg text-sm font-medium ${main ? "bg-accent text-bg hover:bg-accentDark" : "border border-line text-ink bg-white hover:bg-bg2"}">${label}</button>`;
   const fact = (label, value) => `<div class="flex gap-3 py-1 text-sm"><dt class="w-28 shrink-0 text-muted">${label}</dt><dd class="min-w-0 text-ink break-words">${value}</dd></div>`;
-  const head = (title, right) => `<div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">${title}</div><div class="flex flex-wrap gap-2">${right}</div></div>`;
+  const head = right => `<div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div class="text-[11px] font-semibold text-muted uppercase tracking-wider">${SO_STAGE_GROUP[method]}</div><div class="flex flex-wrap gap-2">${live ? right : ""}</div></div>`;
+  const steps = SO_STAGE_STEPS[method];
+  const at = steps.indexOf(stage);
+  const stepper = at < 0 ? "" : `<ol class="flex flex-wrap gap-1.5 mb-3">${steps.map((key, i) => `<li class="rounded-md px-2 py-1 text-xs ${i === at ? "bg-accent text-bg font-semibold" : i < at ? "bg-done/10 text-done" : "bg-bg2 text-muted"}"${i === at ? ' aria-current="step"' : ""}>${SO_STAGE_LABELS[key]}</li>`).join("")}</ol>`;
   if (method === "ambil") {
-    const ready = live && ["sampai_di_toko", "dititipkan"].includes(po.status);
-    card.innerHTML = head("Ambil di Toko", ready ? btn("Konfirmasi Penyerahan", "soConfirmHandover()") : "")
-      + `<p class="text-sm text-ink">${po.status === "terpasang" ? "Barang sudah diserahkan ke customer." : ready ? "Barang siap diambil customer." : "Menunggu barang tersedia."}</p>`;
+    card.innerHTML = head(stage === "siap_diambil" ? btn("Konfirmasi Sudah Diambil", "soConfirmHandover()") : "") + stepper
+      + (stage === "sudah_diambil" ? "" : `<p class="text-xs text-muted">Tidak memerlukan alamat, ekspedisi, atau nomor resi.</p>`);
     return;
   }
   if (method === "pasang") {
-    const ready = live && ["sampai_di_toko", "dititipkan", "terpasang"].includes(po.status);
-    card.innerHTML = head("Pemasangan di Toko", po.receipt_id ? btn("Buka Pengerjaan di Kasir", `openReceiptFromHistory('${esc(po.receipt_id)}')`, false) : "")
+    const single = (po.invoice_count || 1) <= 1 && po.receipt_id;
+    const next = !single ? "" : { menunggu_pemasangan: btn("Mulai Pemasangan", "soWorkTo('pengerjaan')"), sedang_dipasang: btn("Pemasangan Selesai", "soWorkDoneOpen()") }[stage] || "";
+    const back = !single ? "" : { sedang_dipasang: btn("Mundur Satu Langkah", "soWorkTo('belum')", false), pemasangan_selesai: btn("Mundur Satu Langkah", "soWorkTo('pengerjaan')", false) }[stage] || "";
+    card.innerHTML = head(back + (po.receipt_id ? btn("Buka di Kasir", `openReceiptFromHistory('${esc(po.receipt_id)}')`, false) : "") + next) + stepper
       + `<dl>${fact("Jadwal", esc(soScheduleText(po.install_schedule)))}</dl>`
-      + `<p class="mt-1 text-xs text-muted">${ready ? "Status pengerjaan diperbarui di Kasir." : "Pengerjaan bisa dimulai setelah semua barang tersedia."}</p>`;
+      + (stage === "menunggu_barang" ? `<p class="mt-1 text-xs text-muted">Pemasangan bisa dimulai setelah semua barang tersedia.</p>` : "");
     return;
   }
-  const stages = Object.keys(SO_SHIP_STAGES);
-  const at = stages.indexOf(po.ship_stage);
-  const stepper = at < 0 ? "" : `<ol class="flex flex-wrap gap-1.5 mb-3">${stages.map((key, i) => `<li class="rounded-md px-2 py-1 text-xs ${i === at ? "bg-accent text-bg font-semibold" : i < at ? "bg-done/10 text-done" : "bg-bg2 text-muted"}"${i === at ? ' aria-current="step"' : ""}>${SO_SHIP_STAGES[key]}</li>`).join("")}</ol>`;
-  const next = { siap_dipacking: btn("Mulai Packing", "soShipStep('mulai')"), sedang_dipacking: btn("Selesai Packing", "soShipStep('selesai')"),
+  const next = { barang_tersedia: btn("Mulai Packing", "soShipStep('mulai')"), sedang_dipacking: btn("Selesai Packing", "soShipStep('selesai')"),
     siap_dikirim: btn("Tandai Dikirim", "soShipOpen()"),
-    sudah_dikirim: btn("Ubah Data Kirim", "soShipOpen()", false) + btn("Tandai Diterima", "soShipReceivedOpen()") }[po.ship_stage] || "";
+    sudah_dikirim: btn("Ubah Data Kirim", "soShipOpen()", false) + btn("Dalam Perjalanan", "soShipStep('perjalanan')", false) + btn("Tandai Diterima", "soShipReceivedOpen()"),
+    dalam_perjalanan: btn("Ubah Data Kirim", "soShipOpen()", false) + btn("Tandai Diterima", "soShipReceivedOpen()") }[stage] || "";
   const back = at >= 2 ? btn("Mundur Satu Langkah", "soShipStepBack()", false) : "";
+  const edit = stage !== "diterima" ? btn("Ubah Detail Pengiriman", "soShipDetailOpen()", false) : "";
   const address = soShipAddressLines(po);
-  card.innerHTML = head("Pengiriman Customer", live ? back + next : "") + stepper + `
+  const missing = !po.ship_recipient_name || !po.ship_recipient_phone || !po.ship_address;
+  card.innerHTML = head(back + edit + next) + stepper
+    + (missing && live ? `<p class="mb-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">Nama penerima, No. HP, dan alamat wajib lengkap sebelum paket dikirim.</p>` : "") + `
     <dl class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
       <div>${fact("Penerima", `${esc(po.ship_recipient_name || "—")}${po.ship_recipient_phone ? ` · <span class="tabular-nums">${esc(po.ship_recipient_phone)}</span>` : ""}`)}
         ${fact("Alamat", address.map(esc).join("<br>") || "—")}</div>
@@ -21585,16 +21643,68 @@ async function soShipStep(action) {
   catch (e) { closeModal(); showToast(e.message); }
 }
 function soShipStepBack() {
-  const stages = Object.keys(SO_SHIP_STAGES);
-  const stage = currentPreorder.ship_stage;
-  const target = SO_SHIP_STAGES[stages[stages.indexOf(stage) - 1]];
+  const stage = soFulfilStage(currentPreorder);
+  const target = stage === "diterima" ? "sudah_dikirim" : SO_STAGE_STEPS.kirim[SO_STAGE_STEPS.kirim.indexOf(stage) - 1];
   openModal("Mundur Satu Langkah", `<div class="space-y-3">
-    <p class="text-sm text-ink">Kembalikan status ke <b>${esc(target)}</b>?${stage === "sudah_dikirim" ? " Stok barang dikembalikan." : ""}</p>
+    <p class="text-sm text-ink">Kembalikan status ke <b>${esc(SO_STAGE_LABELS[target])}</b>?${stage === "sudah_dikirim" ? " Stok barang dikembalikan." : ""}</p>
     <div class="flex justify-end gap-2"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
       <button type="button" class="${GR_BTN}" onclick="soShipStep('mundur')">Kembalikan</button></div></div>`);
 }
+// Everything about the delivery can be completed here, on the same order, after it was saved.
+async function soShipDetailOpen() {
+  const po = currentPreorder;
+  let rows = [];
+  try { rows = await soForwarders(); } catch (e) { showToast(e.message); return; }
+  const field = (id, label, wide = false) => `<div class="${wide ? "sm:col-span-2" : ""}">${grField(label, `<input id="${id}" class="${GR_IN}" autocomplete="off">`)}</div>`;
+  openModal("Ubah Detail Pengiriman", `<div class="space-y-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      ${field("so-d-name", "Nama penerima")}${field("so-d-phone", "No. HP penerima")}
+      <div class="sm:col-span-2">${grField("Alamat lengkap", `<textarea id="so-d-address" rows="2" class="${GR_IN}"></textarea>`)}</div>
+      ${field("so-d-province", "Provinsi")}${field("so-d-city", "Kota/Kabupaten")}${field("so-d-district", "Kecamatan")}${field("so-d-village", "Kelurahan/Desa")}${field("so-d-postal", "Kode Pos")}${field("so-d-landmark", "Patokan alamat")}
+      ${grField("Ekspedisi", `<select id="so-d-forwarder" class="${GR_IN}">${soForwarderOptions(rows, po.ship_forwarder_id, po.ship_forwarder_name)}</select>`)}${field("so-d-service", "Layanan")}
+      ${grField("Ongkir dibebankan", `<select id="so-d-payer" class="${GR_IN}">${Object.entries(SO_FEE_PAYER_LABELS).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select>`)}
+      ${grField("Ongkir (Rp)", `<input id="so-d-fee" type="text" inputmode="numeric" class="price-input ${GR_IN} text-right tabular-nums">`)}
+    </div>
+    <label class="flex items-center gap-2 text-sm text-ink"><input id="so-d-unknown" type="checkbox" class="accent-[#EA580C]" onchange="document.getElementById('so-d-fee').disabled=this.checked"> Ongkir belum ditentukan</label>
+    <div class="flex justify-end gap-2 pt-1"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
+      <button type="button" class="${GR_BTN}" onclick="soShipDetailSave()">Simpan</button></div></div>`, { lg: true });
+  const set = (id, v) => { document.getElementById(id).value = v || ""; };
+  set("so-d-name", po.ship_recipient_name || po.customer_name); set("so-d-phone", po.ship_recipient_phone || po.customer_phone); set("so-d-address", po.ship_address);
+  set("so-d-province", po.ship_province); set("so-d-city", po.ship_city); set("so-d-district", po.ship_district); set("so-d-village", po.ship_village);
+  set("so-d-postal", po.ship_postal_code); set("so-d-landmark", po.ship_landmark); set("so-d-service", po.ship_service);
+  document.getElementById("so-d-payer").value = po.ship_fee_payer || "customer";
+  setPriceInput(document.getElementById("so-d-fee"), po.ship_fee || 0);
+  document.getElementById("so-d-unknown").checked = !!po.ship_fee_unknown;
+  document.getElementById("so-d-fee").disabled = !!po.ship_fee_unknown;
+}
+async function soShipDetailSave() {
+  const v = id => document.getElementById(id).value.trim() || null;
+  const unknown = document.getElementById("so-d-unknown").checked;
+  try {
+    const detail = await grApi(`/api/preorders/${currentPreorder.id}`, "PATCH", { expected_updated_at: currentPreorder.updated_at, fulfillment_method: "kirim", shipping: {
+      ship_recipient_name: v("so-d-name"), ship_recipient_phone: v("so-d-phone"), ship_address: v("so-d-address"), ship_province: v("so-d-province"), ship_city: v("so-d-city"),
+      ship_district: v("so-d-district"), ship_village: v("so-d-village"), ship_postal_code: v("so-d-postal"), ship_landmark: v("so-d-landmark"), ship_service: v("so-d-service"),
+      ship_forwarder_id: whNum(document.getElementById("so-d-forwarder").value), ship_fee_payer: document.getElementById("so-d-payer").value,
+      ship_fee: unknown ? 0 : priceValue(document.getElementById("so-d-fee")), ship_fee_unknown: unknown } });
+    closeModal(); showToast("Detail pengiriman disimpan.", "success"); renderPreorderDetail(detail);
+  } catch (e) { showToast(e.message); }
+}
+// Pemasangan moves the invoice's own Pengerjaan, the same status the Kasir shows.
+async function soWorkTo(to) {
+  try {
+    await grApi(`/api/receipts/${currentPreorder.receipt_id}/work-status`, "POST", { to });
+    renderPreorderDetail(await grApi(`/api/preorders/${currentPreorder.id}`));
+    closeModal();
+  } catch (e) { closeModal(); showToast(e.message); }
+}
+function soWorkDoneOpen() {
+  openModal("Pemasangan Selesai", `<div class="space-y-3">
+    <p class="text-sm text-ink">Pemasangan sudah selesai? Stok barang keluar saat dikonfirmasi.</p>
+    <div class="flex justify-end gap-2"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
+      <button type="button" class="${GR_BTN}" onclick="soWorkTo('selesai')">Konfirmasi</button></div></div>`);
+}
 function soConfirmHandover() {
-  openModal("Konfirmasi Penyerahan", `<div class="space-y-3">
+  openModal("Konfirmasi Sudah Diambil", `<div class="space-y-3">
     <p class="text-sm text-ink">Customer sudah mengambil semua barang? Stok barang keluar saat dikonfirmasi.</p>
     <div class="flex justify-end gap-2"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
       <button type="button" class="${GR_BTN}" onclick="soConfirmHandoverSave()">Konfirmasi</button></div></div>`);
@@ -21607,6 +21717,11 @@ async function soConfirmHandoverSave() {
 }
 async function soShipOpen() {
   const po = currentPreorder;
+  if (!po.ship_status && (!po.ship_recipient_name || !po.ship_recipient_phone || !po.ship_address)) {
+    showToast("Lengkapi penerima dan alamat dulu sebelum paket dikirim.");
+    soShipDetailOpen();
+    return;
+  }
   let rows = [];
   try { rows = await soForwarders(); } catch (e) { showToast(e.message); return; }
   const unpaid = po.remaining > 0 ? `<p class="rounded-lg border border-failed/30 bg-failed/5 px-3 py-2 text-xs text-failed">Masih ada sisa bayar ${formatIDR(po.remaining)}. Pastikan ini memang boleh dikirim.</p>` : "";
@@ -21761,12 +21876,7 @@ function validatePreorderPayload(payload) {
   }
   const total = payload.items.reduce((acc, i) => acc + i.quantity * i.unit_price, 0) + poShipCharge();
   if ((payload.deposit || 0) > total) return "DP melebihi total pesanan.";
-  if (!payload.is_draft && payload.fulfillment_method === "kirim") {
-    const s = payload.shipping;
-    if (!s.ship_recipient_name) return "Nama penerima wajib diisi untuk Kirim ke Alamat.";
-    if (!s.ship_recipient_phone) return "No. HP penerima wajib diisi untuk Kirim ke Alamat.";
-    if (!s.ship_address) return "Alamat lengkap wajib diisi untuk Kirim ke Alamat.";
-  }
+  if (!payload.is_draft && !payload.fulfillment_method && (!currentPreorder || currentPreorder.is_draft)) return "Pilih Metode Pemenuhan Customer sebelum Sales Order diterbitkan.";
   if (poProofNeeded() && (payload.deposit || 0) > 0) {
     const f = document.getElementById("po-deposit-proof").files[0];
     if (!f) return "Bukti transfer wajib diunggah untuk DP pesanan WhatsApp.";
@@ -22078,8 +22188,7 @@ function renderPreorderDetail(detail) {
     poInfoRow("Nomor Telepon", `<span class="tabular-nums">${esc(detail.customer_phone)}</span>`),
     poInfoRow("Catatan", esc(detail.notes || "—")),
   ].join("");
-  document.getElementById("po-detail-status").innerHTML =
-    `<span class="po-pill is-solid is-${esc(detail.status)}">${esc(SO_SHIP_STAGES[detail.ship_stage] || preorderStatusLabel(detail.status, detail.fulfillment_method))}</span>`;
+  renderSoStatusStrip(detail);
   document.getElementById("po-menu-draft").textContent = detail.is_draft ? "Aktifkan Kembali" : "Jadikan Draft";
   const soCancelled = !!detail.cancelled_at;
   document.getElementById("po-edit-btn").classList.toggle("hidden", soCancelled);
@@ -22114,7 +22223,7 @@ function renderPreorderDetail(detail) {
       <td class="px-3 py-2 text-right text-ink tabular-nums">${item.quantity}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(item.unit_price)}</td>
       <td class="px-3 py-2 text-right text-ink tabular-nums whitespace-nowrap">${formatIDR(item.quantity * item.unit_price)}</td>
-      <td class="px-3 py-2">${soProcureHtml(item)}${detail.fulfillment_method === "kirim" ? "" : `<div class="mt-1">${preorderStatusBadgeHtml(item.status, detail.fulfillment_method)}</div>`}${soReservationHtml(item)}</td>
+      <td class="px-3 py-2">${soProcureHtml(item)}${detail.fulfillment_method !== "kirim" && ["sampai_di_toko", "dititipkan", "terpasang"].includes(item.status) ? `<div class="mt-1">${preorderStatusBadgeHtml(item.status, detail.fulfillment_method)}</div>` : ""}${soReservationHtml(item)}</td>
       <td class="px-3 py-2">
         <div class="flex items-center justify-end gap-1.5">
           ${detail.receipt_id && item.quantity > 1 && item.reserved_qty > 0 && item.status !== "terpasang"
@@ -22141,7 +22250,7 @@ function renderPreorderDetail(detail) {
   const liveItems = detail.items.filter(i => i.status !== "dibatalkan");
   const pay = detail.payment_status || "belum";
   document.getElementById("po-sum-d-pay").innerHTML = `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SO_PAY_TINTS[pay] || ""}">${esc(SO_PAY_LABELS[pay] || pay)}</span>`;
-  document.getElementById("po-sum-d-status").innerHTML = `<span class="po-pill is-${esc(detail.status)}">${esc(SO_SHIP_STAGES[detail.ship_stage] || preorderStatusLabel(detail.status, detail.fulfillment_method))}</span>`
+  document.getElementById("po-sum-d-status").innerHTML = `<span class="po-pill is-${esc(detail.status)}">${esc(SO_STAGE_LABELS[soFulfilStage(detail)] || preorderStatusLabel(detail.status, detail.fulfillment_method))}</span>`
     + (detail.receipt_no ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border border-accent/40 text-accentDark tabular-nums">${esc(detail.receipt_no)}</span>` : "");
   document.getElementById("po-sum-d-no").textContent = detail.po_number;
   document.getElementById("po-sum-d-plate").textContent = detail.plate_full || "Plat belum diisi";
@@ -22195,21 +22304,21 @@ function renderPreorderDetail(detail) {
       <span class="text-xs text-muted tabular-nums">${esc(formatDateTimeSeconds(a.allocated_at).slice(0, 16))}${a.allocated_by ? " &middot; " + esc(a.allocated_by) : ""}</span>
     </div>`).join("");
 
-  if (poTlFor !== detail.id) { poTlFor = detail.id; poTlTab = "bayar"; }
+  if (poTlFor !== detail.id) { poTlFor = detail.id; poTlTab = "timeline"; }
   renderPoTimeline(detail);
   showPreorderPanel("po-detail-panel");
 }
 
 // Catatan & Riwayat Perubahan of a Sales Order: one tab per kind, the same look as Kasir's timeline.
-let poTlTab = "bayar", poTlFor = null;
+let poTlTab = "timeline", poTlFor = null;
 function setPoTlTab(key) {
   poTlTab = key;
   if (currentPreorder) renderPoTimeline(currentPreorder);
 }
 function renderPoTimeline(detail) {
   const invoices = (detail.invoices || []).filter(i => i.receipt_no);
-  const groups = [["catatan", "Catatan", detail.notes ? 1 : 0], ["bayar", "Riwayat Pembayaran", detail.payments.length],
-                  ["status", "Riwayat Status", detail.history.length], ["invoice", "Terkait Invoice", invoices.length]];
+  const groups = [["timeline", "Perkembangan Pesanan", (detail.timeline || []).length], ["catatan", "Catatan SO", detail.notes ? 1 : 0],
+                  ["bayar", "Riwayat Pembayaran", detail.payments.length], ["invoice", "Terkait Invoice", invoices.length]];
   document.getElementById("po-tl-tabs").innerHTML = groups.map(([key, label, n]) => `
     <button type="button" role="tab" aria-selected="${key === poTlTab}" onclick="setPoTlTab('${key}')"
       class="py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${key === poTlTab ? "border-accent text-accentDark" : "border-transparent text-muted hover:text-ink"}">${esc(label)} (${n})</button>`).join("");
@@ -22233,10 +22342,8 @@ function renderPoTimeline(detail) {
           + (p.state === "gagal" && p.fail_reason ? ` <span class="text-failed">· ${esc(p.fail_reason)}</span>` : "")
           + soProofCell(detail, p), "min-w-[18rem] whitespace-normal break-words leading-relaxed")
         + td(esc(p.created_by || "—")) + `</tr>`));
-  } else if (poTlTab === "status") {
-    html = table(["Waktu", "Barang", "Status Lama", "Status Baru", "Dilakukan Oleh"],
-      detail.history.map(h => `<tr class="border-b border-line last:border-b-0">${td(when(h.changed_at), "tabular-nums whitespace-nowrap")}${td(esc(h.product_name))}`
-        + `${td(h.old_status ? esc(PREORDER_STATUS_DETAIL[h.old_status] || h.old_status) : "—", "text-muted")}${td(esc(PREORDER_STATUS_DETAIL[h.status] || h.status))}${td(esc(h.changed_by || "—"))}</tr>`));
+  } else if (poTlTab === "timeline") {
+    html = soTimelineHtml(detail);
   } else {
     html = table(["No. Invoice", "Total", "Dibayar", "Status", ""],
       invoices.map(i => `<tr class="border-b border-line last:border-b-0">${td(`<span class="font-mono">${esc(i.receipt_no)}</span>`)}${td(esc(formatIDR(i.total)), "tabular-nums")}${td(esc(formatIDR(i.amount_paid)), "tabular-nums")}`

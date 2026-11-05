@@ -1362,6 +1362,13 @@ def init_db() -> None:
         # Owner, 24-10-2026: where the order came in (walk-in at the shop or by WhatsApp).
         if "order_source" not in {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}:
             con.execute("ALTER TABLE preorders ADD COLUMN order_source TEXT NOT NULL DEFAULT 'walk_in'")
+        # Owner 05-11-2026: how the order reaches the customer, and the delivery details of a Kirim ke Alamat order.
+        preorder_cols = {r["name"] for r in con.execute("PRAGMA table_info(preorders)").fetchall()}
+        for col, ddl in _SO_SHIPPING_DDL:
+            if col not in preorder_cols:
+                con.execute(f"ALTER TABLE preorders ADD COLUMN {col} {ddl}")
+        if "is_shipping" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
+            con.execute("ALTER TABLE receipt_items ADD COLUMN is_shipping INTEGER NOT NULL DEFAULT 0")
         if "preorder_item_id" not in {r["name"] for r in con.execute("PRAGMA table_info(receipt_items)").fetchall()}:
             con.execute("ALTER TABLE receipt_items ADD COLUMN preorder_item_id INTEGER")
         # --- Additive migration: Retur Barang ---
@@ -2509,6 +2516,16 @@ _RECEIPT_SELECT = f"""SELECT r.*,
 
 RECEIPT_NO_PREFIX = "PJSG"
 
+_SO_SHIPPING_DDL = (
+    ("fulfillment_method", "TEXT"), ("ship_recipient_name", "TEXT"), ("ship_recipient_phone", "TEXT"),
+    ("ship_province", "TEXT"), ("ship_city", "TEXT"), ("ship_district", "TEXT"), ("ship_village", "TEXT"),
+    ("ship_postal_code", "TEXT"), ("ship_landmark", "TEXT"), ("ship_address", "TEXT"), ("ship_forwarder_id", "INTEGER"),
+    ("ship_forwarder_name", "TEXT"), ("ship_service", "TEXT"), ("ship_fee_payer", "TEXT"),
+    ("ship_fee", "INTEGER NOT NULL DEFAULT 0"), ("ship_fee_unknown", "INTEGER NOT NULL DEFAULT 0"),
+    ("ship_status", "TEXT"), ("ship_tracking_no", "TEXT"), ("ship_sent_date", "TEXT"), ("ship_received_date", "TEXT"),
+    ("ship_proof_file", "TEXT"), ("ship_proof_name", "TEXT"),
+)
+
 
 def _next_receipt_no(con: sqlite3.Connection, created_at: str) -> str:
     """PJSG/YY/MM/NNNN: a counter per calendar month on the shop's wall clock, restarting at
@@ -3276,7 +3293,7 @@ def update_receipt(
             # and the invoice follows. Here they must come back untouched apart from discount.
             sent_by_id = {item.get("id"): item for item in resolved_items if item.get("id") in old_by_id}
             for old_row in existing_items:
-                if not old_row.get("preorder_item_id"):
+                if not old_row.get("preorder_item_id") and not old_row.get("is_shipping"):
                     continue
                 sent = sent_by_id.get(old_row["id"])
                 if sent is None or sent["product_name"] != old_row["product_name"] or sent["quantity"] != old_row["quantity"] \
@@ -3349,6 +3366,10 @@ def update_receipt(
                          *[item["_price"][c] for c in _PRICE_COLS]),
                     ).lastrowid
                     added_names.append(item["product_name"])
+            # The rows were re-inserted above: the ongkir line stays marked as ongkir.
+            for old_row in existing_items:
+                if old_row.get("is_shipping"):
+                    con.execute("UPDATE receipt_items SET is_shipping=1 WHERE id=?", (old_row["id"],))
             # Logged on drafts too: the owner reads Riwayat Item to see who added which line.
             if added_names:
                 _log_receipt_event(con, receipt_id, "item_added", "Item ditambahkan: " + ", ".join(added_names), changed_by)
@@ -7924,14 +7945,98 @@ def _preorder_source(source: str | None) -> str:
     return source
 
 
+# Owner 05-11-2026: Metode Pemenuhan. Ambil di Toko and Pemasangan di Toko carry no delivery details; Kirim ke Alamat
+# does. Ongkir charged to the customer raises the order's total and is billed as one locked line on the main invoice;
+# ongkir paid by the shop or at the destination is only a note. Null method = an order from before this existed.
+SO_FULFILLMENT_METHODS = ("ambil", "kirim", "pasang")
+SO_FEE_PAYERS = ("customer", "toko", "tujuan")
+SO_SHIPPING_LINE_NAME = "ONGKOS KIRIM"
+_SO_SHIP_TEXT_LIMITS = {"ship_recipient_name": 120, "ship_recipient_phone": 20, "ship_province": 80, "ship_city": 80,
+                        "ship_district": 80, "ship_village": 80, "ship_postal_code": 10, "ship_landmark": 200,
+                        "ship_address": 500, "ship_service": 80}
+
+
+def _so_fulfillment(method: str | None) -> str | None:
+    method = method or None
+    if method is not None and method not in SO_FULFILLMENT_METHODS:
+        raise ValueError("Metode pemenuhan harus Ambil di Toko, Kirim ke Alamat, atau Pemasangan di Toko.")
+    return method
+
+
+def _so_forwarder(con: sqlite3.Connection, forwarder_id) -> tuple[int | None, str | None]:
+    if not forwarder_id:
+        return None, None
+    row = con.execute("SELECT id, name FROM forwarders WHERE id=?", (forwarder_id,)).fetchone()
+    if row is None:
+        raise ValueError("Ekspedisi tidak ditemukan di Master Ekspedisi.")
+    return row["id"], row["name"]
+
+
+def _so_fee_columns(data: dict) -> dict:
+    payer = data.get("ship_fee_payer") or "customer"
+    if payer not in SO_FEE_PAYERS:
+        raise ValueError("Ongkir dibebankan kepada Customer, Toko, atau Bayar di Tujuan.")
+    unknown = bool(data.get("ship_fee_unknown"))
+    fee = 0 if unknown else int(data.get("ship_fee") or 0)
+    if fee < 0:
+        raise ValueError("Ongkir tidak boleh minus.")
+    return {"ship_fee_payer": payer, "ship_fee_unknown": int(unknown), "ship_fee": fee}
+
+
+def _so_shipping_columns(con: sqlite3.Connection, method: str | None, shipping: dict | None) -> dict:
+    """What the order stores for its method. Leaving Kirim ke Alamat clears the details, and with them the ongkir."""
+    if method != "kirim":
+        return {**{c: None for c in _SO_SHIP_TEXT_LIMITS}, "ship_forwarder_id": None, "ship_forwarder_name": None,
+                "ship_fee_payer": None, "ship_fee": 0, "ship_fee_unknown": 0}
+    data = shipping or {}
+    out = {}
+    for col, limit in _SO_SHIP_TEXT_LIMITS.items():
+        text = (data.get(col) or "").strip()
+        if len(text) > limit:
+            raise ValueError(f"Isian pengiriman terlalu panjang (maksimal {limit} huruf): {text[:30]}…")
+        out[col] = text or None
+    phone = re.sub(r"[\s-]", "", out["ship_recipient_phone"] or "")
+    if phone and not PHONE_RE.match(phone):
+        raise ValueError("No. HP penerima tidak valid.")
+    out["ship_recipient_phone"] = phone or None
+    out["ship_forwarder_id"], out["ship_forwarder_name"] = _so_forwarder(con, data.get("ship_forwarder_id"))
+    return {**out, **_so_fee_columns(data)}
+
+
+def _so_require_shipping(row: dict) -> None:
+    """Drafts may stay empty; a published Kirim ke Alamat order must say who gets the goods and where."""
+    if row.get("fulfillment_method") != "kirim":
+        return
+    if not row.get("ship_recipient_name"):
+        raise ValueError("Nama penerima wajib diisi untuk Kirim ke Alamat.")
+    if not row.get("ship_recipient_phone"):
+        raise ValueError("No. HP penerima wajib diisi untuk Kirim ke Alamat.")
+    if not row.get("ship_address"):
+        raise ValueError("Alamat lengkap wajib diisi untuk Kirim ke Alamat.")
+
+
+def _so_set_columns(con: sqlite3.Connection, preorder_id: str, columns: dict) -> None:
+    con.execute(f"UPDATE preorders SET {', '.join(c + '=?' for c in columns)} WHERE id=?", (*columns.values(), preorder_id))
+
+
+def so_shipping_charge(row: dict) -> int:
+    """The ongkir the customer is billed for."""
+    if row.get("fulfillment_method") != "kirim" or row.get("ship_fee_payer") != "customer" or row.get("ship_fee_unknown"):
+        return 0
+    return row.get("ship_fee") or 0
+
+
 def _preorder_row(row: dict, items: list[dict], paid: int = 0, invoice: dict | None = None) -> dict:
     """`paid` is the sum of the order's own payments; the legacy preorders.deposit column is ignored.
     Once the PO has its invoice, paid and remaining are the invoice's (payments are taken there)."""
     total = sum(i["quantity"] * i["unit_price"] for i in items if i["status"] != PO_LINE_CANCELLED)
+    charge = so_shipping_charge(row) if any(i["status"] != PO_LINE_CANCELLED for i in items) else 0
+    total += charge
     out = {
         **row,
         "deposit": paid,
         "total": total,
+        "shipping_charge": charge,
         # Overpayment would otherwise show as a negative balance owing.
         "remaining": max(total - paid, 0),
         "item_count": len(items),
@@ -8266,6 +8371,8 @@ def create_preorder(
     price_actor: dict | None = None,
     order_source: str | None = None,
     deposit_proof: tuple[str, str | None] | None = None,
+    fulfillment_method: str | None = None,
+    shipping: dict | None = None,
 ) -> dict:
     """A deposit given at creation is recorded as the first payment ("DP awal"); on a published PO it
     is booked straight onto the PO's invoice, which is created here too. `deposit_proof` = (stored file, original
@@ -8283,6 +8390,11 @@ def create_preorder(
             (preorder_id, _next_po_no(con, po_date), po_date, plate_full, customer_name,
              customer_phone, notes, now, now, int(is_draft), supplier_id, _preorder_source(order_source)),
         )
+        method = _so_fulfillment(fulfillment_method)
+        ship_columns = _so_shipping_columns(con, method, shipping)
+        _so_set_columns(con, preorder_id, {"fulfillment_method": method, **ship_columns})
+        if not is_draft:
+            _so_require_shipping({"fulfillment_method": method, **ship_columns})
         if deposit > 0:
             con.execute(
                 "INSERT INTO preorder_payments (preorder_id, paid_at, amount, note, created_by, proof_file, proof_name, proof_by, proof_at) "
@@ -8762,6 +8874,9 @@ def _po_invoice_sync(
         "SELECT * FROM preorder_items WHERE preorder_id=? AND status<>? ORDER BY position ASC, id ASC",
         (preorder_id, PO_LINE_CANCELLED),
     ).fetchall()]
+    # A line taken back from Terpasang means the goods did not leave after all: the order is no longer Dikirim.
+    if po.get("ship_status") and any(pi["status"] not in PO_INSTALLED_STATUSES for pi in po_items):
+        _so_set_columns(con, preorder_id, {"ship_status": None, "ship_received_date": None})
     active_ids = {i["id"] for i in invoices}
     mine: dict[str, list[dict]] = {i["id"]: [] for i in invoices}
     for pi in po_items:
@@ -8769,7 +8884,38 @@ def _po_invoice_sync(
     for inv in invoices:
         _po_invoice_sync_one(con, po, inv["id"], mine[inv["id"]], created and inv["id"] == main_id,
                              (before or {}).get(inv["id"]), by)
+    # After the goods, so the ongkir is the invoice's last line; its invoice then adds up again.
+    billed_on = _po_sync_shipping_line(con, po, invoices, bool(po_items), by)
+    if billed_on:
+        _po_invoice_sync_one(con, po, billed_on, mine[billed_on], False, None, by)
     return main_id
+
+
+def _po_sync_shipping_line(con: sqlite3.Connection, po: dict, invoices: list[dict], has_lines: bool, by: str | None) -> str | None:
+    """The billed ongkir is one line on the main invoice. Nothing left to deliver (every line cancelled) = no ongkir.
+    Returns the invoice whose line changed, None when nothing did. `invoices` was read before this sync moved them."""
+    fee = so_shipping_charge(po) if has_lines else 0
+    line = con.execute(
+        "SELECT ri.* FROM receipt_items ri JOIN receipts r ON r.id=ri.receipt_id "
+        "WHERE r.preorder_id=? AND r.status<>'void' AND ri.is_shipping=1", (po["id"],)).fetchone()
+    old = line["unit_price"] if line else 0
+    if old == fee:
+        return None
+    owner = next((i for i in invoices if line and i["id"] == line["receipt_id"]), invoices[0])
+    if _is_closed(owner):
+        raise ValueError("Invoice Sales Order ini sudah lunas dan selesai (ditutup). Minta admin membukanya kembali sebelum mengubah ongkir.")
+    if line is None:
+        con.execute(
+            """INSERT INTO receipt_items (receipt_id, product_name, quantity, unit_price, warranty_date, master_item_id,
+                   item_type, line_discount, added_at, added_by, added_during_work, preorder_item_id, is_shipping)
+               VALUES (?, ?, 1, ?, NULL, NULL, 'jasa', 0, ?, ?, 0, NULL, 1)""",
+            (owner["id"], SO_SHIPPING_LINE_NAME, fee, _now(), by))
+    elif fee:
+        con.execute("UPDATE receipt_items SET unit_price=? WHERE id=?", (fee, line["id"]))
+    else:
+        con.execute("DELETE FROM receipt_items WHERE id=?", (line["id"],))
+    _log_receipt_event(con, owner["id"], "item_changed", f"Ongkir {_rp(old)} -> {_rp(fee)} (Sales Order {po['po_number']})", by)
+    return owner["id"]
 
 
 def _po_invoice_sync_one(con: sqlite3.Connection, po: dict, receipt_id: str, po_items: list[dict], created: bool,
@@ -9270,6 +9416,7 @@ def _require_publish_dp(con: sqlite3.Connection, preorder_id: str) -> None:
     total = con.execute(
         "SELECT COALESCE(SUM(quantity*unit_price),0) AS t FROM preorder_items WHERE preorder_id=?", (preorder_id,)
     ).fetchone()["t"]
+    total += so_shipping_charge(dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()))
     need = -(-total * SO_MIN_DP_PERCENT // 100)
     paid = con.execute(
         "SELECT COALESCE(SUM(amount),0) AS n FROM preorder_payments WHERE preorder_id=? AND state='sah'", (preorder_id,)
@@ -9303,6 +9450,9 @@ def update_preorder(
     supplier_id: int | None = None,
     price_actor: dict | None = None,
     order_source: str | None = None,
+    set_fulfillment: bool = False,
+    fulfillment_method: str | None = None,
+    shipping: dict | None = None,
 ) -> dict:
     """Items are matched by id rather than deleted and re-inserted (the pattern
     receipts use), because a line item owns its stage and its status history —
@@ -9338,6 +9488,14 @@ def update_preorder(
                 preorder_id,
             ),
         )
+        if set_fulfillment:
+            method = _so_fulfillment(fulfillment_method)
+            if existing.get("ship_status") and method != "kirim":
+                raise ValueError("Paket Sales Order ini sudah dikirim, jadi metode pemenuhannya tidak bisa diganti.")
+            _so_set_columns(con, preorder_id, {"fulfillment_method": method, **_so_shipping_columns(con, method, shipping)})
+        final = dict(con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone())
+        if not final["is_draft"] and (set_fulfillment or existing["is_draft"]):
+            _so_require_shipping(final)
         new_plate = split_plate(plate_full) if plate_full else None
         if new_plate and plate_full != existing["plate_full"]:
             # A plate typed later on the Sales Order reaches its open invoices that still have none.
@@ -9510,6 +9668,106 @@ def set_preorder_status(preorder_id: str, status: str, changed_by: str | None = 
             con.execute("UPDATE preorders SET updated_at=? WHERE id=?", (now, preorder_id))
             _po_invoice_sync(con, preorder_id, changed_by, before)
     return changed
+
+
+# --- Owner 05-11-2026: delivering a Kirim ke Alamat order (one shipment per order) ------------------
+# Siap Dikirim -> Dikirim -> Diterima. Marking it Dikirim hands the goods over: the lines go to Terpasang, so stock
+# leaves the way it does for any handover. Taking a line back from Terpasang clears Dikirim (see _po_invoice_sync).
+
+def _so_load_shipment(con: sqlite3.Connection, preorder_id: str) -> dict:
+    con.execute("BEGIN IMMEDIATE")
+    row = con.execute("SELECT * FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+    if row is None:
+        raise LookupError("Sales Order tidak ditemukan.")
+    po = dict(row)
+    if po.get("cancelled_at"):
+        raise ValueError("Sales Order ini sudah dibatalkan.")
+    if po["is_draft"]:
+        raise ValueError("Terbitkan Sales Order ini dulu sebelum mengirim barangnya.")
+    if po.get("fulfillment_method") != "kirim":
+        raise ValueError("Metode pemenuhan Sales Order ini bukan Kirim ke Alamat.")
+    return po
+
+
+def _so_ship_date(value: str | None, label: str) -> str:
+    value = (value or "").strip()
+    if not _YMD_RE.match(value):
+        raise ValueError(f"{label} wajib diisi.")
+    return value
+
+
+def _so_lines_not_ready(con: sqlite3.Connection, lines: list[dict]) -> list[str]:
+    """Goods still to come. A shelf line whose stock is fully held counts as ready, the same reading as the dashboard."""
+    held = {r["id"]: r for r in _reservation_lines(con, [ln["master_item_id"] for ln in lines if ln["master_item_id"]])}
+    names = []
+    for ln in lines:
+        h = held.get(ln["id"])
+        ready = (ln["status"] in PO_ARRIVED_STATUSES or ln.get("source") == "jasa"
+                 or (h is not None and h["coming"] == 0 and h["reserved"] >= ln["quantity"]))
+        if not ready:
+            names.append(ln["product_name"])
+    return names
+
+
+def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
+    """Records the shipment. Sent again on an order already Dikirim, it corrects the details."""
+    sent_date = _so_ship_date(data.get("ship_sent_date"), "Tanggal kirim")
+    with _conn() as con:
+        po = _so_load_shipment(con, preorder_id)
+        if po.get("ship_status") == "diterima":
+            raise ValueError("Paket ini sudah diterima customer.")
+        forwarder_id, forwarder_name = _so_forwarder(con, data.get("ship_forwarder_id"))
+        if not forwarder_id:
+            raise ValueError("Pilih ekspedisi yang mengirim paket ini.")
+        fee = _so_fee_columns(data)
+        if fee["ship_fee_unknown"]:
+            raise ValueError("Isi ongkir dulu sebelum menandai paket dikirim.")
+        first = not po.get("ship_status")
+        lines = [dict(r) for r in con.execute("SELECT * FROM preorder_items WHERE preorder_id=? AND status<>?",
+                                              (preorder_id, PO_LINE_CANCELLED))]
+        if first:
+            waiting = _so_lines_not_ready(con, [ln for ln in lines if ln["status"] not in PO_INSTALLED_STATUSES])
+            if waiting:
+                raise ValueError("Barang ini belum siap: " + ", ".join(waiting) + ". Tunggu sampai semua barang ada di toko.")
+        now = _now()
+        before = _po_invoice_snapshot(con, preorder_id)
+        tracking = (data.get("ship_tracking_no") or "").strip()[:80] or None
+        _so_set_columns(con, preorder_id, {
+            **fee, "ship_status": "dikirim", "ship_forwarder_id": forwarder_id, "ship_forwarder_name": forwarder_name,
+            "ship_service": (data.get("ship_service") or "").strip()[:80] or None, "ship_tracking_no": tracking,
+            "ship_sent_date": sent_date, "updated_at": now})
+        for ln in lines:
+            if ln["status"] not in PO_INSTALLED_STATUSES:
+                con.execute("UPDATE preorder_items SET status='terpasang' WHERE id=?", (ln["id"],))
+                _log_preorder_status(con, preorder_id, ln["id"], ln["product_name"], "terpasang", now, by, ln["status"])
+        invoice_id = _po_invoice_sync(con, preorder_id, by, before)
+        _log_receipt_event(con, invoice_id, "status",
+                           f"Paket {'dikirim' if first else 'diperbarui'}: {forwarder_name}" + (f", resi {tracking}" if tracking else ""), by)
+    return get_preorder(preorder_id)
+
+
+def so_mark_received(preorder_id: str, received_date: str | None, proof: tuple[str, str | None] | None, by: str | None) -> tuple[dict, str | None]:
+    """Returns the order and the replaced proof file, for the caller to delete."""
+    received_date = _so_ship_date(received_date, "Tanggal diterima")
+    with _conn() as con:
+        po = _so_load_shipment(con, preorder_id)
+        if not po.get("ship_status"):
+            raise ValueError("Paket ini belum ditandai dikirim.")
+        if received_date < (po.get("ship_sent_date") or ""):
+            raise ValueError("Tanggal diterima tidak boleh sebelum tanggal kirim.")
+        columns = {"ship_status": "diterima", "ship_received_date": received_date, "updated_at": _now()}
+        if proof:
+            columns.update(ship_proof_file=proof[0], ship_proof_name=proof[1])
+        _so_set_columns(con, preorder_id, columns)
+        if po.get("receipt_id"):
+            _log_receipt_event(con, po["receipt_id"], "status", "Paket diterima customer", by)
+    return get_preorder(preorder_id), (po.get("ship_proof_file") if proof else None)
+
+
+def so_shipment_proof(preorder_id: str) -> str | None:
+    with _conn() as con:
+        row = con.execute("SELECT ship_proof_file FROM preorders WHERE id=?", (preorder_id,)).fetchone()
+    return row["ship_proof_file"] if row else None
 
 
 # --- K-13: cancelling a Sales Order (official policy, decided 2026-10-18) -----------------------
@@ -9718,7 +9976,9 @@ def _so_amounts(con: sqlite3.Connection, po: dict, keep_lines: list[dict], recei
     rec = con.execute("SELECT * FROM receipts WHERE id=?", (receipt_id,)).fetchone()
     keep_ids = {ln["id"] for ln in keep_lines}
     items = [dict(r) for r in con.execute("SELECT * FROM receipt_items WHERE receipt_id=?", (receipt_id,))]
-    billed = sum(_line_total(i) for i in items if i["preorder_item_id"] is None or i["preorder_item_id"] in keep_ids)
+    # With no line left on the order nothing is delivered, so the ongkir goes too and its money can be refunded.
+    billed = sum(_line_total(i) for i in items if (i["preorder_item_id"] is None and (keep_lines or not i.get("is_shipping")))
+                 or i["preorder_item_id"] in keep_ids)
     billed = max(billed - min(rec["discount"] or 0, billed) - (rec["return_total"] or 0), 0)
     return rec["amount_paid"], billed
 

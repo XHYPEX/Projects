@@ -177,6 +177,15 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
     else:
         status_key, status_label = ("menunggu_lunas", "Menunggu pelunasan") if row["remaining"] > 0 else ("menunggu_selesai", "Menunggu selesai")
 
+    # Owner 05-11-2026: a Kirim ke Alamat order is sent, not picked up.
+    if row.get("fulfillment_method") == "kirim":
+        if row.get("ship_status") == "diterima":
+            status_key, status_label = "diterima", "Diterima"
+        elif row.get("ship_status") == "dikirim":
+            status_key, status_label = "dikirim", "Dikirim"
+        elif status_key in ("siap", "dialokasikan"):
+            status_key, status_label = "siap_dikirim", "Siap dikirim"
+
     actions: list[dict] = []
     if stage != "selesai":
         if missing:
@@ -199,7 +208,8 @@ def _so_dashboard_row(row: dict, items: list[dict], links: dict[int, list[dict]]
         if stage == "siap" and work_status not in ("pengerjaan", "selesai") and status_key != "dititipkan":
             what = summary if len(lines) == 1 else f"{len(lines)} jenis barang"
             actions.append({"kind": "hubungi_customer", "button": "Hubungi Customer",
-                            "text": f"{what} siap — hubungi customer untuk pemasangan / pengambilan"})
+                            "text": f"{what} siap dikirim — lengkapi ongkir dan kirim paketnya" if row.get("fulfillment_method") == "kirim"
+                            else f"{what} siap — hubungi customer untuk pemasangan / pengambilan"})
 
     due = row["invoice_total"] if row["invoice_total"] is not None else row["total"]
     return {

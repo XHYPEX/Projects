@@ -12,6 +12,10 @@ from backend import payment_proofs
 from backend.auth import get_current_user, require_admin
 from backend.routes.quotations import guard_conversion, record_conversion
 from backend.database import (
+    so_mark_received,
+    so_mark_shipped,
+    so_shipment_proof,
+    so_shipping_charge,
     decide_price_request,
     price_actor,
     peek_next_po_no,
@@ -53,6 +57,8 @@ from backend.database import (
     update_preorder,
 )
 from backend.schemas import (
+    PreorderShipmentReceivedRequest,
+    PreorderShipmentRequest,
     PreorderPartialHandoverRequest,
     PriceDecisionRequest,
     PaymentFailRequest,
@@ -292,7 +298,9 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
     items = _validate_items(req.items)
     if not req.is_draft:
         _require_prices(items)
-    if req.deposit > sum(i["quantity"] * i["unit_price"] for i in items):
+    shipping = req.shipping.model_dump() if req.shipping else None
+    charge = so_shipping_charge({"fulfillment_method": req.fulfillment_method, **(shipping or {})})
+    if req.deposit > sum(i["quantity"] * i["unit_price"] for i in items) + charge:
         raise HTTPException(status_code=422, detail="Uang muka melebihi total pesanan.")
     notes = req.notes.strip() if req.notes else None
 
@@ -310,7 +318,7 @@ async def create_new_preorder(req: PreorderRequest, user: dict = Depends(get_cur
                 preorder_id, customer_name, customer_phone, items, req.deposit, notes, user["username"],
                 plate_full, po_date, req.is_draft, deposit_method=req.deposit_method, supplier_id=req.supplier_id,
                 deposit_confirmed=req.deposit_confirmed, price_actor=price_actor(user), order_source=req.order_source,
-                deposit_proof=proof,
+                deposit_proof=proof, fulfillment_method=req.fulfillment_method, shipping=shipping,
             ),
         )
     except ValueError as e:
@@ -397,12 +405,56 @@ async def update_preorder_route(
                 notes=notes, update_notes=update_notes, changed_by=user["username"],
                 is_draft=req.is_draft, plate_full=plate_full, po_date=po_date,
                 set_supplier=set_supplier, supplier_id=req.supplier_id, price_actor=price_actor(user),
-                order_source=req.order_source,
+                order_source=req.order_source, set_fulfillment="fulfillment_method" in req.model_fields_set,
+                fulfillment_method=req.fulfillment_method, shipping=req.shipping.model_dump() if req.shipping else None,
             ),
         )
     except ValueError as e:
         raise _po_error(e)
     return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/shipment", response_model=PreorderDetail)
+async def mark_preorder_shipped(preorder_id: str, req: PreorderShipmentRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    try:
+        await loop.run_in_executor(None, so_mark_shipped, preorder_id, req.model_dump(), user["username"])
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e).strip("'\""))
+    except ValueError as e:
+        raise _po_error(e)
+    return await _detail(preorder_id)
+
+
+@router.post("/preorders/{preorder_id}/shipment/received", response_model=PreorderDetail)
+async def mark_preorder_received(preorder_id: str, req: PreorderShipmentReceivedRequest, user: dict = Depends(get_current_user)):
+    loop = asyncio.get_event_loop()
+    proof = None
+    if req.proof:
+        proof = (await loop.run_in_executor(None, payment_proofs.save_proof, *_decode_proof(req.proof)),
+                 str(req.proof.get("name") or "")[:120] or None)
+    try:
+        _, replaced = await loop.run_in_executor(None, so_mark_received, preorder_id, req.received_date, proof, user["username"])
+    except (LookupError, ValueError) as e:
+        if proof:
+            await loop.run_in_executor(None, payment_proofs.delete_proof_file, proof[0])
+        if isinstance(e, LookupError):
+            raise HTTPException(status_code=404, detail=str(e).strip("'\""))
+        raise _po_error(e)
+    if replaced:
+        await loop.run_in_executor(None, payment_proofs.delete_proof_file, replaced)
+    return await _detail(preorder_id)
+
+
+@router.get("/preorders/{preorder_id}/shipment/proof")
+async def get_preorder_shipment_proof(preorder_id: str):
+    loop = asyncio.get_event_loop()
+    stored = await loop.run_in_executor(None, so_shipment_proof, preorder_id)
+    path = await loop.run_in_executor(None, payment_proofs.proof_file, stored)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Paket ini belum punya foto bukti terima.")
+    return FileResponse(path, media_type=payment_proofs.media_type_for(stored),
+                        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
 
 
 async def _price_decision(preorder_id: str, item_id: int, approve: bool, req: PriceDecisionRequest, user: dict) -> PreorderDetail:

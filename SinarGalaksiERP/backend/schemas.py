@@ -178,6 +178,7 @@ class ReceiptItemOut(BaseModel):
     so_note: str | None = None  # the Sales Order line's note (e.g. the plate to print), read-only on the nota
     sku: str | None = None
     unit: str | None = None  # the linked master item's unit; None for a hand-typed line
+    is_shipping: bool = False  # the ongkir line of a Sales Order invoice; changed on the Sales Order only
     item_type: str = "barang"
     line_discount: int = 0
     added_at: str | None = None
@@ -1129,6 +1130,40 @@ class PreorderItemRequest(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class PreorderShippingInfo(BaseModel):
+    """Kirim ke Alamat (owner 05-11-2026). Name, phone and address are required once the order is published."""
+    ship_recipient_name: str | None = None
+    ship_recipient_phone: str | None = None
+    ship_province: str | None = None
+    ship_city: str | None = None
+    ship_district: str | None = None
+    ship_village: str | None = None
+    ship_postal_code: str | None = None
+    ship_landmark: str | None = None
+    ship_address: str | None = None
+    ship_forwarder_id: int | None = None
+    ship_service: str | None = None
+    ship_fee_payer: str = "customer"  # customer (billed on the order) | toko | tujuan (notes only)
+    ship_fee: int = 0
+    ship_fee_unknown: bool = False
+
+
+class PreorderShipmentRequest(BaseModel):
+    ship_forwarder_id: int | None = None
+    ship_service: str | None = None
+    ship_tracking_no: str | None = None
+    ship_sent_date: str | None = None
+    ship_fee_payer: str = "customer"
+    ship_fee: int = 0
+    ship_fee_unknown: bool = False
+
+
+class PreorderShipmentReceivedRequest(BaseModel):
+    received_date: str | None = None
+    # Photo of the goods received {name, content_type, data (base64)}; optional.
+    proof: dict | None = None
+
+
 class PreorderRequest(BaseModel):
     customer_name: str
     customer_phone: str
@@ -1152,6 +1187,8 @@ class PreorderRequest(BaseModel):
     # Penawaran Harga this order was made from (accepted, not converted yet); linked once the order is saved.
     quotation_id: int | None = None
     order_source: str = "walk_in"  # walk_in | whatsapp: where the order came in
+    fulfillment_method: str | None = None  # ambil | kirim | pasang
+    shipping: PreorderShippingInfo | None = None  # for kirim
 
 
 class PreorderUpdateRequest(BaseModel):
@@ -1169,6 +1206,8 @@ class PreorderUpdateRequest(BaseModel):
     # Omitted = keep; null = clear (follow each barang's supplier).
     supplier_id: int | None = None
     order_source: str | None = None  # omitted = keep
+    fulfillment_method: str | None = None  # omitted = keep (with its shipping details)
+    shipping: PreorderShippingInfo | None = None
 
 
 class PreorderItemStatusRequest(BaseModel):
@@ -1341,6 +1380,28 @@ class PreorderOut(BaseModel):
     po_number: str
     po_date: str
     order_source: str = "walk_in"  # walk_in | whatsapp
+    fulfillment_method: str | None = None  # ambil | kirim | pasang; null = an order from before this existed
+    ship_recipient_name: str | None = None
+    ship_recipient_phone: str | None = None
+    ship_province: str | None = None
+    ship_city: str | None = None
+    ship_district: str | None = None
+    ship_village: str | None = None
+    ship_postal_code: str | None = None
+    ship_landmark: str | None = None
+    ship_address: str | None = None
+    ship_forwarder_id: int | None = None
+    ship_forwarder_name: str | None = None
+    ship_service: str | None = None
+    ship_fee_payer: str | None = None
+    ship_fee: int = 0
+    ship_fee_unknown: bool = False
+    ship_status: str | None = None  # null | dikirim | diterima
+    ship_tracking_no: str | None = None
+    ship_sent_date: str | None = None
+    ship_received_date: str | None = None
+    ship_proof_name: str | None = None
+    shipping_charge: int = 0  # the ongkir inside `total`
     supplier_id: int | None = None
     supplier_name: str | None = None
     # Empty for orders created before the plate was captured.

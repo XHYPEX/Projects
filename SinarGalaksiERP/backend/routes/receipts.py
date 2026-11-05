@@ -173,6 +173,7 @@ def _row_to_item(row: dict) -> ReceiptItemOut:
         sku=row.get("sku"),
         unit=row.get("unit"),
         item_type=row.get("item_type") or "barang",
+        is_shipping=bool(row.get("is_shipping")),
         line_discount=row.get("line_discount") or 0,
         added_at=row.get("added_at"),
         added_by=row.get("added_by"),

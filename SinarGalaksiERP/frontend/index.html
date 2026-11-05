@@ -2346,7 +2346,7 @@
           <details id="po-ship-more" class="mt-5 pt-4 border-t border-line">
           <summary class="cursor-pointer text-sm font-semibold text-ink mb-2">Ekspedisi dan ongkir <span class="ml-1 text-[11px] font-normal text-muted border border-line rounded-full px-2 py-0.5">Boleh diisi belakangan</span></summary>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label for="po-ship-forwarder" class="block text-xs font-medium text-ink mb-1">Ekspedisi</label><select id="po-ship-forwarder" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="">Belum ditentukan</option></select></div>
+            <div><label for="po-ship-forwarder" class="block text-xs font-medium text-ink mb-1">Ekspedisi</label><input id="po-ship-forwarder" list="po-ship-forwarder-list" maxlength="80" autocomplete="off" placeholder="Ketik atau pilih, mis. JNE" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /><datalist id="po-ship-forwarder-list"></datalist></div>
             <div><label for="po-ship-service" class="block text-xs font-medium text-ink mb-1">Layanan</label><input id="po-ship-service" type="text" placeholder="Reguler / Cargo / lainnya" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-payer" class="block text-xs font-medium text-ink mb-1">Ongkir dibebankan kepada</label><select id="po-ship-payer" onchange="poShipFeeChanged()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="customer">Customer (masuk tagihan SO)</option><option value="toko">Toko</option><option value="tujuan">Bayar di tujuan</option></select></div>
             <div><label for="po-ship-fee" class="block text-xs font-medium text-ink mb-1">Ongkir (Rp)</label><input id="po-ship-fee" type="text" inputmode="numeric" value="0" oninput="updatePreorderTotals()" class="price-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors text-right tabular-nums disabled:bg-bg2 disabled:text-muted" /></div>
@@ -21533,10 +21533,10 @@ async function soForwarders() {
   return poForwardersCache;
 }
 // <option>s of the ekspedisi; a saved one stays selectable even after it was deactivated.
-function soForwarderOptions(rows, id, name) {
-  const missing = id && !rows.some(f => f.id === id);
-  return `<option value="">Belum ditentukan</option>` + (missing ? `<option value="${id}" selected>${esc(name || "")}</option>` : "")
-    + rows.map(f => `<option value="${f.id}" ${f.id === id ? "selected" : ""}>${esc(f.name)}</option>`).join("");
+// Owner 05-11-2026: the expedition is typed; Master Ekspedisi only suggests names. The option text is its value.
+const soForwarderOptions = rows => rows.map(f => `<option>${esc(f.name)}</option>`).join("");
+function soForwarderInput(id, rows) {
+  return `<input id="${id}" list="${id}-list" maxlength="80" autocomplete="off" placeholder="Ketik atau pilih, mis. JNE" class="${GR_IN}"><datalist id="${id}-list">${soForwarderOptions(rows)}</datalist>`;
 }
 const PO_SHIP_FIELDS = { "po-ship-name": "ship_recipient_name", "po-ship-phone": "ship_recipient_phone", "po-ship-province": "ship_province",
   "po-ship-city": "ship_city", "po-ship-district": "ship_district", "po-ship-village": "ship_village", "po-ship-postal": "ship_postal_code",
@@ -21549,18 +21549,19 @@ function poShipFill(detail) {
   // A new delivery usually has no ongkir yet, so it starts as "belum diketahui".
   document.getElementById("po-ship-fee-unknown").checked = detail?.fulfillment_method === "kirim" ? !!detail.ship_fee_unknown : true;
   setPriceInput(document.getElementById("po-ship-fee"), detail?.ship_fee || 0);
+  document.getElementById("po-ship-forwarder").value = detail?.ship_forwarder_name || "";
   soForwarders().then(rows => {
-    document.getElementById("po-ship-forwarder").innerHTML = soForwarderOptions(rows, detail?.ship_forwarder_id, detail?.ship_forwarder_name);
+    document.getElementById("po-ship-forwarder-list").innerHTML = soForwarderOptions(rows);
   }).catch(() => {});
   // Owner 05-11-2026: Sumber Order decides nothing here; a new order starts with no method chosen.
   poFulfillSelect(detail ? detail.fulfillment_method : null);
-  document.getElementById("po-ship-more").open = !!(detail?.ship_forwarder_id || detail?.ship_service || detail?.ship_fee);
+  document.getElementById("po-ship-more").open = !!(detail?.ship_forwarder_name || detail?.ship_service || detail?.ship_fee);
   poShipFeeChanged();
   const sent = !!detail?.ship_status;
   for (const input of document.querySelectorAll('input[name="po-fulfill"]')) input.disabled = sent;
 }
 function poShipPayload() {
-  const out = { ship_forwarder_id: whNum(document.getElementById("po-ship-forwarder").value), ship_fee_payer: document.getElementById("po-ship-payer").value,
+  const out = { ship_forwarder_name: document.getElementById("po-ship-forwarder").value.trim() || null, ship_fee_payer: document.getElementById("po-ship-payer").value,
     ship_fee: priceValue(document.getElementById("po-ship-fee")), ship_fee_unknown: document.getElementById("po-ship-fee-unknown").checked };
   for (const [id, key] of Object.entries(PO_SHIP_FIELDS)) out[key] = document.getElementById(id).value.trim() || null;
   return out;
@@ -21685,7 +21686,7 @@ async function soShipDetailOpen() {
       ${field("so-d-name", "Nama penerima")}${field("so-d-phone", "No. HP penerima")}
       <div class="sm:col-span-2">${grField("Alamat lengkap", `<textarea id="so-d-address" rows="2" class="${GR_IN}"></textarea>`)}</div>
       ${field("so-d-province", "Provinsi")}${field("so-d-city", "Kota/Kabupaten")}${field("so-d-district", "Kecamatan")}${field("so-d-village", "Kelurahan/Desa")}${field("so-d-postal", "Kode Pos")}${field("so-d-landmark", "Patokan alamat")}
-      ${grField("Ekspedisi", `<select id="so-d-forwarder" class="${GR_IN}">${soForwarderOptions(rows, po.ship_forwarder_id, po.ship_forwarder_name)}</select>`)}${field("so-d-service", "Layanan")}
+      ${grField("Ekspedisi", soForwarderInput("so-d-forwarder", rows))}${field("so-d-service", "Layanan")}
       ${grField("Ongkir dibebankan", `<select id="so-d-payer" class="${GR_IN}">${Object.entries(SO_FEE_PAYER_LABELS).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select>`)}
       ${grField("Ongkir (Rp)", `<input id="so-d-fee" type="text" inputmode="numeric" class="price-input ${GR_IN} text-right tabular-nums">`)}
     </div>
@@ -21695,7 +21696,7 @@ async function soShipDetailOpen() {
   const set = (id, v) => { document.getElementById(id).value = v || ""; };
   set("so-d-name", po.ship_recipient_name || po.customer_name); set("so-d-phone", po.ship_recipient_phone || po.customer_phone); set("so-d-address", po.ship_address);
   set("so-d-province", po.ship_province); set("so-d-city", po.ship_city); set("so-d-district", po.ship_district); set("so-d-village", po.ship_village);
-  set("so-d-postal", po.ship_postal_code); set("so-d-landmark", po.ship_landmark); set("so-d-service", po.ship_service);
+  set("so-d-postal", po.ship_postal_code); set("so-d-landmark", po.ship_landmark); set("so-d-service", po.ship_service); set("so-d-forwarder", po.ship_forwarder_name);
   document.getElementById("so-d-payer").value = po.ship_fee_payer || "customer";
   setPriceInput(document.getElementById("so-d-fee"), po.ship_fee || 0);
   document.getElementById("so-d-unknown").checked = !!po.ship_fee_unknown;
@@ -21708,7 +21709,7 @@ async function soShipDetailSave() {
     const detail = await grApi(`/api/preorders/${currentPreorder.id}`, "PATCH", { expected_updated_at: currentPreorder.updated_at, fulfillment_method: "kirim", shipping: {
       ship_recipient_name: v("so-d-name"), ship_recipient_phone: v("so-d-phone"), ship_address: v("so-d-address"), ship_province: v("so-d-province"), ship_city: v("so-d-city"),
       ship_district: v("so-d-district"), ship_village: v("so-d-village"), ship_postal_code: v("so-d-postal"), ship_landmark: v("so-d-landmark"), ship_service: v("so-d-service"),
-      ship_forwarder_id: whNum(document.getElementById("so-d-forwarder").value), ship_fee_payer: document.getElementById("so-d-payer").value,
+      ship_forwarder_name: v("so-d-forwarder"), ship_fee_payer: document.getElementById("so-d-payer").value,
       ship_fee: unknown ? 0 : priceValue(document.getElementById("so-d-fee")), ship_fee_unknown: unknown } });
     closeModal(); showToast("Detail pengiriman disimpan.", "success"); renderPreorderDetail(detail);
   } catch (e) { showToast(e.message); }
@@ -21752,7 +21753,7 @@ async function soShipOpen() {
   openModal(po.ship_status ? "Ubah Data Kirim" : "Tandai Dikirim", `<div class="space-y-3">
     ${unpaid}
     ${po.ship_status ? "" : `<p class="text-sm text-muted">Stok barang keluar saat paket ditandai dikirim.</p>`}
-    ${grField("Ekspedisi", `<select id="so-ship-forwarder" class="${GR_IN}">${soForwarderOptions(rows, po.ship_forwarder_id, po.ship_forwarder_name)}</select>`, true)}
+    ${grField("Ekspedisi", soForwarderInput("so-ship-forwarder", rows), true)}
     <div class="grid grid-cols-2 gap-3">
       ${grField("Layanan", `<input id="so-ship-service" class="${GR_IN}" maxlength="80" autocomplete="off">`)}
       ${grField("No. Resi", `<input id="so-ship-tracking" class="${GR_IN} font-mono" maxlength="80" autocomplete="off">`)}
@@ -21762,6 +21763,7 @@ async function soShipOpen() {
     ${grField("Ongkir (Rp)", `<input id="so-ship-fee" type="text" inputmode="numeric" class="price-input ${GR_IN} text-right tabular-nums">`, true)}
     <div class="flex justify-end gap-2 pt-1"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
       <button type="button" class="${GR_BTN}" onclick="soShipSave()">Simpan</button></div></div>`);
+  document.getElementById("so-ship-forwarder").value = po.ship_forwarder_name || "";
   document.getElementById("so-ship-service").value = po.ship_service || "";
   document.getElementById("so-ship-tracking").value = po.ship_tracking_no || "";
   document.getElementById("so-ship-date").value = po.ship_sent_date || toDateInputValue(new Date());
@@ -21770,10 +21772,10 @@ async function soShipOpen() {
 }
 async function soShipSave() {
   const v = id => document.getElementById(id).value;
-  if (!v("so-ship-forwarder")) { showToast("Pilih ekspedisi yang mengirim paket ini."); return; }
+  if (!v("so-ship-forwarder").trim()) { showToast("Isi ekspedisi yang mengirim paket ini."); return; }
   try {
     const detail = await grApi(`/api/preorders/${currentPreorder.id}/shipment`, "POST", {
-      ship_forwarder_id: whNum(v("so-ship-forwarder")), ship_service: v("so-ship-service"), ship_tracking_no: v("so-ship-tracking"),
+      ship_forwarder_name: v("so-ship-forwarder").trim(), ship_service: v("so-ship-service"), ship_tracking_no: v("so-ship-tracking"),
       ship_sent_date: v("so-ship-date"), ship_fee_payer: v("so-ship-payer"), ship_fee: priceValue(document.getElementById("so-ship-fee")), ship_fee_unknown: false });
     closeModal(); showToast("Data pengiriman disimpan.", "success"); renderPreorderDetail(detail);
   } catch (e) { showToast(e.message); }
@@ -24160,6 +24162,11 @@ function poInvoiceHtml(po, settings) {
   const paid = Math.max(po.total - po.remaining, 0);
   const status = poPayStatus(po);
   const lastPay = [...(po.payments || [])].filter(p => p.state === "sah" && p.amount > 0).pop();
+  // The half form is short: the recipient's own line only when it differs from "Kepada".
+  const recipient = [po.ship_recipient_name, po.ship_recipient_phone].filter(Boolean).join(" / ");
+  const sameRecipient = (po.ship_recipient_name || po.customer_name) === po.customer_name && (po.ship_recipient_phone || po.customer_phone) === po.customer_phone;
+  const shipTo = [...(sameRecipient || !recipient ? [] : [recipient]), ...soShipAddressLines(po)];
+  const payMethod = esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-");
   const kv = (label, value, bold) => docKv(label, value, 92, bold);
   const sum = docSum;
   const rule = settings.lines ? "border-bottom:1px solid #000;" : "";
@@ -24168,21 +24175,20 @@ function poInvoiceHtml(po, settings) {
   const accounts = (poPrintCompany.accounts || []).filter(a => a.is_active !== false);
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;line-height:1.35;">
-    ${docHeadHtml("INVOICE", [`No. <b>${esc(po.receipt_no || po.po_number)}</b>`, esc(poDateTimeLabel(po)),
-      `<span style="display:inline-block;margin-top:2px;padding:1px ${G.sm}px;border:1px solid #000;font-weight:bold;letter-spacing:.06em">${status}</span>`])}
+    ${docHeadHtml("INVOICE", [`No. <b>${esc(po.receipt_no || po.po_number)}</b>`,
+      `${esc(poDateTimeLabel(po))} <span style="display:inline-block;margin-left:${G.xs}px;padding:0 ${G.xs}px;border:1px solid #000;font-weight:bold;letter-spacing:.04em;white-space:nowrap">${status}</span>`])}
     <div style="margin-top:${G.md}px;">${docCols(`
         ${kv("Kepada", esc(po.customer_name || "-"), true)}
         ${kv("No. HP", esc(po.customer_phone || "-"))}
-        ${kv("No. Plat", esc(po.plate_full || "Belum dicatat"))}`, `
+        ${po.plate_full ? kv("No. Plat", esc(po.plate_full)) : kv("Pembayaran", payMethod)}`, `
         ${kv("Ref. SO", esc(po.po_number), true)}
         ${kv("Sumber Order", po.order_source === "whatsapp" ? "WhatsApp" : "Walk-in")}
         ${po.fulfillment_method ? kv("Pemenuhan", esc(SO_FULFILL_LABELS[po.fulfillment_method])) : ""}
         ${po.install_schedule ? kv("Jadwal Pasang", esc(soScheduleText(po.install_schedule))) : ""}
-        ${kv("Pembayaran", esc(lastPay ? (PAYMENT_METHOD_LABELS[lastPay.method] || lastPay.method) : "-"))}`)}
+        ${po.plate_full ? kv("Pembayaran", payMethod) : ""}`)}
     </div>
     ${po.fulfillment_method === "kirim" ? `<div style="margin-top:${G.sm}px;padding-top:${G.xs}px;border-top:1px solid #000;font-size:9pt;">
-      <b>Kirim ke:</b> ${esc([po.ship_recipient_name, po.ship_recipient_phone].filter(Boolean).join(" / ") || "-")}<br>
-      ${soShipAddressLines(po).map(esc).join("<br>")}
+      <b>Kirim ke:</b> ${shipTo.map(esc).join("<br>") || "-"}
       <br><b>Ekspedisi:</b> ${esc([po.ship_forwarder_name || "Belum ditentukan", po.ship_service].filter(Boolean).join(" / "))}${po.ship_tracking_no ? ` &nbsp;<b>Resi:</b> ${esc(po.ship_tracking_no)}` : ""} &nbsp;<b>Ongkir:</b> ${esc(soShipFeeText(po))}
     </div>` : ""}
     <table style="width:100%;border-collapse:collapse;margin-top:${G.md}px;border-bottom:1.5px solid #000;">
@@ -24203,27 +24209,27 @@ function poInvoiceHtml(po, settings) {
           <td style="${cell}text-align:right;">${money(it.quantity * it.unit_price)}</td>
         </tr>`).join("")}</tbody>
     </table>
+    <div style="break-inside:avoid;page-break-inside:avoid;">
     <div style="margin-top:${G.md}px;display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;">
       <div style="min-width:0;font-size:9pt;">
         ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:${G.xs}px;">Pembayaran transfer ke rekening:</div>
           ${accounts.map(a => `<div style="margin-bottom:${G.xs}px;">${esc(a.bank_name)} &nbsp;<b>${esc(a.account_number)}</b><br>a.n. ${esc(a.account_name)}</div>`).join("")}
           <div>Mohon konfirmasi setelah melakukan transfer.</div>` : ""}
         ${po.notes ? `<div style="margin-top:${G.sm}px;">Catatan: ${esc(po.notes)}</div>` : ""}
+        ${settings.footer ? `<div style="margin-top:${G.sm}px;font-size:8.5pt;">Terima kasih atas kepercayaan Anda.</div>` : ""}
       </div>
       <table style="border-collapse:collapse;flex-shrink:0;">
-        ${sum("Subtotal", money(subtotal))}
+        ${ongkir || cut ? sum("Subtotal", money(subtotal)) : ""}
         ${ongkir ? sum("Ongkir", money(ongkir)) : ""}
         ${cut ? sum("Potongan", money(cut)) : ""}
-        ${docSumRule}
+        ${ongkir || cut ? docSumRule : ""}
         ${sum("Jumlah", money(po.total))}
         ${sum(status === "LUNAS" ? "Dibayar" : "Dibayar (DP)", money(paid))}
         ${sum("Sisa", money(Math.max(po.remaining, 0)), true)}
       </table>
     </div>
-    ${settings.footer ? `<div style="margin-top:${G.md}px;padding-top:${G.sm}px;border-top:1px solid #000;">
-      <div style="text-align:center;font-size:8.5pt;">Terima kasih atas kepercayaan Anda.</div>
-      ${svcSigns(["Penerima,", po.customer_name], ["Hormat kami,", ""])}
-    </div>` : ""}
+    ${settings.footer ? svcSigns(["Penerima,", po.customer_name], ["Hormat kami,", ""]) : ""}
+    </div>
   </div>`;
 }
 

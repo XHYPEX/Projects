@@ -7983,13 +7983,21 @@ def _so_fulfillment(method: str | None) -> str | None:
     return method
 
 
-def _so_forwarder(con: sqlite3.Connection, forwarder_id) -> tuple[int | None, str | None]:
-    if not forwarder_id:
+def _so_forwarder(con: sqlite3.Connection, forwarder_id, typed_name=None) -> tuple[int | None, str | None]:
+    """The order's expedition. Owner 05-11-2026: staff may type it; a name that is not in Master Ekspedisi
+    is kept on the order as text and does not add a master row."""
+    if forwarder_id:
+        row = con.execute("SELECT id, name FROM forwarders WHERE id=?", (forwarder_id,)).fetchone()
+        if row is None:
+            raise ValueError("Ekspedisi tidak ditemukan di Master Ekspedisi.")
+        return row["id"], row["name"]
+    name = (typed_name or "").strip()
+    if not name:
         return None, None
-    row = con.execute("SELECT id, name FROM forwarders WHERE id=?", (forwarder_id,)).fetchone()
-    if row is None:
-        raise ValueError("Ekspedisi tidak ditemukan di Master Ekspedisi.")
-    return row["id"], row["name"]
+    if len(name) > 80:
+        raise ValueError("Nama ekspedisi terlalu panjang (maksimal 80 huruf).")
+    row = con.execute("SELECT id, name FROM forwarders WHERE name=? COLLATE NOCASE", (name,)).fetchone()
+    return (row["id"], row["name"]) if row else (None, name)
 
 
 def _so_fee_columns(data: dict) -> dict:
@@ -8019,7 +8027,7 @@ def _so_shipping_columns(con: sqlite3.Connection, method: str | None, shipping: 
     if phone and not PHONE_RE.match(phone):
         raise ValueError("No. HP penerima tidak valid.")
     out["ship_recipient_phone"] = phone or None
-    out["ship_forwarder_id"], out["ship_forwarder_name"] = _so_forwarder(con, data.get("ship_forwarder_id"))
+    out["ship_forwarder_id"], out["ship_forwarder_name"] = _so_forwarder(con, data.get("ship_forwarder_id"), data.get("ship_forwarder_name"))
     return {**out, **_so_fee_columns(data)}
 
 
@@ -8077,7 +8085,7 @@ def _so_log_shipping_changes(con: sqlite3.Connection, preorder_id: str, before: 
         return
     if any((before.get(c) or None) != (after.get(c) or None) for c in _SO_SHIP_TEXT_LIMITS if c != "ship_service"):
         _so_event(con, preorder_id, "pengiriman", "Detail penerima dan alamat diperbarui", by)
-    if (before.get("ship_forwarder_id"), before.get("ship_service")) != (after.get("ship_forwarder_id"), after.get("ship_service")) and after.get("ship_forwarder_name"):
+    if (before.get("ship_forwarder_name"), before.get("ship_service")) != (after.get("ship_forwarder_name"), after.get("ship_service")) and after.get("ship_forwarder_name"):
         _so_event(con, preorder_id, "pengiriman", "Ekspedisi: " + " / ".join(x for x in (after["ship_forwarder_name"], after.get("ship_service")) if x), by)
     fee = lambda r: (r.get("ship_fee_payer"), r.get("ship_fee") or 0, bool(r.get("ship_fee_unknown")))
     if before.get("fulfillment_method") == "kirim" and fee(before) != fee(after) or (before.get("fulfillment_method") != "kirim" and not after.get("ship_fee_unknown") and after.get("ship_fee")):
@@ -9825,9 +9833,9 @@ def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
         po = _so_load_shipment(con, preorder_id)
         if po.get("ship_status") == "diterima":
             raise ValueError("Paket ini sudah diterima customer.")
-        forwarder_id, forwarder_name = _so_forwarder(con, data.get("ship_forwarder_id"))
-        if not forwarder_id:
-            raise ValueError("Pilih ekspedisi yang mengirim paket ini.")
+        forwarder_id, forwarder_name = _so_forwarder(con, data.get("ship_forwarder_id"), data.get("ship_forwarder_name"))
+        if not forwarder_name:
+            raise ValueError("Isi ekspedisi yang mengirim paket ini.")
         fee = _so_fee_columns(data)
         if fee["ship_fee_unknown"]:
             raise ValueError("Isi ongkir dulu sebelum menandai paket dikirim.")
@@ -9857,7 +9865,7 @@ def so_mark_shipped(preorder_id: str, data: dict, by: str | None) -> dict:
                            f"Paket {'dikirim' if first else 'diperbarui'}: {forwarder_name}" + (f", resi {tracking}" if tracking else ""), by)
         if first:
             _so_event(con, preorder_id, "pengiriman", f"Paket dikirim melalui {forwarder_name}", by)
-        elif forwarder_id != po.get("ship_forwarder_id"):
+        elif forwarder_name != po.get("ship_forwarder_name"):
             _so_event(con, preorder_id, "pengiriman", f"Ekspedisi diganti menjadi {forwarder_name}", by)
         if tracking and tracking != po.get("ship_tracking_no"):
             _so_event(con, preorder_id, "pengiriman", f"Nomor resi dimasukkan: {tracking}", by)

@@ -1142,6 +1142,7 @@ class PreorderShippingInfo(BaseModel):
     ship_landmark: str | None = None
     ship_address: str | None = None
     ship_forwarder_id: int | None = None
+    ship_forwarder_name: str | None = None  # typed; matched to Master Ekspedisi by name when it is there
     ship_service: str | None = None
     ship_fee_payer: str = "customer"  # customer (billed on the order) | toko | tujuan (notes only)
     ship_fee: int = 0
@@ -1150,6 +1151,7 @@ class PreorderShippingInfo(BaseModel):
 
 class PreorderShipmentRequest(BaseModel):
     ship_forwarder_id: int | None = None
+    ship_forwarder_name: str | None = None
     ship_service: str | None = None
     ship_tracking_no: str | None = None
     ship_sent_date: str | None = None

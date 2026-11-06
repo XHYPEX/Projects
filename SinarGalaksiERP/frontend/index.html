@@ -2275,7 +2275,7 @@
               </div>
               <div class="po-frow">
                 <label for="po-source">Sumber Order <span class="text-failed">*</span></label>
-                <select id="po-source" onchange="poDepositMethodChanged()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                <select id="po-source" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
                   <option value="walk_in">Walk-in (datang ke toko)</option>
                   <option value="whatsapp">WhatsApp</option>
                 </select>
@@ -2401,45 +2401,6 @@
                 </div>
                 <p id="po-total-note" class="hidden mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">Ongkir belum ditentukan. Total dan sisa tagihan belum final.</p>
               </dl>
-              <div class="mt-3 space-y-2">
-              <div class="flex items-center justify-between gap-3">
-                <label for="po-deposit" class="text-muted shrink-0">DP Customer</label>
-                <div id="po-deposit-wrap" class="relative w-40">
-                  <span class="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">Rp</span>
-                  <input id="po-deposit" type="text" inputmode="numeric" value="0" oninput="updatePreorderTotals()"
-                    class="price-input w-full border border-line rounded-lg pl-8 pr-2 py-1 text-sm text-right bg-white text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
-                </div>
-                <span id="po-deposit-fixed" class="hidden font-serif text-base font-semibold text-done tabular-nums">Rp 0</span>
-              </div>
-              <div id="po-deposit-method-wrap" class="space-y-2">
-                <div class="flex items-center justify-between gap-3">
-                  <label for="po-deposit-method" class="text-muted shrink-0">Metode DP</label>
-                  <select id="po-deposit-method" onchange="poDepositMethodChanged()" class="select-chevron w-40 border border-line rounded-lg px-2 py-1 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
-                    <option value="cash">Tunai</option><option value="transfer">Transfer</option><option value="qris">QRIS</option><option value="debit">Debit</option></select>
-                </div>
-                <label id="po-deposit-confirm-wrap" class="hidden flex items-start gap-2 rounded-lg border border-line bg-bg2 px-3 py-2 text-xs text-ink cursor-pointer">
-                  <input id="po-deposit-confirmed" type="checkbox" class="accent-[#EA580C] mt-0.5" />
-                  <span>Dana sudah saya cek masuk<span class="block text-[11px] text-muted">Bila tidak dicentang, DP dicatat <b>Pending</b> dan belum dihitung sebagai DP sampai dikonfirmasi.</span></span>
-                </label>
-                <div id="po-deposit-proof-wrap" class="hidden rounded-lg border border-line bg-white px-3 py-2">
-                  <label for="po-deposit-proof" class="block text-xs font-medium text-ink">Bukti Transfer dari Customer <span class="text-failed">*</span></label>
-                  <p class="text-[11px] text-muted mb-1.5">Pesanan WhatsApp: unggah screenshot transfer yang dikirim customer (JPG/PNG/WebP/PDF, maks. 5 MB).</p>
-                  <input id="po-deposit-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="poDepositProofChanged()"
-                    class="block w-full text-xs text-ink file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-line file:bg-bg2 file:text-ink file:text-xs file:font-medium hover:file:bg-bg" />
-                  <img id="po-deposit-proof-preview" alt="Pratinjau bukti transfer" class="hidden mt-2 max-h-40 rounded-lg border border-line" />
-                </div>
-              </div>
-              <div id="po-deposit-hint" class="hidden text-right">
-                <button type="button" onclick="poPayClick()" class="px-3 py-1.5 border border-accent text-accent rounded-lg text-xs font-medium hover:bg-accent/10 transition-colors">+ Tambah DP / Pembayaran</button>
-                <p class="text-[11px] text-muted mt-1">Dicatat langsung ke Sales Order ini; perubahan form yang belum disimpan tidak ikut.</p>
-              </div>
-              <div id="po-deposit-min-box" class="hidden rounded-lg bg-bg2 px-3 py-2">
-                <div class="flex items-center justify-between text-xs"><span class="text-muted">Minimal DP (30%)</span><span id="po-deposit-need" class="tabular-nums text-ink">Rp 0</span></div>
-                <div class="mt-1.5 h-1.5 rounded-full bg-line overflow-hidden"><div id="po-deposit-bar" class="h-full bg-accent rounded-full transition-all" style="width:0%"></div></div>
-                <p id="po-deposit-min" class="text-[11px] text-muted mt-1.5"></p>
-                <button id="po-deposit-fill" type="button" onclick="poFillMinDeposit()" class="hidden mt-1.5 text-xs text-accent hover:text-accentDark font-medium">Isi DP minimal</button>
-              </div>
-              </div>
               <dl class="mt-2 border-t border-line pt-2">
                 <div class="flex items-baseline justify-between gap-3 text-xs"><dt class="text-muted">Sudah Dibayar</dt><dd id="po-sum-paid" class="tabular-nums font-medium text-ink">Rp 0</dd></div>
                 <div class="flex items-baseline justify-between gap-3 pt-1 text-xs"><dt class="text-muted">Sisa Bayar</dt><dd id="po-remaining-display" class="tabular-nums font-semibold text-failed">Rp 0</dd></div>
@@ -2448,6 +2409,12 @@
                   <div id="po-sum-progress-pct" class="text-[11px] text-muted mt-1 text-right tabular-nums">0% terbayar</div>
                 </div>
               </dl>
+              <!-- Owner 06-11-2026: DP and pelunasan only through the Pembayaran pop-up (as on the Kasir); a new SO gets it right after saving. -->
+              <div id="po-pay-wrap" class="hidden">
+                <button type="button" onclick="poPayClick()" class="mt-3 w-full px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accentDark transition-colors">+ Tambah Pembayaran</button>
+                <p class="text-[11px] text-muted mt-1">Dicatat langsung ke Sales Order ini; perubahan form yang belum disimpan tidak ikut.</p>
+              </div>
+              <p id="po-pay-new-hint" class="mt-2 text-[11px] text-muted">DP dibayar lewat pop-up Pembayaran setelah Sales Order disimpan.</p>
               <p class="mt-2 text-[11px] text-muted">Harga beli supplier tidak memengaruhi total tagihan customer.</p>
             </div>
           </aside>
@@ -10297,6 +10264,11 @@ async function refreshAfterSettle() {
     await loadPreorders();
     if (currentPreorder && ["po-detail-panel", "po-form-panel"].some(id => !document.getElementById(id).classList.contains("hidden"))) {
       await openPreorder(currentPreorder.id);
+    }
+    // DP taken right after saving, while the draft PO review is open: its "DP Diterima" follows.
+    else if (currentPreorder && !document.getElementById("po-review-panel").classList.contains("hidden")) {
+      const fresh = await fetchPreorder(currentPreorder.id);
+      if (fresh) await openPoReview(fresh);
     }
   }
 }
@@ -20887,18 +20859,9 @@ async function renderPreorderForm(detail) {
   if (editing) for (const item of detail.items) addPreorderRow(item);
   else addPreorderRow();
 
-  // A new order takes an up-front DP; once it exists, payments are only added
-  // from the detail page, so the form shows the running total read-only.
-  document.getElementById("po-deposit-wrap").classList.toggle("hidden", editing);
-  document.getElementById("po-deposit-method-wrap").classList.toggle("hidden", editing);
-  document.getElementById("po-deposit-method").value = "cash";
-  document.getElementById("po-deposit-confirmed").checked = false;
-  document.getElementById("po-deposit-proof").value = "";
-  poDepositProofChanged();
-  poDepositMethodChanged();
-  document.getElementById("po-deposit-fixed").classList.toggle("hidden", !editing);
-  document.getElementById("po-deposit-hint").classList.toggle("hidden", !editing);
-  setPriceInput(document.getElementById("po-deposit"), 0);
+  // Payments only through the Pembayaran pop-up: a saved order has the button, a new one gets the pop-up after saving.
+  document.getElementById("po-pay-wrap").classList.toggle("hidden", !editing);
+  document.getElementById("po-pay-new-hint").classList.toggle("hidden", editing);
   // Parking an active order is the detail page's menu; the form only offers the
   // draft save for a new order or one that is already a draft.
   document.getElementById("po-draft-btn").classList.toggle("hidden", editing && !detail.is_draft);
@@ -21367,26 +21330,12 @@ function updatePreorderTotals() {
   }
   const goods = total;
   total += poShipCharge();
-  // Editing an existing order: the DP is whatever payments already exist.
-  const deposit = currentPreorder ? currentPreorder.deposit : priceValue(document.getElementById("po-deposit"));
+  // Only saved payments count: a new order has none until the Pembayaran pop-up after saving.
+  const deposit = currentPreorder ? currentPreorder.deposit : 0;
   const remaining = Math.max(total - deposit, 0);
   document.getElementById("po-total-display").textContent = formatIDR(total);
-  document.getElementById("po-deposit-fixed").textContent = formatIDR(deposit);
-  // K-03: an order is published only with a DP of at least SO_MIN_DP_PERCENT of the total; a draft has no minimum.
-  const minEl = document.getElementById("po-deposit-min");
   const published = currentPreorder && !currentPreorder.is_draft;
   const need = soMinDp(total);
-  const short = !published && total > 0 && deposit < need;
-  document.getElementById("po-deposit-need").textContent = formatIDR(need);
-  document.getElementById("po-deposit-bar").style.width = `${need > 0 ? Math.min(100, Math.round(deposit / need * 100)) : 0}%`;
-  document.getElementById("po-deposit-bar").classList.toggle("bg-done", !short);
-  document.getElementById("po-deposit-bar").classList.toggle("bg-accent", short);
-  minEl.textContent = published ? "Sales Order sudah terbit; DP minimal hanya dicek saat diterbitkan."
-    : total <= 0 ? "" : short ? `Kurang ${formatIDR(need - deposit)} untuk bisa diterbitkan. Draft tetap bisa disimpan.`
-    : "DP cukup untuk menerbitkan Sales Order.";
-  document.getElementById("po-deposit-fill").classList.toggle("hidden", !(short && !currentPreorder));
-  minEl.classList.toggle("text-failed", short);
-  minEl.classList.toggle("text-muted", !short);
   renderPoDraftPreview();
   refreshPoFormStates(total, deposit, need, published);
   const remainingEl = document.getElementById("po-remaining-display");
@@ -21805,54 +21754,6 @@ async function soShipReceivedSave() {
   } catch (e) { showToast(e.message); }
 }
 
-function poDepositMethodChanged() {
-  const m = document.getElementById("po-deposit-method").value;
-  document.getElementById("po-deposit-confirm-wrap").classList.toggle("hidden", !["transfer", "qris"].includes(m));
-  document.getElementById("po-deposit-proof-wrap").classList.toggle("hidden", !poProofNeeded());
-}
-
-// Owner 25-10-2026: a WhatsApp order paying its DP by transfer/QRIS keeps the screenshot the customer sent.
-function poProofNeeded() {
-  return !currentPreorder && document.getElementById("po-source").value === "whatsapp"
-    && ["transfer", "qris"].includes(document.getElementById("po-deposit-method").value);
-}
-function poDepositProofChanged() {
-  const file = document.getElementById("po-deposit-proof").files[0];
-  const img = document.getElementById("po-deposit-proof-preview");
-  if (img.src) URL.revokeObjectURL(img.src);
-  const show = !!file && file.type.startsWith("image/");
-  img.classList.toggle("hidden", !show);
-  if (show) img.src = URL.createObjectURL(file); else img.removeAttribute("src");
-}
-async function poProofPayload() {
-  const file = document.getElementById("po-deposit-proof").files[0];
-  if (!file) return null;
-  const data = await new Promise((ok, fail) => {
-    const r = new FileReader();
-    r.onload = () => ok(String(r.result).split(",")[1] || "");
-    r.onerror = () => fail(new Error("File bukti transfer tidak bisa dibaca."));
-    r.readAsDataURL(file);
-  });
-  return { name: file.name, content_type: file.type, data };
-}
-
-function poFillMinDeposit() {
-  let total = 0;
-  for (const row of preorderRowValues()) total += row.quantity * row.unit_price;
-  setPriceInput(document.getElementById("po-deposit"), soMinDp(total));
-  updatePreorderTotals();
-}
-
-// The DP rule was broken: scroll to the DP field and flash it so it is obvious where to type.
-function poFocusDeposit() {
-  const el = document.getElementById("po-deposit");
-  if (!el || el.offsetParent === null) return;
-  el.scrollIntoView({ block: "center", behavior: "smooth" });
-  el.focus();
-  el.classList.add("ring-2", "ring-failed", "border-failed");
-  setTimeout(() => el.classList.remove("ring-2", "ring-failed", "border-failed"), 2500);
-}
-
 function collectPreorderPayload(asDraft) {
   const items = preorderRowValues()
     .filter(r => r.product_name)
@@ -21877,9 +21778,6 @@ function collectPreorderPayload(asDraft) {
   }
   if (!currentPreorder) {
     if (poQuotationId) payload.quotation_id = poQuotationId;
-    payload.deposit = priceValue(document.getElementById("po-deposit"));
-    payload.deposit_method = document.getElementById("po-deposit-method").value;
-    payload.deposit_confirmed = ["transfer", "qris"].includes(payload.deposit_method) ? document.getElementById("po-deposit-confirmed").checked : null;
   }
   return payload;
 }
@@ -21901,19 +21799,7 @@ function validatePreorderPayload(payload) {
     if (item.unit_price < 0) return `Harga untuk “${item.product_name}” tidak boleh minus.`;
     if (item.source === "stok" && !item.master_item_id) return `“${item.product_name}”: Stok Tersedia hanya untuk barang dari Master Barang. Pilih dari daftar, atau ubah sumbernya.`;
   }
-  const total = payload.items.reduce((acc, i) => acc + i.quantity * i.unit_price, 0) + poShipCharge();
-  if ((payload.deposit || 0) > total) return "DP melebihi total pesanan.";
   if (!payload.is_draft && !payload.fulfillment_method && (!currentPreorder || currentPreorder.is_draft)) return "Pilih Metode Pemenuhan Customer sebelum Sales Order diterbitkan.";
-  if (poProofNeeded() && (payload.deposit || 0) > 0) {
-    const f = document.getElementById("po-deposit-proof").files[0];
-    if (!f) return "Bukti transfer wajib diunggah untuk DP pesanan WhatsApp.";
-    if (f.size > 5 * 1024 * 1024) return "Ukuran bukti transfer maksimal 5 MB.";
-  }
-  const publishing = !payload.is_draft && (!currentPreorder || currentPreorder.is_draft);
-  const paid = currentPreorder ? currentPreorder.deposit : (payload.deposit || 0);
-  if (publishing && paid < soMinDp(total)) {
-    return `DP minimal ${SO_MIN_DP_PERCENT}% (${formatIDR(soMinDp(total))}) sebelum Sales Order diterbitkan. Isi kolom “DP Dibayar” di sebelah kanan, atau simpan sebagai draft dulu.`;
-  }
   return null;
 }
 
@@ -21946,14 +21832,12 @@ async function savePreorder(asDraft = false) {
   const error = poStockShortError() || validatePreorderPayload(payload) || (payload.is_draft ? null : poPriceMissingError()) || poSpecialReasonError();
   if (error) {
     showToast(error);
-    if (/^DP/.test(error)) poFocusDeposit();
     return;
   }
   const buttons = [document.getElementById("po-save-btn"), document.getElementById("po-draft-btn")];
   buttons.forEach(b => { b.disabled = true; });
   try {
     const editing = Boolean(currentPreorder);
-    if (!editing && poProofNeeded() && payload.deposit > 0) payload.deposit_proof = await poProofPayload();
     if (editing && currentPreorder.updated_at) payload.expected_updated_at = currentPreorder.updated_at;
     const resp = await fetch(editing ? `/api/preorders/${currentPreorder.id}` : "/api/preorders", {
       method: editing ? "PATCH" : "POST",
@@ -21973,10 +21857,9 @@ async function savePreorder(asDraft = false) {
       showToast(editing ? "Sales Order diperbarui." : `Sales Order ${detail.po_number} tersimpan.`, "success");
       // Fresh draft Purchase Orders (or lines still without a supplier) are reviewed before going out.
       if (soDraftPoIds(detail).length || soMissingSupplierItems(detail).length) await openPoReview(detail);
-      else {
-        renderPreorderDetail(detail);
-        if (!editing && detail.receipt_id) openPoInvoiceCreatedModal(detail);
-      }
+      else renderPreorderDetail(detail);
+      // Owner 06-11-2026: a new order's DP is taken right away in the Pembayaran pop-up (Batal = no DP yet).
+      if (!editing && detail.receipt_id && detail.remaining > 0) await openReceiptPaymentModal(detail.receipt_id);
     }
   } catch (e) {
     showToast(e.message);
@@ -22529,23 +22412,6 @@ async function poSettleClick() {
   if ((currentPreorder.invoice_count || 1) > 1) { showToast("Pilih invoice yang dilunasi lewat tombol “Bayar” di daftar invoice."); return; }
   await openReceiptPaymentModal(currentPreorder.receipt_id);
   if (receiptPayCtx && document.getElementById("rp-amount")) setReceiptPayAmount(receiptPayCtx.remaining);
-}
-
-function openPoInvoiceCreatedModal(detail) {
-  openModal("Invoice Dibuat", `
-    <div class="space-y-3">
-      <p class="text-sm text-muted">Sales Order <b class="text-ink">${esc(detail.po_number)}</b> tersimpan dan invoicenya sudah dibuat:
-        <b class="text-ink tabular-nums">${esc(detail.receipt_no || "")}</b> (${formatIDR(detail.invoice_total || 0)}).
-        Status pengerjaan <b class="text-ink">Menunggu Barang</b> sampai semua barang sampai di toko.</p>
-      <p class="text-xs text-muted">Purchase Order draft sudah dibuat otomatis per supplier dan terhubung ke Sales Order ini. Buka menu Purchase Order untuk menerbitkannya.</p>
-      <div class="rounded-lg bg-bg2 px-3 py-2 text-sm flex justify-between"><span class="text-muted">Sudah dibayar</span><span class="tabular-nums text-ink">${formatIDR(detail.deposit)}</span></div>
-      <div class="rounded-lg bg-bg2 px-3 py-2 text-sm flex justify-between"><span class="text-muted">Sisa tagihan</span><span class="tabular-nums font-semibold text-ink">${formatIDR(detail.remaining)}</span></div>
-      <div class="flex flex-wrap justify-end gap-2 pt-1">
-        <button type="button" onclick="closeModal()" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Nanti</button>
-        <button type="button" id="po-created-open" onclick="closeModal(); openReceiptFromHistory('${esc(detail.receipt_id)}')" class="px-4 py-1.5 border border-line rounded-lg text-sm text-ink hover:bg-bg2 transition-colors">Buka Invoice</button>
-        ${detail.remaining > 0 ? `<button type="button" id="po-created-pay" onclick="closeModal(); openReceiptPaymentModal('${esc(detail.receipt_id)}')" class="px-4 py-1.5 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">Bayar Sekarang</button>` : ""}
-      </div>
-    </div>`);
 }
 
 // K-13: cancelling an indent Sales Order. The server decides; this shows what it allows and why.

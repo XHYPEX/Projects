@@ -16,6 +16,8 @@ description: Rules and building blocks for the printed documents of the SINAR GA
   (they print as bands), Arial/Helvetica, body 9–9.5pt, smallest text 7.5pt. Logo is printed as a black
   silhouette (`filter:brightness(0)`) of `frontend/assets/logo-nota.png` (transparent PNG). A logo on a black
   background would print as a solid block.
+- **Max print width 8"** (LX-310, 80 columns at 10 cpi; owner 06-11-2026): every document caps its content at
+  `LX310_MAX_IN` and centres it on the 9.5" form, whatever margins are set.
 - Keep text off the paper edge: the tractor strips and the printer's dead zone cut it. The Kasir nota adds a
   3 mm inner margin on top of the page margin from "Atur Cetak".
 

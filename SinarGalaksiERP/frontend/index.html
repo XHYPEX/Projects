@@ -20169,7 +20169,8 @@ async function printReceiptNota(receiptId) {
   const zoom = prefs.scale / 100;
   const minHeightMm = Math.max(60, Math.floor(area.h * 25.4 / zoom) - 4);
   document.getElementById("nota-print-area").innerHTML =
-    `<div style="zoom:${zoom};">${receiptNotaHtml(receipt, customer, { minHeightMm })}</div>`;
+    // Owner 06-11-2026: never wider than the LX-310's 8" line; the cap is set before zoom, so it is divided by it.
+    `<div style="zoom:${zoom};max-width:${LX310_MAX_IN / zoom}in;margin:0 auto;">${receiptNotaHtml(receipt, customer, { minHeightMm })}</div>`;
   // Wait for the logo (or its failure) so the dialog never prints a half-loaded header.
   const logo = document.querySelector("#nota-print-area img");
   if (logo && !logo.complete) {
@@ -28769,7 +28770,8 @@ function svcSigns(...pairs) {
 }
 const svcLegend = no => `<div style="display:flex;justify-content:space-between;margin-top:${DOC_GAP.md}px;font-size:7.5pt">
     <span>Lembar Putih: Arsip Toko &nbsp;·&nbsp; Kuning: Supplier &nbsp;·&nbsp; Merah: Customer</span><span>${esc(no || "")}</span></div>`;
-const svcSheet = body => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;line-height:1.35;color:#000;background:#fff">${body}</div>`;
+// Owner 06-11-2026: at most the LX-310's 8" line, centred on the 9.5" form.
+const svcSheet = body => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;line-height:1.35;color:#000;background:#fff;max-width:${LX310_MAX_IN}in;margin:0 auto">${body}</div>`;
 const svcItemTable = (o, serial) => `<table style="border-collapse:collapse;width:100%">
       <thead><tr><th style="${SVC_TH}">NAMA BARANG</th><th style="${SVC_TH}">MEREK / TIPE</th><th style="${SVC_TH}">NO. SERI</th><th style="${SVC_TH};text-align:center;width:64px">QTY</th></tr></thead>
       <tbody><tr><td style="${SVC_CELL};font-weight:bold">${svcV(o.product_name)}</td><td style="${SVC_CELL}">${esc([o.brand_name, o.model].filter(Boolean).join(" / ") || "-")}</td>

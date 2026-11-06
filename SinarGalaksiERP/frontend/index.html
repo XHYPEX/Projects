@@ -24099,6 +24099,7 @@ async function submitPoStatus() {
 // Courier at 12pt is exactly 10 characters per inch, which is how the column
 // count is derived from the paper width and margins; 12pt line height is 6 lines
 // per inch. The preview and the printout come from the same text.
+const LX310_MAX_IN = 8; // widest line the Epson LX-310 can print (80 columns at 10 cpi)
 const PO_PAPERS = {
   cf11: { widthIn: 9.5, page: '9.5in 11in' },
   cf55: { widthIn: 9.5, page: '9.5in 5.5in' },
@@ -24173,8 +24174,10 @@ function poInvoiceHtml(po, settings) {
   const cell = `padding:3px ${G.sm}px;vertical-align:top;${rule}`;
   const th = `padding:3px ${G.sm}px;font-size:8pt;font-weight:bold;letter-spacing:.04em;white-space:nowrap;border-top:1.5px solid #000;border-bottom:1.5px solid #000;`;
   const accounts = (poPrintCompany.accounts || []).filter(a => a.is_active !== false);
+  // Owner 06-11-2026: the LX-310 prints at most 8" wide (80 columns), so the content never runs wider than that,
+  // centred on the 9.5" form, whatever margins are set.
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;line-height:1.35;">
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;line-height:1.35;max-width:${LX310_MAX_IN}in;margin:0 auto;">
     ${docHeadHtml("INVOICE", [`No. <b>${esc(po.receipt_no || po.po_number)}</b>`,
       `${esc(poDateTimeLabel(po))} <span style="display:inline-block;margin-left:${G.xs}px;padding:0 ${G.xs}px;border:1px solid #000;font-weight:bold;letter-spacing:.04em;white-space:nowrap">${status}</span>`])}
     <div style="margin-top:${G.md}px;">${docCols(`
@@ -24237,7 +24240,7 @@ function renderPoNotaPreview() {
   if (!currentPreorder) return;
   const settings = poPrintSettings();
   const paper = PO_PAPERS[settings.paper];
-  const usableIn = paper.widthIn - (settings.left + settings.right) / 2.54;
+  const usableIn = Math.min(paper.widthIn - (settings.left + settings.right) / 2.54, LX310_MAX_IN);
   const note = document.getElementById("po-print-note");
   note.textContent = `Status pembayaran tercetak: ${poPayStatus(currentPreorder)}. Lebar area cetak ${usableIn.toFixed(1).replace(".", ",")} inci.`;
   note.classList.remove("hidden");

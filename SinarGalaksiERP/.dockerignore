@@ -1,7 +1,19 @@
-__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 .git/
 .env
 results.csv
 output_map.html
+
+# Live data never goes into the image: docker-compose mounts ./data and ./results at runtime.
+data/
+results/
+
+# Not needed to run the app.
+.claude/
+.agents/
+.codegraph/
+.pytest_cache/
+docs/
+.DS_Store

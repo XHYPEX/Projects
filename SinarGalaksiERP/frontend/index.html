@@ -20238,9 +20238,13 @@ const NOTA_PAPERS = {
 };
 // Owner, 22-10-2026: the nota is printed on 9,5" × 5,5". A new key so every computer moves to that size once,
 // keeping the margins and text size it already had.
-const NOTA_PRINT_KEY = "nota-print-prefs-v2";
+// Owner's video 07-11-2026: the top ~0.47" of the form printed nothing on the LX-310 (shop name and title lost), so
+// the top margin is at least 1.4 cm; v3 raises a lower saved value once, keeping the other settings.
+const NOTA_PRINT_KEY = "nota-print-prefs-v3";
+const NOTA_PRINT_V2_KEY = "nota-print-prefs-v2";
 const NOTA_PRINT_OLD_KEY = "nota-print-prefs";
-const NOTA_PRINT_DEFAULTS = { paper: "half", top: 0.7, left: 0.9, right: 0.9, bottom: 0.7, scale: 100, force: false, tested: null };
+const NOTA_TOP_MIN_CM = 1.4;
+const NOTA_PRINT_DEFAULTS = { paper: "half", top: 1.4, left: 0.9, right: 0.9, bottom: 0.7, scale: 100, force: false, tested: null };
 const notaPaperSize = pg => `${String(pg.w).replace(".", ",")}″ × ${String(pg.h).replace(".", ",")}″`;
 
 function notaPrintPrefs() {
@@ -20248,8 +20252,10 @@ function notaPrintPrefs() {
   try { saved = JSON.parse(localStorage.getItem(NOTA_PRINT_KEY) || "null"); } catch (_) {}
   if (!saved) {
     try {
-      const old = JSON.parse(localStorage.getItem(NOTA_PRINT_OLD_KEY) || "null");
-      if (old) saved = { top: old.top, left: old.left, right: old.right, bottom: old.bottom, scale: old.scale };
+      const v2 = JSON.parse(localStorage.getItem(NOTA_PRINT_V2_KEY) || "null");
+      const old = v2 || JSON.parse(localStorage.getItem(NOTA_PRINT_OLD_KEY) || "null");
+      if (old) saved = { ...(v2 ? { paper: v2.paper, force: v2.force } : {}),
+        top: Math.max(Number(old.top) || 0, NOTA_TOP_MIN_CM), left: old.left, right: old.right, bottom: old.bottom, scale: old.scale };
     } catch (_) {}
   }
   const out = { ...NOTA_PRINT_DEFAULTS, ...(saved || {}) };
@@ -20414,8 +20420,8 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
       [`No. <b>${esc(r.receipt_no || "-")}</b>`, esc(formatNotaDate(r.created_at)), ...(pages > 1 ? [`Hal. ${page} / ${pages}`] : [])])}
     <div style="margin-top:${DOC_GAP.md}px;">${docCols(`
         ${kv("Kepada", `<b>${esc(name) || "&ndash;"}</b>`)}
-        ${customer && customer.address ? kv("Alamat", esc(customer.address)) : ""}${r.customer_phone ? kv("No. HP", esc(r.customer_phone)) : ""}
-        ${kv("No. Plat", esc(r.plate_full) || "&ndash;")}${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}`, `
+        ${customer && customer.address ? kv("Alamat", esc(customer.address)) : ""}${r.customer_phone ? kv("No. HP", esc(r.customer_phone)) : ""}`, `
+        ${kv("No. Plat", esc(r.plate_full) || "&ndash;")}${vehicle ? kv("Kendaraan", esc(vehicle)) : ""}
         ${r.po_number ? kv("Ref. SO", `${esc(r.po_number)}${(r.invoice_count || 1) > 1 ? ` (Invoice ${r.invoice_seq || 1})` : ""}`) : ""}
         ${kv("Pembayaran", `${esc(PAYMENT_METHOD_LABELS[r.payment_method] || r.payment_method || "")}${r.payment_method === "transfer" && r.transfer_account ? ` ke ${esc(r.transfer_account)}` : ""}${r.payment_method === "transfer" && r.transfer_sender ? ` (dari ${esc(r.transfer_sender)})` : ""}`)}
         ${r.work_status === "pengerjaan" && r.status !== "void" ? kv("Status", "Dalam pengerjaan") : ""}`)}
@@ -20449,10 +20455,9 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
         </table>
       </div>
       <table style="border-collapse:collapse;flex:none;">
-        ${docSum("Sub Total", groupDigits(r.subtotal) || "0")}
-        ${docSum("Potongan", groupDigits(r.discount) || "0")}
+        ${r.discount > 0 ? docSum("Sub Total", groupDigits(r.subtotal) || "0") + docSum("Potongan", groupDigits(r.discount)) : ""}
         ${r.return_total > 0 ? docSum("Total Awal", groupDigits(r.total + r.return_total)) + docSum("Retur", "-" + groupDigits(r.return_total)) : ""}
-        ${docSumRule}
+        ${r.discount > 0 || r.return_total > 0 ? docSumRule : ""}
         ${docSum(r.return_total > 0 ? "Jumlah Akhir" : "Jumlah", groupDigits(r.total) || "0", true)}
         ${remaining > 0 && r.status !== "void" ? docSum("Dibayar", groupDigits(r.amount_paid) || "0") + docSum("Sisa", groupDigits(remaining), true) : ""}
       </table>

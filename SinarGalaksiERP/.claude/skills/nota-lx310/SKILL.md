@@ -18,7 +18,8 @@ description: Rules and building blocks for the printed documents of the SINAR GA
   background would print as a solid block.
 - **Max print width 7.4"**: every document caps its content at `LX310_MAX_IN` and centres it on the 9.5" form,
   whatever margins are set. The spec says 8", but the owner's video (07-11-2026) showed only about 7.6" coming out,
-  cut evenly on both sides, and the top ~0.47" of the form printing nothing (Invoice SO top margin is now 1.4 cm).
+  cut evenly on both sides, and the top ~0.47" of the form printing nothing (top margin now at least 1.4 cm on the Invoice SO and the Kasir nota). On the half form a Kasir nota fits about
+  4 one-line items; header, totals and signatures take ~345 px of the ~448 px room.
 - Keep text off the paper edge: the tractor strips and the printer's dead zone cut it. The Kasir nota adds a
   3 mm inner margin on top of the page margin from "Atur Cetak".
 

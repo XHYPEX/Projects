@@ -2578,8 +2578,8 @@
               <label for="po-print-paper" class="block text-xs text-muted mb-1.5">Ukuran Kertas</label>
               <select id="po-print-paper" onchange="renderPoNotaPreview()"
                 class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors">
+                <option value="cf55" selected>Continuous Form 9.5" x 5.5"</option>
                 <option value="cf11">Continuous Form 9.5" x 11"</option>
-                <option value="cf55">Continuous Form 9.5" x 5.5"</option>
                 <option value="cf95l">Landscape 11" x 9.5" (K-16)</option>
                 <option value="a5l">A5 Landscape</option>
                 <option value="a4">A4</option>
@@ -23971,12 +23971,17 @@ async function submitPoStatus() {
 const LX310_MAX_IN = 8; // widest line the Epson LX-310 can print (80 columns at 10 cpi)
 const PO_PAPERS = {
   cf11: { widthIn: 9.5, page: '9.5in 11in' },
-  cf55: { widthIn: 9.5, page: '9.5in 5.5in' },
+  // driver: the size is left to the printer driver's 9,5 × 5,5 form, as on the Kasir nota. Sent from the page it
+  // reads as landscape and the driver turns the print 90° (owner photo, 22-10-2026).
+  cf55: { widthIn: 9.5, page: '9.5in 5.5in', driver: true },
   cf95l: { widthIn: 11, page: '11in 9.5in' },
   a5l: { widthIn: 8.27, page: 'A5 landscape' },
   a4: { widthIn: 8.27, page: 'A4' },
 };
-const PO_PRINT_PREFS_KEY = "po-print-prefs";
+// Owner 07-11-2026: Invoice SO prints on 9,5" × 5,5". A new key so every computer moves to that size once,
+// keeping the margins and options it already had.
+const PO_PRINT_PREFS_KEY = "po-print-prefs-v2";
+const PO_PRINT_OLD_PREFS_KEY = "po-print-prefs";
 
 function poPrintSettings() {
   const num = id => Math.max(0, parseFloat(document.getElementById(id).value) || 0);
@@ -23991,9 +23996,10 @@ function poPrintSettings() {
 
 function loadPoPrintPrefs() {
   try {
-    const prefs = JSON.parse(localStorage.getItem(PO_PRINT_PREFS_KEY) || "null");
+    const saved = JSON.parse(localStorage.getItem(PO_PRINT_PREFS_KEY) || "null");
+    const prefs = saved || JSON.parse(localStorage.getItem(PO_PRINT_OLD_PREFS_KEY) || "null");
     if (!prefs) return;
-    if (PO_PAPERS[prefs.paper]) document.getElementById("po-print-paper").value = prefs.paper;
+    if (saved && PO_PAPERS[saved.paper]) document.getElementById("po-print-paper").value = saved.paper;
     for (const side of ["top", "left", "right", "bottom"]) {
       if (typeof prefs[side] === "number") document.getElementById(`po-margin-${side}`).value = prefs[side];
     }
@@ -24143,7 +24149,8 @@ function printPreorderNota() {
   const { settings } = rendered;
   document.getElementById("nota-print-area").innerHTML = poInvoiceHtml(currentPreorder, settings);
   const margin = `${settings.top}cm ${settings.right}cm ${settings.bottom}cm ${settings.left}cm`;
-  printWithPageRule(`@page { size: ${PO_PAPERS[settings.paper].page}; margin: ${margin}; }`, "print-nota");
+  const paper = PO_PAPERS[settings.paper];
+  printWithPageRule(`@page { ${paper.driver ? "" : `size: ${paper.page}; `}margin: ${margin}; }`, "print-nota");
 }
 
 // ── Purchase Order (Pembelian Supplier) ─────────────────────────────────────────

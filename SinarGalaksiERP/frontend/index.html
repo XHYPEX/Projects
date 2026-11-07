@@ -2589,7 +2589,7 @@
               <div class="text-xs text-muted mb-1.5">Margin (cm)</div>
               <div class="grid grid-cols-4 gap-2">
                 <label class="text-[11px] text-muted">Atas
-                  <input id="po-margin-top" type="number" min="0" max="5" step="0.1" value="0.5" oninput="renderPoNotaPreview()"
+                  <input id="po-margin-top" type="number" min="0" max="5" step="0.1" value="1.4" oninput="renderPoNotaPreview()"
                     class="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-sm text-ink bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent" /></label>
                 <label class="text-[11px] text-muted">Kiri
                   <input id="po-margin-left" type="number" min="0" max="5" step="0.1" value="0.5" oninput="renderPoNotaPreview()"
@@ -24039,7 +24039,11 @@ async function submitPoStatus() {
 // Courier at 12pt is exactly 10 characters per inch, which is how the column
 // count is derived from the paper width and margins; 12pt line height is 6 lines
 // per inch. The preview and the printout come from the same text.
-const LX310_MAX_IN = 8; // widest line the Epson LX-310 can print (80 columns at 10 cpi)
+// Owner's video 07-11-2026: on the 9.5" form only about 7.6" came out, cut evenly on both sides, so an 8" line lost
+// "Ke" of Kepada and the last digits of the amounts. 7.4" stays inside that with a little to spare.
+const LX310_MAX_IN = 7.4;
+// Same video: the top ~0.47" of the form printed nothing, which took the shop name and INVOICE off the paper.
+const PO_TOP_MIN_CM = 1.4;
 const PO_PAPERS = {
   cf11: { widthIn: 9.5, page: '9.5in 11in' },
   // driver: the size is left to the printer driver's 9,5 × 5,5 form, as on the Kasir nota. Sent from the page it
@@ -24051,7 +24055,8 @@ const PO_PAPERS = {
 };
 // Owner 07-11-2026: Invoice SO prints on 9,5" × 5,5". A new key so every computer moves to that size once,
 // keeping the margins and options it already had.
-const PO_PRINT_PREFS_KEY = "po-print-prefs-v2";
+const PO_PRINT_PREFS_KEY = "po-print-prefs-v3";
+const PO_PRINT_V2_PREFS_KEY = "po-print-prefs-v2";
 const PO_PRINT_OLD_PREFS_KEY = "po-print-prefs";
 
 function poPrintSettings() {
@@ -24068,9 +24073,13 @@ function poPrintSettings() {
 function loadPoPrintPrefs() {
   try {
     const saved = JSON.parse(localStorage.getItem(PO_PRINT_PREFS_KEY) || "null");
-    const prefs = saved || JSON.parse(localStorage.getItem(PO_PRINT_OLD_PREFS_KEY) || "null");
+    const v2 = saved ? null : JSON.parse(localStorage.getItem(PO_PRINT_V2_PREFS_KEY) || "null");
+    const prefs = saved || v2 || JSON.parse(localStorage.getItem(PO_PRINT_OLD_PREFS_KEY) || "null");
     if (!prefs) return;
-    if (saved && PO_PAPERS[saved.paper]) document.getElementById("po-print-paper").value = saved.paper;
+    const paper = saved?.paper || v2?.paper;
+    if (PO_PAPERS[paper]) document.getElementById("po-print-paper").value = paper;
+    // Moving to v3 once: a top margin below the printer's dead zone is raised; afterwards the field is the owner's.
+    if (!saved && typeof prefs.top === "number") prefs.top = Math.max(prefs.top, PO_TOP_MIN_CM);
     for (const side of ["top", "left", "right", "bottom"]) {
       if (typeof prefs[side] === "number") document.getElementById(`po-margin-${side}`).value = prefs[side];
     }
@@ -24161,9 +24170,8 @@ function poInvoiceHtml(po, settings) {
     <div style="break-inside:avoid;page-break-inside:avoid;">
     <div style="margin-top:${G.md}px;display:flex;justify-content:space-between;align-items:flex-start;gap:${G.lg * 2}px;">
       <div style="min-width:0;font-size:9pt;">
-        ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:${G.xs}px;">Pembayaran transfer ke rekening:</div>
-          ${accounts.map(a => `<div style="margin-bottom:${G.xs}px;">${esc(a.bank_name)} &nbsp;<b>${esc(a.account_number)}</b><br>a.n. ${esc(a.account_name)}</div>`).join("")}
-          <div>Mohon konfirmasi setelah melakukan transfer.</div>` : ""}
+        ${status !== "LUNAS" && accounts.length ? `<div style="font-weight:bold;margin-bottom:${G.xs}px;">Pembayaran transfer ke rekening (mohon konfirmasi setelah transfer):</div>
+          ${accounts.map(a => `<div>${esc(a.bank_name)} &nbsp;<b>${esc(a.account_number)}</b> &nbsp;a.n. ${esc(a.account_name)}</div>`).join("")}` : ""}
         ${po.notes ? `<div style="margin-top:${G.sm}px;">Catatan: ${esc(po.notes)}</div>` : ""}
         ${settings.footer ? `<div style="margin-top:${G.sm}px;font-size:8.5pt;">Terima kasih atas kepercayaan Anda.</div>` : ""}
       </div>

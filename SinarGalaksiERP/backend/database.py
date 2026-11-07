@@ -2639,7 +2639,28 @@ def get_receipt_payments(receipt_id: str) -> list[dict]:
     reversed_ids = {r["reversed_of"] for r in rows if r.get("reversed_of")}
     for r in rows:
         r["reversed"] = r["id"] in reversed_ids
+        r["has_proof"] = bool(r.get("proof_file"))
     return rows
+
+
+def set_receipt_payment_proof(receipt_id: str, payment_id: int, filename: str, original_name: str | None, by: str | None) -> str | None:
+    """Attaches (or replaces) the transfer proof of a nota's payment. Returns the previous file so the caller can remove it."""
+    with _conn() as con:
+        row = con.execute("SELECT * FROM receipt_payments WHERE id=? AND receipt_id=?", (payment_id, receipt_id)).fetchone()
+        if row is None:
+            raise ValueError("Pembayaran tidak ditemukan.")
+        if row["amount"] <= 0 or row["method"] not in PENDING_METHODS:
+            raise ValueError("Bukti transfer hanya untuk pembayaran transfer atau QRIS.")
+        con.execute("UPDATE receipt_payments SET proof_file=?, proof_name=?, proof_by=?, proof_at=? WHERE id=?",
+                    (filename, (original_name or "")[:120] or None, by, _now(), payment_id))
+        _log_receipt_event(con, receipt_id, "payment", f"Bukti transfer pembayaran {_rp(row['amount'])} diunggah", by)
+        return row["proof_file"]
+
+
+def get_receipt_payment_proof(receipt_id: str, payment_id: int) -> str | None:
+    with _conn() as con:
+        row = con.execute("SELECT proof_file FROM receipt_payments WHERE id=? AND receipt_id=?", (payment_id, receipt_id)).fetchone()
+        return row["proof_file"] if row else None
 
 
 def reverse_receipt_payment(receipt_id: str, payment_id: int, reason: str, by: str | None = None) -> dict:

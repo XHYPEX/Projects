@@ -8741,7 +8741,7 @@ function renderCashierTimeline() {
   } else if (cashierTlTab === "bayar") {
     html = table(["Waktu", "Metode", "Nominal", "Catatan", "Dilakukan Oleh"],
       [...payments].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)).map(pay => `<tr class="border-b border-line last:border-b-0">${td(esc(formatReceiptWhen(pay.paid_at, true)), "tabular-nums whitespace-nowrap")}${td(esc(PAYMENT_METHOD_LABELS[pay.method] || pay.method))}${td(esc((pay.amount < 0 ? "-" : "") + formatIDR(Math.abs(pay.amount))) + (pay.reversed ? ' <span class="text-[10px] text-failed">dibatalkan</span>' : "") + (pay.state && pay.state !== "sah" ? " " + payStateBadge(pay) : ""), "tabular-nums font-medium")}${td(esc(pay.note === "Menunggu konfirmasi dana masuk" ? "" : (pay.note || "")) + (pay.proof_ref ? ` <span class="text-muted">· bukti: ${esc(pay.proof_ref)}</span>` : "")
-        + cashierPayFundsNote(pay)
+        + cashierPayFundsNote(pay) + receiptProofCell(tab.receiptId, pay)
         + (pay.state === "pending" ? " " + payActionButtons("nota", tab.receiptId, pay) : "") + (pay.state === "gagal" && pay.fail_reason ? ` <span class="text-failed">· ${esc(pay.fail_reason)}</span>` : ""), "min-w-[20rem] whitespace-normal break-words leading-relaxed")}${td(esc(pay.created_by || "-"))}</tr>`));
   } else if (cashierTlTab === "status") {
     html = table(["Waktu", "Aktivitas", "Detail Perubahan", "Dilakukan Oleh"],
@@ -10014,13 +10014,13 @@ function openPaymentForm(opts, lists) {
                 <datalist id="rp-sender-list">${lists.sender.map(a => `<option value="${esc(a.name)}"></option>`).join("")}</datalist>
               </div>
             </div>
-            ${ctx.soId || ctx.fromSoId ? `<div id="rp-proof-wrap" class="hidden rounded-lg border border-line bg-white px-3 py-2.5">
+            <div id="rp-proof-wrap" class="hidden rounded-lg border border-line bg-white px-3 py-2.5">
               <label for="rp-proof" class="block text-xs font-medium text-ink">Bukti Transfer dari Customer ${soProofRequired() ? `<span class="text-failed">*</span>` : `<span class="text-muted font-normal">(opsional)</span>`}</label>
               <p class="text-[11px] text-muted mb-1.5">Screenshot atau foto bukti transfer (JPG/PNG/WebP/PDF, maks. 5 MB).</p>
               <input id="rp-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="rpProofChanged()"
                 class="block w-full text-xs text-ink file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-line file:bg-bg2 file:text-ink file:text-xs file:font-medium hover:file:bg-bg" />
               <img id="rp-proof-preview" alt="Pratinjau bukti transfer" class="hidden mt-2 max-h-40 rounded-lg border border-line" />
-            </div>` : ""}
+            </div>
             <div>
               <label for="rp-note" class="block text-xs text-muted mb-1.5">Catatan Pembayaran <span class="text-muted/70">(opsional)</span></label>
               <textarea id="rp-note" rows="2" maxlength="200" placeholder="${esc(opts.notePlaceholder)}"
@@ -10072,8 +10072,9 @@ function setReceiptPayAmount(amount) {
 
 // Recomputes the two summary cards and the buttons from what is typed. The save buttons stay
 // disabled until the amount is more than 0 and no more than the remaining balance.
-// Owner 07-11-2026: the transfer proof goes in with a Sales Order payment. Required on a WhatsApp order, optional on Walk-in.
-function soProofRequired() { return currentPreorder?.order_source === "whatsapp"; }
+// Owner 07-11-2026: the transfer proof goes in with the payment, in Sales Order and Kasir alike.
+// Required on a WhatsApp Sales Order, optional everywhere else.
+function soProofRequired() { return !!(receiptPayCtx?.soId || receiptPayCtx?.fromSoId) && currentPreorder?.order_source === "whatsapp"; }
 function rpProofChanged() {
   const file = document.getElementById("rp-proof").files[0];
   const img = document.getElementById("rp-proof-preview");
@@ -10085,20 +10086,47 @@ function rpProofChanged() {
 // Attaches the proof to the payment just saved. The money is already recorded, so a failed upload only warns:
 // the proof can still be uploaded from Riwayat Pembayaran. Returns the fresh Sales Order, or null and a message.
 async function soUploadNewPaymentProof(ctx, file, amount, method) {
-  const soId = ctx.soId || ctx.fromSoId;
   const fail = "Pembayaran tersimpan, tapi bukti transfer gagal diunggah. Unggah lagi dari Riwayat Pembayaran.";
+  const base = ctx.soId ? `/api/preorders/${encodeURIComponent(ctx.soId)}` : `/api/receipts/${encodeURIComponent(ctx.id)}`;
   try {
-    const so = await fetch(`/api/preorders/${encodeURIComponent(soId)}`);
-    if (!so.ok) return { error: fail };
-    const payments = (await so.json()).payments || [];
-    const mine = payments.filter(p => p.amount === amount && p.method === method && !p.kind && !p.has_proof && (ctx.soId ? !p.receipt_id : p.receipt_id === ctx.id));
+    const list = await fetch(ctx.soId ? base : `${base}/payments`);
+    if (!list.ok) return { error: fail };
+    const data = await list.json();
+    const mine = (ctx.soId ? data.payments : data).filter(p => p.amount === amount && p.method === method && !p.kind && !p.has_proof);
     const row = mine.sort((a, b) => b.id - a.id)[0];
     if (!row) return { error: fail };
-    const resp = await fetch(`/api/preorders/${encodeURIComponent(soId)}/payments/${row.id}/proof?src=${ctx.soId ? "so" : "nota"}&name=${encodeURIComponent(file.name)}`,
+    const resp = await fetch(`${base}/payments/${row.id}/proof?${ctx.soId ? "src=so&" : ""}name=${encodeURIComponent(file.name)}`,
       { method: "PUT", headers: { "Content-Type": file.type }, body: file });
     if (!resp.ok) return { error: `${fail} (${await responseErrorDetail(resp, "server menolak file")})` };
-    return { detail: await resp.json() };
+    return ctx.soId ? { detail: await resp.json() } : {};
   } catch (_) { return { error: fail }; }
+}
+// Kasir's Riwayat Pembayaran: view the proof, or add one to a payment that has none.
+function receiptProofCell(receiptId, p) {
+  if (!(p.amount > 0) || !["transfer", "qris"].includes(p.method) || p.kind) return "";
+  if (p.has_proof) return `<div class="mt-1"><a href="/api/receipts/${esc(receiptId)}/payments/${p.id}/proof" target="_blank" rel="noopener"
+    class="inline-flex items-center gap-1 text-xs font-medium text-[#1D4ED8] hover:underline">Lihat bukti transfer</a></div>`;
+  return `<div class="mt-1 flex items-center gap-2"><span class="text-[11px] text-muted">Belum ada bukti transfer</span>
+    <button type="button" onclick="pickReceiptProof('${esc(receiptId)}', ${p.id})" class="px-2 py-0.5 border border-line rounded-md text-[11px] font-medium text-ink hover:bg-bg2">Unggah bukti</button></div>`;
+}
+function pickReceiptProof(receiptId, paymentId) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = PI_PROOF_TYPES.join(",");
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showToast("Ukuran bukti transfer maksimal 5 MB."); return; }
+    try {
+      const resp = await fetch(`/api/receipts/${encodeURIComponent(receiptId)}/payments/${paymentId}/proof?name=${encodeURIComponent(file.name)}`,
+        { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!resp.ok) throw new Error(await responseErrorDetail(resp, "Bukti transfer gagal diunggah."));
+      if (document.getElementById("rph-root")) await openReceiptPaymentHistory(receiptId);
+      await reloadReceiptIntoOpenTab(receiptId);
+      showToast("Bukti transfer tersimpan.", "success");
+    } catch (e) { showToast(e.message); }
+  };
+  input.click();
 }
 function updateReceiptPayModal() {
   const ctx = receiptPayCtx;
@@ -10138,7 +10166,7 @@ function updateReceiptPayModal() {
     label.classList.toggle("border-line", !on);
   });
   document.getElementById("rp-transfer").classList.toggle("hidden", method !== "transfer");
-  document.getElementById("rp-proof-wrap")?.classList.toggle("hidden", !(method === "transfer" || method === "qris"));
+  document.getElementById("rp-proof-wrap").classList.toggle("hidden", !(method === "transfer" || method === "qris"));
   document.getElementById("rp-save-btn").disabled = !valid;
   document.getElementById("rp-print-btn").disabled = !valid;
 }
@@ -10156,7 +10184,7 @@ async function submitReceiptPayment(forcePrint) {
   if (method === "transfer" && !account) { showToast("Rekening penerima transfer wajib diisi."); return; }
   if (method === "transfer" && !sender) { showToast("Nama pengirim transfer wajib diisi."); return; }
   const proofFile = (method === "transfer" || method === "qris") ? document.getElementById("rp-proof")?.files[0] || null : null;
-  if ((ctx.soId || ctx.fromSoId) && (method === "transfer" || method === "qris")) {
+  if (method === "transfer" || method === "qris") {
     if (!proofFile && soProofRequired()) { showToast("Bukti transfer wajib diunggah untuk pesanan WhatsApp."); return; }
     if (proofFile && !PI_PROOF_TYPES.includes(proofFile.type)) { showToast("Bukti harus berupa JPEG, PNG, WebP, atau PDF."); return; }
     if (proofFile && proofFile.size > 5 * 1024 * 1024) { showToast("Ukuran bukti transfer maksimal 5 MB."); return; }
@@ -10253,7 +10281,7 @@ async function openReceiptPaymentHistory(receiptId) {
               <td class="px-2.5 py-2 text-muted whitespace-nowrap tabular-nums">${esc(formatDateTimeSeconds(p.paid_at).slice(0, 16))}${p.created_by ? `<div>${esc(p.created_by)}</div>` : ""}</td>
               <td class="px-2.5 py-2 text-ink">${esc(PAYMENT_METHOD_LABELS[p.method] || p.method)}${p.method === "transfer" && p.transfer_account ? `<div class="text-muted">${esc(p.transfer_account)}</div>` : ""}</td>
               <td class="px-2.5 py-2 text-right tabular-nums whitespace-nowrap ${p.amount < 0 ? "text-failed" : p.state === "pending" ? "text-pending" : p.state === "gagal" ? "text-muted line-through" : "text-ink"}">${esc(formatIDR(p.amount))}${p.state && p.state !== "sah" ? `<div>${payStateBadge(p)}</div>` : ""}</td>
-              <td class="px-2.5 py-2 text-muted">${esc(p.note || "—")}${p.proof_ref ? `<div>Bukti refund: ${esc(p.proof_ref)}</div>` : ""}${p.state === "gagal" && p.fail_reason ? `<div class="text-failed">${esc(p.fail_reason)}</div>` : ""}${p.confirmed_by && p.state === "sah" && p.amount > 0 && (p.method === "transfer" || p.method === "qris") ? `<div>Dana masuk dicek: ${esc(p.confirmed_by)}</div>` : ""}${p.state === "pending" ? `<div class="mt-1">${payActionButtons("nota", detail.id, p)}</div>` : ""}</td>
+              <td class="px-2.5 py-2 text-muted">${esc(p.note || "—")}${receiptProofCell(detail.id, p)}${p.proof_ref ? `<div>Bukti refund: ${esc(p.proof_ref)}</div>` : ""}${p.state === "gagal" && p.fail_reason ? `<div class="text-failed">${esc(p.fail_reason)}</div>` : ""}${p.confirmed_by && p.state === "sah" && p.amount > 0 && (p.method === "transfer" || p.method === "qris") ? `<div>Dana masuk dicek: ${esc(p.confirmed_by)}</div>` : ""}${p.state === "pending" ? `<div class="mt-1">${payActionButtons("nota", detail.id, p)}</div>` : ""}</td>
             </tr>`).join("")}</tbody>
         </table>
       </div>`}

@@ -314,6 +314,8 @@ class ReceiptPaymentOut(BaseModel):
     confirmed_at: str | None = None
     fail_reason: str | None = None
     kind: str | None = None  # pindah (K-19 DP move) | refund (K-20 money handed back)
+    has_proof: bool = False  # a transfer proof file is attached (owner 07-11-2026)
+    proof_name: str | None = None
     proof_ref: str | None = None  # K-20: transfer reference, or the name of the person who received cash
 
 

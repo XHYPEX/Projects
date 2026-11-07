@@ -6,9 +6,10 @@ from uuid import uuid4
 import base64
 import binascii
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
+from backend import payment_proofs
 from backend.auth import get_current_user, require_admin
 from backend.product_images import matches_content_type
 from backend.routes.quotations import guard_conversion, record_conversion
@@ -50,6 +51,8 @@ from backend.database import (
     get_receipt_events,
     get_receipt_items,
     get_receipt_payments,
+    get_receipt_payment_proof,
+    set_receipt_payment_proof,
     get_receipt_summary,
     normalize_phone,
     parse_ymd,
@@ -663,6 +666,44 @@ async def list_receipt_payments(receipt_id: str):
     if await loop.run_in_executor(None, get_receipt, receipt_id) is None:
         raise HTTPException(status_code=404, detail="Nota tidak ditemukan.")
     return [ReceiptPaymentOut(**p) for p in await loop.run_in_executor(None, get_receipt_payments, receipt_id)]
+
+
+@router.put("/receipts/{receipt_id}/payments/{payment_id}/proof")
+async def put_receipt_payment_proof(receipt_id: str, payment_id: int, request: Request, name: str | None = None,
+                                    user: dict = Depends(get_current_user)):
+    """Raw-body upload of a payment's transfer proof (JPEG / PNG / WebP / PDF, 5 MB). Owner 07-11-2026."""
+    loop = asyncio.get_event_loop()
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > payment_proofs.MAX_PROOF_BYTES:
+            raise HTTPException(status_code=413, detail="Ukuran bukti transfer maksimal 5 MB.")
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type not in payment_proofs.PROOF_EXTENSIONS:
+        raise HTTPException(status_code=422, detail="Bukti harus berupa JPEG, PNG, WebP, atau PDF.")
+    if not data:
+        raise HTTPException(status_code=422, detail="File bukti transfer kosong.")
+    if not payment_proofs.matches_content_type(content_type, bytes(data)):
+        raise HTTPException(status_code=422, detail="Isi file tidak sesuai dengan jenisnya.")
+    filename = await loop.run_in_executor(None, payment_proofs.save_proof, bytes(data), content_type)
+    try:
+        previous = await loop.run_in_executor(None, set_receipt_payment_proof, receipt_id, payment_id, filename, name, user["username"])
+    except ValueError as e:
+        await loop.run_in_executor(None, payment_proofs.delete_proof_file, filename)
+        raise HTTPException(status_code=404 if "tidak ditemukan" in str(e) else 422, detail=str(e))
+    await loop.run_in_executor(None, payment_proofs.delete_proof_file, previous)
+    return {"ok": True}
+
+
+@router.get("/receipts/{receipt_id}/payments/{payment_id}/proof")
+async def get_receipt_payment_proof_route(receipt_id: str, payment_id: int):
+    loop = asyncio.get_event_loop()
+    stored = await loop.run_in_executor(None, get_receipt_payment_proof, receipt_id, payment_id)
+    path = await loop.run_in_executor(None, payment_proofs.proof_file, stored)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Pembayaran ini belum punya bukti transfer.")
+    return FileResponse(path, media_type=payment_proofs.media_type_for(stored),
+                        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"})
 
 
 @router.post("/receipts/{receipt_id}/payments", response_model=ReceiptDetail, status_code=201)

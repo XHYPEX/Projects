@@ -20213,7 +20213,7 @@ async function printReceiptNota(receiptId) {
   const minHeightMm = Math.max(60, Math.floor(area.h * 25.4 / zoom) - 4);
   document.getElementById("nota-print-area").innerHTML =
     // Owner 06-11-2026: never wider than the LX-310's 8" line; the cap is set before zoom, so it is divided by it.
-    `<div style="zoom:${zoom};max-width:${LX310_MAX_IN / zoom}in;margin:0 auto;">${receiptNotaHtml(receipt, customer, { minHeightMm })}</div>`;
+    `<div style="zoom:${zoom};max-width:${LX310_MAX_IN / zoom}in;margin:0 auto;">${receiptNotaHtml(receipt, customer, { minHeightMm, perPage: prefs.paper === "half" ? NOTA_ITEMS_PER_HALF_PAGE : NOTA_ITEMS_PER_PAGE })}</div>`;
   // Wait for the logo (or its failure) so the dialog never prints a half-loaded header.
   const logo = document.querySelector("#nota-print-area img");
   if (logo && !logo.complete) {
@@ -20384,12 +20384,15 @@ function saveNotaPrintSettings(thenTest) {
 
 // Owner, 23-10-2026: at most 7 lines per sheet; a longer nota continues on a new sheet with the same header,
 // and the totals, terbilang and signatures are printed once, on the last sheet.
+// Owner 07-11-2026: 4 per sheet on the 9,5" × 5,5" form, which holds about 4 one-line items under the 1.4 cm top margin.
 const NOTA_ITEMS_PER_PAGE = 7;
+const NOTA_ITEMS_PER_HALF_PAGE = 4;
 function receiptNotaHtml(r, customer, opts = {}) {
   const items = r.items || [];
-  const pages = Math.max(Math.ceil(items.length / NOTA_ITEMS_PER_PAGE), 1);
+  const per = opts.perPage || NOTA_ITEMS_PER_PAGE;
+  const pages = Math.max(Math.ceil(items.length / per), 1);
   return Array.from({ length: pages }, (_, i) => receiptNotaPageHtml(r, customer, opts,
-    items.slice(i * NOTA_ITEMS_PER_PAGE, (i + 1) * NOTA_ITEMS_PER_PAGE), i * NOTA_ITEMS_PER_PAGE, i + 1, pages)).join("");
+    items.slice(i * per, (i + 1) * per), i * per, i + 1, pages)).join("");
 }
 function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const last = page === pages;

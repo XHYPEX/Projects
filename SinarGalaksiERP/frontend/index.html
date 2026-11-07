@@ -2349,7 +2349,7 @@
             <div><label for="po-ship-forwarder" class="block text-xs font-medium text-ink mb-1">Ekspedisi</label><input id="po-ship-forwarder" list="po-ship-forwarder-list" maxlength="80" autocomplete="off" placeholder="Ketik atau pilih, mis. JNE" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /><datalist id="po-ship-forwarder-list"></datalist></div>
             <div><label for="po-ship-service" class="block text-xs font-medium text-ink mb-1">Layanan</label><input id="po-ship-service" type="text" placeholder="Reguler / Cargo / lainnya" autocomplete="off" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div>
             <div><label for="po-ship-payer" class="block text-xs font-medium text-ink mb-1">Ongkir dibebankan kepada</label><select id="po-ship-payer" onchange="poShipFeeChanged()" class="select-chevron w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"><option value="customer">Customer (masuk tagihan SO)</option><option value="toko">Toko</option><option value="tujuan">Bayar di tujuan</option></select></div>
-            <div><label for="po-ship-fee" class="block text-xs font-medium text-ink mb-1">Ongkir (Rp)</label><input id="po-ship-fee" type="text" inputmode="numeric" value="0" oninput="updatePreorderTotals()" class="price-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors text-right tabular-nums disabled:bg-bg2 disabled:text-muted" /></div>
+            <div><label for="po-ship-fee" class="block text-xs font-medium text-ink mb-1">Ongkir (Rp)</label><input id="po-ship-fee" type="text" inputmode="numeric" value="0" oninput="soFeeTyped('po-ship-fee', 'po-ship-fee-unknown'); updatePreorderTotals()" class="price-input w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors text-right tabular-nums disabled:bg-bg2 disabled:text-muted" /></div>
           </div>
           <label class="flex items-center gap-2 mt-3 text-sm text-ink"><input id="po-ship-fee-unknown" type="checkbox" class="accent-[#EA580C]" onchange="poShipFeeChanged()" /> Ongkir belum diketahui, tentukan setelah barang siap dikirim</label>
           </details>
@@ -21464,9 +21464,12 @@ function poShipCopyCustomer() {
 function poShipFeeChanged() {
   const unknown = document.getElementById("po-ship-fee-unknown").checked;
   const fee = document.getElementById("po-ship-fee");
-  fee.disabled = unknown;
   if (unknown) setPriceInput(fee, 0);
   updatePreorderTotals();
+}
+// Owner 07-11-2026: the ongkir field stays open; typing an amount means it is known now.
+function soFeeTyped(feeId, boxId) {
+  if (priceValue(document.getElementById(feeId)) > 0) document.getElementById(boxId).checked = false;
 }
 // The ongkir that goes on the bill, from the form as it is filled in.
 function poShipCharge() {
@@ -21638,9 +21641,9 @@ async function soShipDetailOpen() {
       ${field("so-d-province", "Provinsi")}${field("so-d-city", "Kota/Kabupaten")}${field("so-d-district", "Kecamatan")}${field("so-d-village", "Kelurahan/Desa")}${field("so-d-postal", "Kode Pos")}${field("so-d-landmark", "Patokan alamat")}
       ${grField("Ekspedisi", soForwarderInput("so-d-forwarder", rows))}${field("so-d-service", "Layanan")}
       ${grField("Ongkir dibebankan", `<select id="so-d-payer" class="${GR_IN}">${Object.entries(SO_FEE_PAYER_LABELS).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select>`)}
-      ${grField("Ongkir (Rp)", `<input id="so-d-fee" type="text" inputmode="numeric" class="price-input ${GR_IN} text-right tabular-nums">`)}
+      ${grField("Ongkir (Rp)", `<input id="so-d-fee" type="text" inputmode="numeric" oninput="soFeeTyped('so-d-fee', 'so-d-unknown')" class="price-input ${GR_IN} text-right tabular-nums">`)}
     </div>
-    <label class="flex items-center gap-2 text-sm text-ink"><input id="so-d-unknown" type="checkbox" class="accent-[#EA580C]" onchange="document.getElementById('so-d-fee').disabled=this.checked"> Ongkir belum ditentukan</label>
+    <label class="flex items-center gap-2 text-sm text-ink"><input id="so-d-unknown" type="checkbox" class="accent-[#EA580C]" onchange="if (this.checked) setPriceInput(document.getElementById('so-d-fee'), 0)"> Ongkir belum ditentukan</label>
     <div class="flex justify-end gap-2 pt-1"><button type="button" class="${GR_BTN3}" onclick="closeModal()">Batal</button>
       <button type="button" class="${GR_BTN}" onclick="soShipDetailSave()">Simpan</button></div></div>`, { lg: true });
   const set = (id, v) => { document.getElementById(id).value = v || ""; };
@@ -21650,7 +21653,6 @@ async function soShipDetailOpen() {
   document.getElementById("so-d-payer").value = po.ship_fee_payer || "customer";
   setPriceInput(document.getElementById("so-d-fee"), po.ship_fee || 0);
   document.getElementById("so-d-unknown").checked = !!po.ship_fee_unknown;
-  document.getElementById("so-d-fee").disabled = !!po.ship_fee_unknown;
 }
 async function soShipDetailSave() {
   const v = id => document.getElementById(id).value.trim() || null;

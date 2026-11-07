@@ -10014,6 +10014,13 @@ function openPaymentForm(opts, lists) {
                 <datalist id="rp-sender-list">${lists.sender.map(a => `<option value="${esc(a.name)}"></option>`).join("")}</datalist>
               </div>
             </div>
+            ${ctx.soId || ctx.fromSoId ? `<div id="rp-proof-wrap" class="hidden rounded-lg border border-line bg-white px-3 py-2.5">
+              <label for="rp-proof" class="block text-xs font-medium text-ink">Bukti Transfer dari Customer ${soProofRequired() ? `<span class="text-failed">*</span>` : `<span class="text-muted font-normal">(opsional)</span>`}</label>
+              <p class="text-[11px] text-muted mb-1.5">Screenshot atau foto bukti transfer (JPG/PNG/WebP/PDF, maks. 5 MB).</p>
+              <input id="rp-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="rpProofChanged()"
+                class="block w-full text-xs text-ink file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-line file:bg-bg2 file:text-ink file:text-xs file:font-medium hover:file:bg-bg" />
+              <img id="rp-proof-preview" alt="Pratinjau bukti transfer" class="hidden mt-2 max-h-40 rounded-lg border border-line" />
+            </div>` : ""}
             <div>
               <label for="rp-note" class="block text-xs text-muted mb-1.5">Catatan Pembayaran <span class="text-muted/70">(opsional)</span></label>
               <textarea id="rp-note" rows="2" maxlength="200" placeholder="${esc(opts.notePlaceholder)}"
@@ -10065,6 +10072,34 @@ function setReceiptPayAmount(amount) {
 
 // Recomputes the two summary cards and the buttons from what is typed. The save buttons stay
 // disabled until the amount is more than 0 and no more than the remaining balance.
+// Owner 07-11-2026: the transfer proof goes in with a Sales Order payment. Required on a WhatsApp order, optional on Walk-in.
+function soProofRequired() { return currentPreorder?.order_source === "whatsapp"; }
+function rpProofChanged() {
+  const file = document.getElementById("rp-proof").files[0];
+  const img = document.getElementById("rp-proof-preview");
+  if (img.src) URL.revokeObjectURL(img.src);
+  const isImage = !!file && file.type.startsWith("image/");
+  img.classList.toggle("hidden", !isImage);
+  if (isImage) img.src = URL.createObjectURL(file); else img.removeAttribute("src");
+}
+// Attaches the proof to the payment just saved. The money is already recorded, so a failed upload only warns:
+// the proof can still be uploaded from Riwayat Pembayaran. Returns the fresh Sales Order, or null and a message.
+async function soUploadNewPaymentProof(ctx, file, amount, method) {
+  const soId = ctx.soId || ctx.fromSoId;
+  const fail = "Pembayaran tersimpan, tapi bukti transfer gagal diunggah. Unggah lagi dari Riwayat Pembayaran.";
+  try {
+    const so = await fetch(`/api/preorders/${encodeURIComponent(soId)}`);
+    if (!so.ok) return { error: fail };
+    const payments = (await so.json()).payments || [];
+    const mine = payments.filter(p => p.amount === amount && p.method === method && !p.kind && !p.has_proof && (ctx.soId ? !p.receipt_id : p.receipt_id === ctx.id));
+    const row = mine.sort((a, b) => b.id - a.id)[0];
+    if (!row) return { error: fail };
+    const resp = await fetch(`/api/preorders/${encodeURIComponent(soId)}/payments/${row.id}/proof?src=${ctx.soId ? "so" : "nota"}&name=${encodeURIComponent(file.name)}`,
+      { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+    if (!resp.ok) return { error: `${fail} (${await responseErrorDetail(resp, "server menolak file")})` };
+    return { detail: await resp.json() };
+  } catch (_) { return { error: fail }; }
+}
 function updateReceiptPayModal() {
   const ctx = receiptPayCtx;
   const input = document.getElementById("rp-amount");
@@ -10103,6 +10138,7 @@ function updateReceiptPayModal() {
     label.classList.toggle("border-line", !on);
   });
   document.getElementById("rp-transfer").classList.toggle("hidden", method !== "transfer");
+  document.getElementById("rp-proof-wrap")?.classList.toggle("hidden", !(method === "transfer" || method === "qris"));
   document.getElementById("rp-save-btn").disabled = !valid;
   document.getElementById("rp-print-btn").disabled = !valid;
 }
@@ -10119,6 +10155,12 @@ async function submitReceiptPayment(forcePrint) {
   const account = document.getElementById("rp-account").value.trim();
   if (method === "transfer" && !account) { showToast("Rekening penerima transfer wajib diisi."); return; }
   if (method === "transfer" && !sender) { showToast("Nama pengirim transfer wajib diisi."); return; }
+  const proofFile = (method === "transfer" || method === "qris") ? document.getElementById("rp-proof")?.files[0] || null : null;
+  if ((ctx.soId || ctx.fromSoId) && (method === "transfer" || method === "qris")) {
+    if (!proofFile && soProofRequired()) { showToast("Bukti transfer wajib diunggah untuk pesanan WhatsApp."); return; }
+    if (proofFile && !PI_PROOF_TYPES.includes(proofFile.type)) { showToast("Bukti harus berupa JPEG, PNG, WebP, atau PDF."); return; }
+    if (proofFile && proofFile.size > 5 * 1024 * 1024) { showToast("Ukuran bukti transfer maksimal 5 MB."); return; }
+  }
   const print = forcePrint || document.getElementById("rp-print").checked;
   const buttons = [document.getElementById("rp-save-btn"), document.getElementById("rp-print-btn")];
   buttons.forEach(b => { b.disabled = true; });
@@ -10153,11 +10195,12 @@ async function submitReceiptPayment(forcePrint) {
     return;
   }
   const detail = await resp.json();
+  const proof = proofFile ? await soUploadNewPaymentProof(ctx, proofFile, amount, method) : {};
   closeModal();
   receiptPayCtx = null;
   if (ctx.soId) {
-    renderPreorderDetail(detail);
-    showToast((method === "transfer" || method === "qris") && !confirmedIn ? `DP ${formatIDR(amount)} dicatat PENDING. Konfirmasi setelah dana masuk.`
+    renderPreorderDetail(proof.detail || detail);
+    if (proof.error) showToast(proof.error); else showToast((method === "transfer" || method === "qris") && !confirmedIn ? `DP ${formatIDR(amount)} dicatat PENDING. Konfirmasi setelah dana masuk.`
       : detail.remaining === 0 ? "Sales Order lunas." : `Pembayaran ${formatIDR(amount)} dicatat. Sisa ${formatIDR(detail.remaining)}.`, "success");
     loadPreorders();
     if (print) openPreorderPrint(detail.id, "detail");
@@ -10167,7 +10210,7 @@ async function submitReceiptPayment(forcePrint) {
   await refreshAfterSettle();
   const lunas = detail.status === "done";
   const wasPending = (method === "transfer" || method === "qris") && !confirmedIn;
-  showToast(wasPending ? `Pembayaran ${formatIDR(amount)} dicatat PENDING. Konfirmasi setelah dana masuk.`
+  if (proof.error) showToast(proof.error); else showToast(wasPending ? `Pembayaran ${formatIDR(amount)} dicatat PENDING. Konfirmasi setelah dana masuk.`
     : lunas ? `Nota ${detail.plate_full} lunas.` : `Pembayaran ${formatIDR(amount)} dicatat. Sisa ${formatIDR(Math.max(detail.total - detail.amount_paid, 0))}.`, "success");
   if (print && ctx.fromSoId && currentRoute() === "/sales-order") openPreorderPrint(ctx.fromSoId, "detail");
   else if (print) printReceiptNota(detail.id);

@@ -1007,7 +1007,7 @@
   <div id="master-row-menu" class="hidden fixed z-40 min-w-[190px] bg-bg border border-line rounded-lg shadow-sm py-1" role="menu"></div>
   <div id="modal-backdrop" onclick="closeModal()" class="hidden fixed inset-0 bg-ink/40 z-50"></div>
   <div id="modal-panel" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-    <div id="modal-card" class="bg-bg border border-line rounded-xl max-w-md w-full max-h-[85vh] overflow-y-auto p-5 pointer-events-auto">
+    <div id="modal-card" class="bg-bg border border-line rounded-xl max-w-md w-full max-h-[85vh] overflow-y-auto scroll-pb-24 p-5 pointer-events-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 id="modal-title" class="font-serif text-lg font-semibold text-ink"></h3>
         <button type="button" onclick="closeModal()" aria-label="Tutup dialog" class="p-1.5 -m-1.5 rounded-lg hover:bg-bg2 text-muted transition-colors shrink-0">
@@ -10050,7 +10050,7 @@ function openPaymentForm(opts, lists) {
           </label>
         </div>
       </div>
-      <div class="flex flex-wrap justify-end gap-2 pt-1">
+      <div class="sticky bottom-[-10px] z-10 mx-[-10px] mb-[-10px] flex flex-wrap justify-end gap-2 p-[10px] bg-bg border-t border-line">
         <button type="button" onclick="closeModal()" class="px-5 py-2 border border-line rounded-lg text-sm text-ink bg-white hover:bg-bg2 transition-colors">Batal</button>
         <button id="rp-save-btn" type="button" onclick="submitReceiptPayment(false)" disabled class="px-5 py-2 border border-accent text-accentDark rounded-lg text-sm font-medium bg-white hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan Pembayaran</button>
         <button id="rp-print-btn" type="button" onclick="submitReceiptPayment(true)" disabled class="px-5 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Simpan &amp; Cetak</button>

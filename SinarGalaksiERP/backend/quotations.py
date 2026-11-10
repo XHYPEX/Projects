@@ -890,7 +890,8 @@ def list_quotes(f: dict) -> dict:
             continue
         items.append({k: d[k] for k in ("id", "quote_number", "recipient_type", "recipient_name", "company_name", "pic_name", "subject",
                                          "issue_date", "valid_until", "created_at", "created_by", "total", "status", "display_status",
-                                         "revision_no", "target_type", "target_no", "approvals_pending", "follow_up_date", "officer")}
+                                         "revision_no", "target_type", "target_no", "approvals_pending", "follow_up_date", "officer",
+                                         "latest_version_id")}
                      | {"display_label": STATUS_LABELS[d["display_status"]], "recipient_label": _recipient_name(d)})
     with db._conn() as con:
         allq = con.execute("""SELECT q.status, q.decision, q.delivery_status, q.valid_until, q.latest_version_id,

@@ -14383,6 +14383,10 @@ const ICON_PATHS = {
   duplicate: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9M14.5 12.5v4M12.5 14.5h4"/>',
   trash: '<path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0v12.5A1.5 1.5 0 0 1 15.5 21h-7A1.5 1.5 0 0 1 7 19.5V7h10Z"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  download: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
+  revise: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
 };
 
 function svgIcon(name, size = 16) {
@@ -30366,18 +30370,50 @@ function qtTile(label, value, sub, icon, onclick) {
       <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></span></div>
     <div class="font-sans text-2xl font-semibold tabular-nums text-ink mt-1">${value}</div><div class="text-xs text-muted mt-1">${sub}</div></button>`;
 }
-// CRUD from the list (Owner 10-11-2026): Draft → Lihat · Edit · Hapus (pembuat atau Admin; hapus permanen hanya draft
-// yang belum pernah terbit); terbit → Lihat · Revisi · Batalkan (histori tetap); dibatalkan / dikonversi → Lihat saja.
+// CRUD from the list (Owner 10-11-2026): one "⋯" menu per row, like Master Barang. Every action is listed; the ones
+// that do not fit the status are greyed out. Hapus = permanent, only a draft never issued (its creator or Admin);
+// an issued quote is cancelled instead (Batalkan, history kept); cancelled / converted quotes are read-only.
 const qtCanDelete = r => r.display_status === "draft" && (isAdmin() || r.created_by === currentUser?.username);
 function qtRowActions(r) {
-  const b = (label, fn, cls) => `<button type="button" onclick="event.stopPropagation(); ${fn}" class="${cls} text-sm font-medium hover:underline">${label}</button>`;
-  const out = [b("Lihat", `qtView(${r.id})`, "text-accentDark")];
-  const live = r.status !== "cancelled" && !r.target_type;
-  if (live && r.status === "draft") out.push(b("Edit", `qtOpen(${r.id})`, "text-ink"));
-  if (live && r.status === "issued") out.push(b("Revisi", `qtListRevise(${r.id})`, "text-ink"));
-  if (qtCanDelete(r)) out.push(b("Hapus", `qtDeleteModal(${r.id})`, "text-failed"));
-  else if (live && r.status === "issued") out.push(b("Batalkan", `qtListCancel(${r.id})`, "text-failed"));
-  return `<div class="inline-flex items-center gap-3">${out.join("")}</div>`;
+  return `<button type="button" onclick="qtRowMenu(event, ${r.id})" aria-label="Aksi" aria-haspopup="menu"
+    class="w-8 h-8 inline-grid place-items-center rounded-lg border border-line bg-white text-ink hover:bg-bg2 transition-colors"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>`;
+}
+function qtRowMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
+  const r = (QT.list?.items || []).find(x => x.id === id);
+  if (!r) return;
+  const open = !menu.classList.contains("hidden") && menu.dataset.itemId === "qt" + id;
+  closeMasterRowMenu();
+  if (open) return;
+  const live = r.status !== "cancelled" && !r.target_type, issued = live && r.status === "issued";
+  const mi = (icon, label, onclick, ok = true, hint = "", extra = "text-ink") => ok
+    ? `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}" class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${extra}">${svgIcon(icon, 15)}${label}</button>`
+    : `<button type="button" role="menuitem" disabled title="${hint}" class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm text-muted/60 cursor-not-allowed">${svgIcon(icon, 15)}${label}</button>`;
+  const editLbl = issued ? "Buat Revisi" : r.display_status === "revisi" ? "Lanjutkan Revisi" : "Edit Penawaran";
+  menu.innerHTML = [
+    mi("eye", "Lihat Detail", `qtView(${id})`),
+    issued ? mi("revise", editLbl, `qtListRevise(${id})`) : mi("edit", editLbl, `qtOpen(${id})`, live && r.status === "draft", "Penawaran dibatalkan / dikonversi tidak bisa diubah"),
+    mi("duplicate", "Duplikasi", `qtListDuplicate(${id})`),
+    mi("download", "Download PDF", `qtListPdf(${id}, ${r.latest_version_id || 0})`, !!r.latest_version_id, "Belum pernah diterbitkan"),
+    mi("ban", "Batalkan Penawaran", `qtListCancel(${id})`, issued, live ? "Hanya penawaran yang sudah terbit; draft dihapus" : "Sudah dibatalkan / dikonversi"),
+    `<div class="my-1 border-t border-line"></div>`,
+    mi("trash", "Hapus", `qtDeleteModal(${id})`, qtCanDelete(r),
+      r.display_status !== "draft" ? "Hanya draft yang belum pernah terbit; penawaran terbit dibatalkan" : "Hanya pembuat draft atau Admin", "text-failed"),
+  ].join("");
+  menu.dataset.itemId = "qt" + id;
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect(), height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
+}
+async function qtListDuplicate(id) {
+  try { await qtEnsureMeta(); QT.cur = await qtApi(`/api/quotations/${id}`); } catch (e) { showToast(e.message); return; }
+  qtDuplicateView();
+}
+async function qtListPdf(id, vid) {
+  try { QT.cur = await qtApi(`/api/quotations/${id}`); } catch (e) { showToast(e.message); return; }
+  qtPrintVersion(vid);
 }
 async function qtView(id) {
   try { await qtEnsureMeta(); QT.cur = await qtApi(`/api/quotations/${id}`); } catch (e) { showToast(e.message); return; }

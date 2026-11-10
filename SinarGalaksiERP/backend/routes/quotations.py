@@ -154,6 +154,11 @@ async def quote_cancel(qid: int, body: dict, user: dict = Depends(get_current_us
     return await _run(qt.cancel, qid, body.get("reason") or "", user)
 
 
+@router.delete("/quotations/{qid}")
+async def quote_delete(qid: int, user: dict = Depends(get_current_user)):
+    return await _run(qt.delete_draft, qid, user)
+
+
 # ── used by Kasir / Sales Order when they save a document made from a quotation ──
 async def guard_conversion(qid: int | None) -> None:
     """Refuse before saving: the quotation must be accepted, issued and not converted yet."""

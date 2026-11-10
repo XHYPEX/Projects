@@ -782,6 +782,24 @@ def cancel(qid: int, reason: str, user: dict) -> dict:
     return detail(qid, user)
 
 
+def delete_draft(qid: int, user: dict) -> dict:
+    """Hard delete, only for a draft that was never issued (Owner 10-11-2026): no version, no conversion, so nothing
+    was ever sent out. Staff delete their own drafts, Admin any draft. An issued letter is cancelled instead (cancel),
+    so its history stays. Price-request events in the shared log are kept as they are."""
+    with db._conn() as con:
+        con.execute("BEGIN IMMEDIATE")
+        q = _get(con, qid)
+        if q["status"] != "draft" or q["latest_version_id"] or _conversion(con, qid):
+            raise Conflict("Hanya draft yang belum pernah diterbitkan yang bisa dihapus; penawaran terbit dibatalkan, bukan dihapus.")
+        if user.get("role") != "admin" and q["created_by"] != user["username"]:
+            raise PermissionError("Staff hanya bisa menghapus draft buatannya sendiri.")
+        con.execute("UPDATE sales_quotations SET source_quote_id=NULL WHERE source_quote_id=?", (qid,))
+        con.execute("DELETE FROM sales_quotation_lines WHERE quotation_id=?", (qid,))
+        con.execute("DELETE FROM sales_quotation_events WHERE quotation_id=?", (qid,))
+        con.execute("DELETE FROM sales_quotations WHERE id=?", (qid,))
+    return {"ok": True, "quote_number": q["quote_number"]}
+
+
 # ── conversion to Kasir / Sales Order ────────────────────────────────────────
 def check_convertible(qid: int) -> dict:
     """Before a nota / SO made from this quotation is saved: accepted, issued and not converted yet (QT-024)."""

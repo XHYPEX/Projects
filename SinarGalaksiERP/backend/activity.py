@@ -158,6 +158,7 @@ ACTIVITY_RULES: list[tuple[re.Pattern, str, str, str]] = [
 
     (re.compile(r"^/api/quotations$"), "POST", "Buat draft Penawaran Harga", "quotation"),
     (re.compile(r"^/api/quotations/\d+$"), "PUT", "Ubah draft Penawaran Harga", "quotation"),
+    (re.compile(r"^/api/quotations/\d+$"), "DELETE", "Hapus draft Penawaran Harga", "quotation"),
     (re.compile(r"^/api/quotations/\d+/issue$"), "POST", "Terbitkan Penawaran Harga", "quotation"),
     (re.compile(r"^/api/quotations/\d+/versions/\d+/printed$"), "POST", "Cetak / unduh PDF Penawaran Harga", "quotation"),
     (re.compile(r"^/api/quotations/\d+/lines/\d+/price-decision$"), "POST", "Putuskan harga khusus Penawaran Harga", "quotation"),

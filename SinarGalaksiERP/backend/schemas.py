@@ -429,6 +429,8 @@ class CustomerOut(BaseModel):
     # created_at of the newest one (UTC ISO string, null when there are none).
     receipt_count: int = 0
     last_visit: str | None = None
+    # Same test as delete_customer: no nota and no vehicle used by a Sales Order / Service (hides Hapus in the list).
+    deletable: bool | None = None
 
 
 class CustomerListOut(BaseModel):

@@ -57,6 +57,7 @@ def _row_to_customer(row: dict) -> CustomerOut:
         updated_at=row["updated_at"],
         receipt_count=row["receipt_count"],
         last_visit=row["last_visit"],
+        deletable=(not row["receipt_count"] and not row.get("vehicle_used")) if "vehicle_used" in row else None,
     )
 
 

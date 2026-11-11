@@ -132,15 +132,22 @@ def list_warehouses(include_inactive: bool = True) -> list[dict]:
             "SELECT warehouse_id, COUNT(*) AS n FROM master_items WHERE warehouse_id IS NOT NULL GROUP BY warehouse_id")}
         item_r = {r["rack_id"]: r["n"] for r in con.execute(
             "SELECT rack_id, COUNT(*) AS n FROM master_items WHERE rack_id IS NOT NULL GROUP BY rack_id")}
+        # Same tables as _usage: a place still used by goods, an opname or a Barang Masuk line cannot be deleted.
+        used_w, used_r = set(), set()
+        for t in ("master_items", "stock_opnames", "inbound_items"):
+            used_w |= {r[0] for r in con.execute(f"SELECT DISTINCT warehouse_id FROM {t} WHERE warehouse_id IS NOT NULL")}
+            used_r |= {r[0] for r in con.execute(f"SELECT DISTINCT rack_id FROM {t} WHERE rack_id IS NOT NULL")}
         for w in ws:
             w["is_active"] = bool(w["is_active"])
             w["item_count"] = item_w.get(w["id"], 0)
+            w["in_use"] = w["id"] in used_w
             w["racks"] = []
             for r in con.execute("SELECT * FROM warehouse_racks WHERE warehouse_id=?" + ("" if include_inactive else " AND is_active=1")
                                  + " ORDER BY is_active DESC, code", (w["id"],)):
                 r = dict(r)
                 r["is_active"] = bool(r["is_active"])
                 r["item_count"] = item_r.get(r["id"], 0)
+                r["in_use"] = r["id"] in used_r
                 w["racks"].append(r)
         return ws
 

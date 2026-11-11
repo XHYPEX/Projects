@@ -11945,13 +11945,7 @@ function renderCustomersTable(data) {
       <td class="px-2.5 py-3 text-muted tabular-nums whitespace-nowrap">${esc(formatDateOnly(c.birth_date)) || "&ndash;"}</td>
       <td class="px-2.5 py-3 text-muted"><div class="mcust-address max-w-[11rem] truncate">${c.address ? esc(c.address) : "&ndash;"}</div></td>
       <td class="px-2.5 py-3 text-right tabular-nums ${c.receipt_count > 0 ? "text-ink" : "text-muted"}">${c.receipt_count}</td>
-      <td class="px-4 py-3" onclick="event.stopPropagation()">
-        <div class="flex items-center justify-end gap-1.5">
-          <button type="button" onclick="toggleCustomerActive(${c.id}, ${!c.is_active})" class="h-8 px-2.5 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 whitespace-nowrap">${c.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-          ${iconButtonHtml("accent", "Ubah pelanggan", `editCustomer(${c.id})`, "edit")}
-          ${iconButtonHtml("danger", "Hapus pelanggan", `confirmDeleteCustomer(${c.id})`, "trash", "admin-only")}
-        </div>
-      </td>
+      <td class="px-4 py-3 text-right" onclick="event.stopPropagation()">${rowMenuBtn(`customerRowMenu(event, ${c.id}, ${c.is_active}, ${c.deletable === true})`)}</td>
     `;
     tr.querySelector(".mcust-email").title = c.email || "";
     tr.querySelector(".mcust-address").title = c.address || "";
@@ -12008,6 +12002,15 @@ async function toggleCustomerActive(id, nextActive) {
   }
   await loadCustomers();
   showToast(nextActive ? "Pelanggan diaktifkan." : "Pelanggan dinonaktifkan.", "success");
+}
+
+// ⋯ per customer (Owner 11-11-2026). Hapus only for Admin on a customer with no nota and no vehicle used by SO / Service.
+function customerRowMenu(event, id, active, deletable) {
+  rowMenuOpen(event, `cust-${id}`, [
+    rowMenuItem("edit", "Edit Customer", `editCustomer(${id})`),
+    rowMenuItem("archive", active ? "Nonaktifkan" : "Aktifkan Kembali", `toggleCustomerActive(${id}, ${!active})`),
+    isAdmin() && deletable ? rowMenuItem("trash", "Hapus", `confirmDeleteCustomer(${id})`, true) : "",
+  ]);
 }
 
 function confirmDeleteCustomer(id) {
@@ -14960,6 +14963,32 @@ function openMasterRowMenu(event, id) {
   menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
 }
 document.addEventListener("click", closeMasterRowMenu);
+
+// Shared "⋯" row menu (Owner 11-11-2026: every list's AKSI). rowMenuBtn draws the button; rowMenuOpen fills the one
+// #master-row-menu with items and places it under the button. Items that are not allowed are simply not passed (hidden).
+// rowMenuItem(icon, label, onclick, danger): labels are fixed strings; ids are numbers. "" items are skipped; a
+// danger (Hapus) item gets a divider above it.
+function rowMenuBtn(onclick) {
+  return `<button type="button" onclick="${onclick}" aria-label="Aksi" aria-haspopup="menu"
+    class="h-8 w-8 inline-grid place-items-center border border-line rounded-lg text-muted hover:text-ink hover:bg-bg2 bg-white">&#8943;</button>`;
+}
+function rowMenuItem(icon, label, onclick, danger = false) {
+  return `${danger ? '<div class="my-1 border-t border-line"></div>' : ""}<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}"
+    class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${danger ? "text-failed" : "text-ink"}">${svgIcon(icon, 15)}${label}</button>`;
+}
+function rowMenuOpen(event, key, items) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
+  const open = !menu.classList.contains("hidden") && menu.dataset.itemId === key;
+  closeMasterRowMenu();
+  if (open) return;
+  menu.innerHTML = items.filter(Boolean).join("");
+  menu.dataset.itemId = key;
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect(), height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
+}
 window.addEventListener("resize", closeMasterRowMenu);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMasterRowMenu(); });
 
@@ -16620,21 +16649,14 @@ function whRender() {
       <td class="${GR_TD} font-semibold text-ink">${esc(w.name)}<div class="text-[11px] font-normal text-muted">Gudang · ${w.racks.filter(r => r.is_active).length} rak aktif</div></td>
       <td class="${GR_TD} text-right tabular-nums">${formatInt(w.item_count)}</td>
       <td class="${GR_TD}">${status(w.is_active)}</td>
-      <td class="${GR_TD} whitespace-nowrap text-right">
-        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit(${w.id})">Edit</button>
-        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit(${w.id}, true)" ${w.is_active ? "" : "disabled"}>+ Rak</button>
-        <button type="button" class="${GR_BTN3} !py-1.5" onclick="whToggle('gudang', ${w.id}, ${!w.is_active})">${w.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-        ${w.item_count ? "" : `<button type="button" class="${GR_BTND} !py-1.5" onclick="whDelete('gudang', ${w.id})">Hapus</button>`}</td></tr>`);
+      <td class="${GR_TD} text-right">${rowMenuBtn(`whRowMenu(event, 'gudang', ${w.id})`)}</td></tr>`);
     for (const r of w.racks.filter(r => whState.showInactive || r.is_active)) {
       rows.push(`<tr>
         <td class="${GR_TD} font-mono text-ink pl-8">${esc(r.code)}</td>
         <td class="${GR_TD} text-ink pl-8"><span class="text-muted mr-1">↳</span>${esc(r.name)}</td>
         <td class="${GR_TD} text-right tabular-nums">${formatInt(r.item_count)}</td>
         <td class="${GR_TD}">${status(r.is_active)}</td>
-        <td class="${GR_TD} whitespace-nowrap text-right">
-          <button type="button" class="${GR_BTN3} !py-1.5" onclick="whEdit(${w.id})">Edit</button>
-          <button type="button" class="${GR_BTN3} !py-1.5" onclick="whToggle('rak', ${r.id}, ${!r.is_active})">${r.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-          ${r.item_count ? "" : `<button type="button" class="${GR_BTND} !py-1.5" onclick="whDelete('rak', ${r.id})">Hapus</button>`}</td></tr>`);
+        <td class="${GR_TD} text-right">${rowMenuBtn(`whRowMenu(event, 'rak', ${r.id})`)}</td></tr>`);
     }
   }
   const admin = isAdmin();
@@ -16651,6 +16673,18 @@ function whRender() {
         whCache && whCache.length ? "Tidak ada yang cocok." : "Belum ada gudang. Tambahkan gudang beserta raknya."))
     + grNote("blue", "Gudang atau rak yang sudah dipakai barang, stock opname, atau Barang Masuk tidak bisa dihapus, hanya dinonaktifkan. Yang nonaktif tidak muncul di pilihan, tetapi tetap tampil di data lama.");
   const s = document.getElementById("wh-search"); if (s) s.value = whState.q;
+}
+// ⋯ per gudang / rak row. Hapus only when nothing uses the place (in_use: goods, opname, Barang Masuk); else Nonaktifkan.
+function whRowMenu(event, kind, id) {
+  const x = kind === "gudang" ? whFind(id) : whRackFind(id);
+  if (!x) return;
+  const wid = kind === "gudang" ? x.id : x.warehouse_id;
+  rowMenuOpen(event, `wh-${kind}-${id}`, [
+    rowMenuItem("edit", kind === "gudang" ? "Edit Gudang" : "Edit Rak", `whEdit(${wid})`),
+    kind === "gudang" && x.is_active ? rowMenuItem("duplicate", "Tambah Rak", `whEdit(${id}, true)`) : "",
+    rowMenuItem("archive", x.is_active ? "Nonaktifkan" : "Aktifkan Kembali", `whToggle('${kind}', ${id}, ${!x.is_active})`),
+    x.in_use === false ? rowMenuItem("trash", "Hapus", `whDelete('${kind}', ${id})`, true) : "",
+  ]);
 }
 // Owner 04-11-2026: the racks are typed in the Gudang form and saved with it; codes are generated by the server.
 function whEdit(id = null, addRack = false) {
@@ -28907,27 +28941,74 @@ function msvShow(panel) {
   for (const id of ["msv-list-panel", "msv-edit-panel"]) document.getElementById(id).classList.toggle("hidden", id !== panel);
   document.getElementById("page-master-service").scrollTop = 0;
 }
+// Owner 11-11-2026: same shape as the other master lists (Master Satuan): Total / Aktif / Nonaktif cards, a search +
+// status filter bar with the Tambah button, a "Menampilkan x dari y" line, the table, and a ⋯ menu per row.
+// A jenis service is never deleted (Garansi / Service orders point at it); it is deactivated instead.
+let msvFilter = { q: "", status: "" };
 function msvRenderList() {
-  const admin = isAdmin(), yes = v => v ? '<span class="text-green-800">Ya</span>' : '<span class="text-muted">—</span>';
+  const admin = isAdmin();
+  const th = (label, right) => `<th class="${right ? "text-right" : "text-left"} px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">${label}</th>`;
   document.getElementById("msv-list-panel").innerHTML = `
-    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-      <div><h2 class="font-serif text-2xl font-semibold text-ink">Master Service</h2><p class="text-sm text-muted mt-0.5">Masa garansi, kelengkapan, dan aturan service per jenis barang</p></div>
-      ${admin ? `<button type="button" onclick="msvEdit(null)" class="${RTS_BTN}">+ Jenis Service</button>` : ""}</div>
-    ${rtsCard("Jenis Service", `<div class="border border-line rounded-xl overflow-x-auto"><table class="w-full min-w-[980px] text-sm"><thead class="bg-bg2"><tr>
-        <th class="${RTS_TH}">Kode</th><th class="${RTS_TH}">Jenis</th><th class="${RTS_THR}">Garansi</th><th class="${RTS_THR}">Garansi service</th><th class="${RTS_TH}">Kategori</th>
-        <th class="${RTS_THR}">Barang</th><th class="${RTS_TH}">SN wajib</th><th class="${RTS_TH}">SN di Kasir</th><th class="${RTS_TH}">Status</th><th class="${RTS_THR}">Aksi</th></tr></thead>
-      <tbody>${msvList.map(p => `<tr class="border-b border-line last:border-b-0 align-top ${p.status !== "aktif" ? "opacity-60" : ""}">
-        <td class="px-3 py-2.5 font-semibold tabular-nums text-ink">${esc(p.code)}</td>
-        <td class="px-3 py-2.5"><div class="text-ink">${esc(p.name)}</div><div class="text-[11px] text-muted">${esc([p.est_days, p.supplier_name].filter(Boolean).join(" · "))}${p.overrides.length ? ` · ${p.overrides.length} pengecualian` : ""}</div></td>
-        <td class="px-3 py-2.5 text-right tabular-nums">${p.warranty_months} bln</td>
-        <td class="px-3 py-2.5 text-right tabular-nums">${p.after_warranty_days} hr</td>
-        <td class="px-3 py-2.5 max-w-[16rem]"><div class="text-xs text-ink">${p.categories.length ? p.categories.map(c => esc(`${c.code} ${c.name}`)).join(", ") : '<span class="text-failed">Belum ada kategori</span>'}</div></td>
-        <td class="px-3 py-2.5 text-right tabular-nums">${p.item_count}</td>
-        <td class="px-3 py-2.5">${yes(p.require_serial)}</td><td class="px-3 py-2.5">${yes(p.record_serial_at_sale)}</td>
-        <td class="px-3 py-2.5">${rtsPill(p.status === "aktif" ? RTS_TINT.green : RTS_TINT.gray, p.status === "aktif" ? "Aktif" : "Nonaktif")}</td>
-        <td class="px-3 py-2.5 text-right whitespace-nowrap"><button type="button" onclick="msvEdit(${p.id})" class="text-xs font-medium text-accentDark hover:underline">${admin ? "Ubah" : "Lihat"}</button></td></tr>`).join("")}</tbody></table></div>
-      <p class="text-[11px] text-muted mt-3">Garansi dihitung dari tanggal nota. Pengecualian per barang mengalahkan pengecualian per brand, lalu jenis (kategori atau induknya).</p>`)}`;
+    <div id="msv-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" aria-live="polite"></div>
+    <div class="bg-white border border-line rounded-xl p-3 sm:p-4 mb-4"><div class="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div class="flex-1 min-w-[14rem]"><label for="msv-search" class="sr-only">Cari</label><div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="msv-search" type="text" placeholder="Cari kode, jenis, atau kategori…" autocomplete="off" oninput="msvFilter.q=this.value; msvRenderRows()"
+          class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" /></div></div>
+      <label for="msv-status" class="sr-only">Status</label>
+      <select id="msv-status" onchange="msvFilter.status=this.value; msvRenderRows()" class="border border-line rounded-lg px-2.5 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent">
+        <option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select>
+      ${admin ? `<button type="button" onclick="msvEdit(null)" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-accent text-bg rounded-lg text-sm font-medium hover:bg-accentDark transition-colors">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Tambah Jenis Service</button>` : ""}
+    </div></div>
+    <p id="msv-count" class="text-sm text-muted mb-3 px-1 min-h-[1.25rem]" aria-live="polite"></p>
+    <div class="bg-white border border-line rounded-xl overflow-hidden"><div class="overflow-x-auto"><table class="w-full min-w-[980px] text-sm">
+      <thead class="bg-bg2"><tr>${th("Kode")}${th("Jenis Service")}${th("Garansi", 1)}${th("Garansi Service", 1)}${th("Kategori")}${th("Barang", 1)}${th("SN Wajib")}${th("SN di Kasir")}${th("Status")}${th("Aksi", 1)}</tr></thead>
+      <tbody id="msv-tbody"></tbody></table></div>
+      <div id="msv-empty" class="hidden text-center py-12"><p class="text-sm text-muted">Tidak ada jenis service yang cocok.</p></div></div>
+    <p class="text-xs text-muted mt-3 px-1">Garansi dihitung dari tanggal nota. Pengecualian per barang mengalahkan pengecualian per brand, lalu jenis (kategori atau induknya). Jenis service tidak dihapus, hanya dinonaktifkan.</p>`;
+  document.getElementById("msv-search").value = msvFilter.q;
+  document.getElementById("msv-status").value = msvFilter.status;
+  msvRenderRows();
   msvShow("msv-list-panel");
+}
+function msvRenderRows() {
+  const aktif = msvList.filter(p => p.status === "aktif").length;
+  renderMasterKpis("msv-kpis", msvList.length, aktif, msvList.length - aktif, "Jenis Service");
+  const q = msvFilter.q.trim().toLowerCase();
+  const rows = msvList.filter(p => (!msvFilter.status || (msvFilter.status === "aktif") === (p.status === "aktif"))
+    && (!q || [p.code, p.name, ...p.categories.map(c => `${c.code} ${c.name}`)].some(t => String(t || "").toLowerCase().includes(q))));
+  const yes = v => v ? '<span class="text-done font-medium">Ya</span>' : '<span class="text-muted">—</span>';
+  document.getElementById("msv-tbody").innerHTML = rows.map(p => `<tr class="border-b border-line last:border-b-0 hover:bg-bg2 transition-colors align-top cursor-pointer" onclick="msvEdit(${p.id})">
+      <td class="px-3 py-3 font-mono text-xs font-semibold text-ink whitespace-nowrap">${esc(p.code)}</td>
+      <td class="px-3 py-3"><div class="font-semibold text-ink">${esc(p.name)}</div><div class="text-[11px] text-muted">${esc([p.est_days, p.supplier_name].filter(Boolean).join(" · "))}${p.overrides.length ? ` · ${p.overrides.length} pengecualian` : ""}</div></td>
+      <td class="px-3 py-3 text-right tabular-nums text-ink whitespace-nowrap">${p.warranty_months} bln</td>
+      <td class="px-3 py-3 text-right tabular-nums text-ink whitespace-nowrap">${p.after_warranty_days} hr</td>
+      <td class="px-3 py-3 max-w-[16rem]"><div class="text-xs text-ink">${p.categories.length ? p.categories.map(c => esc(`${c.code} ${c.name}`)).join(", ") : '<span class="text-failed">Belum ada kategori</span>'}</div></td>
+      <td class="px-3 py-3 text-right tabular-nums ${p.item_count ? "text-ink" : "text-muted"}">${formatInt(p.item_count)}</td>
+      <td class="px-3 py-3">${yes(p.require_serial)}</td><td class="px-3 py-3">${yes(p.record_serial_at_sale)}</td>
+      <td class="px-3 py-3">${activePillHtml(p.status === "aktif")}</td>
+      <td class="px-3 py-3 text-right" onclick="event.stopPropagation()">${rowMenuBtn(`msvRowMenu(event, ${p.id})`)}</td></tr>`).join("");
+  document.getElementById("msv-empty").classList.toggle("hidden", rows.length > 0);
+  document.getElementById("msv-count").textContent = `Menampilkan ${rows.length} dari ${msvList.length} data`;
+}
+function msvRowMenu(event, id) {
+  const p = msvList.find(x => x.id === id);
+  if (!p) return;
+  rowMenuOpen(event, `msv-${id}`, isAdmin() ? [
+    rowMenuItem("edit", "Edit Jenis Service", `msvEdit(${id})`),
+    rowMenuItem("archive", p.status === "aktif" ? "Nonaktifkan" : "Aktifkan Kembali", `msvListToggle(${id})`),
+  ] : [rowMenuItem("eye", "Lihat Detail", `msvEdit(${id})`)]);
+}
+async function msvListToggle(id) {
+  const p = msvList.find(x => x.id === id);
+  if (!p) return;
+  try {
+    await rtsApi(`/api/services/profiles/${id}/status`, "POST", { active: p.status !== "aktif" });
+    await msvRefresh();
+  } catch (e) { showToast(e.message); return; }
+  showToast(p.status === "aktif" ? `${p.code} dinonaktifkan.` : `${p.code} diaktifkan kembali.`, "success");
+  msvRenderRows();
 }
 function msvEdit(id) {
   const p = id ? msvList.find(x => x.id === id) : null;

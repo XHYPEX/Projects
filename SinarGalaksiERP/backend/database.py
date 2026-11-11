@@ -4237,7 +4237,10 @@ def get_sales_summary(date_from: str, date_to: str) -> dict:
 
 _CUSTOMER_SELECT = """SELECT c.*,
         (SELECT COUNT(*) FROM receipts r WHERE r.customer_id = c.id) AS receipt_count,
-        (SELECT MAX(r.created_at) FROM receipts r WHERE r.customer_id = c.id) AS last_visit
+        (SELECT MAX(r.created_at) FROM receipts r WHERE r.customer_id = c.id) AS last_visit,
+        EXISTS (SELECT 1 FROM vehicles v WHERE v.customer_id = c.id AND (
+            EXISTS (SELECT 1 FROM service_orders s WHERE s.vehicle_id = v.id) OR EXISTS (SELECT 1 FROM preorders p WHERE p.vehicle_id = v.id)))
+          AS vehicle_used
     FROM customers c"""
 
 

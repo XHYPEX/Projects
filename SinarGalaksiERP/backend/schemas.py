@@ -496,6 +496,7 @@ class SupplierOut(BaseModel):
     npwp: str | None = None
     email: str | None = None
     score: float | None = None
+    in_use: bool | None = None  # only on the full list: a used supplier cannot be deleted
 
 
 class BrandRequest(BaseModel):
@@ -517,6 +518,7 @@ class BrandOut(BaseModel):
     is_system: bool
     source: str
     score: float | None = None
+    in_use: bool | None = None  # only on the full list: a used brand cannot be deleted
 
 
 class UnitRequest(BaseModel):

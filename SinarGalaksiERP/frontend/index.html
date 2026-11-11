@@ -11415,12 +11415,8 @@ function renderEntityRowHtml(type, item, isEditing) {
         <button type="button" onclick="saveEntityEdit('${type}', ${item.id})" class="px-2.5 py-1 bg-accent text-bg rounded-md text-[11px] font-medium hover:bg-accentDark transition-colors">Simpan</button>
       </div>`;
   } else {
-    actionsCell = `
-      <div class="flex items-center justify-end gap-1.5">
-        <button type="button" onclick="toggleEntityActive('${type}', ${item.id}, ${!item.is_active})" class="h-8 px-3 border border-line rounded-lg text-xs text-ink bg-white hover:bg-bg2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">${item.is_active ? "Nonaktifkan" : "Aktifkan"}</button>
-        ${iconButtonHtml("accent", "Ubah", `startEntityEdit('${type}', ${item.id})`, "edit")}
-        ${isAdmin() ? iconButtonHtml("danger", "Hapus", `confirmDeleteEntity('${type}', ${item.id})`, "trash") : ""}
-      </div>`;
+    actionsCell = `<button type="button" onclick="openEntityRowMenu(event, '${type}', ${item.id})" aria-label="Aksi" aria-haspopup="menu"
+      class="h-8 w-8 inline-grid place-items-center border border-line rounded-lg text-muted hover:text-ink hover:bg-bg2 bg-white">&#8943;</button>`;
   }
 
   return `
@@ -11432,6 +11428,32 @@ function renderEntityRowHtml(type, item, isEditing) {
       <td class="px-3 py-3">${sourceBadge}</td>
       <td class="px-4 py-3 text-right">${actionsCell}</td>
     </tr>`;
+}
+
+// Master Brand / Master Supplier row menu (Owner 11-11-2026: "⋯" on every list, actions that are not allowed are
+// hidden). Hapus only for Admin, on a row nothing references (in_use from the list); a used one is deactivated instead.
+function openEntityRowMenu(event, type, id) {
+  event.stopPropagation();
+  const menu = document.getElementById("master-row-menu");
+  const item = entityCache(type).find(x => x.id === id);
+  if (!item) return;
+  const key = `${type}-${id}`, open = !menu.classList.contains("hidden") && menu.dataset.itemId === key;
+  closeMasterRowMenu();
+  if (open) return;
+  const mi = (icon, label, onclick, extra = "text-ink") => `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}"
+    class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${extra}">${svgIcon(icon, 15)}${label}</button>`;
+  const noun = type === "brand" ? "Brand" : "Supplier";
+  const canDelete = isAdmin() && !item.is_system && item.in_use === false;
+  menu.innerHTML = [
+    mi("edit", `Edit ${noun}`, `startEntityEdit('${type}', ${id})`),
+    mi("archive", item.is_active ? "Nonaktifkan" : "Aktifkan Kembali", `toggleEntityActive('${type}', ${id}, ${!item.is_active})`),
+    canDelete ? `<div class="my-1 border-t border-line"></div>${mi("trash", "Hapus", `confirmDeleteEntity('${type}', ${id})`, "text-failed")}` : "",
+  ].join("");
+  menu.dataset.itemId = key;
+  menu.classList.remove("hidden");
+  const btn = event.currentTarget.getBoundingClientRect(), height = menu.offsetHeight;
+  menu.style.top = `${btn.bottom + 4 + height > window.innerHeight ? Math.max(8, btn.top - height - 4) : btn.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, btn.right - menu.offsetWidth)}px`;
 }
 
 function entityCache(type) { return type === "brand" ? brandsCache : suppliersCache; }
@@ -30370,8 +30392,8 @@ function qtTile(label, value, sub, icon, onclick) {
       <span class="w-8 h-8 rounded-lg bg-accent/10 text-accentDark grid place-items-center shrink-0" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></span></div>
     <div class="font-sans text-2xl font-semibold tabular-nums text-ink mt-1">${value}</div><div class="text-xs text-muted mt-1">${sub}</div></button>`;
 }
-// CRUD from the list (Owner 10-11-2026): one "⋯" menu per row, like Master Barang. Every action is listed; the ones
-// that do not fit the status are greyed out. Hapus = permanent, only a draft never issued (its creator or Admin);
+// CRUD from the list (Owner 10-11-2026): one "⋯" menu per row, like Master Barang. Actions that do not fit the
+// status or the user are hidden (Owner 11-11-2026). Hapus = permanent, only a draft never issued (its creator or Admin);
 // an issued quote is cancelled instead (Batalkan, history kept); cancelled / converted quotes are read-only.
 const qtCanDelete = r => r.display_status === "draft" && (isAdmin() || r.created_by === currentUser?.username);
 function qtRowActions(r) {
@@ -30387,19 +30409,16 @@ function qtRowMenu(event, id) {
   closeMasterRowMenu();
   if (open) return;
   const live = r.status !== "cancelled" && !r.target_type, issued = live && r.status === "issued";
-  const mi = (icon, label, onclick, ok = true, hint = "", extra = "text-ink") => ok
-    ? `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}" class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${extra}">${svgIcon(icon, 15)}${label}</button>`
-    : `<button type="button" role="menuitem" disabled title="${hint}" class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm text-muted/60 cursor-not-allowed">${svgIcon(icon, 15)}${label}</button>`;
+  const mi = (icon, label, onclick, ok = true, extra = "text-ink") => ok
+    ? `<button type="button" role="menuitem" onclick="closeMasterRowMenu(); ${onclick}" class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm hover:bg-bg2 transition-colors ${extra}">${svgIcon(icon, 15)}${label}</button>` : "";
   const editLbl = issued ? "Buat Revisi" : r.display_status === "revisi" ? "Lanjutkan Revisi" : "Edit Penawaran";
   menu.innerHTML = [
     mi("eye", "Lihat Detail", `qtView(${id})`),
-    issued ? mi("revise", editLbl, `qtListRevise(${id})`) : mi("edit", editLbl, `qtOpen(${id})`, live && r.status === "draft", "Penawaran dibatalkan / dikonversi tidak bisa diubah"),
+    issued ? mi("revise", editLbl, `qtListRevise(${id})`) : mi("edit", editLbl, `qtOpen(${id})`, live && r.status === "draft"),
     mi("duplicate", "Duplikasi", `qtListDuplicate(${id})`),
-    mi("download", "Download PDF", `qtListPdf(${id}, ${r.latest_version_id || 0})`, !!r.latest_version_id, "Belum pernah diterbitkan"),
-    mi("ban", "Batalkan Penawaran", `qtListCancel(${id})`, issued, live ? "Hanya penawaran yang sudah terbit; draft dihapus" : "Sudah dibatalkan / dikonversi"),
-    `<div class="my-1 border-t border-line"></div>`,
-    mi("trash", "Hapus", `qtDeleteModal(${id})`, qtCanDelete(r),
-      r.display_status !== "draft" ? "Hanya draft yang belum pernah terbit; penawaran terbit dibatalkan" : "Hanya pembuat draft atau Admin", "text-failed"),
+    mi("download", "Download PDF", `qtListPdf(${id}, ${r.latest_version_id || 0})`, !!r.latest_version_id),
+    mi("ban", "Batalkan Penawaran", `qtListCancel(${id})`, issued),
+    qtCanDelete(r) ? `<div class="my-1 border-t border-line"></div>${mi("trash", "Hapus", `qtDeleteModal(${id})`, true, "text-failed")}` : "",
   ].join("");
   menu.dataset.itemId = "qt" + id;
   menu.classList.remove("hidden");

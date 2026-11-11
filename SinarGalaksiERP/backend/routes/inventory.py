@@ -150,6 +150,7 @@ def _row_to_supplier(row: dict) -> SupplierOut:
         npwp=row["npwp"],
         email=row.get("email"),
         score=row.get("score"),
+        in_use=row.get("in_use"),
     )
 
 
@@ -163,6 +164,7 @@ def _row_to_brand(row: dict) -> BrandOut:
         is_system=bool(row["is_system"]),
         source=row["source"],
         score=row.get("score"),
+        in_use=row.get("in_use"),
     )
 
 

@@ -4585,10 +4585,7 @@ def _update_quick_add_entity(
         return dict(updated)
 
 
-def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
-    """True if any master item or document still references this supplier/brand —
-    both have NOT NULL FK columns pointing at these tables, and SQLite here runs
-    without FK enforcement, so a delete would silently orphan them."""
+def _entity_refs(table: str) -> tuple:
     if table == "suppliers":
         # Every table that names a supplier: documents, Sales Order lines, returns, quarantine, service rules.
         refs = (("master_items", "supplier_id"), ("inbound_documents", "supplier_id"), ("purchase_invoices", "supplier_id"),
@@ -4597,8 +4594,21 @@ def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
                 ("service_profiles", "default_supplier_id"), ("service_profile_overrides", "supplier_id"), ("service_orders", "supplier_id"))
     else:
         refs = (("master_items", "brand_id"), ("inbound_items", "pending_brand_id"), ("service_profile_overrides", "brand_id"))
+    return refs
+
+
+def _entity_in_use(con: sqlite3.Connection, table: str, entity_id: int) -> bool:
+    """True if any master item or document still references this supplier/brand —
+    both have NOT NULL FK columns pointing at these tables, and SQLite here runs
+    without FK enforcement, so a delete would silently orphan them."""
+    refs = _entity_refs(table)
     row = con.execute(" UNION ".join(f"SELECT 1 FROM {t} WHERE {c}=?" for t, c in refs) + " LIMIT 1", (entity_id,) * len(refs)).fetchone()
     return row is not None
+
+
+def _entity_used_ids(con: sqlite3.Connection, table: str) -> set:
+    """Every supplier/brand id that _entity_in_use would call in use, in one pass (for the list's ⋯ menu)."""
+    return {r[0] for r in con.execute(" UNION ".join(f"SELECT {c} FROM {t} WHERE {c} IS NOT NULL" for t, c in _entity_refs(table)))}
 
 
 def _delete_quick_add_entity(table: str, entity_id: int) -> None:
@@ -4690,6 +4700,8 @@ def get_all_suppliers(active_only: bool = False) -> list[dict]:
             rows = con.execute("SELECT * FROM suppliers WHERE is_active=1 ORDER BY name ASC").fetchall()
         else:
             rows = con.execute("SELECT * FROM suppliers ORDER BY name ASC").fetchall()
+            used = _entity_used_ids(con, "suppliers")
+            return [dict(r) | {"in_use": r["id"] in used} for r in rows]
         return [dict(r) for r in rows]
 
 
@@ -4733,6 +4745,8 @@ def get_all_brands(active_only: bool = False) -> list[dict]:
             rows = con.execute("SELECT * FROM brands WHERE is_active=1 ORDER BY name ASC").fetchall()
         else:
             rows = con.execute("SELECT * FROM brands ORDER BY name ASC").fetchall()
+            used = _entity_used_ids(con, "brands")
+            return [dict(r) | {"in_use": r["id"] in used} for r in rows]
         return [dict(r) for r in rows]
 
 

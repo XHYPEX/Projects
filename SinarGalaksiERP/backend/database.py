@@ -3037,7 +3037,7 @@ def _receipt_filters(
     work: str | None = None,
 ) -> tuple[str, list]:
     """WHERE clause shared by the receipt list and its total count. Every given
-    filter is ANDed; `q` is the one-box search, matching plate OR customer."""
+    filter is ANDed; `q` is the one-box search, matching plate OR customer OR car."""
     clauses: list[str] = []
     params: list = []
 
@@ -3053,7 +3053,10 @@ def _receipt_filters(
             params += cust[1]
     if q:
         nota_no = ("r.receipt_no LIKE ?" + _LIKE_ESCAPE, [_like_contains(q.strip())]) if "/" in q else None
-        either = [c for c in (_plate_clause(q), _customer_clause(q), nota_no) if c]
+        # The car on the nota ("AVANZA", "TOYOTA AVANZA"), shown in the Mobil column of Riwayat Transaksi.
+        car = ("(COALESCE(r.vehicle_make,'') || ' ' || COALESCE(r.vehicle_model,'')) LIKE ?" + _LIKE_ESCAPE,
+               [_like_contains(" ".join(q.split()))]) if q.strip() else None
+        either = [c for c in (_plate_clause(q), _customer_clause(q), nota_no, car) if c]
         if either:
             clauses.append("(" + " OR ".join(c[0] for c in either) + ")")
             for c in either:

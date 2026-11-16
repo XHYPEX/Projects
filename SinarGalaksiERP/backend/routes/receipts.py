@@ -147,7 +147,9 @@ def _validate_items(items: list[ReceiptItemRequest]) -> list[dict]:
             except ValueError:
                 raise HTTPException(status_code=422, detail="Tanggal garansi tidak valid, gunakan format YYYY-MM-DD.")
         row = item.model_dump()
-        row["serial_no"] = (row.get("serial_no") or "").strip().upper()[:80] or None
+        # One SN per unit, comma separated (Kasir's SN dialog); normalised to "A, B".
+        sns = [x.strip().upper()[:60] for x in (row.get("serial_no") or "").split(",") if x.strip()]
+        row["serial_no"] = ", ".join(sns)[:1000] or None
         # Only the assignment fields the client actually sent are applied (see database._assignments).
         row["_assign"] = {k: row.pop(k) for k in ("technician_ids", "sales_employee_id") if k in item.model_fields_set}
         row.pop("technician_ids", None)

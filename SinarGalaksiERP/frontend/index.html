@@ -7036,6 +7036,7 @@ function stepItemQty(btn, delta) {
   if (!input) return;
   input.value = Math.max(1, (parseInt(input.value, 10) || 0) + delta);
   clampItemQtyToStock(row);
+  refreshItemRowMeta(row);
   recomputeTotals();
   markActiveTabDirty();
 }
@@ -20453,12 +20454,24 @@ function saveNotaPrintSettings(thenTest) {
 // Owner 07-11-2026: 4 per sheet on the 9,5" × 5,5" form, which holds about 4 one-line items under the 1.4 cm top margin.
 const NOTA_ITEMS_PER_PAGE = 7;
 const NOTA_ITEMS_PER_HALF_PAGE = 4;
+// The small SN / Catatan lines under a product name take room too: each counts as half an item line.
 function receiptNotaHtml(r, customer, opts = {}) {
   const items = r.items || [];
   const per = opts.perPage || NOTA_ITEMS_PER_PAGE;
-  const pages = Math.max(Math.ceil(items.length / per), 1);
-  return Array.from({ length: pages }, (_, i) => receiptNotaPageHtml(r, customer, opts,
-    items.slice(i * per, (i + 1) * per), i * per, i + 1, pages)).join("");
+  const weight = it => 1 + (it.serial_no ? 0.5 : 0) + (it.so_note ? 0.5 : 0);
+  const chunks = [];
+  let cur = [], used = 0;
+  for (const it of items) {
+    if (cur.length && used + weight(it) > per) { chunks.push(cur); cur = []; used = 0; }
+    cur.push(it); used += weight(it);
+  }
+  if (cur.length || !chunks.length) chunks.push(cur);
+  let start = 0;
+  return chunks.map((chunk, i) => {
+    const html = receiptNotaPageHtml(r, customer, opts, chunk, start, i + 1, chunks.length);
+    start += chunk.length;
+    return html;
+  }).join("");
 }
 function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const last = page === pages;
@@ -20473,7 +20486,7 @@ function receiptNotaPageHtml(r, customer, opts, pageItems, start, page, pages) {
   const rows = pageItems.map((item, idx) => `
     <tr>
       <td style="${cell}text-align:center;">${start + idx + 1}</td>
-      <td style="${cell}">${esc(item.product_name)}${item.so_note ? `<div style="font-size:8pt;">Catatan: ${esc(item.so_note)}</div>` : ""}</td>
+      <td style="${cell}">${esc(item.product_name)}${item.serial_no ? `<div style="font-size:8pt;">SN: ${esc(item.serial_no)}</div>` : ""}${item.so_note ? `<div style="font-size:8pt;">Catatan: ${esc(item.so_note)}</div>` : ""}</td>
       <td style="${cell}text-align:center;">${item.quantity}</td>
       <td style="${cell}text-align:center;">${esc(item.unit || "-")}</td>
       <td style="${cell}text-align:right;">${groupDigits(item.unit_price) || "0"}</td>
@@ -29164,27 +29177,51 @@ async function svcLoadSerialSkus() {
   document.querySelectorAll("#item-rows .item-row").forEach(row => { if (row.dataset.sku) refreshItemRowMeta(row); });
   return svcSerialSkus;
 }
-function svcSerialMetaBit(row) {
-  if (!row.dataset.sku || !(svcSerialSkus?.has(row.dataset.sku) || row.dataset.serial)) return "";
-  const v = row.dataset.serial;
-  return `<button type="button" class="item-sn-btn ${v ? "text-ink" : "text-accentDark"} font-medium hover:underline" onclick="svcEditRowSerial(this)">${v ? "SN " + esc(v) : "+ Isi SN"}</button>`;
+// Owner 17-11-2026: one SN per unit is required before Pengerjaan Selesai (the server refuses it otherwise),
+// so a line shows how many are filled and turns red while some are missing.
+function svcRowSerials(row) { return (row.dataset.serial || "").split(",").map(x => x.trim()).filter(Boolean); }
+function svcRowSerialNeed(row) {
+  return Math.max((parseInt(row.querySelector(".item-qty")?.value, 10) || 0) - (Number(row.dataset.returnedQty) || 0), 0);
 }
+function svcSerialMetaBit(row) {
+  const required = Boolean(row.dataset.sku && svcSerialSkus?.has(row.dataset.sku));
+  if (!row.dataset.sku || !(required || row.dataset.serial)) return "";
+  const sns = svcRowSerials(row), need = svcRowSerialNeed(row);
+  const short = required && sns.length < need;
+  const label = !sns.length ? (required ? "+ Isi SN (wajib)" : "+ Isi SN")
+    : `SN ${esc(sns.join(", "))}${short ? ` (${sns.length}/${need})` : ""}`;
+  return `<button type="button" class="item-sn-btn ${short ? "text-failed" : "text-ink"} font-medium hover:underline" onclick="svcEditRowSerial(this)">${label}</button>`;
+}
+// One box per unit; Enter (a barcode scanner sends one after each code) jumps to the next box, then saves.
 function svcEditRowSerial(btn) {
   const row = btn.closest(".item-row");
   const rows = [...document.querySelectorAll("#item-rows .item-row")];
   svcEditRowSerial.idx = rows.indexOf(row);
-  openModal("Nomor Seri", `<div class="space-y-3"><p class="text-sm text-muted">${esc(row.querySelector(".item-name").value)}</p>
-    ${rtsField("Nomor seri (SN)", `<input id="svc-row-sn" type="text" maxlength="80" class="${RTS_IN}" onkeydown="if(event.key==='Enter'){event.preventDefault();svcSaveRowSerial()}">`)}
-    <p class="text-[11px] text-muted">Dipakai untuk cek garansi saat barang dibawa service. Qty lebih dari 1: pisahkan dengan koma.</p>
+  const sns = svcRowSerials(row);
+  const n = Math.min(Math.max(svcRowSerialNeed(row), sns.length, 1), 50);
+  const boxes = Array.from({ length: n }, (_, i) => `<div class="flex items-center gap-2"><span class="w-14 shrink-0 text-xs text-muted tabular-nums">Unit ${i + 1}</span>
+    <input type="text" maxlength="60" class="svc-row-sn ${RTS_IN}" data-i="${i}" onkeydown="svcRowSnKey(event, ${i})"></div>`).join("");
+  openModal("Nomor Seri", `<div class="space-y-3"><p class="text-sm text-muted">${esc(row.querySelector(".item-name").value)} &middot; qty ${n}</p>
+    <div class="space-y-2 max-h-[50vh] overflow-y-auto">${boxes}</div>
+    <p class="text-[11px] text-muted">Satu SN per unit, ketik atau scan barcode SN di dus. Wajib lengkap sebelum Pengerjaan Selesai; dipakai untuk cek garansi saat barang dibawa service.</p>
     <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="${RTS_BTN3}">Batal</button><button type="button" onclick="svcSaveRowSerial()" class="${RTS_BTN}">Simpan</button></div></div>`);
-  const inp = document.getElementById("svc-row-sn");
-  inp.value = row.dataset.serial || "";
-  inp.focus();
+  const inputs = document.querySelectorAll(".svc-row-sn");
+  inputs.forEach((inp, i) => { inp.value = sns[i] || ""; });
+  (([...inputs].find(i => !i.value)) || inputs[0])?.focus();
+}
+function svcRowSnKey(e, i) {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const next = document.querySelectorAll(".svc-row-sn")[i + 1];
+  if (next) next.focus(); else svcSaveRowSerial();
 }
 function svcSaveRowSerial() {
   const row = document.querySelectorAll("#item-rows .item-row")[svcEditRowSerial.idx];
   if (!row) { closeModal(); return; }
-  const v = svcVal("svc-row-sn").toUpperCase().slice(0, 80);
+  const vals = [...document.querySelectorAll(".svc-row-sn")].map(i => i.value.replace(/,/g, " ").trim().toUpperCase()).filter(Boolean);
+  const dup = vals.find((v, i) => vals.indexOf(v) !== i);
+  if (dup) { showToast(`SN ${dup} diisi dua kali.`); return; }
+  const v = vals.join(", ");
   if (v) row.dataset.serial = v; else delete row.dataset.serial;
   closeModal();
   refreshItemRowMeta(row);

@@ -2940,6 +2940,8 @@ def create_receipt(
             _log_receipt_event(con, receipt_id, "item_added",
                                "Item ditambahkan: " + ", ".join(i["product_name"] for i in resolved_items), created_by)
         if work_status == "selesai":
+            if final_status != "void":
+                _require_receipt_serials(con, receipt_id)
             _incentives().finish_assigned_items(con, receipt_id, created_by)
         _incentives().sync_receipt(con, receipt_id, created_by, _assignments(extra, resolved_items))
 
@@ -3527,6 +3529,8 @@ def update_receipt(
             )
             _log_receipt_event(con, receipt_id, "void", note, changed_by)
 
+        if items is not None and new_work_status == "selesai" and new_status != "void":
+            _require_receipt_serials(con, receipt_id)
         _incentives().sync_receipt(con, receipt_id, changed_by,
                                    _assignments(extra, resolved_items if items is not None else None))
         updated = con.execute(_RECEIPT_SELECT + " WHERE r.id=?", (receipt_id,)).fetchone()
@@ -3896,6 +3900,7 @@ def change_receipt_work_status(
                                        walkin=({}, _walkin_holdings(items, con)),
                                        override_reason=stock_override_reason, by=changed_by)
         if to_status == "selesai":
+            _require_receipt_serials(con, receipt_id)
             _install_so_lines(con, receipt_id, changed_by)
             _incentives().finish_assigned_items(con, receipt_id, changed_by)
         # K-06: entering Dalam Pengerjaan starts at Persiapan; going back to Belum Dikerjakan forgets the stage.
@@ -14642,19 +14647,40 @@ def delete_service_override(override_id: int, user: dict) -> dict:
     return next(p for p in list_service_profiles(True) if p["id"] == row["profile_id"])
 
 
+def _serial_item_ids(con: sqlite3.Connection) -> set[int]:
+    return {r["id"] for r in con.execute(
+        """SELECT mi.id FROM master_items mi JOIN categories c ON c.id=mi.category_id
+           JOIN service_profile_categories pc ON pc.category_id IN (c.id, c.parent_id)
+           JOIN service_profiles p ON p.id=pc.profile_id
+           WHERE p.status='aktif' AND p.record_serial_at_sale=1 AND mi.is_active=1
+           UNION SELECT o.master_item_id FROM service_profile_overrides o JOIN service_profiles p ON p.id=o.profile_id
+           WHERE o.master_item_id IS NOT NULL AND p.record_serial_at_sale=1 AND p.status='aktif'""")}
+
+
 def service_serial_item_ids() -> list[int]:
     """K-S2: master items whose service profile asks for the serial number at sale (Kasir shows an SN field)."""
     with _conn() as con:
-        out = set()
-        rows = con.execute(
-            """SELECT mi.id FROM master_items mi JOIN categories c ON c.id=mi.category_id
-               JOIN service_profile_categories pc ON pc.category_id IN (c.id, c.parent_id)
-               JOIN service_profiles p ON p.id=pc.profile_id
-               WHERE p.status='aktif' AND p.record_serial_at_sale=1 AND mi.is_active=1
-               UNION SELECT o.master_item_id FROM service_profile_overrides o JOIN service_profiles p ON p.id=o.profile_id
-               WHERE o.master_item_id IS NOT NULL AND p.record_serial_at_sale=1 AND p.status='aktif'""").fetchall()
-        out.update(r["id"] for r in rows)
-        return sorted(out)
+        return sorted(_serial_item_ids(con))
+
+
+def _require_receipt_serials(con: sqlite3.Connection, receipt_id: str) -> None:
+    """Owner 17-11-2026: a barang whose Master Service jenis has "Catat nomor seri di Kasir" needs one SN per unit
+    (comma separated, as Kasir saves them) before the nota may be Pengerjaan Selesai. Returned units need none."""
+    ids = _serial_item_ids(con)
+    if not ids:
+        return
+    missing = []
+    for it in con.execute("SELECT product_name, quantity, returned_qty, serial_no, master_item_id FROM receipt_items "
+                          "WHERE receipt_id=? AND master_item_id IS NOT NULL ORDER BY id", (receipt_id,)):
+        if it["master_item_id"] not in ids:
+            continue
+        need = max(it["quantity"] - (it["returned_qty"] or 0), 0)
+        have = len([x for x in (it["serial_no"] or "").split(",") if x.strip()])
+        if have < need:
+            missing.append(f"{it['product_name']} ({have}/{need})")
+    if missing:
+        raise ValueError("Nomor seri (SN) wajib diisi sebelum Pengerjaan Selesai: " + ", ".join(missing)
+                         + ". Klik \"+ Isi SN\" di baris barang.")
 
 
 def service_serial_skus() -> list[str]:

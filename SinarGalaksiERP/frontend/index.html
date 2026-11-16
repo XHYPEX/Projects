@@ -1790,12 +1790,13 @@
           </label>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[960px] text-[13px]">
+          <table class="w-full min-w-[1060px] text-[13px]">
             <thead class="bg-bg2">
               <tr>
                 <th class="text-left pl-4 pr-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. Invoice</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">No. SO</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Plat</th>
+                <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Mobil</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Customer</th>
                 <th class="text-left px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th>
                 <th class="text-right px-2 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Item</th>
@@ -10820,6 +10821,11 @@ function renderHistoryTable(receipts, total) {
         <button type="button" onclick="event.stopPropagation(); openReceiptFromHistory('${r.id}')"
           class="font-serif font-semibold text-ink hover:text-accentDark rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors">${esc(r.plate_full)}</button>
       </td>
+      <td class="px-2 py-3">${(() => {
+        const car = [r.vehicle_make, r.vehicle_model].filter(Boolean).join(" ");
+        const sub = [r.vehicle_color, r.vehicle_year].filter(Boolean).join(" · ");
+        return car ? `<div class="min-w-[7rem] text-ink">${esc(car)}</div>${sub ? `<div class="text-xs text-muted">${esc(sub)}</div>` : ""}` : '<span class="text-muted">&mdash;</span>';
+      })()}</td>
       <td class="px-2 py-3">
         <div class="min-w-[9rem]">
           <div class="text-ink">${esc(who || r.customer_phone) || "&mdash;"}</div>

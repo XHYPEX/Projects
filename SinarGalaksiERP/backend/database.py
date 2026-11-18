@@ -12478,6 +12478,100 @@ def category_code_preview(name: str, parent_id: int | None) -> str:
         return code
 
 
+# ---- Category suggestions for the Master Barang form (18-11-2026) ----
+# Staff type the shop's words ("bemper", "salon", "tape"), the categories use catalogue words ("BUMPER", "SPEAKER",
+# "HEAD UNIT"). A word matches exactly, by prefix, or with a typo or two; a few shop words get their catalogue word.
+_CAT_ALIASES = {
+    "BEMPER": "BUMPER", "SALON": "SPEAKER", "TAPE": "HEAD", "HEADUNIT": "HEAD", "HU": "HEAD", "TWITER": "TWEETER",
+    "SUB": "SUBWOOFER", "AMPLI": "AMPLIFIER", "AMP": "AMPLIFIER", "KACAFILM": "FILM", "CAMERA": "KAMERA",
+    "LIS": "GARNISH", "VELK": "VELG", "PELEK": "VELG", "TELOLET": "KLAKSON",
+}
+_CAT_STOP = {"DAN", "&", "DENGAN", "UNTUK", "MOBIL", "SET", "PCS", "ORI", "OEM", "UNIVERSAL", "LAINNYA", "AKSESORI"}
+
+
+def _cat_words(text: str | None) -> list[str]:
+    return [w for w in re.sub(r"[^A-Z0-9]+", " ", (text or "").upper()).split() if w not in _CAT_STOP]
+
+
+def _edit_distance(a: str, b: str, cap: int) -> int:
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        if min(cur) > cap:
+            return cap + 1
+        prev = cur
+    return prev[-1]
+
+
+def _word_score(q: str, words: list[str]) -> float:
+    """How well one typed word matches a list of words: 3 exact, 2 prefix / typo, 1 inside a word, 0 none."""
+    best = 0.0
+    q2 = _CAT_ALIASES.get(q, q)
+    for w in words:
+        for t in {q, q2}:
+            if w == t:
+                return 3.0
+            if len(t) >= 3 and w.startswith(t):
+                best = max(best, 2.0)
+            elif len(t) >= 4 and _edit_distance(t, w[:len(t) + 1] if len(w) > len(t) + 1 else w, 2 if len(t) >= 7 else 1) <= (2 if len(t) >= 7 else 1):
+                best = max(best, 2.0)
+            elif len(t) >= 3 and t in w:
+                best = max(best, 1.0)
+    return best
+
+
+def suggest_categories(query: str, mode: str = "all", limit: int = 8) -> list[dict]:
+    """Active categories for a search word ("bemper") or a product name ("BEMPER DEPAN AVANZA"), best first.
+    mode 'all': every typed word must match (the search box). mode 'any': ranked by how many words match (a product
+    name has words that are no category, like the car). A match on the subcategory's own name counts double the one
+    on its main category; existing items with a similar name add their category ("dipakai N barang")."""
+    q_words = [w for w in _cat_words(query) if len(w) >= 2][:8]
+    if not q_words:
+        return []
+    with _conn() as con:
+        cats = [dict(r) for r in con.execute(
+            """SELECT c.id, c.name, c.parent_id, p.name AS parent_name FROM categories c
+               LEFT JOIN categories p ON p.id=c.parent_id
+               WHERE c.status='aktif' AND (p.id IS NULL OR p.status='aktif')""")]
+        items = con.execute("SELECT name, category_id FROM master_items WHERE category_id IS NOT NULL AND is_active=1").fetchall()
+    has_subs = {c["parent_id"] for c in cats if c["parent_id"]}
+    out = []
+    for c in cats:
+        if c["parent_id"] is None and c["id"] in has_subs:
+            continue  # the form needs a subcategory; a main category is found through its subcategories
+        own, parent = _cat_words(c["name"]), _cat_words(c["parent_name"])
+        per_word = [max(_word_score(q, own) * 2, _word_score(q, parent)) for q in q_words]
+        if mode == "all" and not all(per_word):
+            continue
+        score = sum(per_word)
+        if score:
+            out.append({**c, "score": score, "item_count": 0})
+    # Items whose name shares the typed words (at least two of them, or the only one) vote for their category.
+    need = min(len(q_words), 2)
+    votes: dict[int, int] = {}
+    for it in items:
+        words = _cat_words(it["name"])
+        if sum(1 for q in q_words if _word_score(q, words) >= 2) >= need:
+            votes[it["category_id"]] = votes.get(it["category_id"], 0) + 1
+    by_id = {c["id"]: c for c in out}
+    for cid, n in votes.items():
+        c = by_id.get(cid)
+        if c is None:
+            base = next((x for x in cats if x["id"] == cid), None)
+            if base is None:
+                continue
+            c = by_id[cid] = {**base, "score": 0, "item_count": 0}
+            out.append(c)
+        c["item_count"] = n
+        c["score"] += 2 + min(n, 5)
+    out.sort(key=lambda c: (-c["score"], c["parent_name"] or "", c["name"]))
+    return out[:limit]
+
+
 def find_similar_categories(name: str, parent_id: int | None = None, exclude_id: int | None = None) -> list[dict]:
     """Soft warning for the form: same name elsewhere, or one name containing the other."""
     key = _category_name_key(name)

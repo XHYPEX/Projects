@@ -16,6 +16,7 @@ from backend.database import (
     list_categories_with_stats,
     list_category_items,
     set_category_archived,
+    suggest_categories,
     update_category,
 )
 from backend.schemas import (
@@ -55,6 +56,12 @@ async def categories_code_preview(name: str = "", parent_id: int | None = None):
         return {"code": await _run(category_code_preview, name, parent_id)}
     except ValueError as e:
         _raise(e)
+
+
+@router.get("/categories/suggest")
+async def categories_suggest(q: str = "", mode: str = "all"):
+    """Master Barang form: which category a word or product name belongs to (typo tolerant, best first)."""
+    return {"matches": await _run(suggest_categories, q[:120], "any" if mode == "any" else "all")}
 
 
 @router.get("/categories/check-name")

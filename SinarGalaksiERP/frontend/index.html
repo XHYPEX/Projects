@@ -4362,7 +4362,7 @@
 
                 <div>
                   <label for="new-item-name" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Nama Barang <span class="text-failed">*</span></label>
-                  <input id="new-item-name" type="text" autocomplete="off" placeholder="Masukkan nama barang" oninput="debouncedNewItemSkuPreview()"
+                  <input id="new-item-name" type="text" autocomplete="off" placeholder="Masukkan nama barang" oninput="debouncedNewItemSkuPreview(); itemCatRefreshSuggest()"
                     class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink placeholder:text-muted/70 placeholder:normal-case uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
                   <div id="new-item-sku-badge" class="text-xs text-muted mt-1.5 min-h-[1rem]"></div>
                   <p id="new-item-duplicate-note" class="hidden mt-2 bg-pending/10 border border-pending/30 rounded-lg px-3 py-2 text-xs text-ink"></p>
@@ -4421,14 +4421,24 @@
                   </div>
                   <p id="new-item-stock-hint" class="text-xs text-muted mt-1.5">Isi jumlah yang ada sekarang. Kosongkan atau 0 jika belum ada stok.</p>
                 </div>
+                <div class="relative">
+                  <label for="item-cat-search" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Cari Kategori <span class="normal-case font-normal">(ketik nama barang, mis. bemper, salon, karpet)</span></label>
+                  <div class="relative">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <input id="item-cat-search" type="text" autocomplete="off" placeholder="Cari kategori atau subkategori…" oninput="itemCatSearchInput()" onkeydown="itemCatSearchKey(event)" onblur="setTimeout(itemCatHideResults, 150)"
+                      class="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors" />
+                  </div>
+                  <div id="item-cat-results" role="listbox" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-line rounded-lg shadow-lg max-h-72 overflow-y-auto"></div>
+                  <div id="item-cat-suggest" class="hidden mt-2 flex flex-wrap items-center gap-1.5"></div>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label for="new-item-category-main" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Kategori Produk <span class="normal-case font-normal">(opsional)</span></label>
-                    <select id="new-item-category-main" onchange="onItemCategoryMainChange()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+                    <select id="new-item-category-main" onchange="onItemCategoryMainChange(); itemCatRefreshSuggest()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
                   </div>
                   <div>
                     <label for="new-item-category" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Subkategori Produk <span class="normal-case font-normal text-red-600">*</span></label>
-                    <select id="new-item-category" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
+                    <select id="new-item-category" onchange="itemCatRefreshSuggest()" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"></select>
                   </div>
                 </div>
                 <p class="text-xs text-muted -mt-2 flex items-center gap-1.5"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Data kategori diambil dari Master Kategori. Kategori dan subkategori tidak dapat diisi manual.</p>
@@ -15319,6 +15329,83 @@ function onItemCategoryMainChange(selectedSubId) {
   subSel.value = typeof selectedSubId === "number" ? String(selectedSubId) : "";
 }
 
+// ── Cari Kategori (18-11-2026) ──────────────────────────────────────────────
+// The search box finds a subcategory by the shop's words, typos included ("bemper" → BUMPER DEPAN); the server
+// also counts existing items with a similar name. Under it, "Saran" chips come from the Nama Barang while no
+// subcategory is picked yet. Picking one fills both selects.
+let itemCatResults = [], itemCatActive = -1, itemCatTimer = null, itemCatSuggestTimer = null, itemCatSeq = 0;
+async function itemCatFetch(q, mode) {
+  try {
+    const r = await fetch(`/api/categories/suggest?mode=${mode}&q=${encodeURIComponent(q)}`);
+    return r.ok ? (await r.json()).matches : [];
+  } catch (_) { return []; }
+}
+function itemCatLabel(c) {
+  return `<span class="text-ink">${esc(c.name)}</span>${c.parent_name ? `<span class="text-muted"> · ${esc(c.parent_name)}</span>` : ""}`;
+}
+function itemCatSearchInput() {
+  clearTimeout(itemCatTimer);
+  const q = document.getElementById("item-cat-search").value.trim();
+  if (q.length < 2) { itemCatHideResults(); return; }
+  itemCatTimer = setTimeout(async () => {
+    const seq = ++itemCatSeq;
+    const rows = await itemCatFetch(q, "all");
+    if (seq !== itemCatSeq) return;
+    itemCatResults = rows; itemCatActive = rows.length ? 0 : -1;
+    itemCatRenderResults();
+  }, 180);
+}
+function itemCatRenderResults() {
+  const box = document.getElementById("item-cat-results");
+  box.innerHTML = itemCatResults.length ? itemCatResults.map((c, i) => `
+    <button type="button" role="option" onmousedown="event.preventDefault(); itemCatPick(${i})"
+      class="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-3 ${i === itemCatActive ? "bg-bg2" : "hover:bg-bg2"}">
+      <span class="min-w-0 truncate">${itemCatLabel(c)}</span>
+      ${c.item_count ? `<span class="shrink-0 text-[11px] text-muted">${c.item_count} barang mirip</span>` : ""}</button>`).join("")
+    : `<div class="px-3 py-3 text-sm text-muted">Tidak ada kategori yang cocok. Coba kata lain, atau pilih manual di bawah.</div>`;
+  box.classList.remove("hidden");
+}
+function itemCatHideResults() { document.getElementById("item-cat-results")?.classList.add("hidden"); }
+function itemCatSearchKey(e) {
+  const open = !document.getElementById("item-cat-results").classList.contains("hidden");
+  if (e.key === "Escape") { itemCatHideResults(); return; }
+  if (!open || !itemCatResults.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    itemCatActive = (itemCatActive + (e.key === "ArrowDown" ? 1 : -1) + itemCatResults.length) % itemCatResults.length;
+    itemCatRenderResults();
+  } else if (e.key === "Enter") { e.preventDefault(); itemCatPick(itemCatActive); }
+}
+function itemCatApply(c) {
+  if (!c) return;
+  if (!categoriesCache.some(x => x.id === c.id)) categoriesCache.push({ id: c.id, name: c.name, parent_id: c.parent_id, status: "aktif" });
+  document.getElementById("new-item-category-main").value = String(c.parent_id || c.id);
+  onItemCategoryMainChange(c.parent_id ? c.id : null);
+  itemCatRefreshSuggest();
+}
+function itemCatPick(i) {
+  itemCatApply(itemCatResults[i]);
+  document.getElementById("item-cat-search").value = "";
+  itemCatHideResults();
+}
+// Saran from Nama Barang: only while no subcategory is chosen, so it never nags after a pick.
+function itemCatRefreshSuggest() {
+  clearTimeout(itemCatSuggestTimer);
+  const box = document.getElementById("item-cat-suggest");
+  if (!box) return;
+  const name = (document.getElementById("new-item-name")?.value || "").trim();
+  if (name.length < 3 || document.getElementById("new-item-category").value) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  itemCatSuggestTimer = setTimeout(async () => {
+    const rows = (await itemCatFetch(name, "any")).slice(0, 3);
+    if (document.getElementById("new-item-category").value) return;
+    itemCatSuggest = rows;
+    box.innerHTML = rows.length ? `<span class="text-xs text-muted">Saran dari nama barang:</span>` + rows.map((c, i) => `
+      <button type="button" onclick="itemCatApply(itemCatSuggest[${i}])" class="px-2.5 py-1 rounded-full border border-line bg-white text-xs hover:border-accent hover:bg-bg2 transition-colors">${itemCatLabel(c)}</button>`).join("") : "";
+    box.classList.toggle("hidden", !rows.length);
+  }, 400);
+}
+let itemCatSuggest = [];
+
 // The category stored on the item is the subcategory when one is picked, otherwise the main category.
 function selectedItemCategoryId() {
   const sub = document.getElementById("new-item-category").value;
@@ -15347,6 +15434,9 @@ function openMasterForm(mode, item, prefillName) {
   supplierEl.disabled = isEdit && !isAdmin();
   brandEl.disabled = isEdit;
   g("new-item-name").value = (item ? item.name : (prefillName || "")).toUpperCase();
+  g("item-cat-search").value = "";
+  itemCatHideResults();
+  g("item-cat-suggest").classList.add("hidden");
   if (item) setUnitSelectValue(g("new-item-unit"), item.unit); else g("new-item-unit").value = "";
   const costEl = g("new-item-cost-price"), sellEl = g("new-item-sell-price");
   // 0 shows as an empty field (placeholder "0"), so typing a price never ends up in front of a leftover zero.

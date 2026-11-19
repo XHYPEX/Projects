@@ -64,3 +64,77 @@ def build_xlsx(rows: list[list], sheet_name: str = "Laporan", bold_rows: tuple =
         z.writestr("xl/styles.xml", styles)
         z.writestr("xl/worksheets/sheet1.xml", sheet)
     return buf.getvalue()
+
+
+# ---- Reading (Master Barang import, 19-11-2026) ----
+# The first worksheet of an .xlsx as rows of strings, on the standard library too. Handles shared strings,
+# inline strings, numbers and booleans, and skips gaps in a row by the cell reference (A1, C1 ...).
+import re as _re
+import xml.etree.ElementTree as _ET
+
+_NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+_REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+
+def _col_index(ref: str) -> int:
+    n = 0
+    for ch in _re.match(r"[A-Z]+", ref).group(0):
+        n = n * 26 + (ord(ch) - 64)
+    return n - 1
+
+
+def _text(el) -> str:
+    return "".join(t.text or "" for t in el.iter("{%s}t" % _NS["m"]))
+
+
+def read_xlsx(data: bytes, max_rows: int = 20000) -> list[list[str]]:
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise ValueError("File bukan Excel (.xlsx) yang valid.")
+    names = set(z.namelist())
+    shared: list[str] = []
+    if "xl/sharedStrings.xml" in names:
+        shared = [_text(si) for si in _ET.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", _NS)]
+    sheet_path = "xl/worksheets/sheet1.xml"
+    try:  # the first sheet in the workbook's order, wherever its file is
+        wb = _ET.fromstring(z.read("xl/workbook.xml"))
+        first = wb.find("m:sheets/m:sheet", _NS)
+        rels = _ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+        for r in rels:
+            if r.get("Id") == first.get(_REL_NS):
+                target = r.get("Target").lstrip("/")
+                sheet_path = target if target.startswith("xl/") else "xl/" + target
+    except (KeyError, AttributeError, _ET.ParseError):
+        pass
+    if sheet_path not in names:
+        raise ValueError("Sheet pertama tidak ditemukan di file Excel.")
+    rows: list[list[str]] = []
+    for row in _ET.fromstring(z.read(sheet_path)).iter("{%s}row" % _NS["m"]):
+        # Excel leaves empty rows out of the file; pad them back so a row number in a message is Excel's row number.
+        if (row.get("r") or "").isdigit():
+            while len(rows) < int(row.get("r")) - 1:
+                rows.append([])
+        out: list[str] = []
+        for c in row.findall("m:c", _NS):
+            ref, t = c.get("r"), c.get("t")
+            idx = _col_index(ref) if ref else len(out)
+            v = c.find("m:v", _NS)
+            if t == "s" and v is not None:
+                val = shared[int(v.text)] if v.text and int(v.text) < len(shared) else ""
+            elif t == "inlineStr":
+                val = _text(c)
+            elif t == "b" and v is not None:
+                val = "TRUE" if v.text == "1" else "FALSE"
+            else:
+                val = (v.text or "") if v is not None else ""
+                if val and _re.fullmatch(r"-?\d+(\.\d+)?(E[+-]?\d+)?", val, _re.I) and t != "str":
+                    f = float(val)
+                    val = str(int(f)) if f == int(f) else str(f)
+            while len(out) < idx:
+                out.append("")
+            out.append(val.strip())
+        rows.append(out)
+        if len(rows) > max_rows:
+            raise ValueError(f"File terlalu besar (lebih dari {max_rows} baris).")
+    return rows

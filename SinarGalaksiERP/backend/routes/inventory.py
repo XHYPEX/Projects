@@ -6,7 +6,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from backend import product_images, warehouses
+from backend import master_item_io, product_images, warehouses
 from backend.auth import get_current_user, require_admin, require_inbound_poster
 from backend.database import (
     shop_today,
@@ -719,6 +719,49 @@ async def export_master_items_csv(user: dict = Depends(get_current_user)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=master-barang.csv"},
     )
+
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@router.get("/inventory/master-items/export.xlsx")
+async def export_master_items_xlsx(user: dict = Depends(get_current_user)):
+    """Same columns as the import, so the file can be edited and imported back. Harga Modal only for admin."""
+    data = await asyncio.get_event_loop().run_in_executor(None, master_item_io.export_xlsx, user["role"] == "admin")
+    return Response(content=data, media_type=_XLSX,
+                    headers={"Content-Disposition": f"attachment; filename=master-barang-{date.today().isoformat()}.xlsx"})
+
+
+@router.get("/inventory/master-items/import-template.xlsx", dependencies=[Depends(require_admin)])
+async def master_items_import_template():
+    return Response(content=master_item_io.template_xlsx(), media_type=_XLSX,
+                    headers={"Content-Disposition": "attachment; filename=template-import-master-barang.xlsx"})
+
+
+async def _import_body(request: Request) -> tuple[bytes, str]:
+    data = await request.body()
+    if len(data) > master_item_io.MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File terlalu besar (maksimal 5 MB).")
+    return data, request.headers.get("x-filename", "")
+
+
+@router.post("/inventory/master-items/import/preview", dependencies=[Depends(require_admin)])
+async def master_items_import_preview(request: Request):
+    """The raw file as the request body (X-Filename tells .csv from .xlsx). Nothing is saved."""
+    data, name = await _import_body(request)
+    try:
+        return await asyncio.get_event_loop().run_in_executor(None, master_item_io.preview, data, name)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/inventory/master-items/import", dependencies=[Depends(require_admin)])
+async def master_items_import(request: Request, user: dict = Depends(get_current_user)):
+    data, name = await _import_body(request)
+    try:
+        return await asyncio.get_event_loop().run_in_executor(None, master_item_io.apply, data, name, user["username"])
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("/inventory/master-items/{master_item_id}", response_model=MasterItemDetailOut)

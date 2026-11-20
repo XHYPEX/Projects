@@ -15,7 +15,7 @@ import io
 import re
 
 from backend import database as db
-from backend.xlsx_min import build_xlsx, read_xlsx
+from backend.xlsx_min import build_xlsx, build_xlsx_sheets, read_xlsx
 
 COLUMNS = ["SKU", "Nama Barang", "Supplier", "Merek", "Kategori", "Subkategori", "Satuan", "Harga Jual",
            "Harga Modal", "Stok", "Stok Minimum", "Deskripsi", "Status"]
@@ -60,7 +60,73 @@ def export_xlsx(is_admin: bool) -> bytes:
 
 
 def template_xlsx() -> bytes:
-    return build_xlsx([COLUMNS], "Master Barang", widths=WIDTHS)
+    """Sheet 1 is the one that is imported (only the header row). The other sheets are help and are never read:
+    Contoh (example rows built from this shop's own master names, so they would pass), Petunjuk (what goes in each
+    column) and Daftar Master (the names a Supplier/Merek/Kategori/Satuan cell must match)."""
+    with db._conn() as con:
+        sups = [r["name"] for r in con.execute("SELECT name FROM suppliers WHERE is_active=1 ORDER BY name")]
+        brands = [r["name"] for r in con.execute("SELECT name FROM brands WHERE is_active=1 ORDER BY name")]
+        units = [r["name"] for r in con.execute("SELECT name FROM units WHERE is_active=1 ORDER BY name")]
+        cats = con.execute(
+            """SELECT p.name AS main, c.name AS sub FROM categories c LEFT JOIN categories p ON p.id=c.parent_id
+               WHERE c.status='aktif' AND (c.parent_id IS NOT NULL
+                     OR NOT EXISTS (SELECT 1 FROM categories k WHERE k.parent_id=c.id))
+               ORDER BY COALESCE(p.name, c.name), c.name""").fetchall()
+        old = con.execute(
+            """SELECT mi.sku, mi.name, mi.sell_price FROM master_items mi WHERE mi.is_active=1 ORDER BY mi.id LIMIT 1""").fetchone()
+    cat_pairs = [(r["main"], r["sub"]) if r["main"] else (r["sub"], "") for r in cats]
+    sup = sups[0] if sups else "NAMA SUPPLIER"
+    brand = brands[0] if brands else "NAMA MEREK"
+    unit = "PCS" if "PCS" in units else (units[0] if units else "PCS")
+    default_cat = cat_pairs[0] if cat_pairs else ("NAMA KATEGORI", "NAMA SUBKATEGORI")
+
+    def cat_for(words: str) -> tuple[str, str]:
+        try:
+            got = db.suggest_categories(words)
+            m = (got.get("matches") if isinstance(got, dict) else got) or []
+        except Exception:  # an example only; never fail the download over it
+            m = []
+        if not m:
+            return default_cat
+        return (m[0]["parent_name"], m[0]["name"]) if m[0].get("parent_id") else (m[0]["name"], "")
+    examples = [COLUMNS,
+                ["", "BUMPER DEPAN AVANZA 2019", sup, brand, *cat_for("BUMPER DEPAN"), unit, 1500000, 1100000, 3, 1,
+                 "WARNA HITAM DOFF", "Aktif"],
+                ["", "LAMPU LED H4 6000K", sup, brand, *cat_for("LAMPU LED"), unit, 250000, "", "", 2, "", ""]]
+    if old:
+        examples.append([old["sku"], "", "", "", "", "", "", old["sell_price"] + 10000, "", "", "", "", ""])
+    else:
+        examples.append(["SGV-XXX-CONTOH-001", "", "", "", "", "", "", 260000, "", "", "", "", ""])
+    examples += [[], ["Keterangan contoh:"],
+                 ["Baris 2", "Barang baru dengan stok awal 3. SKU kosong: dibuat otomatis. Harga Modal wajib karena ada Stok."],
+                 ["Baris 3", "Barang baru tanpa stok (stok 0). Harga Modal, Stok, Deskripsi dan Status boleh kosong."],
+                 ["Baris 4", "Mengubah barang yang sudah ada: isi SKU-nya, isi hanya kolom yang mau diubah (di sini Harga Jual)."],
+                 [], ["Isi data di sheet pertama (Master Barang). Hanya sheet pertama yang diimport; sheet ini tidak."]]
+    guide = [["Kolom", "Wajib untuk barang baru?", "Keterangan"],
+             ["SKU", "Tidak", "Kosongkan untuk barang baru (dibuat otomatis). Isi SKU yang sudah ada untuk mengubah barang itu."],
+             ["Nama Barang", "Ya", "Nama barang. Huruf otomatis jadi huruf besar."],
+             ["Supplier", "Ya", "Harus sama dengan nama di Master Supplier (lihat sheet Daftar Master)."],
+             ["Merek", "Ya", "Harus sama dengan nama di Master Brand. Merek barang lama tidak bisa diubah lewat import."],
+             ["Kategori", "Ya", "Kategori utama, sama dengan Master Kategori."],
+             ["Subkategori", "Ya, bila kategorinya punya subkategori", "Lihat pasangan Kategori - Subkategori di sheet Daftar Master."],
+             ["Satuan", "Ya", "Sama dengan Master Satuan, misalnya PCS, SET."],
+             ["Harga Jual", "Ya", "Angka saja, boleh 1500000 atau 1.500.000 atau Rp 1.500.000."],
+             ["Harga Modal", "Ya, bila Stok diisi", "Untuk barang lama hanya bisa diubah bila stoknya 0."],
+             ["Stok", "Tidak", "Stok awal barang baru. Untuk barang lama diabaikan (pakai Stock Opname)."],
+             ["Stok Minimum", "Tidak", "Batas peringatan stok menipis."],
+             ["Deskripsi", "Tidak", "Keterangan bebas."],
+             ["Status", "Tidak", "Aktif atau Nonaktif (hanya untuk barang baru). Kosong = Aktif."],
+             [],
+             ["Catatan", "", "Sel kosong pada barang lama berarti tidak diubah. Baris dengan nama master yang tidak ditemukan ditolak."]]
+    n = max(len(sups), len(brands), len(units), len(cat_pairs), 1)
+    pad = lambda xs, i: xs[i] if i < len(xs) else ""  # noqa: E731
+    lists = [["Supplier", "Merek", "Satuan", "", "Kategori", "Subkategori"]]
+    lists += [[pad(sups, i), pad(brands, i), pad(units, i), "",
+               cat_pairs[i][0] if i < len(cat_pairs) else "", cat_pairs[i][1] if i < len(cat_pairs) else ""] for i in range(n)]
+    return build_xlsx_sheets([("Master Barang", [COLUMNS], WIDTHS, (0,)),
+                              ("Contoh", examples, WIDTHS, (0, 6)),
+                              ("Petunjuk", guide, [16, 34, 100], (0,)),
+                              ("Daftar Master", lists, [28, 22, 12, 3, 30, 34], (0,))])
 
 
 def _read_rows(data: bytes, filename: str) -> list[list[str]]:

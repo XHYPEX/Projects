@@ -1,5 +1,5 @@
 """A tiny .xlsx writer on the standard library (zipfile + XML), so Excel exports need no new dependency.
-One sheet, text cells as inline strings, numbers as numbers (thousands separator), the first `bold_rows` rows bold."""
+One or more sheets, text cells as inline strings, numbers as numbers (thousands separator), the first `bold_rows` rows bold."""
 import io
 import zipfile
 from xml.sax.saxutils import escape
@@ -14,7 +14,7 @@ def _col(n: int) -> str:
     return s
 
 
-def build_xlsx(rows: list[list], sheet_name: str = "Laporan", bold_rows: tuple = (0,), widths: list[int] | None = None) -> bytes:
+def _sheet_xml(rows: list[list], bold_rows: tuple = (0,), widths: list[int] | None = None) -> str:
     cells = []
     for ri, row in enumerate(rows):
         out = []
@@ -31,8 +31,16 @@ def build_xlsx(rows: list[list], sheet_name: str = "Laporan", bold_rows: tuple =
     cols = ""
     if widths:
         cols = "<cols>" + "".join(f'<col min="{i + 1}" max="{i + 1}" width="{w}" customWidth="1"/>' for i, w in enumerate(widths)) + "</cols>"
-    sheet = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-             f'{cols}<sheetData>{"".join(cells)}</sheetData></worksheet>')
+    return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            f'{cols}<sheetData>{"".join(cells)}</sheetData></worksheet>')
+
+
+def build_xlsx(rows: list[list], sheet_name: str = "Laporan", bold_rows: tuple = (0,), widths: list[int] | None = None) -> bytes:
+    return build_xlsx_sheets([(sheet_name, rows, widths, bold_rows)])
+
+
+def build_xlsx_sheets(sheets: list[tuple]) -> bytes:
+    """Several sheets: [(name, rows, widths, bold_rows), ...]; the first one is the one Excel opens on."""
     styles = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
               '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
               '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
@@ -44,17 +52,18 @@ def build_xlsx(rows: list[list], sheet_name: str = "Laporan", bold_rows: tuple =
               '<xf numFmtId="3" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')
     wb = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
           'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-          f'<sheets><sheet name="{escape(sheet_name)[:31]}" sheetId="1" r:id="rId1"/></sheets></workbook>')
+          "<sheets>" + "".join(f'<sheet name="{escape(sh[0])[:31]}" sheetId="{i + 1}" r:id="rId{i + 1}"/>' for i, sh in enumerate(sheets))
+          + "</sheets></workbook>")
     wb_rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-               '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-               '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')
+               + "".join(f'<Relationship Id="rId{i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{i + 1}.xml"/>' for i in range(len(sheets)))
+               + f'<Relationship Id="rId{len(sheets) + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')
     root_rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
                  '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')
     ctypes = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
               '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
               '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-              '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-              '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>')
+              + "".join(f'<Override PartName="/xl/worksheets/sheet{i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' for i in range(len(sheets)))
+              + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>')
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", ctypes)
@@ -62,7 +71,8 @@ def build_xlsx(rows: list[list], sheet_name: str = "Laporan", bold_rows: tuple =
         z.writestr("xl/workbook.xml", wb)
         z.writestr("xl/_rels/workbook.xml.rels", wb_rels)
         z.writestr("xl/styles.xml", styles)
-        z.writestr("xl/worksheets/sheet1.xml", sheet)
+        for i, (_, rows, widths, bold_rows) in enumerate(sheets):
+            z.writestr(f"xl/worksheets/sheet{i + 1}.xml", _sheet_xml(rows, bold_rows, widths))
     return buf.getvalue()
 
 

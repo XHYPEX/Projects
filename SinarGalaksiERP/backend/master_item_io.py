@@ -82,8 +82,8 @@ def _lookups(con) -> dict:
         return {_key(r["name"]): dict(r) for r in con.execute(sql)}
     cats = [dict(r) for r in con.execute("SELECT id, name, parent_id, status FROM categories")]
     return {
-        "supplier": by_name("SELECT id, name, is_active FROM suppliers"),
-        "brand": by_name("SELECT id, name, is_active FROM brands"),
+        "supplier": by_name("SELECT id, name, code, is_active FROM suppliers"),
+        "brand": by_name("SELECT id, name, code, is_active FROM brands"),
         "unit": by_name("SELECT name, is_active FROM units"),
         "main": {_key(c["name"]): c for c in cats if c["parent_id"] is None},
         "sub": {(c["parent_id"], _key(c["name"])): c for c in cats if c["parent_id"] is not None},
@@ -91,6 +91,8 @@ def _lookups(con) -> dict:
         "items": {r["sku"].upper(): dict(r) for r in con.execute("SELECT * FROM master_items")},
         "names": {(r["supplier_id"], r["brand_id"], r["name_normalized"]): r["sku"]
                   for r in con.execute("SELECT supplier_id, brand_id, name_normalized, sku FROM master_items")},
+        "seq": {r["sku_prefix"]: r["m"] for r in con.execute(
+            "SELECT sku_prefix, MAX(sku_seq) AS m FROM master_items WHERE sku_prefix IS NOT NULL GROUP BY sku_prefix")},
     }
 
 
@@ -112,6 +114,7 @@ def _check(rows: list[list[str]]) -> tuple[list[dict], dict]:
             continue
         errors: list[str] = []
         notes: list[str] = []
+        sku_auto = ""
         sku = get("SKU").upper()
         item = lk["items"].get(sku) if sku else None
         if sku and item is None:
@@ -192,6 +195,10 @@ def _check(rows: list[list[str]]) -> tuple[list[dict], dict]:
                     errors.append(f"Barang yang sama juga ada di baris {seen_new[k]}")
                 else:
                     seen_new[k] = n
+                    # SKU left empty (or unknown): show the SKU it will get, same rule as preview_sku.
+                    prefix = f"{supplier['code']}-{brand['code']}-{db._compute_product_segment(k[2])}"
+                    lk["seq"][prefix] = (lk["seq"].get(prefix) or 0) + 1
+                    sku_auto = f"{prefix}-{lk['seq'][prefix]:03d}"
             action = "baru"
         else:
             if sell is not None and sell <= 0:
@@ -223,7 +230,7 @@ def _check(rows: list[list[str]]) -> tuple[list[dict], dict]:
             if status and active != bool(item["is_active"]):
                 notes.append("Status tidak diubah lewat import (pakai Nonaktifkan/Aktifkan di Master Barang)")
             action = "ubah" if upd else "sama"
-        row = {"row": n, "sku": item["sku"] if item else "", "name": name or (item["name"] if item else ""),
+        row = {"row": n, "sku": item["sku"] if item else (sku_auto if not errors else ""), "sku_auto": item is None, "name": name or (item["name"] if item else ""),
                "action": "error" if errors else action, "errors": errors, "notes": notes, "changes": changes}
         if not errors:
             if new:

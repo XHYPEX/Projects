@@ -15120,7 +15120,7 @@ function mbImportRenderPreview(d) {
       <thead class="bg-bg2 sticky top-0"><tr>${["Baris", "Barang", "Hasil", "Keterangan"].map(h => `<th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">${h}</th>`).join("")}</tr></thead>
       <tbody>${shown.map(r => `<tr class="border-b border-line last:border-b-0 align-top">
         <td class="px-3 py-2 tabular-nums text-muted">${r.row}</td>
-        <td class="px-3 py-2"><div class="text-ink">${esc(r.name || "—")}</div>${r.sku ? `<div class="font-mono text-[11px] text-muted">${esc(r.sku)}</div>` : ""}</td>
+        <td class="px-3 py-2"><div class="text-ink">${esc(r.name || "—")}</div>${r.sku ? `<div class="font-mono text-[11px] text-muted">${esc(r.sku)}${r.sku_auto ? " (SKU otomatis)" : ""}</div>` : ""}</td>
         <td class="px-3 py-2">${mbImpPill(r.action)}</td>
         <td class="px-3 py-2 text-xs space-y-0.5">${r.errors.map(e => `<div class="text-failed">${esc(e)}</div>`).join("")}${r.changes.map(c => `<div class="text-ink">${esc(c)}</div>`).join("")}${r.notes.map(n => `<div class="text-muted">${esc(n)}</div>`).join("")}</td></tr>`).join("")}</tbody></table></div></div>
       ${rows.length > shown.length ? `<p class="text-xs text-muted mt-1">Menampilkan 300 dari ${rows.length} baris.</p>` : ""}` : `<p class="text-sm text-muted">Tidak ada perubahan di file ini.</p>`}
@@ -15140,7 +15140,8 @@ async function mbImportApply() {
     document.getElementById("mb-imp-result").innerHTML = `<div class="rounded-lg border border-line px-4 py-3 space-y-1">
       <p class="text-ink font-medium">Import selesai: ${d.created} barang baru, ${d.updated} diperbarui.</p>
       <p class="text-xs text-muted">${d.unchanged} tidak berubah, ${d.skipped} baris ditolak${d.failed.length ? `, ${d.failed.length} gagal disimpan` : ""}.</p>
-      ${d.failed.map(f => `<p class="text-xs text-failed">Baris ${f.row} ${esc(f.name)}: ${esc(f.error)}</p>`).join("")}</div>
+      ${d.failed.map(f => `<p class="text-xs text-failed">Baris ${f.row} ${esc(f.name)}: ${esc(f.error)}</p>`).join("")}
+      ${d.new_skus.length ? `<div class="pt-2"><p class="text-xs font-medium text-ink mb-1">SKU yang dibuat:</p><div class="max-h-[30vh] overflow-y-auto text-xs space-y-0.5">${d.new_skus.map(n => `<div><span class="text-muted tabular-nums">Baris ${n.row}</span> &middot; <span class="font-mono">${esc(n.sku)}</span> &middot; ${esc(n.name)}</div>`).join("")}</div></div>` : ""}</div>
       <div class="flex justify-end mt-3"><button type="button" onclick="closeModal()" class="${RTS_BTN}">Selesai</button></div>`;
     mbImportFile = null;
     showToast(`Import selesai: ${d.created} baru, ${d.updated} diperbarui.`, d.failed.length ? "error" : "success");

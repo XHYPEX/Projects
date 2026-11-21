@@ -492,6 +492,8 @@
     .barcode-label.is-tall .barcode-label-code { font-size: 14pt; }
 
     .is-staff .admin-only { display: none !important; }
+    /* Owner 21-11-2026: Harga Modal (and what is computed from it: markup, nilai stok/modal) is stored but shown nowhere. */
+    .cost-info { display: none !important; }
     /* A Sales Order being created has no stage yet; the per-line status only shows when editing. */
     #po-form-panel.is-new .po-row-status, #po-form-panel.is-new .po-col-status { display: none; }
     /* Set on <body> when /api/config reports scraper_enabled=false. */
@@ -3241,7 +3243,7 @@
           <div id="qr-sum-cand" class="font-sans text-2xl font-semibold text-ink tabular-nums">0</div><div class="text-xs text-muted mt-0.5">menunggu diproses retur</div></div>
         <div class="border border-line rounded-xl bg-bg2 px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Pengajuan Hapus</div>
           <div id="qr-sum-wo" class="font-sans text-2xl font-semibold text-ink tabular-nums">0</div><div class="text-xs text-muted mt-0.5">menunggu admin / owner</div></div>
-        <div class="admin-only border border-line rounded-xl bg-bg2 px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Modal Karantina</div>
+        <div class="cost-info border border-line rounded-xl bg-bg2 px-4 py-3"><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">Nilai Modal Karantina</div>
           <div id="qr-sum-value" class="font-sans text-2xl font-semibold text-failed tabular-nums">Rp 0</div><div class="text-xs text-muted mt-0.5">harga beli barang yang tertahan</div></div>
       </div>
       <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -3933,7 +3935,6 @@
                   <option value="stock_desc">Stok tertinggi</option>
                   <option value="sell_desc">Harga jual tertinggi</option>
                   <option value="sell_asc">Harga jual terendah</option>
-                  <option class="admin-only" value="margin_desc">Markup tertinggi</option>
                 </select>
               </label>
               <div class="flex items-center gap-1.5 text-sm text-muted">
@@ -3974,9 +3975,7 @@
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Produk</th>
                     <th class="text-left px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Status Persediaan</th>
                     <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Stok</th>
-                    <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal Rata-rata</th>
-                    <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th>
-                    <th class="admin-only text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Markup</th>
+                                        <th class="text-right px-2.5 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th>
                     <th class="sticky right-0 bg-bg2 text-right px-3 py-2.5 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line shadow-[-6px_0_6px_-6px_rgba(17,24,39,0.12)]">Aksi</th>
                   </tr>
                 </thead>
@@ -4088,24 +4087,24 @@
                 <div id="dt-state" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-state-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
+                  <div class="cost-info relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-accent/10 text-accentDark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Nilai Stok</div>
                 <div id="dt-value" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-value-sub" class="text-xs text-muted mt-0.5"></div>
-              </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                  <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
-                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-bg2 text-muted"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Harga Modal Rata-rata</div>
-                <div id="dt-cost" class="text-xl font-semibold text-ink tabular-nums"></div>
-                <div id="dt-cost-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
                   <div class="relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-accent/10 text-accentDark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Harga Jual</div>
                 <div id="dt-sell" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-sell-sub" class="text-xs text-muted mt-0.5"></div>
               </div>
-                  <div class="admin-only relative border border-line rounded-xl bg-white px-4 py-3">
+                </div>
+                <div class="cost-info grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                  <div class="cost-info relative border border-line rounded-xl bg-white px-4 py-3">
+                <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-bg2 text-muted"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Harga Modal Rata-rata</div>
+                <div id="dt-cost" class="text-xl font-semibold text-ink tabular-nums"></div>
+                <div id="dt-cost-sub" class="text-xs text-muted mt-0.5"></div>
+              </div>
+                  <div class="cost-info relative border border-line rounded-xl bg-white px-4 py-3">
                 <span class="absolute top-3 right-3 w-7 h-7 rounded-lg grid place-items-center bg-done/10 text-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/></svg></span><div class="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 pr-8">Markup</div>
                 <div id="dt-margin" class="text-xl font-semibold text-ink tabular-nums"></div>
                 <div id="dt-margin-sub" class="text-xs text-muted mt-0.5"></div>
@@ -4162,7 +4161,7 @@
               <div class="border border-line rounded-xl overflow-hidden">
                 <table class="w-full text-sm">
                   <thead class="bg-bg2"><tr>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dokumen</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Masuk</th><th class="admin-only text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
+                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Dokumen</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Qty Masuk</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Sisa</th>
                   </tr></thead>
                   <tbody id="batch-history-tbody"></tbody>
                 </table>
@@ -4204,7 +4203,7 @@
               <div class="border border-line rounded-xl overflow-hidden overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead class="bg-bg2"><tr>
-                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="admin-only text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Modal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diubah Oleh</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Catatan</th>
+                    <th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Tanggal</th><th class="text-right px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Harga Jual</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Diubah Oleh</th><th class="text-left px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">Catatan</th>
                   </tr></thead>
                   <tbody id="dt-change-tbody"></tbody>
                 </table>
@@ -14724,7 +14723,6 @@ function renderMasterItemsTable(data) {
 
   for (const item of items) {
     const stock = masterStockState(item.stock_qty, item.min_stock ?? 5);
-    const margin = masterMarginText(item);
     const selected = masterSelectedIds.has(item.id);
     const checkbox = `<input type="checkbox" class="master-row-cb w-4 h-4 rounded accent-accent cursor-pointer align-middle" data-id="${item.id}"
           aria-label="Pilih barang" ${selected ? "checked" : ""} onchange="toggleMasterRowSelection(${item.id}, this.checked)" />`;
@@ -14779,11 +14777,7 @@ function renderMasterItemsTable(data) {
       <td class="px-2.5 py-3 text-right tabular-nums font-medium ${stock.text}">${item.stock_qty}<div class="text-[11px] font-normal text-muted">${esc(item.unit || "")}</div>${item.reserved_qty > 0
         ? `<div class="text-[11px] font-normal text-pending whitespace-nowrap" title="Dicadangkan untuk pelanggan Sales Order">${item.reserved_qty} dicadangkan · bebas ${item.available_qty}</div>` : ""}${item.quarantine_qty > 0
         ? `<a href="#/karantina" onclick="event.stopPropagation()" class="block text-[11px] font-normal text-failed whitespace-nowrap hover:underline" title="Tidak bisa dijual, ada di Stok Karantina">+${item.quarantine_qty} karantina</a>` : ""}</td>
-      <td class="admin-only px-2.5 py-3 text-right tabular-nums whitespace-nowrap">${item.avg_cost_price > 0
-        ? `<span class="text-muted">${formatIDR(item.avg_cost_price)}</span>`
-        : '<span class="text-xs text-muted">Belum dapat dihitung</span>'}</td>
       <td class="px-2.5 py-3 text-right tabular-nums text-ink whitespace-nowrap">${item.sell_price > 0 ? formatIDR(item.sell_price) : '<span class="text-xs text-muted">Belum ada</span>'}</td>
-      <td class="admin-only px-2.5 py-3 text-right tabular-nums whitespace-nowrap ${margin === null ? "text-muted" : margin >= 0 ? "text-done" : "text-failed"}">${margin === null ? "-" : margin.toFixed(2) + "%"}</td>
       <td class="sticky right-0 bg-white px-3 py-3 shadow-[-6px_0_6px_-6px_rgba(17,24,39,0.12)]" onclick="event.stopPropagation()">
         <div class="flex items-center justify-end">
           <button type="button" onclick="openMasterRowMenu(event, ${item.id})" aria-label="Aksi barang" aria-haspopup="menu" title="Aksi"
@@ -15545,13 +15539,14 @@ function openMasterForm(mode, item, prefillName) {
   const costEl = g("new-item-cost-price"), sellEl = g("new-item-sell-price");
   // 0 shows as an empty field (placeholder "0"), so typing a price never ends up in front of a leftover zero.
   if (item) {
-    setPriceInput(costEl, (isEdit ? item.avg_cost_price : item.last_cost_price) || "");
+    costEl.value = "";  // Owner 21-11-2026: the stored Harga Modal is never shown; empty = keep it
     setPriceInput(sellEl, item.sell_price || "");
   } else { costEl.value = ""; sellEl.value = ""; }
   // With stock on hand the cost is the Barang Masuk average; while the product holds none an admin may fill it in.
   const costOpen = !isEdit || (isAdmin() && !item.stock_qty && !item.quarantine_qty);
   costEl.disabled = !costOpen;
-  g("new-item-cost-label").textContent = !isEdit ? "Harga Modal Awal" : costOpen ? "Harga Modal (stok 0, boleh diisi)" : "Harga Modal Rata-rata";
+  costEl.placeholder = isEdit ? (costOpen ? "Tersimpan · isi untuk mengganti" : "Tersimpan") : "0";
+  g("new-item-cost-label").textContent = !isEdit ? "Harga Modal Awal" : costOpen ? "Harga Modal (stok 0, boleh diganti)" : "Harga Modal (dari Barang Masuk)";
   const stockEl = g("new-item-stock-initial");
   stockEl.value = isEdit ? String(item.stock_qty) : "0";
   stockEl.disabled = isEdit;  // Owner 31-10-2026: a duplicate takes its own Stok Awal, like a new item
@@ -15681,7 +15676,7 @@ function updateNewItemMarginHint() {
   const sellEl = document.getElementById("new-item-sell-price");
   const hint = document.getElementById("new-item-margin-hint");
   onNewItemStockInput();
-  if (!costEl.value && !sellEl.value) { hint.textContent = ""; return; }
+  if (!costEl.value) { hint.textContent = ""; return; }  // the stored cost is not shown, so no estimate from it
   const margin = priceValue(sellEl) - priceValue(costEl);
   const pct = priceValue(costEl) > 0 ? ` (${(margin / priceValue(costEl) * 100).toFixed(2)}% dari modal)` : "";
   hint.textContent = `Estimasi laba per satuan: ${formatIDR(margin)}${pct}`;
@@ -15732,7 +15727,7 @@ async function submitMasterFormEdit() {
   const sellPrice = priceValue(document.getElementById("new-item-sell-price"));
   if (sellPrice <= 0) { showToast("Harga jual wajib diisi."); document.getElementById("new-item-sell-price").focus(); return; }
   const costEl = document.getElementById("new-item-cost-price");
-  const costPrice = !costEl.disabled && priceValue(costEl) !== (item.avg_cost_price || 0) ? priceValue(costEl) : undefined;
+  const costPrice = !costEl.disabled && costEl.value.trim() !== "" && priceValue(costEl) !== (item.avg_cost_price || 0) ? priceValue(costEl) : undefined;
   if (newItemImageBusy) { showToast("Foto masih diproses. Coba lagi sebentar."); return; }
   const saveBtn = document.getElementById("new-item-save-btn");
   const saveLabel = document.getElementById("new-item-save-label");
@@ -16066,7 +16061,6 @@ function renderMasterActivity(resetCount) {
     const prev = hist[i];
     const parts = [];
     if (prev.sell_price !== h.sell_price) parts.push(`harga jual ${formatIDR(prev.sell_price)} → ${formatIDR(h.sell_price)}`);
-    if (isAdmin() && prev.cost_price !== h.cost_price) parts.push(`modal ${formatIDR(prev.cost_price)} → ${formatIDR(h.cost_price)}`);
     if (!parts.length) return;
     rows.push({ at: h.created_at, kind: "harga", text: `Perubahan ${parts.join(", ")}.${h.note ? " " + h.note : ""}`, by: h.changed_by || "-", ref: "" });
   });
@@ -16093,7 +16087,7 @@ function renderMasterChangeHistory() {
   const hist = masterDetailExtra.prices?.history || [];
   document.getElementById("dt-change-tbody").innerHTML = hist.length ? hist.map(h => `<tr class="border-b border-line last:border-b-0">
     <td class="px-3 py-2 text-muted whitespace-nowrap">${esc(formatMasterDateTime(h.created_at))}</td>
-    <td class="admin-only px-3 py-2 text-right tabular-nums">${formatIDR(h.cost_price)}</td><td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.sell_price)}</td>
+    <td class="px-3 py-2 text-right tabular-nums">${formatIDR(h.sell_price)}</td>
     <td class="px-3 py-2 text-muted">${esc(h.changed_by || "-")}</td><td class="px-3 py-2 text-ink">${esc(h.note || "-")}</td></tr>`).join("")
     : `<tr><td colspan="5" class="px-3 py-6 text-center text-muted">Belum ada riwayat perubahan.</td></tr>`;
 }
@@ -16114,7 +16108,6 @@ function renderBatchHistoryTable(batches) {
       </td>
       <td class="px-3 py-2 text-muted">${esc(b.received_date)}</td>
       <td class="px-3 py-2 text-right tabular-nums text-ink">${b.qty_in}</td>
-      <td class="admin-only px-3 py-2 text-right tabular-nums text-muted">${formatIDR(b.cost_price)}</td>
       <td class="px-3 py-2 text-right tabular-nums text-ink">${b.qty_remaining}</td>
     `;
     tbody.appendChild(tr);
@@ -16555,12 +16548,9 @@ function renderMasterPriceHistory() {
   const g = i => document.getElementById(i);
   const act = shActivity || {};
   g("ph-header").innerHTML = masterHistoryHeader({ ...it, supplier_name: (p.suppliers.find(x => x.is_primary) || p.suppliers[0] || {}).name || it.supplier_name }, true);
-  const margin = masterMarginText(it);
   const prim = p.suppliers.find(x => x.is_primary) || p.suppliers[0];
   g("ph-kpis").innerHTML =
     mhKpi("tag", "bg-orange-100 text-orange-600", "Harga Jual Aktif", formatIDR(it.sell_price), "Harga jual saat ini")
-    + (isAdmin() ? mhKpi("coins", "bg-pending/15 text-pending", "Harga Modal Rata-rata", formatIDR(it.avg_cost_price), "Harga modal rata-rata saat ini")
-    + mhKpi("pct", "bg-done/10 text-done", "Markup Saat Ini", margin === null ? "-" : `${margin.toFixed(1)}%`, "Dihitung dari harga aktif") : "")
     + mhKpi("truck", "bg-purple-100 text-purple-600", "Supplier Utama", esc(prim ? prim.name : "-"), "Pemasok utama barang ini");
   const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" class="w-full h-full object-cover" />` : `<span class="text-muted">${mhIcon("box", 40)}</span>`;
   const row = (icon, tint, title, desc) => `<button type="button" onclick="backToMasterDetail()" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-bg2/60 border-t border-line first:border-t-0 transition-colors">
@@ -16587,8 +16577,9 @@ function renderPriceTables() {
     const on = phTab === k;
     g(id).className = `px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${on ? "border-accent text-accentDark bg-white rounded-t-lg" : "border-transparent text-muted hover:text-ink"}`;
     g(id).setAttribute("aria-selected", on);
-    if (k === "buy") g(id).classList.toggle("hidden", !isAdmin());
+    if (k === "buy") g(id).classList.add("hidden");  // purchase cost history: not shown (Owner 21-11-2026)
   }
+  if (phTab === "buy") phTab = "sell";
   g("ph-sell-card").classList.toggle("hidden", phTab !== "sell");
   g("ph-buy-card").classList.toggle("hidden", phTab !== "buy");
   const sorted = (rows, sel) => (g(sel).value === "old" ? rows : [...rows].reverse());
@@ -16613,7 +16604,6 @@ function exportMasterPriceHistory() {
   downloadCsvText(`riwayat-harga-${it.sku}.csv`, [
     ["Jenis", "Tanggal", "Jenis Perubahan", "Harga Sebelum", "Harga Sesudah", "Supplier / Sumber", "Pengguna", "Catatan"],
     ...priceSellRows().map(r => ["Harga Jual", r.at, r.kind, r.before ?? "", r.after, r.source, r.by || "", r.note || ""]),
-    ...priceBuyRows().map(r => ["Harga Beli", r.at, r.kind, r.before ?? "", r.after, `${r.supplier} / ${r.source}`, "", r.note || ""]),
   ]);
 }
 
@@ -16625,7 +16615,7 @@ function openChangeSellPriceModal() {
       <div><label for="csp-price" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Harga Jual Baru</label>
         <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">Rp</span>
         <input id="csp-price" type="text" inputmode="numeric" class="price-input w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white text-ink text-right focus:outline-none focus:ring-2 focus:ring-accent/30" /></div>
-        <p class="text-xs text-muted mt-1">Saat ini ${formatIDR(it.sell_price)}.${isAdmin() ? ` Modal rata-rata ${formatIDR(it.avg_cost_price)}.` : ""}</p></div>
+        <p class="text-xs text-muted mt-1">Saat ini ${formatIDR(it.sell_price)}.</p></div>
       <div><label for="csp-note" class="block text-[11px] font-medium text-muted uppercase tracking-wider mb-1.5">Catatan <span class="normal-case font-normal">(opsional)</span></label>
         <input id="csp-note" type="text" maxlength="120" data-no-uppercase placeholder="Misal: mengikuti harga pasar" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-white text-ink focus:outline-none focus:ring-2 focus:ring-accent/30" /></div>
       <div class="flex justify-end gap-2 pt-1">
@@ -19847,7 +19837,6 @@ async function searchPiProducts(inputEl, query) {
         <div class="text-[11px] text-muted flex flex-wrap gap-x-2">
           <span class="font-mono">${esc(item.sku)}</span>
           <span>· ${esc(item.unit)}</span>
-          ${isAdmin() ? `<span>· Modal ${formatIDR(item.last_cost_price)}</span>` : ""}
         </div>
       </button>
     `).join("");
@@ -29455,7 +29444,7 @@ function qrSetTab(key) { qrTab = key; qrLoad(); }
 
 function renderQrLots(rows) {
   const admin = isAdmin();
-  document.getElementById("qr-thead").innerHTML = `<tr>${["Barang", "Supplier", "Asal", "Kondisi", "Qty", ...(admin ? ["Nilai Modal"] : []), "Tanggal", ""].map((h, i) =>
+  document.getElementById("qr-thead").innerHTML = `<tr>${["Barang", "Supplier", "Asal", "Kondisi", "Qty", ...([]), "Tanggal", ""].map((h, i) =>
     `<th class="${h === "Qty" || h === "Nilai Modal" ? "text-right" : "text-left"} px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">${h}</th>`).join("")}</tr>`;
   document.getElementById("qr-empty").classList.toggle("hidden", rows.length > 0);
   document.getElementById("qr-tbody").innerHTML = rows.map(l => `
@@ -29465,7 +29454,6 @@ function renderQrLots(rows) {
       <td class="px-3 py-2.5"><div class="text-ink">${esc(l.source_label)}</div><div class="text-[11px] text-muted tabular-nums">${svcRefLink(l.source_type, l.source_id, l.source_ref)}</div></td>
       <td class="px-3 py-2.5"><div class="flex flex-wrap gap-1">${qrPill(QR_COND_TINTS[l.condition] || "bg-bg2 text-muted", l.condition_label)}${l.retur_candidate && l.qty_left ? qrPill("bg-accent/10 text-accentDark", "Kandidat retur") : ""}${l.pending_writeoff_qty ? qrPill("bg-pending/10 text-ink", `${l.pending_writeoff_qty} diajukan hapus`) : ""}</div></td>
       <td class="px-3 py-2.5 text-right tabular-nums whitespace-nowrap"><b class="text-ink">${l.qty_left}</b><span class="text-muted"> / ${l.quantity} ${esc(l.unit || "")}</span></td>
-      ${admin ? `<td class="px-3 py-2.5 text-right tabular-nums text-ink whitespace-nowrap">${formatIDR(l.cost_value || 0)}</td>` : ""}
       <td class="px-3 py-2.5 text-muted tabular-nums whitespace-nowrap">${esc(formatDateTimeSeconds(l.created_at).slice(0, 16))}<div class="text-[11px]">${esc(l.created_by || "")}</div></td>
       <td class="px-3 py-2.5 text-right"><button type="button" class="px-2.5 py-1 border border-line rounded-md text-[11px] text-ink hover:bg-bg2">Detail</button></td>
     </tr>`).join("");
@@ -29482,14 +29470,13 @@ function qrWoActions(w) {
 
 function renderQrWriteoffs(rows) {
   const admin = isAdmin();
-  document.getElementById("qr-thead").innerHTML = `<tr>${["Barang", "Qty", ...(admin ? ["Nilai Modal"] : []), "Alasan", "Diajukan", "Status", ""].map(h =>
+  document.getElementById("qr-thead").innerHTML = `<tr>${["Barang", "Qty", ...([]), "Alasan", "Diajukan", "Status", ""].map(h =>
     `<th class="${h === "Qty" || h === "Nilai Modal" ? "text-right" : "text-left"} px-3 py-2 font-medium text-muted text-[11px] uppercase tracking-wider border-b border-line">${h}</th>`).join("")}</tr>`;
   document.getElementById("qr-empty").classList.toggle("hidden", rows.length > 0);
   document.getElementById("qr-tbody").innerHTML = rows.map(w => `
     <tr class="border-b border-line last:border-b-0 hover:bg-bg2 cursor-pointer transition-colors align-top" onclick="openQrLot(${w.lot_id})">
       <td class="px-3 py-2.5"><div class="text-ink font-medium">${esc(w.product_name)}</div><div class="text-[11px] text-muted">${esc(w.supplier_name || "")}${w.source_ref ? " · " + esc(w.source_ref) : ""}</div></td>
       <td class="px-3 py-2.5 text-right tabular-nums text-ink">${w.qty}</td>
-      ${admin ? `<td class="px-3 py-2.5 text-right tabular-nums text-failed whitespace-nowrap">${formatIDR(w.cost_value || 0)}</td>` : ""}
       <td class="px-3 py-2.5 text-ink max-w-[18rem]">${esc(w.reason)}${w.recommend_note ? `<div class="text-[11px] text-muted">Admin: ${esc(w.recommend_note)}</div>` : ""}</td>
       <td class="px-3 py-2.5 text-muted text-xs whitespace-nowrap">${esc(formatDateTimeSeconds(w.requested_at).slice(0, 16))}<div>${esc(w.requested_by || "")}</div></td>
       <td class="px-3 py-2.5">${qrPill(QR_WO_TINTS[w.status], QR_WO_LABELS[w.status])}</td>
@@ -29556,7 +29543,6 @@ async function openQrLot(lotId) {
         <div>
           ${row("Sisa di karantina", `<b class="tabular-nums">${l.qty_left}</b> dari ${l.quantity}`)}
           ${row("Diajukan hapus", `<span class="tabular-nums">${l.pending_writeoff_qty}</span>`)}
-          ${admin ? row("Harga modal / unit", formatIDR(l.unit_cost || 0)) + row("Nilai tertahan", `<b class="text-failed">${formatIDR(l.cost_value || 0)}</b>`) : ""}
           ${l.note ? row("Catatan", esc(l.note)) : ""}
         </div>
       </div>

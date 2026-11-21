@@ -704,14 +704,13 @@ async def export_master_items_csv(user: dict = Depends(get_current_user)):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(
-        ["SKU", "Nama Barang", "Supplier", "Brand", "Satuan", "Stok", "Stok Minimum", "Lokasi", "Deskripsi", "Harga Rata-rata", "Harga Beli Terakhir", "Harga Jual", "Aktif"]
-    )
-    is_admin = user["role"] == "admin"
+        ["SKU", "Nama Barang", "Supplier", "Brand", "Satuan", "Stok", "Stok Minimum", "Lokasi", "Deskripsi", "Harga Jual", "Aktif"]
+    )  # Owner 21-11-2026: no Harga Modal / harga beli in any export, admin included
     for r in rows:
         writer.writerow(
             [
                 r["sku"], r["name"], r["supplier_name"], r["brand_name"], r["unit"], r["stock_qty"],
-                r["min_stock"], r["location"] or "", r["description"] or "", r["avg_cost_price"] if is_admin else "", r["last_cost_price"] if is_admin else "", r["sell_price"], "Ya" if r["is_active"] else "Tidak",
+                r["min_stock"], r["location"] or "", r["description"] or "", r["sell_price"], "Ya" if r["is_active"] else "Tidak",
             ]
         )
     return Response(
@@ -726,8 +725,8 @@ _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 @router.get("/inventory/master-items/export.xlsx")
 async def export_master_items_xlsx(user: dict = Depends(get_current_user)):
-    """Same columns as the import, so the file can be edited and imported back. Harga Modal only for admin."""
-    data = await asyncio.get_event_loop().run_in_executor(None, master_item_io.export_xlsx, user["role"] == "admin")
+    """Same columns as the import (without Harga Modal), so the file can be edited and imported back."""
+    data = await asyncio.get_event_loop().run_in_executor(None, master_item_io.export_xlsx)
     return Response(content=data, media_type=_XLSX,
                     headers={"Content-Disposition": f"attachment; filename=master-barang-{date.today().isoformat()}.xlsx"})
 

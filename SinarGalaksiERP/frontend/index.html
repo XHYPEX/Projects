@@ -15051,7 +15051,7 @@ function masterItemsNextPage() {
 function downloadMasterItemsCsv() {
   window.location.href = "/api/inventory/master-items/export.csv";
 }
-// Export Excel: every item, same columns as the import (Harga Modal for admin only).
+// Export Excel: every item, same columns as the import, without Harga Modal (Owner 21-11-2026, not even for admin).
 function downloadMasterItemsXlsx() {
   window.location.href = "/api/inventory/master-items/export.xlsx";
 }

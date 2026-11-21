@@ -42,21 +42,24 @@ def _int(raw: str, label: str, errors: list[str]) -> int | None:
     return None
 
 
-def export_xlsx(is_admin: bool) -> bytes:
+def export_xlsx() -> bytes:
+    """Owner 21-11-2026: the export never shows Harga Modal, not even for admin (the file gets passed around).
+    The import still reads a Harga Modal column when someone adds it (opening stock of a new item needs it)."""
     with db._conn() as con:
         rows = con.execute(
             """SELECT mi.sku, mi.name, s.name AS supplier, b.name AS brand, c.name AS cat, c.parent_id, p.name AS parent,
-                      mi.unit, mi.sell_price, mi.avg_cost_price, mi.stock_qty, mi.min_stock, mi.description, mi.is_active
+                      mi.unit, mi.sell_price, mi.stock_qty, mi.min_stock, mi.description, mi.is_active
                FROM master_items mi JOIN suppliers s ON s.id=mi.supplier_id JOIN brands b ON b.id=mi.brand_id
                LEFT JOIN categories c ON c.id=mi.category_id LEFT JOIN categories p ON p.id=c.parent_id
                ORDER BY mi.sku""").fetchall()
-    out = [COLUMNS]
+    cols = [c for c in COLUMNS if c != "Harga Modal"]
+    out = [cols]
     for r in rows:
         main, sub = (r["parent"], r["cat"]) if r["parent_id"] else (r["cat"], "")
         out.append([r["sku"], r["name"], r["supplier"], r["brand"], main or "", sub or "", r["unit"], r["sell_price"],
-                    r["avg_cost_price"] if is_admin else "", r["stock_qty"], r["min_stock"], r["description"] or "",
+                    r["stock_qty"], r["min_stock"], r["description"] or "",
                     "Aktif" if r["is_active"] else "Nonaktif"])
-    return build_xlsx(out, "Master Barang", widths=WIDTHS)
+    return build_xlsx(out, "Master Barang", widths=[w for c, w in zip(COLUMNS, WIDTHS) if c != "Harga Modal"])
 
 
 def template_xlsx() -> bytes:
@@ -290,7 +293,7 @@ def _check(rows: list[list[str]]) -> tuple[list[dict], dict]:
                 notes.append(f"Stok di file ({stock}) diabaikan; stok tetap {item['stock_qty']} (ubah lewat Stock Opname)")
             if cost is not None and cost != item["avg_cost_price"]:
                 if (item["stock_qty"] or 0) == 0 and (item["quarantine_qty"] or 0) == 0:
-                    upd["cost_price"] = cost; changes.append(f"Harga Modal: {item['avg_cost_price']:,} → {cost:,}".replace(",", "."))
+                    upd["cost_price"] = cost; changes.append("Harga Modal diubah")  # no amounts shown (Owner 21-11-2026)
                 else:
                     notes.append("Harga Modal diabaikan: barang masih punya stok, modal dihitung dari Barang Masuk")
             if status and active != bool(item["is_active"]):
